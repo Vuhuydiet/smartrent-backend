@@ -40,11 +40,11 @@ jobs:
           gradle-
 
     - name: Make gradlew executable
-      run: chmod +x ./gradlew
+      run: chmod +x ./smart-rent/gradlew
 
     - name: Build with Gradle
       run: |
-        ./gradlew build \
+        ./smart-rent/gradlew build \
           --no-daemon \
           --parallel \
           --build-cache \
@@ -53,7 +53,7 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        ./gradlew test jacocoTestReport \
+        ./smart-rent/gradlew test jacocoTestReport \
           --no-daemon \
           --parallel \
           --build-cache \
@@ -61,7 +61,7 @@ jobs:
 
     - name: Generate aggregated coverage report
       run: |
-        ./gradlew jacocoAggregatedReport \
+        ./smart-rent/gradlew jacocoAggregatedReport \
           --no-daemon \
           --continue
 
