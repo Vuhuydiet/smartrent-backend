@@ -3,6 +3,7 @@ package com.smartrent.userauth.infra.exception.model;
 import com.smartrent.common.exception.DomainCode;
 
 public enum UserAuthDomainCode implements DomainCode {
+    USER_NOT_FOUND("001", "User not found")
     ;
 
     private final String code;

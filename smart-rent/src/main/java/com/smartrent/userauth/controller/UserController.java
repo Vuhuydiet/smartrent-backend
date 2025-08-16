@@ -1,4 +1,4 @@
-package com.smartrent.userauth.controller.dto;
+package com.smartrent.userauth.controller;
 
 import com.smartrent.userauth.controller.dto.request.UserCreationRequest;
 import com.smartrent.userauth.controller.dto.response.GetUserDetailResponse;
@@ -34,7 +34,7 @@ public class UserController {
 
     @GetMapping
     public GetUserDetailResponse getUserDetail(@RequestHeader(USER_ID) @NotBlank String userId) {
-        log.debug("getUserDetail {}", userId);
+        log.info("getUserDetail {}", userId);
         return userService.getUserDetail(userId);
     }
 

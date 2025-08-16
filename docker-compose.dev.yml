@@ -24,7 +24,7 @@ services:
 
   # Redis Cache for development
   redis-dev:
-    image: redis:7-alpine
+    image: redis:8.2.0
     container_name: smartrent-redis-dev
     restart: unless-stopped
     ports:

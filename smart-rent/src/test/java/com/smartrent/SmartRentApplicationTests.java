@@ -8,7 +8,7 @@ class SmartRentApplicationTests {
 
     @Test
     void contextLoads() {
-        // Test chỉ đảm bảo context load thành công
+        // Test to make sure the application starts successfully
 		assert true;
     }
 }
