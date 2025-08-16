@@ -1,0 +1,3 @@
+IDENTITY_SERVICE_DB_URL: "jdbc:mysql://localhost:3306/smartrent"
+DB_USERNAME: root
+DB_PASSWORD: root
