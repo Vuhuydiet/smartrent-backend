@@ -62,33 +62,33 @@ jobs:
           --build-cache \
           --continue
 
-    - name: Coverage summary
-      run: |
-        echo "=== Coverage Summary ==="
-        find . -name "jacocoTestReport.xml" -path "*/build/reports/jacoco/test/*" | while read report; do
-          module=$(echo $report | sed 's|./||; s|/build/reports/jacoco/test/jacocoTestReport.xml||')
-          echo "Module: $module"
-          if [ -f "$report" ]; then
-            COVERAGE=$(grep -o 'missed="[0-9]*".*covered="[0-9]*"' "$report" | head -1 | sed -E 's/missed="([0-9]*).*covered="([0-9]*)"/\1 \2/')
-            MISSED=$(echo $COVERAGE | cut -d' ' -f1)
-            COVERED=$(echo $COVERAGE | cut -d' ' -f2)
-            TOTAL=$((MISSED + COVERED))
-            if [ $TOTAL -gt 0 ]; then
-              PERCENTAGE=$(( (COVERED * 100) / TOTAL ))
-              echo "  Coverage: $PERCENTAGE% ($COVERED/$TOTAL lines)"
-            else
-              echo "  No coverage data"
-            fi
-          fi
-          echo ""
-        done
+    # - name: Coverage summary
+    #   run: |
+    #     echo "=== Coverage Summary ==="
+    #     find . -name "jacocoTestReport.xml" -path "*/build/reports/jacoco/test/*" | while read report; do
+    #       module=$(echo $report | sed 's|./||; s|/build/reports/jacoco/test/jacocoTestReport.xml||')
+    #       echo "Module: $module"
+    #       if [ -f "$report" ]; then
+    #         COVERAGE=$(grep -o 'missed="[0-9]*".*covered="[0-9]*"' "$report" | head -1 | sed -E 's/missed="([0-9]*).*covered="([0-9]*)"/\1 \2/')
+    #         MISSED=$(echo $COVERAGE | cut -d' ' -f1)
+    #         COVERED=$(echo $COVERAGE | cut -d' ' -f2)
+    #         TOTAL=$((MISSED + COVERED))
+    #         if [ $TOTAL -gt 0 ]; then
+    #           PERCENTAGE=$(( (COVERED * 100) / TOTAL ))
+    #           echo "  Coverage: $PERCENTAGE% ($COVERED/$TOTAL lines)"
+    #         else
+    #           echo "  No coverage data"
+    #         fi
+    #       fi
+    #       echo ""
+    #     done
 
  
-    - name: Upload build artifacts and reports
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-reports-${{ github.run_number }}
-        path: |
-          **/build/reports/
-          **/build/test-results/
-        retention-days: 7
+    # - name: Upload build artifacts and reports
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: build-reports-${{ github.run_number }}
+    #     path: |
+    #       **/build/reports/
+    #       **/build/test-results/
+    #     retention-days: 7
