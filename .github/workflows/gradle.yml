@@ -1,0 +1,155 @@
+name: Java CI with Gradle
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: gradle-${{ runner.os }}-${{ hashFiles('**/gradle-wrapper.properties') }}-${{ hashFiles('**/*.gradle*', '**/buildSrc/**/*.kt') }}
+        restore-keys: |
+          gradle-${{ runner.os }}-
+          gradle-
+
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
+
+    - name: Build with Gradle
+      run: |
+        ./gradlew build \
+          --no-daemon \
+          --parallel \
+          --build-cache \
+          --configuration-cache \
+          -Dorg.gradle.jvmargs="-Xmx2g -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError"
+
+    - name: Run tests with coverage
+      run: |
+        ./gradlew test jacocoTestReport \
+          --no-daemon \
+          --parallel \
+          --build-cache \
+          --continue
+
+    - name: Generate aggregated coverage report
+      run: |
+        ./gradlew jacocoAggregatedReport \
+          --no-daemon \
+          --continue
+
+    - name: Generate and submit dependency graph
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: gradle/actions/dependency-submission@v3
+      with:
+        build-scan-publish: false 
+
+    - name: Coverage verification
+      run: |
+        echo "=== Module Coverage Summary ==="
+        
+        # Find all module coverage reports
+        find . -name "jacocoTestReport.xml" -path "*/build/reports/jacoco/test/*" | while read report; do
+          module=$(echo $report | sed 's|./||; s|/build/reports/jacoco/test/jacocoTestReport.xml||')
+          echo "Module: $module"
+          
+          if [ -f "$report" ]; then
+            # Parse coverage từ XML report
+            COVERAGE=$(grep -o 'missed="[0-9]*".*covered="[0-9]*"' "$report" | head -1 | sed -E 's/missed="([0-9]*).*covered="([0-9]*)"/\1 \2/')
+            MISSED=$(echo $COVERAGE | cut -d' ' -f1)
+            COVERED=$(echo $COVERAGE | cut -d' ' -f2)
+            TOTAL=$((MISSED + COVERED))
+            
+            if [ $TOTAL -gt 0 ]; then
+              PERCENTAGE=$(( (COVERED * 100) / TOTAL ))
+              echo "  Coverage: $PERCENTAGE% ($COVERED/$TOTAL lines)"
+            else
+              echo "  No coverage data"
+            fi
+          fi
+          echo ""
+        done
+        
+        # Check aggregated coverage if exists
+        if [ -f "build/reports/jacoco/jacocoAggregatedReport/jacocoAggregatedReport.xml" ]; then
+          echo "=== Overall Project Coverage ==="
+          COVERAGE=$(grep -o 'missed="[0-9]*".*covered="[0-9]*"' build/reports/jacoco/jacocoAggregatedReport/jacocoAggregatedReport.xml | head -1 | sed -E 's/missed="([0-9]*).*covered="([0-9]*)"/\1 \2/')
+          MISSED=$(echo $COVERAGE | cut -d' ' -f1)
+          COVERED=$(echo $COVERAGE | cut -d' ' -f2)
+          TOTAL=$((MISSED + COVERED))
+          
+          if [ $TOTAL -gt 0 ]; then
+            PERCENTAGE=$(( (COVERED * 100) / TOTAL ))
+            echo "Overall Coverage: $PERCENTAGE% ($COVERED/$TOTAL lines covered)"
+            
+            if [ $PERCENTAGE -lt 1 ]; then
+              echo "Overall coverage is below 1% threshold"
+              exit 1
+            else
+              echo " Overall coverage meets 1% threshold"
+            fi
+          fi
+        fi
+
+    - name: Comment coverage on PR
+      if: github.event_name == 'pull_request'
+      uses: madrapps/jacoco-report@v1.6.1
+      with:
+        paths: |
+          build/reports/jacoco/jacocoAggregatedReport/jacocoAggregatedReport.xml
+          **/build/reports/jacoco/test/jacocoTestReport.xml
+        token: ${{ secrets.GITHUB_TOKEN }}
+        min-coverage-overall: 70
+        min-coverage-changed-files: 80
+        title: 'Code Coverage Report (Multi-Module)'
+        update-comment: true
+
+    # Tối ưu: Upload artifacts và coverage reports
+    - name: Upload build artifacts and reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-reports-${{ github.run_number }}
+        path: |
+          **/build/libs/*.jar
+          **/build/reports/
+          **/build/test-results/
+          build/reports/jacoco/jacocoAggregatedReport/
+        retention-days: 7
+
+    # - name: Upload coverage summary
+    #   if: always()
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: coverage-summary-${{ github.run_number }}
+    #     path: |
+    #       **/build/reports/jacoco/test/html/
+    #       **/build/reports/jacoco/test/jacocoTestReport.xml
+    #       build/reports/jacoco/jacocoAggregatedReport/
+        retention-days: 30
