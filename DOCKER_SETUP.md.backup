@@ -1,0 +1,211 @@
+# Docker Setup for SmartRent Backend
+
+This document provides instructions for setting up and running the SmartRent backend application using Docker and Docker Compose.
+
+## Prerequisites
+
+- Docker (version 20.10 or later)
+- Docker Compose (version 2.0 or later)
+
+## Quick Start
+
+### 1. Production Setup
+
+To run the complete application stack (app + database + cache):
+
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Run in detached mode
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f
+
+# Stop all services
+docker-compose down
+```
+
+The application will be available at:
+- **Application**: http://localhost:8080
+- **Health Check**: http://localhost:8080/actuator/health
+
+### 2. Development Setup
+
+For development, you might want to run only the database and cache services while running the Spring Boot application locally:
+
+```bash
+# Start only database and cache services for development
+docker-compose -f docker-compose.dev.yml up -d
+
+# Stop development services
+docker-compose -f docker-compose.dev.yml down
+```
+
+Development services will be available at:
+- **MySQL**: localhost:3307 (root/root)
+- **Redis**: localhost:6380
+- **phpMyAdmin**: http://localhost:8081 (database management UI)
+- **Redis Commander**: http://localhost:8082 (Redis management UI)
+
+Then run your Spring Boot application locally with the `local` profile:
+
+```bash
+cd smart-rent
+./gradlew bootRun --args='--spring.profiles.active=local'
+```
+
+## Configuration
+
+### Environment Variables
+
+The application uses the following environment variables in Docker:
+
+- `SPRING_PROFILES_ACTIVE=docker` - Activates Docker-specific configuration
+- `IDENTITY_SERVICE_DB_URL` - Database connection URL
+- `DB_USERNAME` - Database username
+- `DB_PASSWORD` - Database password
+- `SPRING_REDIS_HOST` - Redis host
+- `SPRING_REDIS_PORT` - Redis port
+
+### Database Configuration
+
+- **Database**: MySQL 8.0
+- **Default Database**: `smartrent`
+- **Root Password**: `root`
+- **Additional User**: `smartrent_user` / `smartrent_pass`
+
+### Redis Configuration
+
+- **Version**: Redis 7 (Alpine)
+- **Port**: 6379 (internal), 6380 (development external)
+
+## Useful Commands
+
+### Application Management
+
+```bash
+# Rebuild and restart the application
+docker-compose up --build app
+
+# View application logs
+docker-compose logs -f app
+
+# Execute commands in the running container
+docker-compose exec app bash
+
+# Restart a specific service
+docker-compose restart app
+```
+
+### Database Management
+
+```bash
+# Connect to MySQL database
+docker-compose exec mysql mysql -u root -p smartrent
+
+# Run database migrations manually
+docker-compose exec app java -jar app.jar --spring.profiles.active=docker --flyway.migrate
+
+# Backup database
+docker-compose exec mysql mysqldump -u root -p smartrent > backup.sql
+
+# Restore database
+docker-compose exec -T mysql mysql -u root -p smartrent < backup.sql
+```
+
+### Redis Management
+
+```bash
+# Connect to Redis CLI
+docker-compose exec redis redis-cli
+
+# Monitor Redis commands
+docker-compose exec redis redis-cli monitor
+
+# Flush all Redis data
+docker-compose exec redis redis-cli flushall
+```
+
+### Cleanup
+
+```bash
+# Stop and remove containers, networks
+docker-compose down
+
+# Remove containers, networks, and volumes
+docker-compose down -v
+
+# Remove containers, networks, volumes, and images
+docker-compose down -v --rmi all
+
+# Clean up unused Docker resources
+docker system prune -a
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Port conflicts**: If ports 3306, 6379, or 8080 are already in use, modify the port mappings in `docker-compose.yml`
+
+2. **Database connection issues**: Ensure MySQL is fully started before the application. The health checks should handle this automatically.
+
+3. **Build failures**: Clear Docker cache and rebuild:
+   ```bash
+   docker-compose down
+   docker system prune -f
+   docker-compose up --build
+   ```
+
+4. **Permission issues**: On Linux/macOS, ensure Docker has proper permissions:
+   ```bash
+   sudo chown -R $USER:$USER .
+   ```
+
+### Logs and Debugging
+
+```bash
+# View all service logs
+docker-compose logs
+
+# View specific service logs
+docker-compose logs app
+docker-compose logs mysql
+docker-compose logs redis
+
+# Follow logs in real-time
+docker-compose logs -f app
+
+# View last 100 lines
+docker-compose logs --tail=100 app
+```
+
+## Production Considerations
+
+For production deployment, consider:
+
+1. **Security**: Change default passwords and use secrets management
+2. **Persistence**: Ensure volumes are properly backed up
+3. **Monitoring**: Add monitoring and alerting services
+4. **Load Balancing**: Use a reverse proxy like Nginx
+5. **SSL/TLS**: Configure HTTPS termination
+6. **Resource Limits**: Set appropriate CPU and memory limits
+7. **Health Checks**: Configure proper health check endpoints
+
+## File Structure
+
+```
+.
+├── Dockerfile                          # Multi-stage build for Spring Boot app
+├── docker-compose.yml                  # Production setup
+├── docker-compose.dev.yml              # Development setup with management tools
+├── .dockerignore                       # Docker build context exclusions
+├── DOCKER_SETUP.md                     # This documentation
+└── smart-rent/
+    └── src/main/resources/
+        ├── application.yml              # Default configuration
+        ├── application-local.yml        # Local development
+        └── application-docker.yml       # Docker-specific configuration
+```
