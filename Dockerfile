@@ -1,0 +1,47 @@
+# Multi-stage build for Spring Boot application
+FROM eclipse-temurin:17-jdk as builder
+
+# Set working directory
+WORKDIR /app
+
+# Copy gradle wrapper and build files
+COPY smart-rent/gradlew smart-rent/gradlew.bat ./
+COPY smart-rent/gradle ./gradle
+COPY smart-rent/build.gradle smart-rent/settings.gradle ./
+
+# Make gradlew executable
+RUN chmod +x ./gradlew
+
+# Copy source code
+COPY smart-rent/src ./src
+
+# Build the application
+RUN ./gradlew build -x test --no-daemon
+
+# Runtime stage
+FROM eclipse-temurin:17-jre
+
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Create app user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy the built jar from builder stage
+COPY --from=builder /app/build/libs/*.jar app.jar
+
+# Change ownership to app user
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:8080/actuator/health || exit 1
+
+# Run the application
+ENTRYPOINT ["java", "-jar", "app.jar"]

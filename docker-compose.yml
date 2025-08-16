@@ -1,0 +1,94 @@
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: smartrent-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-smartrent}
+      MYSQL_USER: ${MYSQL_USER:-smartrent_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-smartrent_pass}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    networks:
+      - smartrent-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: ${MYSQL_HEALTH_CHECK_INTERVAL:-30}s
+      timeout: ${MYSQL_HEALTH_CHECK_TIMEOUT:-20}s
+      retries: ${MYSQL_HEALTH_CHECK_RETRIES:-10}
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: smartrent-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - smartrent-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: ${REDIS_HEALTH_CHECK_INTERVAL:-30}s
+      timeout: ${REDIS_HEALTH_CHECK_TIMEOUT:-3}s
+      retries: ${REDIS_HEALTH_CHECK_RETRIES:-3}
+
+  # Spring Boot Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartrent-app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-docker}
+      - IDENTITY_SERVICE_DB_URL=${IDENTITY_SERVICE_DB_URL:-jdbc:mysql://mysql:3306/smartrent}
+      - DB_USERNAME=${DB_USERNAME:-root}
+      - DB_PASSWORD=${DB_PASSWORD:-root}
+      - SPRING_REDIS_HOST=${SPRING_REDIS_HOST:-redis}
+      - SPRING_REDIS_PORT=${SPRING_REDIS_PORT:-6379}
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-dev-encryption-key}
+      - JAVA_OPTS=${JAVA_OPTS:--Xms512m -Xmx1024m}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ROOT_LOG_LEVEL=${ROOT_LOG_LEVEL:-WARN}
+      - DB_MAX_POOL_SIZE=${DB_MAX_POOL_SIZE:-20}
+      - DB_MIN_IDLE=${DB_MIN_IDLE:-5}
+      - DB_CONNECTION_TIMEOUT=${DB_CONNECTION_TIMEOUT:-30000}
+      - DB_IDLE_TIMEOUT=${DB_IDLE_TIMEOUT:-600000}
+      - DB_MAX_LIFETIME=${DB_MAX_LIFETIME:-1800000}
+      - REDIS_MAX_ACTIVE=${REDIS_MAX_ACTIVE:-8}
+      - REDIS_MAX_IDLE=${REDIS_MAX_IDLE:-8}
+      - REDIS_MIN_IDLE=${REDIS_MIN_IDLE:-0}
+      - REDIS_TIMEOUT=${REDIS_TIMEOUT:-2000}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - smartrent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: ${APP_HEALTH_CHECK_INTERVAL:-30}s
+      timeout: ${APP_HEALTH_CHECK_TIMEOUT:-10}s
+      retries: ${APP_HEALTH_CHECK_RETRIES:-3}
+      start_period: 60s
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  smartrent-network:
+    driver: bridge
