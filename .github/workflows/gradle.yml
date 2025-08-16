@@ -14,7 +14,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write 
+      contents: write
+
+    defaults:
+      run:
+        working-directory: ./smart-rent  # ✅ Đặt thư mục gốc là smart-rent
 
     steps:
     - name: Checkout Repository
@@ -27,24 +31,24 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        
+
     - name: Cache Gradle packages
       uses: actions/cache@v4
       with:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-        key: gradle-${{ runner.os }}-${{ hashFiles('**/gradle-wrapper.properties') }}-${{ hashFiles('**/*.gradle*', '**/buildSrc/**/*.kt') }}
+        key: gradle-${{ runner.os }}-${{ hashFiles('smart-rent/**/gradle-wrapper.properties') }}-${{ hashFiles('smart-rent/**/*.gradle*', 'smart-rent/**/buildSrc/**/*.kt') }}
         restore-keys: |
           gradle-${{ runner.os }}-
           gradle-
 
     - name: Make gradlew executable
-      run: chmod +x ./smart-rent/gradlew
+      run: chmod +x gradlew
 
     - name: Build with Gradle
       run: |
-        ./smart-rent/gradlew build \
+        ./gradlew build \
           --no-daemon \
           --parallel \
           --build-cache \
@@ -53,40 +57,32 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        ./smart-rent/gradlew test jacocoTestReport \
+        ./gradlew test jacocoTestReport \
           --no-daemon \
           --parallel \
           --build-cache \
           --continue
 
     - name: Generate aggregated coverage report
-      run: |
-        ./smart-rent/gradlew jacocoAggregatedReport \
-          --no-daemon \
-          --continue
+      run: ./gradlew jacocoAggregatedReport --no-daemon --continue
 
     - name: Generate and submit dependency graph
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: gradle/actions/dependency-submission@v3
       with:
-        build-scan-publish: false 
+        build-scan-publish: false
 
     - name: Coverage verification
       run: |
         echo "=== Module Coverage Summary ==="
-        
-        # Find all module coverage reports
         find . -name "jacocoTestReport.xml" -path "*/build/reports/jacoco/test/*" | while read report; do
           module=$(echo $report | sed 's|./||; s|/build/reports/jacoco/test/jacocoTestReport.xml||')
           echo "Module: $module"
-          
           if [ -f "$report" ]; then
-            # Parse coverage từ XML report
             COVERAGE=$(grep -o 'missed="[0-9]*".*covered="[0-9]*"' "$report" | head -1 | sed -E 's/missed="([0-9]*).*covered="([0-9]*)"/\1 \2/')
             MISSED=$(echo $COVERAGE | cut -d' ' -f1)
             COVERED=$(echo $COVERAGE | cut -d' ' -f2)
             TOTAL=$((MISSED + COVERED))
-            
             if [ $TOTAL -gt 0 ]; then
               PERCENTAGE=$(( (COVERED * 100) / TOTAL ))
               echo "  Coverage: $PERCENTAGE% ($COVERED/$TOTAL lines)"
@@ -96,19 +92,16 @@ jobs:
           fi
           echo ""
         done
-        
-        # Check aggregated coverage if exists
+
         if [ -f "build/reports/jacoco/jacocoAggregatedReport/jacocoAggregatedReport.xml" ]; then
           echo "=== Overall Project Coverage ==="
           COVERAGE=$(grep -o 'missed="[0-9]*".*covered="[0-9]*"' build/reports/jacoco/jacocoAggregatedReport/jacocoAggregatedReport.xml | head -1 | sed -E 's/missed="([0-9]*).*covered="([0-9]*)"/\1 \2/')
           MISSED=$(echo $COVERAGE | cut -d' ' -f1)
           COVERED=$(echo $COVERAGE | cut -d' ' -f2)
           TOTAL=$((MISSED + COVERED))
-          
           if [ $TOTAL -gt 0 ]; then
             PERCENTAGE=$(( (COVERED * 100) / TOTAL ))
             echo "Overall Coverage: $PERCENTAGE% ($COVERED/$TOTAL lines covered)"
-            
             if [ $PERCENTAGE -lt 1 ]; then
               echo "Overall coverage is below 1% threshold"
               exit 1
@@ -131,7 +124,6 @@ jobs:
         title: 'Code Coverage Report (Multi-Module)'
         update-comment: true
 
-    # Tối ưu: Upload artifacts và coverage reports
     - name: Upload build artifacts and reports
       uses: actions/upload-artifact@v4
       with:
@@ -142,14 +134,3 @@ jobs:
           **/build/test-results/
           build/reports/jacoco/jacocoAggregatedReport/
         retention-days: 7
-
-    # - name: Upload coverage summary
-    #   if: always()
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: coverage-summary-${{ github.run_number }}
-    #     path: |
-    #       **/build/reports/jacoco/test/html/
-    #       **/build/reports/jacoco/test/jacocoTestReport.xml
-    #       build/reports/jacoco/jacocoAggregatedReport/
-        # retention-days: 30
