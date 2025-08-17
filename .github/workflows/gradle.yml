@@ -2,15 +2,9 @@ name: Java CI with Gradle
 
 on:
   push:
-<<<<<<< HEAD
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-=======
     branches: [ "main", "dev" ]
   pull_request:
     branches: [ "main", "dev" ]
->>>>>>> cbf0b5c8b7e5f97ed992c6bb45574048d15cfa7e
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,11 +18,7 @@ jobs:
 
     defaults:
       run:
-<<<<<<< HEAD
-        working-directory: ./smart-rent  # Thư mục gốc là smart-rent
-=======
         working-directory: ./smart-rent 
->>>>>>> cbf0b5c8b7e5f97ed992c6bb45574048d15cfa7e
 
     steps:
     - name: Checkout Repository
