@@ -24,7 +24,11 @@ services:
 
   # Redis Cache
   redis:
+<<<<<<< HEAD
     image: redis:7-alpine
+=======
+    image: redis:8.2.0
+>>>>>>> cbf0b5c8b7e5f97ed992c6bb45574048d15cfa7e
     container_name: smartrent-redis
     restart: unless-stopped
     ports:
