@@ -85,7 +85,7 @@ jobs:
           -f ../Dockerfile \
           -t $IMAGE_NAME:$COMMIT_SHA \
           -t $IMAGE_NAME:$ENV_TAG \
-          .
+          ..
 
         docker push $IMAGE_NAME:$COMMIT_SHA
         docker push $IMAGE_NAME:$ENV_TAG
