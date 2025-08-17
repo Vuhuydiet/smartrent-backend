@@ -75,14 +75,14 @@ jobs:
 
     - name: Build and Push Docker Image
       run: |
-        IMAGE_NAME="hytaty/smart-rent"
+        IMAGE_NAME="vuhuydiet/smart-rent"
         COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
         ENV_TAG="dev"
 
         echo "Building image $IMAGE_NAME:$COMMIT_SHA and $IMAGE_NAME:$ENV_TAG"
 
         docker build \
-          -f Dockerfile \
+          -f ../../Dockerfile \
           -t $IMAGE_NAME:$COMMIT_SHA \
           -t $IMAGE_NAME:$ENV_TAG \
           .
