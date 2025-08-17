@@ -82,7 +82,7 @@ jobs:
         echo "Building image $IMAGE_NAME:$COMMIT_SHA and $IMAGE_NAME:$ENV_TAG"
 
         docker build \
-          -f ../../Dockerfile \
+          -f ../Dockerfile \
           -t $IMAGE_NAME:$COMMIT_SHA \
           -t $IMAGE_NAME:$ENV_TAG \
           .
