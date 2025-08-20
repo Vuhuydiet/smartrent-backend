@@ -145,6 +145,7 @@ jobs:
           exit 0
         fi
         
+        # Format: {image tag}: {commit message của commit trên repo backend} {link tới commit}
         COMMIT_MESSAGE="${{ steps.commit-info.outputs.commit-sha }}: ${{ steps.commit-info.outputs.commit-message }} ${{ steps.commit-info.outputs.commit-link }}"
         git commit -m "$COMMIT_MESSAGE"
         git push
