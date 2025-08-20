@@ -131,7 +131,12 @@ jobs:
         fi
         
         COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
-        BACKEND_COMMIT_MSG=$(git log -1 --pretty=%B)
-        BACKEND_COMMIT_URL="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
-        git commit -m "$COMMIT_SHA: $BACKEND_COMMIT_MSG $BACKEND_COMMIT_URL"
+        BACKEND_REPO="Vuhuydiet/smartrent-backend"
+        BACKEND_COMMIT=$(git log -1 --pretty=%H)
+        BACKEND_COMMIT_SHORT=$(echo "$BACKEND_COMMIT" | cut -c1-8)
+        BACKEND_COMMIT_MSG=$(git log -1 --pretty=%s)
+        DEPLOY_REPO="Vuhuydiet/smartrent-deploy"
+        DEPLOY_COMMIT=$(git rev-parse HEAD)
+        DEPLOY_COMMIT_SHORT=$(echo "$DEPLOY_COMMIT" | cut -c1-8)
+        git commit -m "$COMMIT_SHA: $BACKEND_COMMIT_MSG $BACKEND_REPO@$BACKEND_COMMIT_SHORT $DEPLOY_REPO@$DEPLOY_COMMIT_SHORT"
         git push
