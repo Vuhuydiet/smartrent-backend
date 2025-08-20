@@ -130,8 +130,8 @@ jobs:
           exit 0
         fi
         
-  COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
-  BACKEND_COMMIT_MSG=$(git log -1 --pretty=%B)
-  BACKEND_COMMIT_URL="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
-  git commit -m "$COMMIT_SHA: $BACKEND_COMMIT_MSG $BACKEND_COMMIT_URL"
-  git push
+        COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
+        BACKEND_COMMIT_MSG=$(git log -1 --pretty=%B)
+        BACKEND_COMMIT_URL="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+        git commit -m "$COMMIT_SHA: $BACKEND_COMMIT_MSG $BACKEND_COMMIT_URL"
+        git push
