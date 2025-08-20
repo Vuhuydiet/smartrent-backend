@@ -57,6 +57,7 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
     defaults:
       run:
         working-directory: ./smart-rent 
@@ -118,6 +119,20 @@ jobs:
         echo "Updated values.yaml content:"
         cat $VALUES_FILE
 
+    - name: Get commit message from backend
+      id: commit-info
+      run: |
+        # Lấy commit message từ commit hiện tại
+        COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+        echo "commit-message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+        
+        COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
+        echo "commit-sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+        
+        # Tạo link tới commit
+        COMMIT_LINK="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+        echo "commit-link=$COMMIT_LINK" >> $GITHUB_OUTPUT
+
     - name: Commit and push changes
       run: |
         cd deploy-repo
@@ -130,13 +145,6 @@ jobs:
           exit 0
         fi
         
-        COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
-        BACKEND_REPO="Vuhuydiet/smartrent-backend"
-        BACKEND_COMMIT=$(git log -1 --pretty=%H)
-        BACKEND_COMMIT_SHORT=$(echo "$BACKEND_COMMIT" | cut -c1-8)
-        BACKEND_COMMIT_MSG=$(git log -1 --pretty=%s)
-        DEPLOY_REPO="Vuhuydiet/smartrent-deploy"
-        DEPLOY_COMMIT=$(git rev-parse HEAD)
-        DEPLOY_COMMIT_SHORT=$(echo "$DEPLOY_COMMIT" | cut -c1-8)
-        git commit -m "$COMMIT_SHA: $BACKEND_COMMIT_MSG $BACKEND_REPO@$BACKEND_COMMIT_SHORT $DEPLOY_REPO@$DEPLOY_COMMIT_SHORT"
+        COMMIT_MESSAGE="${{ steps.commit-info.outputs.commit-sha }}: ${{ steps.commit-info.outputs.commit-message }} ${{ steps.commit-info.outputs.commit-link }}"
+        git commit -m "$COMMIT_MESSAGE"
         git push
