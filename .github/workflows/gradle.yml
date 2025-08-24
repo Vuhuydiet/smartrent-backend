@@ -155,3 +155,5 @@ jobs:
           COMMIT_MESSAGE="${{ steps.commit-info.outputs.commit-sha }}: ${{ steps.commit-info.outputs.commit-message }} ${{ steps.commit-info.outputs.commit-link }}"
           git commit -m "$COMMIT_MESSAGE"
           git push
+          
+          
