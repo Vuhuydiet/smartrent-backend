@@ -88,7 +88,7 @@ smart-rent/
    curl http://localhost:8080/actuator/health
    ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Profiles
 
@@ -106,7 +106,7 @@ smart-rent/
 | `SPRING_REDIS_HOST` | Redis host | `localhost` |
 | `SPRING_REDIS_PORT` | Redis port | `6379` |
 
-## 📊 API Documentation
+## API Documentation
 
 ### Base URL
 - **Local**: `http://localhost:8080`
@@ -145,7 +145,7 @@ curl -X GET http://localhost:8080/api/v1/users \
   -H "user-id: user-uuid-here"
 ```
 
-## 🗄️ Database Schema
+## Database Schema
 
 ### Current Tables
 
@@ -168,7 +168,7 @@ The application uses Flyway for database versioning:
 - **V3**: Insert default admin user for initial access
 - **V4**: Create properties table for rental property management
 
-## 🐳 Docker Support
+## Docker Support
 
 ### Available Services
 
@@ -202,7 +202,7 @@ The application uses Flyway for database versioning:
 ./docker-helper.sh rebuild       # Rebuild and restart application
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Running Tests
 
@@ -225,7 +225,7 @@ cd smart-rent
 - **Test Framework**: JUnit 5
 - **Mocking**: Mockito (included with Spring Boot Test)
 
-## 🔨 Development
+## Development
 
 ### Building the Application
 
@@ -247,45 +247,3 @@ cd smart-rent
 - **Lombok**: Used for reducing boilerplate code
 - **Package Structure**: Domain-driven design with clear module separation
 - **Naming Conventions**: CamelCase for Java, snake_case for database
-
-### Adding New Features
-
-1. **Create domain module** under `com.smartrent.{domain}`
-2. **Follow the structure**: controller → service → repository → entity
-3. **Add database migrations** in `src/main/resources/db/migration/`
-4. **Write tests** for all new functionality
-5. **Update API documentation** in this README
-
-## 🚀 Deployment
-
-### Production Checklist
-
-- [ ] Set secure database credentials
-- [ ] Configure Redis connection
-- [ ] Set up SSL/TLS certificates
-- [ ] Configure logging levels
-- [ ] Set up monitoring and alerting
-- [ ] Configure backup strategies
-
-### Environment Variables for Production
-
-```bash
-# Database Configuration
-IDENTITY_SERVICE_DB_URL=jdbc:mysql://prod-db:3306/smartrent
-DB_USERNAME=smartrent_user
-DB_PASSWORD=secure_password
-
-# Redis Configuration
-SPRING_REDIS_HOST=prod-redis
-SPRING_REDIS_PORT=6379
-
-# Application Configuration
-SPRING_PROFILES_ACTIVE=prod
-SERVER_PORT=8080
-```
-
-## 📚 Additional Documentation
-
-- **[Docker Setup Guide](DOCKER_SETUP.md)** - Comprehensive Docker documentation
-- **[Database Migration Guide](smart-rent/DATABASE_MIGRATION_SETUP.md)** - Database setup and migration details
-- **[Migration Scripts](smart-rent/src/main/resources/db/migration/README.md)** - Database migration file documentation
