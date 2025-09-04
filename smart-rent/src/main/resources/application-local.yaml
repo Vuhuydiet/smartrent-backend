@@ -1,0 +1,18 @@
+IDENTITY_SERVICE_DB_URL: "jdbc:mysql://localhost:3306/smartrent"
+DB_USERNAME: root
+DB_PASSWORD: root
+ACCESS_SIGNER_KEY: "dW8zb2xoeGE5ZW81cm4yZWJhdmdjaDI4ZHl3YnM1ZXhhajRyaG80dTcwcHU1cHpjNXU2NnkxMmltM3hwNm4xOThhZWlqMm5ycm1kenB1YXIydmtuMzh0aXFyZzZlZzM3NTF6bzVmcnFvMTFuNHJ0MHNucWlqeDRxb2I5cjBhN2k="
+REFRESH_SIGNER_KEY: "bmFoNXd2ZXdmcjY5d3BpeHEyMXRrcDFqMXIxMWZ4anVha2tlNGd4YjRmMzI0bzZleHN2anR6OXVyZWdtbDdidTR4Ym54bXU1d29zOTJsdXdlNTRzeHNxOWdraHNtaWZobnQyZnE0dWo2NmRvbDZqdDNtazR1amIzcmo4NTl4bmQ="
+VALID_DURATION: 3600 # in seconds
+REFRESHABLE_DURATION: 86400 # in seconds
+application:
+  client-url: "${CLIENT_URL:http://localhost:3000}"
+  authorize-ignored:
+    methods:
+      get:
+        - "/v1/users/**"
+        - "/v1/admins/**"
+      post:
+        - "/v1/auth/**"
+        - "/v1/users/**"
+        - "/v1/admins/**"
