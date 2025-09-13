@@ -20,9 +20,11 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserCreationRequest {
 
+  @NotBlank(message = "INVALID_PHONE")
   @Size(min = 1, max = 5)
   String phoneCode;
 
+  @NotBlank(message = "INVALID_PHONE")
   @Size(min = 5, max = 20)
   String phoneNumber;
 
@@ -34,15 +36,13 @@ public class UserCreationRequest {
   @Pattern(regexp = Constants.PASSWORD_PATTERN, message = "INVALID_PASSWORD")
   String password;
 
-  @NotBlank
+  @NotBlank(message = "EMPTY_INPUT")
   String firstName;
 
-  @NotBlank
+  @NotBlank(message = "EMPTY_INPUT")
   String lastName;
 
-  @NotBlank
   String idDocument;
 
-  @NotBlank
   String taxNumber;
 }

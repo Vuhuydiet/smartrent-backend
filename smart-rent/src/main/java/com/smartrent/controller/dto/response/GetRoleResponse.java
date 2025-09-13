@@ -1,6 +1,6 @@
 package com.smartrent.controller.dto.response;
 
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,22 +15,10 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class AdminCreationResponse {
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class GetRoleResponse {
 
-  String adminId;
+  String roleId;
 
-  String phoneCode;
-
-  String phoneNumber;
-
-  String email;
-
-  String password;
-
-  String firstName;
-
-  String lastName;
-
-  List<String> roles;
-
+  String roleName;
 }

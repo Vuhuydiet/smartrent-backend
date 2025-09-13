@@ -1,5 +1,6 @@
 package com.smartrent.controller.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +16,10 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AuthenticationRequest {
+
+  @NotBlank(message = "INVALID_EMAIL")
   String email;
 
+  @NotBlank(message = "INVALID_PASSWORD")
   String password;
 }

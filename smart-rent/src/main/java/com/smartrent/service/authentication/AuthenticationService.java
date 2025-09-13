@@ -1,6 +1,8 @@
 package com.smartrent.service.authentication;
 
 import com.smartrent.controller.dto.request.AuthenticationRequest;
+import com.smartrent.controller.dto.request.ChangePasswordRequest;
+import com.smartrent.controller.dto.request.ForgotPasswordRequest;
 import com.smartrent.controller.dto.request.IntrospectRequest;
 import com.smartrent.controller.dto.request.LogoutRequest;
 import com.smartrent.controller.dto.request.RefreshTokenRequest;
@@ -15,4 +17,8 @@ public interface AuthenticationService {
   void logout(LogoutRequest request);
 
   AuthenticationResponse refresh(RefreshTokenRequest request);
+
+  void changePassword(ChangePasswordRequest request);
+
+  void forgotPassword(ForgotPasswordRequest request);
 }

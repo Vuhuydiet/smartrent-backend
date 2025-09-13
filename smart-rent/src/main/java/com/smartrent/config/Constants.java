@@ -23,4 +23,8 @@ public class Constants {
   public static final String USER_ID = "user-id";
 
   public static final String ADMIN_ID = "admin-id";
+
+  public static final String VERIFICATION_EMAIL_SERVICE = "VERIFICATION_EMAIL_SERVICE";
+
+  public static final String EMAIL_VERIFICATION_HEADER = "Email Verification";
 }

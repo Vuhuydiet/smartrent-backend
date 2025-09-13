@@ -22,9 +22,11 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AdminCreationRequest {
 
+  @NotBlank(message = "INVALID_PHONE")
   @Size(min = 1, max = 5)
   String phoneCode;
 
+  @NotBlank(message = "INVALID_PHONE")
   @Size(min = 5, max = 20)
   String phoneNumber;
 
@@ -36,12 +38,12 @@ public class AdminCreationRequest {
   @Pattern(regexp = Constants.PASSWORD_PATTERN, message = "INVALID_PASSWORD")
   String password;
 
-  @NotBlank
+  @NotBlank(message = "EMPTY_INPUT")
   String firstName;
 
-  @NotBlank
+  @NotBlank(message = "EMPTY_INPUT")
   String lastName;
 
-  @NotNull
+  @NotNull(message = "INVALID_ROLE")
   List<String> roles;
 }
