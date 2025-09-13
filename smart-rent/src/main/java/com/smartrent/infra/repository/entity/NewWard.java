@@ -1,5 +1,3 @@
-package com.smartrent.infra.repository.entity;
-
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
