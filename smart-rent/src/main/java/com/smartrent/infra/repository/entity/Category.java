@@ -13,6 +13,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Entity(name = "categories")
@@ -32,7 +33,7 @@ public class Category {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long id;
+    Long categoryId;
 
     @Column(name = "name", nullable = false, length = 100)
     String name;
@@ -50,8 +51,8 @@ public class Category {
     @Column(name = "is_active", nullable = false)
     Boolean isActive = true;
 
-    @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<Listing> listings;
+    @OneToMany(mappedBy = "categoryId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<Listing> listings;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

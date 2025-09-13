@@ -13,6 +13,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Entity(name = "listings")
@@ -46,9 +47,8 @@ public class Listing {
     @Column(name = "description", columnDefinition = "LONGTEXT")
     String description;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    User user;
+    @Column(name = "user_id", nullable = false)
+    String userId;
 
     @Column(name = "post_date")
     @CreationTimestamp
@@ -74,9 +74,8 @@ public class Listing {
     @Column(name = "vip_type", nullable = false)
     VipType vipType = VipType.NORMAL;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
-    Category category;
+    @Column(name = "category_id", nullable = false)
+    Long categoryId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "product_type", nullable = false)
@@ -92,9 +91,8 @@ public class Listing {
     PriceUnit priceUnit = PriceUnit.MONTH;
 
     // Location Information - Reference to Address table
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "address_id", nullable = false)
-    Address address;
+    @Column(name = "address_id", nullable = false)
+    Long addressId;
 
     // Property Specifications
     @Column(name = "area")
@@ -123,10 +121,10 @@ public class Listing {
 
     // Relationships
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<Image> images;
+    List<Image> images;
 
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<Video> videos;
+    List<Video> videos;
 
     @ManyToMany
     @JoinTable(
@@ -134,13 +132,13 @@ public class Listing {
             joinColumns = @JoinColumn(name = "listing_id"),
             inverseJoinColumns = @JoinColumn(name = "amenity_id")
     )
-    Set<Amenity> amenities;
+    List<Amenity> amenities;
 
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<Favorite> favorites;
+    List<Favorite> favorites;
 
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<View> views;
+    List<View> views;
 
     // Timestamps
     @Column(name = "created_at", updatable = false)
