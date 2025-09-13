@@ -36,7 +36,7 @@ public class Address {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long id;
+    Long addressId;
 
     @Column(name = "full_address", nullable = false, columnDefinition = "TEXT")
     String fullAddress;
@@ -54,7 +54,7 @@ public class Address {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "new_ward_id", nullable = false)
-    NewWard ward;
+    NewWard newWard;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "district_id", nullable = false)

@@ -1,41 +1,49 @@
 package com.smartrent.infra.repository.entity;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Entity(name = "new_wards")
+@Entity(name = "new_provinces")
 @Table(
-        name = "new_wards",
+        name = "new_provinces",
         indexes = {
-                @Index(name = "idx_new_wards_province_id", columnList = "province_id"),
-                @Index(name = "idx_new_wards_name", columnList = "name"),
-                @Index(name = "idx_new_wards_is_active", columnList = "is_active"),
+                @Index(name = "idx_new_provinces_name", columnList = "name"),
+                @Index(name = "idx_new_provinces_is_active", columnList = "is_active"),
                 @Index(name = "idx_effective_period", columnList = "effective_from, effective_to")
         },
         uniqueConstraints = {
-                @UniqueConstraint(name = "unique_province_new_ward_code", columnNames = {"province_id", "code"})
+                @UniqueConstraint(name = "unique_new_province_code", columnNames = {"code"})
         }
 )
-public class NewWard {
+@Getter
+@Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+public class NewProvince {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Integer newWardId;
+    Integer newProvinceId;
 
     @Column(nullable = false, length = 100)
     String name;
 
     @Column(length = 10)
     String code;
-
-    @Column(nullable = false, length = 20)
-    String type;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "province_id", nullable = false)
-    Province province;
 
     @Column(name = "is_active", nullable = false)
     Boolean isActive = true;
@@ -46,8 +54,8 @@ public class NewWard {
     @Column(name = "effective_to")
     LocalDate effectiveTo;
 
-    @OneToMany(mappedBy = "newWard", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    List<Ward> mergedWards;
+    @OneToMany(mappedBy = "newProvince", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<Province> mergedProvinces;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     LocalDateTime createdAt = LocalDateTime.now();
@@ -59,5 +67,4 @@ public class NewWard {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
-
 }

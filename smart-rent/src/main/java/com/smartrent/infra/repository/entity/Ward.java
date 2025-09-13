@@ -13,6 +13,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Entity(name = "wards")
@@ -36,7 +37,7 @@ public class Ward {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long id;
+    Long wardId;
 
     @Column(name = "name", nullable = false, length = 100)
     String name;
@@ -56,15 +57,9 @@ public class Ward {
     @Column(name = "is_active", nullable = false)
     Boolean isActive = true;
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "admins_roles",
-            joinColumns = @JoinColumn(name = "admin_id"),
-            inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
-    List<Role> roles;
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "merged_into_id")
-    Ward mergedInto;
+    NewWard mergedInto;
 
     @Column(name = "effective_from", nullable = false)
     LocalDate effectiveFrom;
@@ -73,10 +68,7 @@ public class Ward {
     LocalDate effectiveTo;
 
     @OneToMany(mappedBy = "ward", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<Street> streets;
-
-    @OneToMany(mappedBy = "mergedInto", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<Ward> mergedWards;
+    List<Street> streets;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -85,6 +77,10 @@ public class Ward {
     @UpdateTimestamp
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "new_ward_id")
+    NewWard newWard;
 
     public enum WardType {
         WARD, COMMUNE, TOWN

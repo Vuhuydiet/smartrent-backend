@@ -13,6 +13,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Entity(name = "provinces")
@@ -60,10 +61,10 @@ public class Province {
     LocalDate effectiveTo;
 
     @OneToMany(mappedBy = "province", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<District> districts;
+    List<District> districts;
 
     @OneToMany(mappedBy = "mergedInto", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<Province> mergedProvinces;
+    List<Province> mergedProvinces;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -72,6 +73,10 @@ public class Province {
     @UpdateTimestamp
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "new_province_id")
+    NewProvince newProvince;
 
     public enum ProvinceType {
         PROVINCE, CITY, SPECIAL_CITY
