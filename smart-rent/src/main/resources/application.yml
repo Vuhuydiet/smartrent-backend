@@ -39,6 +39,13 @@ application:
     methods:
       get:
         - "/swagger-ui/**"
+        - "/swagger-ui.html"
+        - "/v3/api-docs/**"
+        - "/v3/api-docs"
+        - "/swagger-resources/**"
+        - "/webjars/**"
+        - "/actuator/health"
+        - "/actuator/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
@@ -65,13 +72,20 @@ feign:
       brevo:
         url: "${BREVO_URL}"
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
 open:
   api:
     title: "SmartRent API"
     version: "v1.0.0"
     description: "API for SmartRent Application"
     server:
-      url: "http://localhost:8080/contract"
+      url: "http://localhost:8080"
       description: "Local Server."
     group:
       package-to-scan: "com.smartrent.controller"

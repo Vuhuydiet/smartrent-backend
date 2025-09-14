@@ -40,6 +40,8 @@ public class SecurityConfig {
 
     http.authorizeHttpRequests(configurer -> {
       configurer
+          .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs", "/swagger-resources/**", "/webjars/**")
+          .permitAll()
           .requestMatchers(HttpMethod.POST, securityProperties.getMethods().getPost().toArray(new String[0]))
           .permitAll()
           .requestMatchers(HttpMethod.GET, securityProperties.getMethods().getGet().toArray(new String[0]))

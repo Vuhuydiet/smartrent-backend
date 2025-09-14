@@ -107,6 +107,8 @@ smart-rent/
 | `SPRING_REDIS_PORT` | Redis port | `6379` |
 
 ## API Documentation
+- [Swagger UI](http://localhost:8080/swagger-ui/index.html)
+- [OpenAPI Specification](http://localhost:8080/v3/api-docs)
 
 ### Base URL
 - **Local**: `http://localhost:8080`
