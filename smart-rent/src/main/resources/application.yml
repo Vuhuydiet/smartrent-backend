@@ -38,6 +38,7 @@ application:
   authorize-ignored:
     methods:
       get:
+        - "/swagger-ui/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
@@ -63,3 +64,14 @@ feign:
     config:
       brevo:
         url: "${BREVO_URL}"
+
+open:
+  api:
+    title: "SmartRent API"
+    version: "v1.0.0"
+    description: "API for SmartRent Application"
+    server:
+      url: "http://localhost:8080/contract"
+      description: "Local Server."
+    group:
+      package-to-scan: "com.smartrent.controller"
