@@ -28,7 +28,7 @@ public class VerificationServiceImpl implements VerificationService {
 
   @Override
   public void verifyCode(VerifyCodeRequest verifyCodeRequest) {
-    VerifyCode verifyCode = checkExisted(verifyCodeRequest.getUserId(), verifyCodeRequest.getVerificationCode());
+    VerifyCode verifyCode = checkExisted(verifyCodeRequest.getEmail(), verifyCodeRequest.getVerificationCode());
 
     if (checkExpiration(verifyCode)) {
       verifyCodeRepository.delete(verifyCode);
@@ -69,8 +69,8 @@ public class VerificationServiceImpl implements VerificationService {
     verifyCodeRepository.saveAndFlush(verifyCode);
   }
 
-  private VerifyCode checkExisted(String userId, String verificationCode) {
-    return verifyCodeRepository.findByVerifyCodeAndUserId(verificationCode, userId)
+  private VerifyCode checkExisted(String userEmail, String verificationCode) {
+    return verifyCodeRepository.findByVerifyCodeAndUserEmail(verificationCode, userEmail)
         .orElseThrow(VerifyCodeNotFoundException::new);
   }
 

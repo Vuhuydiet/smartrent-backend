@@ -30,7 +30,7 @@ public class VerificationController {
 
   @PostMapping("/code")
   public ApiResponse<Void> sendCode(@RequestParam("email") String email) {
-    verificationService.verifyCode(email);
+    verificationService.sendVerifyCode(email);
     return ApiResponse.<Void>builder().build();
   }
 }

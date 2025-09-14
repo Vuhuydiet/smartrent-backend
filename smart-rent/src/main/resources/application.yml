@@ -57,7 +57,7 @@ application:
     subject: "SmartRent"
   otp:
     length: 6
-    duration: 30 #s
+    duration: 60 #s
 feign:
   client:
     config:

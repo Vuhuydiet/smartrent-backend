@@ -11,8 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public interface VerifyCodeRepository extends JpaRepository<VerifyCode, String> {
 
-  @Query("SELECT v FROM verify_codes v WHERE v.verifyCode = :verifyCode AND v.user.userId = :userId")
-  Optional<VerifyCode> findByVerifyCodeAndUserId(String verifyCode, String userId);
+  @Query("SELECT v FROM verify_codes v WHERE v.verifyCode = :verifyCode AND v.user.email = :email")
+  Optional<VerifyCode> findByVerifyCodeAndUserEmail(String verifyCode, String email);
 
   @Modifying
   @Transactional

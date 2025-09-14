@@ -168,7 +168,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     verificationService.verifyCode(VerifyCodeRequest.builder()
-            .userId(user.getUserId())
+            .email(user.getEmail())
             .verificationCode(request.getVerificationCode())
         .build());
 
