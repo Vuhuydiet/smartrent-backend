@@ -22,6 +22,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -54,11 +55,13 @@ public class UserServiceImpl implements UserService {
       throw new PhoneExistingException();
     }
 
-    if (userRepository.existsByIdDocument(request.getIdDocument())) {
+    if (ObjectUtils.isNotEmpty(request.getIdDocument()) &&
+            userRepository.existsByIdDocument(request.getIdDocument())) {
       throw new DocumentExistingException();
     }
 
-    if (userRepository.existsByTaxNumber(request.getTaxNumber())) {
+    if (ObjectUtils.isNotEmpty(request.getTaxNumber()) &&
+            userRepository.existsByTaxNumber(request.getTaxNumber())) {
       throw new TaxNumberExisting();
     }
 

@@ -22,25 +22,21 @@ import lombok.experimental.FieldDefaults;
 @Schema(description = "Request object for creating a new user account")
 public class UserCreationRequest {
 
-  @NotBlank(message = "INVALID_PHONE")
   @Size(min = 1, max = 5)
   @Schema(
       description = "International phone code (country code)",
       example = "+1",
       minLength = 1,
-      maxLength = 5,
-      required = true
+      maxLength = 5
   )
   String phoneCode;
 
-  @NotBlank(message = "INVALID_PHONE")
   @Size(min = 5, max = 20)
   @Schema(
       description = "Phone number without country code",
       example = "1234567890",
       minLength = 5,
-      maxLength = 20,
-      required = true
+      maxLength = 20
   )
   String phoneNumber;
 
