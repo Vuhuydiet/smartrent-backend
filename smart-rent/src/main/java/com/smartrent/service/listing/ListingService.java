@@ -12,6 +12,7 @@ public interface ListingService {
     ListingCreationResponse createListing(ListingCreationRequest request);
     ListingResponse getListingById(Long id);
     List<ListingResponse> getListingsByIds(Set<Long> ids);
+    List<ListingResponse> getListings(int page, int size);
     ListingResponse updateListing(Long id, ListingRequest request);
     void deleteListing(Long id);
 }
