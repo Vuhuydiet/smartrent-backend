@@ -11,20 +11,19 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.List;
 
 @Entity(name = "addresses")
 @Table(name = "addresses",
         indexes = {
+                @Index(name = "idx_street_id", columnList = "street_id"),
                 @Index(name = "idx_ward_id", columnList = "ward_id"),
-                @Index(name = "idx_new_ward_id", columnList = "new_ward_id"),
                 @Index(name = "idx_district_id", columnList = "district_id"),
                 @Index(name = "idx_province_id", columnList = "province_id"),
-                @Index(name = "idx_street_id", columnList = "street_id"),
                 @Index(name = "idx_coordinates", columnList = "latitude, longitude"),
-                @Index(name = "idx_original_location", columnList = "original_ward_id, original_district_id, original_province_id")
+                @Index(name = "idx_is_verified", columnList = "is_verified")
         })
 @Getter
 @Setter
@@ -38,23 +37,16 @@ public class Address {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long addressId;
 
-    @Column(name = "full_address", nullable = false, columnDefinition = "TEXT")
-    String fullAddress;
-
-    @Column(name = "house_number", length = 20)
-    String houseNumber;
+    @Column(name = "street_number", length = 20)
+    String streetNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "street_id")
+    @JoinColumn(name = "street_id", nullable = false)
     Street street;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ward_id", nullable = false)
     Ward ward;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "new_ward_id", nullable = false)
-    NewWard newWard;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "district_id", nullable = false)
@@ -64,18 +56,21 @@ public class Address {
     @JoinColumn(name = "province_id", nullable = false)
     Province province;
 
-    // Original address before merging (if any)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "original_ward_id")
-    Ward originalWard;
+    @Column(name = "full_address", columnDefinition = "TEXT")
+    String fullAddress;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "original_district_id")
-    District originalDistrict;
+    @Column(name = "latitude", precision = 10, scale = 8)
+    BigDecimal latitude;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "original_province_id")
-    Province originalProvince;
+    @Column(name = "longitude", precision = 11, scale = 8)
+    BigDecimal longitude;
+
+    @Builder.Default
+    @Column(name = "is_verified", nullable = false)
+    Boolean isVerified = false;
+
+    @OneToMany(mappedBy = "addressId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<Listing> listings;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -84,4 +79,17 @@ public class Address {
     @UpdateTimestamp
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
+
+    // Helper method to get full address display
+    public String getFullAddressDisplay() {
+        StringBuilder sb = new StringBuilder();
+        if (streetNumber != null) {
+            sb.append(streetNumber).append(" ");
+        }
+        sb.append(street.getName()).append(", ");
+        sb.append(ward.getName()).append(", ");
+        sb.append(district.getName()).append(", ");
+        sb.append(province.getDisplayName()); // Use display name for merged provinces
+        return sb.toString();
+    }
 }
