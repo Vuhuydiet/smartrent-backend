@@ -17,9 +17,9 @@ import lombok.experimental.FieldDefaults;
 
 @Entity(name = "users")
 @Table(name = "users",
-       uniqueConstraints = {
-           @UniqueConstraint(name = "uk_users_phone", columnNames = {"phone_code", "phone_number"})
-       })
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_users_phone", columnNames = {"phone_code", "phone_number"})
+    })
 @Getter
 @Setter
 @Builder
@@ -27,15 +27,15 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class User {
-  
+
   @Id
   @Column(name = "user_id")
   @GeneratedValue(strategy = GenerationType.UUID)
   String userId;
-  
+
   @Column(name = "phone_code")
   String phoneCode;
-  
+
   @Column(name = "phone_number")
   String phoneNumber;
 
@@ -51,10 +51,13 @@ public class User {
   @Column(name = "last_name", nullable = false)
   String lastName;
 
-  @Column(name = "id_document")
+  @Column(name = "id_document", unique = true)
   String idDocument;
 
-  @Column(name = "tax_number")
+  @Column(name = "tax_number", unique = true)
   String taxNumber;
+
+  @Column(name = "is_verified")
+  boolean isVerified;
 
 }

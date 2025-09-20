@@ -19,6 +19,8 @@ import com.smartrent.infra.repository.InvalidatedTokenRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.InvalidatedToken;
+import com.smartrent.mapper.AdminMapper;
+import com.smartrent.mapper.UserMapper;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -27,6 +29,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.StringJoiner;
 import java.util.UUID;
+
+import com.smartrent.service.authentication.VerificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,14 +40,20 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
 
   AdminRepository adminRepository;
 
+  AdminMapper adminMapper;
+
   @Autowired
   public AdminAuthenticationServiceImpl(
       InvalidatedTokenRepository invalidatedTokenRepository,
       UserRepository userRepository,
       PasswordEncoder passwordEncoder,
-      AdminRepository adminRepository) {
-    super(userRepository, invalidatedTokenRepository, passwordEncoder);
+      VerificationService verificationService,
+      AdminRepository adminRepository,
+      UserMapper userMapper,
+      AdminMapper adminMapper) {
+    super(userRepository, userMapper, invalidatedTokenRepository, passwordEncoder, verificationService);
     this.adminRepository = adminRepository;
+    this.adminMapper = adminMapper;
   }
 
   @Override
@@ -147,6 +157,7 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
         .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
         .claim("acId", otherId)
         .claim("scope", buildScope(admin))
+        .claim("user", adminMapper.mapFromAdminEntityToGetAdminResponse(admin))
         .build();
   }
 

@@ -7,23 +7,33 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.smartrent.config.Constants;
 import com.smartrent.controller.dto.request.AuthenticationRequest;
+import com.smartrent.controller.dto.request.ChangePasswordRequest;
+import com.smartrent.controller.dto.request.ForgotPasswordRequest;
 import com.smartrent.controller.dto.request.IntrospectRequest;
 import com.smartrent.controller.dto.request.LogoutRequest;
 import com.smartrent.controller.dto.request.RefreshTokenRequest;
+import com.smartrent.controller.dto.request.VerifyCodeRequest;
 import com.smartrent.controller.dto.response.AuthenticationResponse;
 import com.smartrent.controller.dto.response.IntrospectResponse;
 import com.smartrent.infra.exception.DomainException;
+import com.smartrent.infra.exception.IncorrectPasswordException;
+import com.smartrent.infra.exception.UserNotFoundException;
+import com.smartrent.infra.exception.UserNotVerifiedException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.InvalidatedTokenRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.InvalidatedToken;
 import com.smartrent.infra.repository.entity.User;
+import com.smartrent.mapper.UserMapper;
 import com.smartrent.service.authentication.AuthenticationService;
+import com.smartrent.service.authentication.VerificationService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -42,9 +52,13 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
   UserRepository userRepository;
 
+  UserMapper userMapper;
+
   protected InvalidatedTokenRepository invalidatedTokenRepository;
 
   protected PasswordEncoder passwordEncoder;
+
+  protected VerificationService verificationService;
 
   @NonFinal
   @Value("${application.authentication.jwt.access-signer-key}")
@@ -80,9 +94,12 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
   @Override
   public AuthenticationResponse authenticate(AuthenticationRequest request) {
-
     User user = userRepository.findByEmail(request.getEmail())
         .orElseThrow(() -> new DomainException(DomainCode.INVALID_EMAIL_PASSWORD));
+
+    if (!user.isVerified()) {
+      throw new UserNotVerifiedException();
+    }
 
     if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
       throw new DomainException(DomainCode.INVALID_EMAIL_PASSWORD);
@@ -140,6 +157,32 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
   }
 
+  @Override
+  public void changePassword(ChangePasswordRequest request) {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    User user = userRepository.findById(authentication.getName())
+        .orElseThrow(UserNotFoundException::new);
+
+    if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+      throw new IncorrectPasswordException();
+    }
+
+    verificationService.verifyCode(VerifyCodeRequest.builder()
+            .email(user.getEmail())
+            .verificationCode(request.getVerificationCode())
+        .build());
+
+    user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+    userRepository.save(user);
+  }
+
+  @Override
+  public void forgotPassword(ForgotPasswordRequest request) {
+    User user = verificationService.verifyCode(request.getVerificationCode());
+    user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+    userRepository.save(user);
+  }
+
   private AuthenticationResponse buildAuthenticationResponse(User user) {
     String acId = UUID.randomUUID().toString();
     String rfId = UUID.randomUUID().toString();
@@ -180,7 +223,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
       return signedJWT;
     } catch (ParseException | JOSEException e) {
-      throw new DomainException(DomainCode.UNKNOWN_ERROR);
+      throw new DomainException(DomainCode.INVALID_TOKEN);
     }
   }
 
@@ -217,6 +260,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
           .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
           .claim("rfId", otherId)
           .claim("scope",Constants.ROLE_USER)
+          .claim("user", userMapper.mapFromUserEntityToGetUserResponse(user))
           .build();
     } catch (Exception e) {
       throw new DomainException(DomainCode.UNKNOWN_ERROR);

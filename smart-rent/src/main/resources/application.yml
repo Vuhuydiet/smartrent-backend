@@ -38,6 +38,14 @@ application:
   authorize-ignored:
     methods:
       get:
+        - "/swagger-ui/**"
+        - "/swagger-ui.html"
+        - "/v3/api-docs/**"
+        - "/v3/api-docs"
+        - "/swagger-resources/**"
+        - "/webjars/**"
+        - "/actuator/health"
+        - "/actuator/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
@@ -48,6 +56,39 @@ application:
       refresh-signer-key: "${REFRESH_SIGNER_KEY}"
       valid-duration: "${VALID_DURATION}"
       refreshable-duration: "${REFRESHABLE_DURATION}"
+  api-key:
+    brevo: "${BREVO_API_KEY}"
+  email:
+    sender:
+      email: "${SENDER_EMAIL}"
+      name: "${SENDER_NAME:SmartRent}"
+    subject: "SmartRent"
+  otp:
+    length: 6
+    duration: 60 #s
+feign:
+  client:
+    config:
+      brevo:
+        url: "${BREVO_URL}"
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+open:
+  api:
+    title: "SmartRent API"
+    version: "v1.0.0"
+    description: "API for SmartRent Application"
+    server:
+      url: "http://localhost:8080"
+      description: "Local Server."
+    group:
+      package-to-scan: "com.smartrent.controller"
   # S3-compatible storage config (Cloudflare R2, DigitalOcean Spaces, AWS S3, etc.)
   storage:
     s3:
