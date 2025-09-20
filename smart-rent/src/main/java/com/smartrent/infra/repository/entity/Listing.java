@@ -61,9 +61,14 @@ public class Listing {
     @Column(name = "listing_type", nullable = false)
     ListingType listingType;
 
+
     @Builder.Default
     @Column(name = "verified", nullable = false)
     Boolean verified = false;
+
+    @Builder.Default
+    @Column(name = "is_verify", nullable = false)
+    Boolean isVerify = false;
 
     @Builder.Default
     @Column(name = "expired", nullable = false)
@@ -139,6 +144,9 @@ public class Listing {
 
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<View> views;
+
+    @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    List<PricingHistory> pricingHistories;
 
     // Timestamps
     @Column(name = "created_at", updatable = false)

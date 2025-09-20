@@ -34,7 +34,9 @@ public class ListingRequest {
     @Pattern(regexp = "RENT|SALE|SHARE", message = "listingType must be RENT, SALE, or SHARE")
     String listingType;
 
+
     Boolean verified;
+    Boolean isVerify;
     Boolean expired;
 
     @Pattern(regexp = "NORMAL|VIP|PREMIUM", message = "vipType must be NORMAL, VIP, or PREMIUM")

@@ -33,8 +33,9 @@ public class ListingResponse {
 
     String listingType;
 
-    Boolean verified;
 
+    Boolean verified;
+    Boolean isVerify;
     Boolean expired;
 
     String vipType;

@@ -14,7 +14,7 @@ CREATE TABLE categories (
     INDEX idx_is_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create Provinces table
+-- Create Provinces table with self-referencing for merged provinces
 CREATE TABLE provinces (
     province_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -23,13 +23,21 @@ CREATE TABLE provinces (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     effective_from DATE,
     effective_to DATE,
+    parent_province_id BIGINT,
+    is_merged BOOLEAN NOT NULL DEFAULT FALSE,
+    merged_date DATE,
+    original_name VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     UNIQUE KEY unique_province_code (code),
     INDEX idx_name (name),
     INDEX idx_is_active (is_active),
-    INDEX idx_effective_period (effective_from, effective_to)
+    INDEX idx_effective_period (effective_from, effective_to),
+    INDEX idx_parent_province (parent_province_id),
+    INDEX idx_is_merged (is_merged),
+
+    CONSTRAINT fk_provinces_parent FOREIGN KEY (parent_province_id) REFERENCES provinces(province_id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Districts table
@@ -175,6 +183,30 @@ CREATE TABLE listings (
     CONSTRAINT fk_listings_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     CONSTRAINT fk_listings_category FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE,
     CONSTRAINT fk_listings_address FOREIGN KEY (address_id) REFERENCES addresses(address_id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Create Pricing Histories table
+CREATE TABLE pricing_histories (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    listing_id BIGINT NOT NULL,
+    old_price DECIMAL(15, 0),
+    new_price DECIMAL(15, 0) NOT NULL,
+    old_price_unit ENUM('MONTH', 'DAY', 'YEAR'),
+    new_price_unit ENUM('MONTH', 'DAY', 'YEAR') NOT NULL,
+    change_type ENUM('INITIAL', 'INCREASE', 'DECREASE', 'UNIT_CHANGE', 'CORRECTION') NOT NULL,
+    change_percentage DECIMAL(5, 2),
+    change_amount DECIMAL(15, 0),
+    is_current BOOLEAN NOT NULL DEFAULT TRUE,
+    changed_by VARCHAR(36),
+    change_reason VARCHAR(500),
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_listing_id (listing_id),
+    INDEX idx_listing_date (listing_id, changed_at),
+    INDEX idx_changed_at (changed_at),
+    INDEX idx_is_current (is_current),
+
+    CONSTRAINT fk_pricing_histories_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Images table

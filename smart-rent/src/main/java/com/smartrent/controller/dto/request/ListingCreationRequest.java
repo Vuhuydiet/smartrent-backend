@@ -36,8 +36,9 @@ public class ListingCreationRequest {
     @NotBlank
     String listingType;
 
-    Boolean verified;
 
+    Boolean verified;
+    Boolean isVerify;
     Boolean expired;
 
     @NotBlank
