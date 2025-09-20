@@ -13,18 +13,18 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.List;
 
 @Entity(name = "districts")
 @Table(name = "districts",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "unique_province_district_code", columnNames = {"province_id", "code"})
-        },
         indexes = {
                 @Index(name = "idx_province_id", columnList = "province_id"),
                 @Index(name = "idx_name", columnList = "name"),
                 @Index(name = "idx_is_active", columnList = "is_active"),
                 @Index(name = "idx_effective_period", columnList = "effective_from, effective_to")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "unique_province_district_code", columnNames = {"province_id", "code"})
         })
 @Getter
 @Setter
@@ -36,16 +36,16 @@ public class District {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long id;
+    Long districtId;
 
-    @Column(name = "name", nullable = false, length = 100)
+    @Column(nullable = false, length = 100)
     String name;
 
-    @Column(name = "code", length = 10)
+    @Column(length = 10)
     String code;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
+    @Column(nullable = false)
     DistrictType type;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -56,15 +56,14 @@ public class District {
     @Column(name = "is_active", nullable = false)
     Boolean isActive = true;
 
-    @Column(name = "effective_from", nullable = false)
+    @Column(name = "effective_from")
     LocalDate effectiveFrom;
 
     @Column(name = "effective_to")
     LocalDate effectiveTo;
 
     @OneToMany(mappedBy = "district", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    Set<Ward> wards;
-
+    List<Ward> wards;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
@@ -75,6 +74,6 @@ public class District {
     LocalDateTime updatedAt;
 
     public enum DistrictType {
-        DISTRICT, URBAN_DISTRICT, CITY, TOWN
+        DISTRICT, TOWN, CITY
     }
 }
