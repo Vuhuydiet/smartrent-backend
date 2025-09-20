@@ -4,6 +4,7 @@ import com.smartrent.controller.dto.request.PriceUpdateRequest;
 import com.smartrent.controller.dto.response.ApiResponse;
 import com.smartrent.controller.dto.response.PricingHistoryResponse;
 import com.smartrent.service.pricing.PricingHistoryService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/v1/listings")
+@Tag(name = "Pricing", description = "Pricing & Price History endpoints for listings")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class PricingHistoryController {

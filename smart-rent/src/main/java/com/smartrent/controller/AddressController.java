@@ -3,6 +3,7 @@ package com.smartrent.controller;
 import com.smartrent.controller.dto.request.AddressCreationRequest;
 import com.smartrent.controller.dto.response.*;
 import com.smartrent.service.address.AddressService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/v1/addresses")
+@Tag(name = "Addresses", description = "Administrative address endpoints for provinces, districts, wards, streets, and addresses")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AddressController {

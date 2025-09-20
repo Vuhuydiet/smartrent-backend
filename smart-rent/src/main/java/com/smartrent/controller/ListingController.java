@@ -4,6 +4,7 @@ import com.smartrent.controller.dto.request.ListingCreationRequest;
 import com.smartrent.controller.dto.request.ListingRequest;
 import com.smartrent.controller.dto.response.ListingCreationResponse;
 import com.smartrent.controller.dto.response.ListingResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.smartrent.service.listing.ListingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/v1/listings")
+@Tag(name = "Listings", description = "CRUD operations for property listings")
 @RequiredArgsConstructor
 public class ListingController {
 
