@@ -29,7 +29,6 @@ public class S3StorageService implements StorageService {
 
     @PostConstruct
     public void init() {
-        // TODO: Initialize S3Client when AWS SDK dependency is available
         s3Client = S3Client.builder()
                 .region(Region.of(properties.getRegion()))
                 .credentialsProvider(StaticCredentialsProvider.create(

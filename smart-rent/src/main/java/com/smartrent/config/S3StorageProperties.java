@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Configuration;
 @Getter
 @Setter
 @Configuration
-@ConfigurationProperties(prefix = "application.storage.s3")
+@ConfigurationProperties(prefix = "open.storage.s3")
 public class S3StorageProperties {
     private String endpoint;
     private String region;
