@@ -48,3 +48,12 @@ application:
       refresh-signer-key: "${REFRESH_SIGNER_KEY}"
       valid-duration: "${VALID_DURATION}"
       refreshable-duration: "${REFRESHABLE_DURATION}"
+  # S3-compatible storage config (Cloudflare R2, DigitalOcean Spaces, AWS S3, etc.)
+  storage:
+    s3:
+      endpoint: ${S3_ENDPOINT}
+      region: ${S3_REGION}
+      accessKey: ${S3_ACCESS_KEY}
+      secretKey: ${S3_SECRET_KEY}
+      bucketName: ${S3_BUCKET}
+      publicUrl: ${S3_PUBLIC_URL}
