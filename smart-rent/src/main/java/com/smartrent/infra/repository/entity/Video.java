@@ -11,9 +11,7 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Set;
 
 @Entity(name = "videos")
 @Table(name = "videos",
@@ -37,11 +35,26 @@ public class Video {
     @JoinColumn(name = "listing_id", nullable = false)
     Listing listing;
 
-    @Column(name = "url", nullable = false, length = 500)
+    @Column(nullable = false, length = 500)
     String url;
 
-    @Column(name = "alt_text", length = 200)
-    String altText;
+    @Column(length = 200)
+    String title;
+
+    @Column(columnDefinition = "TEXT")
+    String description;
+
+    @Column(name = "duration_seconds")
+    Integer durationSeconds;
+
+    @Column(name = "file_size")
+    Long fileSize;
+
+    @Column(name = "mime_type", length = 50)
+    String mimeType;
+
+    @Column(name = "thumbnail_url", length = 500)
+    String thumbnailUrl;
 
     @Builder.Default
     @Column(name = "sort_order", nullable = false)
@@ -50,4 +63,8 @@ public class Video {
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    LocalDateTime updatedAt;
 }

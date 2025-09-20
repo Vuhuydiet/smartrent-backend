@@ -11,9 +11,7 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Set;
 
 @Entity(name = "images")
 @Table(name = "images",
@@ -38,7 +36,7 @@ public class Image {
     @JoinColumn(name = "listing_id", nullable = false)
     Listing listing;
 
-    @Column(name = "url", nullable = false, length = 500)
+    @Column(nullable = false, length = 500)
     String url;
 
     @Column(name = "alt_text", length = 200)
@@ -53,15 +51,16 @@ public class Image {
     Boolean isPrimary = false;
 
     @Column(name = "file_size")
-    Integer fileSize;
+    Long fileSize;
 
-    @Column(name = "width")
-    Integer width;
-
-    @Column(name = "height")
-    Integer height;
+    @Column(name = "mime_type", length = 50)
+    String mimeType;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    LocalDateTime updatedAt;
 }
