@@ -114,4 +114,50 @@ public class OpenAPIConfig {
                 .pathsToMatch("/v1/admins/**", "/v1/auth/admin/**", "/v1/roles/**")
                 .build();
     }
+
+    @Bean
+    public GroupedOpenApi listingApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("listings")
+                            .displayName("Listing APIs")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/listings/**")
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi addressApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("addresses")
+                            .displayName("Address APIs")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/addresses/**")
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi uploadApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("file-upload")
+                            .displayName("File Upload APIs")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/upload/**")
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi pricingApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("pricing")
+                            .displayName("Pricing & Price History APIs")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch(
+                                            "/v1/listings/*/price",
+                                            "/v1/listings/*/pricing-history",
+                                            "/v1/listings/*/pricing-history/date-range",
+                                            "/v1/listings/*/current-price",
+                                            "/v1/listings/recent-price-changes"
+                            )
+                            .build();
+    }
 }
