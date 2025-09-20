@@ -11,16 +11,15 @@ import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.List;
 
 @Entity(name = "streets")
 @Table(name = "streets",
         indexes = {
-                @Index(name = "idx_ward_street", columnList = "ward_id, specific_address"),
                 @Index(name = "idx_ward_id", columnList = "ward_id"),
-                @Index(name = "idx_specific_address", columnList = "specific_address")
+                @Index(name = "idx_name", columnList = "name"),
+                @Index(name = "idx_is_active", columnList = "is_active")
         })
 @Getter
 @Setter
@@ -32,14 +31,21 @@ public class Street {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long id;
+    Long streetId;
 
-    @Column(name = "specific_address", nullable = false, length = 200)
-    String specificName;
+    @Column(nullable = false, length = 200)
+    String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ward_id", nullable = false)
     Ward ward;
+
+    @Builder.Default
+    @Column(name = "is_active", nullable = false)
+    Boolean isActive = true;
+
+    @OneToMany(mappedBy = "street", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<Address> addresses;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

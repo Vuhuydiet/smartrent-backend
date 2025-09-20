@@ -14,18 +14,17 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 @Entity(name = "wards")
 @Table(name = "wards",
-        uniqueConstraints = {
-                @UniqueConstraint(name = "unique_district_ward_code", columnNames = {"district_id", "code"})
-        },
         indexes = {
                 @Index(name = "idx_district_id", columnList = "district_id"),
                 @Index(name = "idx_name", columnList = "name"),
                 @Index(name = "idx_is_active", columnList = "is_active"),
                 @Index(name = "idx_effective_period", columnList = "effective_from, effective_to")
+        },
+        uniqueConstraints = {
+                @UniqueConstraint(name = "unique_district_ward_code", columnNames = {"district_id", "code"})
         })
 @Getter
 @Setter
@@ -39,14 +38,14 @@ public class Ward {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long wardId;
 
-    @Column(name = "name", nullable = false, length = 100)
+    @Column(nullable = false, length = 100)
     String name;
 
-    @Column(name = "code", length = 10)
+    @Column(length = 10)
     String code;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
+    @Column(nullable = false)
     WardType type;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -57,11 +56,7 @@ public class Ward {
     @Column(name = "is_active", nullable = false)
     Boolean isActive = true;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "merged_into_id")
-    NewWard mergedInto;
-
-    @Column(name = "effective_from", nullable = false)
+    @Column(name = "effective_from")
     LocalDate effectiveFrom;
 
     @Column(name = "effective_to")
@@ -78,11 +73,7 @@ public class Ward {
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "new_ward_id")
-    NewWard newWard;
-
     public enum WardType {
-        WARD, COMMUNE, TOWN
+        WARD, COMMUNE, TOWNSHIP
     }
 }
