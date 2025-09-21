@@ -15,4 +15,7 @@ public interface ListingService {
     List<ListingResponse> getListings(int page, int size);
     ListingResponse updateListing(Long id, ListingRequest request);
     void deleteListing(Long id);
+
+    // Filter listings (feature)
+    com.smartrent.controller.dto.response.ListingFilterResponse filterListings(com.smartrent.controller.dto.request.ListingFilterRequest filterRequest);
 }

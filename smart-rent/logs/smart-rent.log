@@ -3603,3 +3603,220 @@ java.lang.RuntimeException: Unexpected error
 2025-09-20 17:25:17 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 3.6 seconds (process running for 3.76)
 2025-09-20 17:26:03 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
 2025-09-20 17:26:17 [http-nio-8080-exec-3] INFO  o.s.api.AbstractOpenApiResource - Init duration for springdoc-openapi is: 186 ms
+2025-09-21 17:40:03 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 11356 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 17:40:03 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 17:40:06 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 17:40:06 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 17:40:06 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 17:40:07 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 17:40:07 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.040s)
+2025-09-21 17:40:07 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 17:40:07 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 17:40:08 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 17:40:08 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 17:40:09 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 17:40:10 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 17:40:13 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 10.517 seconds (process running for 11.31)
+2025-09-21 17:40:14 [RMI TCP Connection(4)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 17:48:21 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 13360 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 17:48:21 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 17:48:23 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 17:48:23 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 17:48:23 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 17:48:24 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 17:48:24 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.033s)
+2025-09-21 17:48:24 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 17:48:24 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 17:48:24 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 17:48:24 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 17:48:25 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 17:48:27 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 17:48:30 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 9.553 seconds (process running for 10.089)
+2025-09-21 17:48:30 [RMI TCP Connection(3)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 17:54:32 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 24680 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 17:54:32 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 17:54:34 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 17:54:34 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 17:54:34 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 17:54:34 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 17:54:34 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.036s)
+2025-09-21 17:54:34 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 17:54:34 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 17:54:35 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 17:54:35 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 17:54:36 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 17:54:37 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 17:54:40 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 8.918 seconds (process running for 9.528)
+2025-09-21 17:54:41 [RMI TCP Connection(1)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 17:59:57 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 4976 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 17:59:57 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 18:00:00 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 18:00:00 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 18:00:00 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 18:00:01 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 18:00:01 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.067s)
+2025-09-21 18:00:01 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 18:00:01 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 18:00:02 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 18:00:02 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 18:00:03 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 18:00:04 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 18:00:08 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 11.153 seconds (process running for 12.49)
+2025-09-21 18:00:08 [RMI TCP Connection(4)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 18:04:00 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 19400 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 18:04:00 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 18:04:02 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 18:04:02 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 18:04:02 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 18:04:03 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 18:04:03 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.046s)
+2025-09-21 18:04:03 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 18:04:03 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 18:04:03 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 18:04:03 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 18:04:03 [main] ERROR o.s.o.j.LocalContainerEntityManagerFactoryBean - Failed to initialize JPA EntityManagerFactory: Collection 'com.smartrent.infra.repository.entity.Address.listings' is 'mappedBy' a property named 'addressId' which does not exist in the target entity 'com.smartrent.infra.repository.entity.Listing'
+2025-09-21 18:04:03 [main] WARN  o.s.b.w.s.c.AnnotationConfigServletWebServerApplicationContext - Exception encountered during context initialization - cancelling refresh attempt: org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'entityManagerFactory' defined in class path resource [org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaConfiguration.class]: Collection 'com.smartrent.infra.repository.entity.Address.listings' is 'mappedBy' a property named 'addressId' which does not exist in the target entity 'com.smartrent.infra.repository.entity.Listing'
+2025-09-21 18:04:03 [main] INFO  o.a.catalina.core.StandardService - Stopping service [Tomcat]
+2025-09-21 18:04:04 [main] ERROR o.s.boot.SpringApplication - Application run failed
+org.springframework.beans.factory.BeanCreationException: Error creating bean with name 'entityManagerFactory' defined in class path resource [org/springframework/boot/autoconfigure/orm/jpa/HibernateJpaConfiguration.class]: Collection 'com.smartrent.infra.repository.entity.Address.listings' is 'mappedBy' a property named 'addressId' which does not exist in the target entity 'com.smartrent.infra.repository.entity.Listing'
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1802)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:601)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:523)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:336)
+	at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:288)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:334)
+	at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:204)
+	at org.springframework.context.support.AbstractApplicationContext.finishBeanFactoryInitialization(AbstractApplicationContext.java:970)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:627)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:752)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:439)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:318)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1361)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1350)
+	at com.smartrent.SmartRentApplication.main(SmartRentApplication.java:12)
+Caused by: org.hibernate.AnnotationException: Collection 'com.smartrent.infra.repository.entity.Address.listings' is 'mappedBy' a property named 'addressId' which does not exist in the target entity 'com.smartrent.infra.repository.entity.Listing'
+	at org.hibernate.boot.model.internal.CollectionBinder.isReversePropertyInJoin(CollectionBinder.java:1638)
+	at org.hibernate.boot.model.internal.CollectionBinder.noAssociationTable(CollectionBinder.java:1652)
+	at org.hibernate.boot.model.internal.CollectionBinder.bindStarToManySecondPass(CollectionBinder.java:1613)
+	at org.hibernate.boot.model.internal.CollectionBinder$1.secondPass(CollectionBinder.java:1604)
+	at org.hibernate.boot.model.internal.CollectionSecondPass.doSecondPass(CollectionSecondPass.java:45)
+	at org.hibernate.boot.internal.InFlightMetadataCollectorImpl.processSecondPasses(InFlightMetadataCollectorImpl.java:1842)
+	at org.hibernate.boot.internal.InFlightMetadataCollectorImpl.processSecondPasses(InFlightMetadataCollectorImpl.java:1800)
+	at org.hibernate.boot.model.process.spi.MetadataBuildingProcess.complete(MetadataBuildingProcess.java:334)
+	at org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl.metadata(EntityManagerFactoryBuilderImpl.java:1431)
+	at org.hibernate.jpa.boot.internal.EntityManagerFactoryBuilderImpl.build(EntityManagerFactoryBuilderImpl.java:1502)
+	at org.springframework.orm.jpa.vendor.SpringHibernateJpaPersistenceProvider.createContainerEntityManagerFactory(SpringHibernateJpaPersistenceProvider.java:66)
+	at org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean.createNativeEntityManagerFactory(LocalContainerEntityManagerFactoryBean.java:390)
+	at org.springframework.orm.jpa.AbstractEntityManagerFactoryBean.buildNativeEntityManagerFactory(AbstractEntityManagerFactoryBean.java:419)
+	at org.springframework.orm.jpa.AbstractEntityManagerFactoryBean.afterPropertiesSet(AbstractEntityManagerFactoryBean.java:400)
+	at org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean.afterPropertiesSet(LocalContainerEntityManagerFactoryBean.java:366)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.invokeInitMethods(AbstractAutowireCapableBeanFactory.java:1849)
+	at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.initializeBean(AbstractAutowireCapableBeanFactory.java:1798)
+	... 15 common frames omitted
+2025-09-21 18:05:24 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 28612 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 18:05:24 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 18:05:26 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 18:05:26 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 18:05:26 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 18:05:27 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 18:05:27 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.037s)
+2025-09-21 18:05:27 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 18:05:27 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 18:05:27 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 18:05:27 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 18:05:28 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 18:05:29 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 18:05:33 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 9.181 seconds (process running for 9.737)
+2025-09-21 18:05:33 [RMI TCP Connection(3)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 18:06:48 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 24584 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 18:06:48 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 18:06:51 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 18:06:51 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 18:06:51 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 18:06:51 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 18:06:51 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.034s)
+2025-09-21 18:06:51 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 18:06:51 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 18:06:52 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 18:06:52 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 18:06:53 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 18:06:54 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 18:06:58 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 9.748 seconds (process running for 10.575)
+2025-09-21 18:06:58 [RMI TCP Connection(2)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 18:19:48 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 19644 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 18:19:48 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 18:19:51 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 18:19:51 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 18:19:51 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 18:19:51 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 18:19:51 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.032s)
+2025-09-21 18:19:51 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 18:19:51 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 18:19:52 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 18:19:52 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 18:19:53 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 18:19:54 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 18:19:58 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 9.939 seconds (process running for 10.789)
+2025-09-21 18:19:58 [RMI TCP Connection(6)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 18:30:16 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 13580 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 18:30:16 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 18:30:18 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 18:30:18 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 18:30:18 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 18:30:19 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 18:30:19 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.036s)
+2025-09-21 18:30:19 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 18:30:19 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 18:30:20 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 18:30:20 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 18:30:20 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 18:30:21 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 18:30:25 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 8.894 seconds (process running for 9.459)
+2025-09-21 18:30:25 [RMI TCP Connection(4)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 18:32:06 [http-nio-8080-exec-1] WARN  o.a.c.util.SessionIdGeneratorBase - Creation of SecureRandom instance for session ID generation using [SHA1PRNG] took [128] milliseconds.
+2025-09-21 18:32:16 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 15412 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 18:32:16 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 18:32:18 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 18:32:18 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 18:32:18 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 18:32:19 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 18:32:19 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.042s)
+2025-09-21 18:32:19 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 18:32:19 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 18:32:19 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 18:32:19 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 18:32:20 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 18:32:21 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 18:32:25 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 9.626 seconds (process running for 10.335)
+2025-09-21 18:32:26 [RMI TCP Connection(3)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 18:34:00 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 26992 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 18:34:00 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 18:34:02 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 18:34:02 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 18:34:02 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 18:34:03 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 18:34:03 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.048s)
+2025-09-21 18:34:03 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 18:34:03 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 18:34:03 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 18:34:03 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 18:34:04 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 18:34:05 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 18:34:09 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 9.994 seconds (process running for 10.816)
+2025-09-21 18:34:10 [RMI TCP Connection(1)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-09-21 18:35:52 [main] INFO  com.smartrent.SmartRentApplication - Starting SmartRentApplication using Java 17.0.16 with PID 19748 (D:\DATN\smartrent-backend\smart-rent\build\classes\java\main started by Dell in D:\DATN\smartrent-backend\smart-rent)
+2025-09-21 18:35:52 [main] INFO  com.smartrent.SmartRentApplication - The following 1 profile is active: "local"
+2025-09-21 18:35:55 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2025-09-21 18:35:55 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.33]
+2025-09-21 18:35:55 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2025-09-21 18:35:55 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:mysql://localhost:3306/smartrent (MySQL 8.0)
+2025-09-21 18:35:56 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 8 migrations (execution time 00:00.034s)
+2025-09-21 18:35:56 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema `smartrent`: 8
+2025-09-21 18:35:56 [main] INFO  o.f.core.internal.command.DbMigrate - Schema `smartrent` is up to date. No migration necessary.
+2025-09-21 18:35:56 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: MySQL8Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2025-09-21 18:35:56 [main] WARN  org.hibernate.orm.deprecation - HHH90000026: MySQL8Dialect has been deprecated; use org.hibernate.dialect.MySQLDialect instead
+2025-09-21 18:35:57 [main] INFO  c.s.c.c.CircuitBreakerConfig - Circuit breaker configuration loaded: failureRateThreshold=60%, waitDurationInOpenState=120s, slidingWindowSize=20, minimumNumberOfCalls=10, permittedCallsInHalfOpen=5, timeoutDuration=15s
+2025-09-21 18:35:58 [main] INFO  c.s.s.e.i.ResilientEmailServiceImpl - Email retry configuration loaded: maxAttempts=3, baseWaitDuration=2000ms, exponentialMultiplier=2.0, jitterPercentage=0.25, minWaitDuration=1000ms
+2025-09-21 18:36:02 [main] INFO  com.smartrent.SmartRentApplication - Started SmartRentApplication in 9.8 seconds (process running for 10.486)
+2025-09-21 18:36:02 [RMI TCP Connection(2)-192.168.43.39] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'

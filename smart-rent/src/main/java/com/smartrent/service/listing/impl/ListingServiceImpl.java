@@ -8,6 +8,8 @@ import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
+import com.smartrent.controller.dto.request.ListingFilterRequest;
+import com.smartrent.controller.dto.response.ListingFilterResponse;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -76,8 +78,8 @@ public class ListingServiceImpl implements ListingService {
         if (request.getTitle() != null) existing.setTitle(request.getTitle());
         if (request.getDescription() != null) existing.setDescription(request.getDescription());
         if (request.getExpiryDate() != null) existing.setExpiryDate(request.getExpiryDate());
-    if (request.getVerified() != null) existing.setVerified(request.getVerified());
-    if (request.getIsVerify() != null) existing.setIsVerify(request.getIsVerify());
+        if (request.getVerified() != null) existing.setVerified(request.getVerified());
+        if (request.getIsVerify() != null) existing.setIsVerify(request.getIsVerify());
         if (request.getExpired() != null) existing.setExpired(request.getExpired());
         if (request.getPrice() != null) existing.setPrice(request.getPrice());
         if (request.getArea() != null) existing.setArea(request.getArea());
@@ -96,5 +98,22 @@ public class ListingServiceImpl implements ListingService {
             throw new RuntimeException("Listing not found");
         }
         listingRepository.deleteById(id);
+    }
+
+    // Filter listings (feature)
+    @Override
+    @Transactional(readOnly = true)
+    public ListingFilterResponse filterListings(ListingFilterRequest filterRequest) {
+        int safePage = Math.max(filterRequest.getPage() != null ? filterRequest.getPage() : 0, 0);
+        int safeSize = Math.min(Math.max(filterRequest.getSize() != null ? filterRequest.getSize() : 20, 1), 100);
+        Pageable pageable = PageRequest.of(safePage, safeSize);
+        Page<Listing> pageResult = listingRepository.findAll(com.smartrent.infra.repository.ListingSpecification.filter(filterRequest), pageable);
+        ListingFilterResponse resp = new ListingFilterResponse();
+        resp.setContent(pageResult.getContent().stream().map(listingMapper::toResponse).collect(Collectors.toList()));
+        resp.setTotalElements(pageResult.getTotalElements());
+        resp.setTotalPages(pageResult.getTotalPages());
+        resp.setPage(safePage);
+        resp.setSize(safeSize);
+        return resp;
     }
 }

@@ -4,6 +4,8 @@ import com.smartrent.controller.dto.request.ListingCreationRequest;
 import com.smartrent.controller.dto.request.ListingRequest;
 import com.smartrent.controller.dto.response.ListingCreationResponse;
 import com.smartrent.controller.dto.response.ListingResponse;
+import com.smartrent.controller.dto.request.ListingFilterRequest;
+import com.smartrent.controller.dto.response.ListingFilterResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -103,6 +105,13 @@ public class ListingController {
         }
         List<ListingResponse> responses = listingService.getListings(page, size);
         return ResponseEntity.ok(responses);
+    }
+
+    @Operation(summary = "Filter listings", description = "Filter listings by multiple criteria (POST)")
+    @PostMapping("/filter")
+    public ResponseEntity<ListingFilterResponse> filterListings(@Valid @RequestBody ListingFilterRequest filterRequest) {
+        ListingFilterResponse resp = listingService.filterListings(filterRequest);
+        return ResponseEntity.ok(resp);
     }
 
     @Operation(
