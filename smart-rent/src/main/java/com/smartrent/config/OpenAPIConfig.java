@@ -91,9 +91,6 @@ public class OpenAPIConfig {
                 "## ⚠️ Error Handling\n" +
                 "All API responses follow a consistent format:\n" +
                 "```json\n" +
-                "{\n" +
-                "  \"code\": \"999999\",\n" +
-                "  \"message\": \"Operation completed successfully\",\n" +
                 "  \"data\": { /* response data */ }\n" +
                 "}\n" +
                 "```\n" +
@@ -103,7 +100,6 @@ public class OpenAPIConfig {
                 "- `3xxx`: Resource conflict errors (already exists)\n" +
                 "- `4xxx`: Resource not found errors\n" +
                 "- `5xxx`: Authentication errors (unauthenticated)\n" +
-                "- `6xxx`: Authorization errors (forbidden)\n\n" +
 
                 "## 🏗️ API Versioning\n" +
                 "All endpoints are versioned with `/v1/` prefix. Future versions will use `/v2/`, etc.\n\n" +
