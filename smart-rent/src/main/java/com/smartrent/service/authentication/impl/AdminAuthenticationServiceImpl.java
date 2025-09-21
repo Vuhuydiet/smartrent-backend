@@ -21,6 +21,7 @@ import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.InvalidatedToken;
 import com.smartrent.mapper.AdminMapper;
 import com.smartrent.mapper.UserMapper;
+import com.smartrent.service.authentication.domain.TokenType;
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -71,7 +72,7 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
 
   @Override
   public AuthenticationResponse refresh(RefreshTokenRequest request) {
-    SignedJWT signedJWT = verifyToken(request.getRefreshToken(), true);
+    SignedJWT signedJWT = verifyToken(request.getRefreshToken(), TokenType.REFRESH);
 
     try {
       String acId = signedJWT.getJWTClaimsSet().getClaim("acId").toString();

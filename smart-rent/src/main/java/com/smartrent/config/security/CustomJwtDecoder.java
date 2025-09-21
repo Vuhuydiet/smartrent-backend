@@ -39,14 +39,16 @@ public class CustomJwtDecoder implements JwtDecoder {
   @Override
   public Jwt decode(String token) throws JwtException {
     IntrospectResponse introspectResponse = authenticationService.introspect(
-        IntrospectRequest.builder().token(token).build());
+        IntrospectRequest.builder()
+            .token(token)
+            .build());
 
     if (!introspectResponse.isValid()) {
       throw new JwtException(DomainCode.INVALID_TOKEN.getMessage());
     }
 
     if (Objects.isNull(nimbusJwtDecoder)) {
-      SecretKeySpec secretKeySpec = new SecretKeySpec(ACCESS_SIGNER_KEY.getBytes(), "SH512");
+      SecretKeySpec secretKeySpec = new SecretKeySpec(ACCESS_SIGNER_KEY.getBytes(), "HmacSHA512");
 
       nimbusJwtDecoder = NimbusJwtDecoder
           .withSecretKey(secretKeySpec)

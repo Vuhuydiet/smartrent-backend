@@ -12,8 +12,10 @@ import com.smartrent.controller.dto.request.ForgotPasswordRequest;
 import com.smartrent.controller.dto.request.IntrospectRequest;
 import com.smartrent.controller.dto.request.LogoutRequest;
 import com.smartrent.controller.dto.request.RefreshTokenRequest;
+import com.smartrent.controller.dto.request.ResetPasswordRequest;
 import com.smartrent.controller.dto.request.VerifyCodeRequest;
 import com.smartrent.controller.dto.response.AuthenticationResponse;
+import com.smartrent.controller.dto.response.ForgotPasswordResponse;
 import com.smartrent.controller.dto.response.IntrospectResponse;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.IncorrectPasswordException;
@@ -27,14 +29,17 @@ import com.smartrent.infra.repository.entity.User;
 import com.smartrent.mapper.UserMapper;
 import com.smartrent.service.authentication.AuthenticationService;
 import com.smartrent.service.authentication.VerificationService;
+import com.smartrent.service.authentication.domain.TokenType;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 
 import java.text.ParseException;
@@ -45,6 +50,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.UUID;
 
+@Slf4j
 @Service(Constants.AUTHENTICATION_SERVICE)
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -69,6 +75,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
   protected String REFRESH_SIGNER_KEY;
 
   @NonFinal
+  @Value("${application.authentication.jwt.reset-password-signer-key}")
+  protected String RESET_PASSWORD_KEY;
+
+  @NonFinal
   @Value("${application.authentication.jwt.valid-duration}")
   protected long VALID_DURATION;
 
@@ -76,13 +86,17 @@ public class AuthenticationServiceImpl implements AuthenticationService {
   @Value("${application.authentication.jwt.refreshable-duration}")
   protected long REFRESHABLE_DURATION;
 
+  @NonFinal
+  @Value("${application.authentication.jwt.reset_password_duration}")
+  protected long RESET_PASSWORD_DURATION;
+
   @Override
   public IntrospectResponse introspect(IntrospectRequest request) {
 
     boolean isValid = true;
 
     try {
-      verifyToken(request.getToken(), false);
+      verifyToken(request.getToken(), TokenType.ACCESS);
     } catch (DomainException e) {
       isValid = false;
     }
@@ -129,10 +143,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
   }
 
-
   @Override
   public AuthenticationResponse refresh(RefreshTokenRequest request) {
-    SignedJWT signedJWT = verifyToken(request.getRefreshToken(), true);
+    SignedJWT signedJWT = verifyToken(request.getRefreshToken(), TokenType.REFRESH);
 
     try {
       String acId = signedJWT.getJWTClaimsSet().getClaim("acId").toString();
@@ -177,10 +190,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
   }
 
   @Override
-  public void forgotPassword(ForgotPasswordRequest request) {
+  public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
     User user = verificationService.verifyCode(request.getVerificationCode());
-    user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-    userRepository.save(user);
+    return buildForgotPasswordResponse(user);
   }
 
   private AuthenticationResponse buildAuthenticationResponse(User user) {
@@ -196,14 +208,51 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         .build();
   }
 
-  protected SignedJWT verifyToken(String token, boolean isRefresh) {
-    JWSVerifier verifier;
-
+  @Override
+  public void resetPassword(ResetPasswordRequest request) {
     try {
-      if (isRefresh) {
+      SignedJWT signedJWT = verifyToken(request.getResetPasswordToken(), TokenType.RESET_PASSWORD);
+      String rsId = signedJWT.getJWTClaimsSet().getJWTID();
+
+      Instant expirationInstant = signedJWT.getJWTClaimsSet().getExpirationTime().toInstant();
+      LocalDateTime expirationTime = LocalDateTime.ofInstant(expirationInstant, ZoneId.systemDefault());
+
+      String userId = signedJWT.getJWTClaimsSet().getSubject();
+      User user = userRepository.findById(userId)
+          .orElseThrow(UserNotFoundException::new);
+
+      user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+      userRepository.saveAndFlush(user);
+
+      invalidatedTokenRepository.save(InvalidatedToken.builder()
+          .accessId(rsId)
+          .refreshId(rsId)
+          .expirationTime(expirationTime)
+          .build());
+    } catch (Exception e) {
+      log.info(e.getMessage());
+      throw new DomainException(DomainCode.UNKNOWN_ERROR);
+    }
+  }
+
+  private ForgotPasswordResponse buildForgotPasswordResponse(User user) {
+    String rsId = UUID.randomUUID().toString();
+
+    String resetPasswordToken = generateToken(user, RESET_PASSWORD_DURATION, rsId, null, RESET_PASSWORD_KEY);
+
+    return ForgotPasswordResponse.builder()
+        .resetPasswordToken(resetPasswordToken)
+        .build();
+  }
+
+  protected SignedJWT verifyToken(String token, TokenType tokenType) {
+    try {
+      JWSVerifier verifier = new MACVerifier(SIGNER_KEY);
+
+      if (TokenType.REFRESH.equals(tokenType)) {
         verifier = new MACVerifier(REFRESH_SIGNER_KEY);
-      } else {
-        verifier = new MACVerifier(SIGNER_KEY);
+      } else if (TokenType.RESET_PASSWORD.equals(tokenType)) {
+        verifier = new MACVerifier(RESET_PASSWORD_KEY);
       }
 
       SignedJWT signedJWT = SignedJWT.parse(token);
@@ -213,16 +262,27 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       String id = signedJWT.getJWTClaimsSet().getJWTID();
       boolean verified = signedJWT.verify(verifier);
 
-      if (!verified || expirationTime.before(new Date())) {
+      if (!verified) {
+        log.error("JWT signature verification failed for token type: {}, token ID: {}", tokenType, id);
+        throw new DomainException(DomainCode.INVALID_TOKEN);
+      }
+
+      if (expirationTime.before(new Date())) {
+        log.error("JWT token expired for token type: {}, token ID: {}, expiration: {}", tokenType, id, expirationTime);
         throw new DomainException(DomainCode.INVALID_TOKEN);
       }
 
       if (invalidatedTokenRepository.existsByAccessIdOrRefreshId(id)) {
+        log.error("JWT token has been invalidated for token type: {}, token ID: {}", tokenType, id);
         throw new DomainException(DomainCode.INVALID_TOKEN);
       }
 
       return signedJWT;
-    } catch (ParseException | JOSEException e) {
+    } catch (ParseException e) {
+      log.error("Failed to parse JWT token for token type: {}, error: {}", tokenType, e.getMessage());
+      throw new DomainException(DomainCode.INVALID_TOKEN);
+    } catch (JOSEException e) {
+      log.error("JOSE exception during JWT verification for token type: {}, error: {}", tokenType, e.getMessage());
       throw new DomainException(DomainCode.INVALID_TOKEN);
     }
   }
@@ -235,6 +295,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       claimsSet = buildAccessTokenClaims(user, duration, id, otherId);
     } else if (signerKey.equals(REFRESH_SIGNER_KEY)) {
       claimsSet = buildRefreshTokenClaims(user, duration, id, otherId);
+    } else if (signerKey.equals(RESET_PASSWORD_KEY)) {
+      claimsSet = buildResetPasswordTokenClaims(user, duration, id, otherId);
     }
 
     Payload payload = claimsSet.toPayload();
@@ -275,6 +337,17 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         .issueTime(new Date())
         .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
         .claim("acId", otherId)
+        .claim("scope", Constants.ROLE_USER)
+        .build();
+  }
+
+  private JWTClaimsSet buildResetPasswordTokenClaims(User user, long duration, String id, String otherId) {
+    return new JWTClaimsSet.Builder()
+        .subject(user.getUserId())
+        .jwtID(id)
+        .issuer("Smart-Rent-Team")
+        .issueTime(new Date())
+        .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
         .claim("scope", Constants.ROLE_USER)
         .build();
   }

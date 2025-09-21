@@ -51,7 +51,7 @@ This document summarizes the migration files created to align the database schem
 - **V2**: Invalidated_tokens table (structure matches entity)
 - **V3**: Rename admin_roles to admins_roles (matches entity relationship)
 
-### ⚠️ Notes:
+### Notes:
 - All new migrations maintain backward compatibility
 - Existing data is preserved with safe defaults
 - Foreign key constraints ensure referential integrity
