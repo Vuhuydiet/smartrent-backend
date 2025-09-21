@@ -71,6 +71,11 @@ jacocoTestReport {
     }
 }
 
+// Avoid failing bootJar on duplicate resources (e.g., application-local.yaml copied twice)
+tasks.named('bootJar') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 // Flyway configuration
 flyway {
     url = project.hasProperty('dbUrl') ? project.property('dbUrl') : 'jdbc:mysql://localhost:3306/smartrent'
