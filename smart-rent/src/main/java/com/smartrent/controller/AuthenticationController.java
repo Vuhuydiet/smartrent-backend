@@ -7,8 +7,10 @@ import com.smartrent.controller.dto.request.ForgotPasswordRequest;
 import com.smartrent.controller.dto.request.IntrospectRequest;
 import com.smartrent.controller.dto.request.LogoutRequest;
 import com.smartrent.controller.dto.request.RefreshTokenRequest;
+import com.smartrent.controller.dto.request.ResetPasswordRequest;
 import com.smartrent.controller.dto.response.ApiResponse;
 import com.smartrent.controller.dto.response.AuthenticationResponse;
+import com.smartrent.controller.dto.response.ForgotPasswordResponse;
 import com.smartrent.controller.dto.response.IntrospectResponse;
 import com.smartrent.service.authentication.AuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -432,10 +434,10 @@ public class AuthenticationController {
     return ApiResponse.<Void>builder().build();
   }
 
-  @PatchMapping("/forgot-password")
+  @PostMapping("/forgot-password")
   @Operation(
-      summary = "Reset forgotten password",
-      description = "Resets the user's password using a verification code sent to their email. This endpoint is used when the user has forgotten their password.",
+      summary = "Verify otp to get token to reset password.",
+      description = "Verify otp to get token to reset password.",
       requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
           description = "Forgot password request",
           required = true,
@@ -446,8 +448,71 @@ public class AuthenticationController {
                   name = "Forgot Password Example",
                   value = """
                       {
-                        "newPassword": "NewSecurePass123!",
                         "verificationCode": "123456"
+                      }
+                      """
+              )
+          )
+      )
+  )
+  @ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "200",
+          description = "Password reset successfully",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  name = "Success Response",
+                  value = """
+                      {
+                        "code": "999999",
+                        "data": {
+                            "resetPasswordToken": "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJkNjE3ODI4Mi0zOTQ4LTQ0MTItYjYwYi1lZDc1Mz..."
+                        }
+                      }
+                      """
+              )
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "401",
+          description = "Invalid or expired verification code",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  name = "Invalid Code",
+                  value = """
+                      {
+                        "code": "401001",
+                        "message": "INVALID_VERIFICATION_CODE",
+                        "data": null
+                      }
+                      """
+              )
+          )
+      )
+  })
+  public ApiResponse<ForgotPasswordResponse> forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
+    ForgotPasswordResponse forgotPasswordResponse = authenticationService.forgotPassword(request);
+    return ApiResponse.<ForgotPasswordResponse>builder().data(forgotPasswordResponse).build();
+  }
+
+  @PostMapping("/reset-password")
+  @Operation(
+      summary = "Reset password with token",
+      description = "Resets the user's password using a reset password token obtained from the forgot-password endpoint. This completes the password reset flow.",
+      requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+          description = "Password reset request with token and new password",
+          required = true,
+          content = @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = ResetPasswordRequest.class),
+              examples = @ExampleObject(
+                  name = "Reset Password Example",
+                  value = """
+                      {
+                        "resetPasswordToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                        "newPassword": "NewSecurePass123!"
                       }
                       """
               )
@@ -474,7 +539,7 @@ public class AuthenticationController {
       ),
       @io.swagger.v3.oas.annotations.responses.ApiResponse(
           responseCode = "400",
-          description = "Invalid password format or verification code",
+          description = "Invalid password format or token",
           content = @Content(
               mediaType = "application/json",
               examples = @ExampleObject(
@@ -491,15 +556,15 @@ public class AuthenticationController {
       ),
       @io.swagger.v3.oas.annotations.responses.ApiResponse(
           responseCode = "401",
-          description = "Invalid or expired verification code",
+          description = "Invalid or expired reset token",
           content = @Content(
               mediaType = "application/json",
               examples = @ExampleObject(
-                  name = "Invalid Code",
+                  name = "Invalid Token",
                   value = """
                       {
                         "code": "401001",
-                        "message": "INVALID_VERIFICATION_CODE",
+                        "message": "INVALID_TOKEN",
                         "data": null
                       }
                       """
@@ -507,8 +572,8 @@ public class AuthenticationController {
           )
       )
   })
-  public ApiResponse<Void> forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
-    authenticationService.forgotPassword(request);
+  public ApiResponse<Void> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
+    authenticationService.resetPassword(request);
     return ApiResponse.<Void>builder().build();
   }
 

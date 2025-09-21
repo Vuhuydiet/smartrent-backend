@@ -6,7 +6,9 @@ import com.smartrent.controller.dto.request.ForgotPasswordRequest;
 import com.smartrent.controller.dto.request.IntrospectRequest;
 import com.smartrent.controller.dto.request.LogoutRequest;
 import com.smartrent.controller.dto.request.RefreshTokenRequest;
+import com.smartrent.controller.dto.request.ResetPasswordRequest;
 import com.smartrent.controller.dto.response.AuthenticationResponse;
+import com.smartrent.controller.dto.response.ForgotPasswordResponse;
 import com.smartrent.controller.dto.response.IntrospectResponse;
 
 public interface AuthenticationService {
@@ -20,5 +22,7 @@ public interface AuthenticationService {
 
   void changePassword(ChangePasswordRequest request);
 
-  void forgotPassword(ForgotPasswordRequest request);
+  ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request);
+
+  void resetPassword(ResetPasswordRequest request);
 }

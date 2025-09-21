@@ -27,7 +27,8 @@ public class UserCreationRequest {
       description = "International phone code (country code)",
       example = "+1",
       minLength = 1,
-      maxLength = 5
+      maxLength = 5,
+      required = true
   )
   String phoneCode;
 
@@ -36,7 +37,8 @@ public class UserCreationRequest {
       description = "Phone number without country code",
       example = "1234567890",
       minLength = 5,
-      maxLength = 20
+      maxLength = 20,
+      required = true
   )
   String phoneNumber;
 
