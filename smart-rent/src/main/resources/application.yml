@@ -5,73 +5,76 @@ server:
 logging:
   level:
     root: INFO
+    # Application-wide logging
     com.smartrent: INFO
-      publicUrl: ${S3_PUBLIC_URL}
+    # Service-specific logging levels
+    com.smartrent.service.authentication: INFO
+    com.smartrent.service.user: INFO
+    com.smartrent.service.admin: INFO
+    com.smartrent.service.email: INFO
+    com.smartrent.service.role: INFO
+    com.smartrent.service.payment: INFO
+    com.smartrent.service.analytics: INFO
+    com.smartrent.service.communication: INFO
+    com.smartrent.service.content: INFO
+    com.smartrent.service.discovery: INFO
+    # Framework logging
+    org.springframework: WARN
+    org.hibernate: WARN
+    org.hibernate.SQL: ERROR
+    org.hibernate.type.descriptor.sql.BasicBinder: ERROR
+    com.zaxxer.hikari: WARN
+    org.flywaydb: INFO
+    feign: INFO
+    io.github.resilience4j: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.springframework.boot.actuate: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/smart-rent.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
 
-# Resilience4j Configuration for Circuit Breaker and Retry patterns
-resilience4j:
-  circuitbreaker:
-    configs:
-      default:
-        registerHealthIndicator: true
-        slidingWindowSize: 10
-        slidingWindowType: COUNT_BASED
-        minimumNumberOfCalls: 5
-        permittedNumberOfCallsInHalfOpenState: 3
-        automaticTransitionFromOpenToHalfOpenEnabled: true
-        waitDurationInOpenState: 30s
-        failureRateThreshold: 50
-        eventConsumerBufferSize: 10
-        recordExceptions:
-          - feign.FeignException
-          - java.lang.RuntimeException
-    instances:
-      emailService:
-        baseConfig: default
-        recordFailurePredicate: com.smartrent.config.retry.email.EmailServiceFailurePredicate
+spring:
+  application:
+    name: smart-rent
+  datasource:
+    driverClassName: com.mysql.cj.jdbc.Driver
+    url: ${IDENTITY_SERVICE_DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    out-of-order: false
+  jpa:
+    database: MYSQL
+    openInView: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        jdbc:
+          batch_size: 25
+          batch_versioned_data: true
+          time_zone: UTC
+        order_inserts: true
+        order_updates: true
+        show_sql: false
+        connection:
+          provider_disables_autocommit: false
+          handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_TRANSACTION
 
-  retry:
-    configs:
-      default:
-        maxAttempts: 3
-        waitDuration: 1s
-        exponentialBackoffMultiplier: 2.0
-        enableExponentialBackoff: true
-        retryExceptions:
-          - feign.FeignException
-        ignoreExceptions:
-          - feign.FeignException$BadRequest
-          - feign.FeignException$Unauthorized
-          - feign.FeignException$Forbidden
-    instances:
-      emailService:
-        baseConfig: default
-
-  timelimiter:
-    configs:
-      default:
-        timeoutDuration: 10s
-        cancelRunningFuture: true
-    instances:
-      emailService:
-        baseConfig: default
-
-# Management endpoints for monitoring circuit breaker health
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,circuitbreakers,retries
-  endpoint:
-    health:
-      show-details: always
-  health:
-    circuitbreakers:
-      enabled: true
-  metrics:
-    export:
-      prometheus:
-        enabled: true
+application:
+  client-url: "${CLIENT_URL:http://localhost:3000}"
+  authorize-ignored:
     methods:
       get:
         - "/swagger-ui/**"
@@ -149,3 +152,68 @@ open:
       secretKey: ${S3_SECRET_KEY}
       bucketName: ${S3_BUCKET}
       publicUrl: ${S3_PUBLIC_URL}
+
+# Resilience4j Configuration for Circuit Breaker and Retry patterns
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        slidingWindowType: COUNT_BASED
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 30s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        recordExceptions:
+          - feign.FeignException
+          - java.lang.RuntimeException
+    instances:
+      emailService:
+        baseConfig: default
+        recordFailurePredicate: com.smartrent.config.retry.email.EmailServiceFailurePredicate
+
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 1s
+        exponentialBackoffMultiplier: 2.0
+        enableExponentialBackoff: true
+        retryExceptions:
+          - feign.FeignException
+        ignoreExceptions:
+          - feign.FeignException$BadRequest
+          - feign.FeignException$Unauthorized
+          - feign.FeignException$Forbidden
+    instances:
+      emailService:
+        baseConfig: default
+
+  timelimiter:
+    configs:
+      default:
+        timeoutDuration: 10s
+        cancelRunningFuture: true
+    instances:
+      emailService:
+        baseConfig: default
+
+# Management endpoints for monitoring circuit breaker health
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,retries
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
