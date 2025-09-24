@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import com.smartrent.controller.dto.response.ApiResponse;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,139 +19,47 @@ import java.util.List;
 @RequestMapping("/v1/saved-listings")
 @Tag(name = "Saved Listings", description = "CRUD operations for user saved listings")
 @RequiredArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class SavedListingController {
 
-    private final SavedListingService savedListingService;
+    SavedListingService savedListingService;
 
-    @Operation(
-        summary = "Save a listing for the authenticated user",
-        security = @SecurityRequirement(name = "Bearer Authentication"),
-        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = true,
-            content = @io.swagger.v3.oas.annotations.media.Content(
-                schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = SavedListingRequest.class)
-            )
-        ),
-        responses = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "200",
-                description = "Listing saved successfully",
-                content = @io.swagger.v3.oas.annotations.media.Content(
-                    schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = SavedListingResponse.class)
-                )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "400",
-                description = "Listing is already saved by this user"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "401",
-                description = "Unauthorized - Authentication required"
-            )
-        }
-    )
     @PostMapping
-    public ResponseEntity<SavedListingResponse> saveListing(@Valid @RequestBody SavedListingRequest request) {
+    public ApiResponse<SavedListingResponse> saveListing(@Valid @RequestBody SavedListingRequest request) {
         SavedListingResponse response = savedListingService.saveListing(request);
-        return ResponseEntity.ok(response);
+        return ApiResponse.<SavedListingResponse>builder()
+                .data(response)
+                .build();
     }
 
-    @Operation(
-        summary = "Remove a saved listing for the authenticated user",
-        security = @SecurityRequirement(name = "Bearer Authentication"),
-        parameters = {
-            @Parameter(name = "listingId", description = "Listing ID", required = true)
-        },
-        responses = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "204",
-                description = "Saved listing removed successfully"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "404",
-                description = "Saved listing not found"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "401",
-                description = "Unauthorized - Authentication required"
-            )
-        }
-    )
     @DeleteMapping("/{listingId}")
-    public ResponseEntity<Void> unsaveListing(@PathVariable Long listingId) {
+    public ApiResponse<Void> unsaveListing(@PathVariable Long listingId) {
         savedListingService.unsaveListing(listingId);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.<Void>builder()
+                .build();
     }
 
-    @Operation(
-        summary = "Get all saved listings for the authenticated user",
-        security = @SecurityRequirement(name = "Bearer Authentication"),
-        responses = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "200",
-                description = "List of saved listings",
-                content = @io.swagger.v3.oas.annotations.media.Content(
-                    schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = SavedListingResponse.class)
-                )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "401",
-                description = "Unauthorized - Authentication required"
-            )
-        }
-    )
     @GetMapping("/my-saved")
-    public ResponseEntity<List<SavedListingResponse>> getMySavedListings() {
+    public ApiResponse<List<SavedListingResponse>> getMySavedListings() {
         List<SavedListingResponse> responses = savedListingService.getMySavedListings();
-        return ResponseEntity.ok(responses);
+        return ApiResponse.<List<SavedListingResponse>>builder()
+                .data(responses)
+                .build();
     }
 
-    @Operation(
-        summary = "Check if a listing is saved by the authenticated user",
-        security = @SecurityRequirement(name = "Bearer Authentication"),
-        parameters = {
-            @Parameter(name = "listingId", description = "Listing ID", required = true)
-        },
-        responses = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "200",
-                description = "Returns true if listing is saved, false otherwise",
-                content = @io.swagger.v3.oas.annotations.media.Content(
-                    schema = @io.swagger.v3.oas.annotations.media.Schema(type = "boolean")
-                )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "401",
-                description = "Unauthorized - Authentication required"
-            )
-        }
-    )
     @GetMapping("/check/{listingId}")
     public ResponseEntity<Boolean> isListingSaved(@PathVariable Long listingId) {
         boolean isSaved = savedListingService.isListingSaved(listingId);
-        return ResponseEntity.ok(isSaved);
+        return ApiResponse.<Boolean>builder()
+                .data(isSaved)
+                .build();
     }
 
-    @Operation(
-        summary = "Get count of saved listings for the authenticated user",
-        security = @SecurityRequirement(name = "Bearer Authentication"),
-        responses = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "200",
-                description = "Count of saved listings",
-                content = @io.swagger.v3.oas.annotations.media.Content(
-                    schema = @io.swagger.v3.oas.annotations.media.Schema(type = "integer", format = "int64")
-                )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "401",
-                description = "Unauthorized - Authentication required"
-            )
-        }
-    )
     @GetMapping("/count")
-    public ResponseEntity<Long> getMySavedListingsCount() {
+    public ApiResponse<Long> getMySavedListingsCount() {
         long count = savedListingService.getMySavedListingsCount();
-        return ResponseEntity.ok(count);
+        return ApiResponse.<Long>builder()
+                .data(count)
+                .build();
     }
 }
