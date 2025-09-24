@@ -97,7 +97,7 @@ jobs:
 
   update-dev-deployment:
     runs-on: ubuntu-latest
-    needs: docker
+    needs: build-and-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Checkout Deployment Repository
