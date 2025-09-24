@@ -2,16 +2,16 @@ name: Java CI with Gradle
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches: [ "main"]
   pull_request:
-    branches: [ "main", "dev" ]
+    branches: [ "main"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  unit-test:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -43,11 +43,9 @@ jobs:
             gradle-${{ runner.os }}-
             gradle-
 
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
       - name: Build and Run unit tests with coverage
         run: |
+          chmod +x gradlew
           ./gradlew build jacocoTestReport \
             --no-daemon \
             --parallel \
@@ -67,10 +65,10 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-  docker:
+  build-and-push:
     runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    needs: unit-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     defaults:
       run:
         working-directory: ./smart-rent
@@ -87,70 +85,36 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
-        run: |
-          IMAGE_NAME="vuhuydiet/smart-rent"
-          COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
-          ENV_TAG="dev"
-          
-          echo "Building image $IMAGE_NAME:$COMMIT_SHA and $IMAGE_NAME:$ENV_TAG"
-          
-          docker build \
-            -f ../Dockerfile \
-            -t $IMAGE_NAME:$COMMIT_SHA \
-            -t $IMAGE_NAME:$ENV_TAG \
-            ..
-          
-          docker push $IMAGE_NAME:$COMMIT_SHA
-          docker push $IMAGE_NAME:$ENV_TAG
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ..
+          file: ../Dockerfile
+          push: true
+          tags: |
+            vuhuydiet/smart-rent:${{ github.sha }}
+            vuhuydiet/smart-rent:dev
 
-  update-deployment:
+  update-dev-deployment:
     runs-on: ubuntu-latest
     needs: docker
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout deployment repository
+      - name: Checkout Deployment Repository
         uses: actions/checkout@v4
         with:
           repository: 'Vuhuydiet/smartrent-deploy'
           token: ${{ secrets.DEPLOY_REPO_TOKEN }}
-          path: 'deploy-repo'
-
-      - name: Set environment variables
-        id: env
-        run: |
-          COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
-          ENVIRONMENT=$([[ "${GITHUB_REF}" == "refs/heads/main" ]] && echo "prd" || echo "dev")
-          VALUES_FILE="charts/smartrent/environments/${ENVIRONMENT}/values.yaml"
-          
-          echo "commit-sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
-          echo "values-file=$VALUES_FILE" >> $GITHUB_OUTPUT
+          path: 'smartrent-deploy'
 
       - name: Update image tags in values.yaml
-        run: |
-          echo "Updating image tags to: ${{ steps.env.outputs.commit-sha }} for environment: ${{ steps.env.outputs.environment }}"
-          
-          sed -i '/^AIServer:/,/^[A-Za-z]/ s/^    tag: .*/    tag: ${{ steps.env.outputs.commit-sha }}/' deploy-repo/${{ steps.env.outputs.values-file }}
-          
-          echo "Updated values.yaml content:"
-          cat deploy-repo/${{ steps.env.outputs.values-file }}
-
-      - name: Get commit info
-        id: commit-info
-        run: |
-          COMMIT_MSG="${{ github.event.head_commit.message }}"
-          echo "commit-message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-
-          COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
-          echo "commit-sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-
-          COMMIT_LINK="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
-          echo "commit-link=$COMMIT_LINK" >> $GITHUB_OUTPUT
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i '.BEServer.image.tag = "${{ github.sha }}"' smartrent-deploy/charts/smartrent/environments/dev/values.yaml
 
       - name: Commit and push changes
+        working-directory: smartrent-deploy
         run: |
-          cd deploy-repo
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add charts/smartrent/environments/dev/values.yaml
@@ -160,6 +124,7 @@ jobs:
             exit 0
           fi
           
-          COMMIT_MESSAGE="${{ steps.commit-info.outputs.commit-sha }}: ${{ steps.commit-info.outputs.commit-message }} ${{ steps.commit-info.outputs.commit-link }}"
+          COMMIT_LINK="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+          COMMIT_MESSAGE="Deploy: ${{ github.event.head_commit.message }} (${COMMIT_LINK})"
           git commit -m "$COMMIT_MESSAGE"
           git push
