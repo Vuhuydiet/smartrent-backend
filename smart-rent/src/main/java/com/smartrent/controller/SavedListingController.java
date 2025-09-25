@@ -3,14 +3,16 @@ package com.smartrent.controller;
 import com.smartrent.controller.dto.request.SavedListingRequest;
 import com.smartrent.controller.dto.response.SavedListingResponse;
 import com.smartrent.service.listing.SavedListingService;
+import com.smartrent.controller.dto.response.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import com.smartrent.controller.dto.response.ApiResponse;
+import lombok.experimental.FieldDefaults;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -48,7 +50,7 @@ public class SavedListingController {
     }
 
     @GetMapping("/check/{listingId}")
-    public ResponseEntity<Boolean> isListingSaved(@PathVariable Long listingId) {
+    public ApiResponse<Boolean> isListingSaved(@PathVariable Long listingId) {
         boolean isSaved = savedListingService.isListingSaved(listingId);
         return ApiResponse.<Boolean>builder()
                 .data(isSaved)
