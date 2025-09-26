@@ -1,7 +1,7 @@
 package com.smartrent.service.pricing;
 
-import com.smartrent.controller.dto.request.PriceUpdateRequest;
-import com.smartrent.controller.dto.response.PricingHistoryResponse;
+import com.smartrent.dto.request.PriceUpdateRequest;
+import com.smartrent.dto.response.PricingHistoryResponse;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

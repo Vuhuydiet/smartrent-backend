@@ -1,7 +1,7 @@
 package com.smartrent.config.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.smartrent.controller.dto.response.ApiResponse;
+import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.infra.exception.model.DomainCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

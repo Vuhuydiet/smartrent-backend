@@ -1,7 +1,7 @@
 package com.smartrent.controller;
 
-import com.smartrent.controller.dto.response.ApiResponse;
-import com.smartrent.controller.dto.response.UploadResponse;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.UploadResponse;
 import com.smartrent.service.storage.StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;

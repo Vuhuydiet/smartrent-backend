@@ -121,6 +121,7 @@ public class OpenAPIConfig {
                                 .type(SecurityScheme.Type.HTTP)
                                 .scheme("bearer")
                                 .bearerFormat("JWT")
+
                                 .in(SecurityScheme.In.HEADER)
                                 .name("Authorization")
                                 .description("JWT Authorization header using the Bearer scheme. " +

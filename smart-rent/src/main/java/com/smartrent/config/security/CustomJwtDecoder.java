@@ -1,8 +1,8 @@
 package com.smartrent.config.security;
 
 import com.smartrent.config.Constants;
-import com.smartrent.controller.dto.request.IntrospectRequest;
-import com.smartrent.controller.dto.response.IntrospectResponse;
+import com.smartrent.dto.request.IntrospectRequest;
+import com.smartrent.dto.response.IntrospectResponse;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.service.authentication.AuthenticationService;
 import lombok.experimental.NonFinal;

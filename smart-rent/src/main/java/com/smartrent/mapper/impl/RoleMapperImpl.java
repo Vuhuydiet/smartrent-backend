@@ -1,6 +1,6 @@
 package com.smartrent.mapper.impl;
 
-import com.smartrent.controller.dto.response.GetRoleResponse;
+import com.smartrent.dto.response.GetRoleResponse;
 import com.smartrent.infra.repository.entity.Role;
 import com.smartrent.mapper.RoleMapper;
 import org.springframework.stereotype.Component;

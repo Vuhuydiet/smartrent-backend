@@ -1,10 +1,10 @@
 package com.smartrent.controller;
 
-import com.smartrent.controller.dto.request.ListingCreationRequest;
-import com.smartrent.controller.dto.request.ListingRequest;
-import com.smartrent.controller.dto.response.ApiResponse;
-import com.smartrent.controller.dto.response.ListingCreationResponse;
-import com.smartrent.controller.dto.response.ListingResponse;
+import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.service.listing.ListingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

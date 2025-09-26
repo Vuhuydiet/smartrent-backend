@@ -1,25 +1,30 @@
 package com.smartrent.dto.response;
 
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 
-@Data
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class ProvinceResponse {
-    private Long provinceId;
-    private String name;
-    private String code;
-    private String type;
-    private String displayName;
-    private boolean isActive;
-    private boolean isMerged;
-    private boolean isParentProvince;
+    Long provinceId;
+    String name;
+    String code;
+    String type;
+    String displayName;
+    boolean isActive;
+    boolean isMerged;
+    boolean isParentProvince;
 
     // For merged provinces
-    private Long parentProvinceId;
-    private String originalName;
+    Long parentProvinceId;
+    String originalName;
 }

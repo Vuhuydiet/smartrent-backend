@@ -1,6 +1,6 @@
 package com.smartrent.service.role;
 
-import com.smartrent.controller.dto.response.GetRoleResponse;
+import com.smartrent.dto.response.GetRoleResponse;
 import java.util.List;
 
 

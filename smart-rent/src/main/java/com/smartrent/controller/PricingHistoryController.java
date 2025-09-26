@@ -1,8 +1,8 @@
 package com.smartrent.controller;
 
-import com.smartrent.controller.dto.request.PriceUpdateRequest;
-import com.smartrent.controller.dto.response.ApiResponse;
-import com.smartrent.controller.dto.response.PricingHistoryResponse;
+import com.smartrent.dto.request.PriceUpdateRequest;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.PricingHistoryResponse;
 import com.smartrent.service.pricing.PricingHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;

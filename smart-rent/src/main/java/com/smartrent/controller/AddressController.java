@@ -1,7 +1,7 @@
 package com.smartrent.controller;
 
-import com.smartrent.controller.dto.request.AddressCreationRequest;
-import com.smartrent.controller.dto.response.*;
+import com.smartrent.dto.request.AddressCreationRequest;
+import com.smartrent.dto.response.*;
 import com.smartrent.service.address.AddressService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;

@@ -1,7 +1,7 @@
 package com.smartrent.service.pricing.impl;
 
-import com.smartrent.controller.dto.request.PriceUpdateRequest;
-import com.smartrent.controller.dto.response.PricingHistoryResponse;
+import com.smartrent.dto.request.PriceUpdateRequest;
+import com.smartrent.dto.response.PricingHistoryResponse;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.PricingHistoryRepository;
 import com.smartrent.infra.repository.entity.Listing;
