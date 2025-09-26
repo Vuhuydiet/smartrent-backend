@@ -76,8 +76,8 @@ public class ListingServiceImpl implements ListingService {
         if (request.getTitle() != null) existing.setTitle(request.getTitle());
         if (request.getDescription() != null) existing.setDescription(request.getDescription());
         if (request.getExpiryDate() != null) existing.setExpiryDate(request.getExpiryDate());
-    if (request.getVerified() != null) existing.setVerified(request.getVerified());
-    if (request.getIsVerify() != null) existing.setIsVerify(request.getIsVerify());
+        if (request.getVerified() != null) existing.setVerified(request.getVerified());
+        if (request.getIsVerify() != null) existing.setIsVerify(request.getIsVerify());
         if (request.getExpired() != null) existing.setExpired(request.getExpired());
         if (request.getPrice() != null) existing.setPrice(request.getPrice());
         if (request.getArea() != null) existing.setArea(request.getArea());

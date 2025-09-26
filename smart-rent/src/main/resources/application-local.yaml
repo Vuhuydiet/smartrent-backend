@@ -38,6 +38,7 @@ application:
       get:
         - "/v1/users/**"
         - "/v1/admins/**"
+        - "/**/actuator/**"
       post:
         - "/v1/auth/**"
         - "/v1/users/**"
