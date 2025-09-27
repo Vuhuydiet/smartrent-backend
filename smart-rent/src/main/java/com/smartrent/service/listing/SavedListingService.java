@@ -1,7 +1,7 @@
 package com.smartrent.service.listing;
 
-import com.smartrent.controller.dto.request.SavedListingRequest;
-import com.smartrent.controller.dto.response.SavedListingResponse;
+import com.smartrent.dto.request.SavedListingRequest;
+import com.smartrent.dto.response.SavedListingResponse;
 
 import java.util.List;
 

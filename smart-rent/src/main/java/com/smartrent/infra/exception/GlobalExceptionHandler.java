@@ -1,6 +1,6 @@
 package com.smartrent.infra.exception;
 
-import com.smartrent.controller.dto.response.ApiResponse;
+import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.infra.exception.model.DomainCode;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;

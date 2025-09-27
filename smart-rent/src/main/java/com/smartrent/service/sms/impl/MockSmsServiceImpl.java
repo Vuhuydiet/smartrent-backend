@@ -1,7 +1,7 @@
 package com.smartrent.service.sms.impl;
 
-import com.smartrent.controller.dto.request.MockSmsRequest;
-import com.smartrent.controller.dto.response.MockSmsResponse;
+import com.smartrent.dto.request.MockSmsRequest;
+import com.smartrent.dto.response.MockSmsResponse;
 import com.smartrent.service.sms.SmsService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;

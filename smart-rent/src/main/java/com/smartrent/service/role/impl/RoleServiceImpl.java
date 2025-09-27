@@ -1,6 +1,6 @@
 package com.smartrent.service.role.impl;
 
-import com.smartrent.controller.dto.response.GetRoleResponse;
+import com.smartrent.dto.response.GetRoleResponse;
 import com.smartrent.infra.repository.RoleRepository;
 import com.smartrent.infra.repository.entity.Role;
 import com.smartrent.mapper.RoleMapper;

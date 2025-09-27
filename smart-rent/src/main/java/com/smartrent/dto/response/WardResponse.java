@@ -1,22 +1,27 @@
 package com.smartrent.dto.response;
 
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 
-@Data
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class WardResponse {
-    private Long wardId;
-    private String name;
-    private String code;
-    private String type;
-    private Long districtId;
-    private String districtName;
-    private Long provinceId;
-    private String provinceName;
-    private boolean isActive;
+    Long wardId;
+    String name;
+    String code;
+    String type;
+    Long districtId;
+    String districtName;
+    Long provinceId;
+    String provinceName;
+    boolean isActive;
 }

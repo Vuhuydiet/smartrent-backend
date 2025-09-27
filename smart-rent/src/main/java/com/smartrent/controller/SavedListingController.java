@@ -1,9 +1,9 @@
 package com.smartrent.controller;
 
-import com.smartrent.controller.dto.request.SavedListingRequest;
-import com.smartrent.controller.dto.response.SavedListingResponse;
+import com.smartrent.dto.request.SavedListingRequest;
+import com.smartrent.dto.response.SavedListingResponse;
 import com.smartrent.service.listing.SavedListingService;
-import com.smartrent.controller.dto.response.ApiResponse;
+import com.smartrent.dto.response.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

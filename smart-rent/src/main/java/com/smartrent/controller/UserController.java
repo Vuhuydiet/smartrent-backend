@@ -1,10 +1,10 @@
 package com.smartrent.controller;
 
 import com.smartrent.config.Constants;
-import com.smartrent.controller.dto.request.UserCreationRequest;
-import com.smartrent.controller.dto.response.ApiResponse;
-import com.smartrent.controller.dto.response.GetUserResponse;
-import com.smartrent.controller.dto.response.UserCreationResponse;
+import com.smartrent.dto.request.UserCreationRequest;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.GetUserResponse;
+import com.smartrent.dto.response.UserCreationResponse;
 import com.smartrent.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

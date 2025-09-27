@@ -1,7 +1,7 @@
 package com.smartrent.controller;
 
-import com.smartrent.controller.dto.response.ApiResponse;
-import com.smartrent.controller.dto.response.GetRoleResponse;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.GetRoleResponse;
 import com.smartrent.service.role.RoleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;

@@ -1,7 +1,7 @@
 package com.smartrent.service.listing.impl;
 
-import com.smartrent.controller.dto.request.SavedListingRequest;
-import com.smartrent.controller.dto.response.SavedListingResponse;
+import com.smartrent.dto.request.SavedListingRequest;
+import com.smartrent.dto.response.SavedListingResponse;
 import com.smartrent.infra.repository.SavedListingRepository;
 import com.smartrent.infra.repository.entity.SavedListing;
 import com.smartrent.infra.repository.entity.SavedListingId;
