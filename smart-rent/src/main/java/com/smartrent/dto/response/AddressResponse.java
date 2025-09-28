@@ -1,29 +1,34 @@
 package com.smartrent.dto.response;
 
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 
-@Data
+@Getter
+@Setter
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class AddressResponse {
-    private Long addressId;
-    private String streetNumber;
-    private Long streetId;
-    private String streetName;
-    private Long wardId;
-    private String wardName;
-    private Long districtId;
-    private String districtName;
-    private Long provinceId;
-    private String provinceName;
-    private String fullAddress;
-    private BigDecimal latitude;
-    private BigDecimal longitude;
-    private boolean isVerified;
+    Long addressId;
+    String streetNumber;
+    Long streetId;
+    String streetName;
+    Long wardId;
+    String wardName;
+    Long districtId;
+    String districtName;
+    Long provinceId;
+    String provinceName;
+    String fullAddress;
+    BigDecimal latitude;
+    BigDecimal longitude;
+    boolean isVerified;
 }

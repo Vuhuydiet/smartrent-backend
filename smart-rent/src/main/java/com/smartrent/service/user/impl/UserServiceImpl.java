@@ -1,9 +1,9 @@
 package com.smartrent.service.user.impl;
 
 import com.smartrent.config.Constants;
-import com.smartrent.controller.dto.request.UserCreationRequest;
-import com.smartrent.controller.dto.response.GetUserResponse;
-import com.smartrent.controller.dto.response.UserCreationResponse;
+import com.smartrent.dto.request.UserCreationRequest;
+import com.smartrent.dto.response.GetUserResponse;
+import com.smartrent.dto.response.UserCreationResponse;
 import com.smartrent.infra.exception.DocumentExistingException;
 import com.smartrent.infra.exception.EmailExistingException;
 import com.smartrent.infra.exception.PhoneExistingException;

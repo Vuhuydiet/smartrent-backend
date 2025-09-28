@@ -13,6 +13,7 @@ logging:
     com.smartrent.service.admin: INFO
     com.smartrent.service.email: INFO
     com.smartrent.service.role: INFO
+    com.smartrent.service.listing: INFO
     com.smartrent.service.payment: INFO
     com.smartrent.service.analytics: INFO
     com.smartrent.service.communication: INFO

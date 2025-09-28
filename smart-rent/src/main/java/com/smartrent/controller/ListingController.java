@@ -1,16 +1,19 @@
 package com.smartrent.controller;
 
-import com.smartrent.controller.dto.request.ListingCreationRequest;
-import com.smartrent.controller.dto.request.ListingRequest;
-import com.smartrent.controller.dto.response.ListingCreationResponse;
-import com.smartrent.controller.dto.response.ListingResponse;
+import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.service.listing.ListingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import com.smartrent.service.listing.ListingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,24 +31,68 @@ public class ListingController {
         summary = "Create a new listing",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
-            content = @io.swagger.v3.oas.annotations.media.Content(
-                schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ListingCreationRequest.class)
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ListingCreationRequest.class),
+                examples = @ExampleObject(
+                    name = "Create Listing Example",
+                    value = """
+                        {
+                          "title": "Cozy 2BR Apartment in Downtown",
+                          "description": "Spacious 2-bedroom apartment with balcony and city view.",
+                          "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                          "expiryDate": "2025-12-31T23:59:59",
+                          "listingType": "RENT",
+                          "verified": false,
+                          "isVerify": false,
+                          "expired": false,
+                          "vipType": "NORMAL",
+                          "categoryId": 10,
+                          "productType": "APARTMENT",
+                          "price": 1200.00,
+                          "priceUnit": "MONTH",
+                          "addressId": 501,
+                          "area": 78.5,
+                          "bedrooms": 2,
+                          "bathrooms": 1,
+                          "direction": "NORTHEAST",
+                          "furnishing": "SEMI_FURNISHED",
+                          "propertyType": "APARTMENT",
+                          "roomCapacity": 4,
+                          "amenityIds": [1, 3, 5]
+                        }
+                        """
+                )
             )
         ),
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
                 description = "Listing created",
-                content = @io.swagger.v3.oas.annotations.media.Content(
-                    schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ListingCreationResponse.class)
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Success Response",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "listingId": 123,
+                                "status": "CREATED"
+                              }
+                            }
+                            """
+                    )
                 )
             )
         }
     )
     @PostMapping
-    public ResponseEntity<ListingCreationResponse> createListing(@Valid @RequestBody ListingCreationRequest request) {
+    public ApiResponse<ListingCreationResponse> createListing(@Valid @RequestBody ListingCreationRequest request) {
         ListingCreationResponse response = listingService.createListing(request);
-        return ResponseEntity.ok(response);
+        return ApiResponse.<ListingCreationResponse>builder().data(response).build();
     }
 
     @Operation(
@@ -57,20 +104,71 @@ public class ListingController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
                 description = "Listing found",
-                content = @io.swagger.v3.oas.annotations.media.Content(
-                    schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ListingResponse.class)
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Listing Example",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "listingId": 123,
+                                "title": "Cozy 2BR Apartment in Downtown",
+                                "description": "Spacious 2-bedroom apartment with balcony and city view.",
+                                "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                "postDate": "2025-09-01T10:00:00",
+                                "expiryDate": "2025-12-31T23:59:59",
+                                "listingType": "RENT",
+                                "verified": false,
+                                "isVerify": false,
+                                "expired": false,
+                                "vipType": "NORMAL",
+                                "categoryId": 10,
+                                "productType": "APARTMENT",
+                                "price": 1200.00,
+                                "priceUnit": "MONTH",
+                                "addressId": 501,
+                                "area": 78.5,
+                                "bedrooms": 2,
+                                "bathrooms": 1,
+                                "direction": "NORTHEAST",
+                                "furnishing": "SEMI_FURNISHED",
+                                "propertyType": "APARTMENT",
+                                "roomCapacity": 4,
+                                "amenityIds": [1,3,5],
+                                "createdAt": "2025-09-01T10:00:00",
+                                "updatedAt": "2025-09-01T10:00:00"
+                              }
+                            }
+                            """
+                    )
                 )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "404",
-                description = "Listing not found"
+                description = "Listing not found",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Not Found",
+                        value = """
+                            {
+                              "code": "404001",
+                              "message": "LISTING_NOT_FOUND",
+                              "data": null
+                            }
+                            """
+                    )
+                )
             )
         }
     )
     @GetMapping("/{id}")
-    public ResponseEntity<ListingResponse> getListingById(@PathVariable Long id) {
+    public ApiResponse<ListingResponse> getListingById(@PathVariable Long id) {
         ListingResponse response = listingService.getListingById(id);
-        return ResponseEntity.ok(response);
+        return ApiResponse.<ListingResponse>builder().data(response).build();
     }
 
     @GetMapping
@@ -86,23 +184,49 @@ public class ListingController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
                 description = "List of listings",
-                content = @io.swagger.v3.oas.annotations.media.Content(
-                    schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ListingResponse.class)
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Listings Example",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": [
+                                {
+                                  "listingId": 123,
+                                  "title": "Cozy 2BR Apartment in Downtown",
+                                  "price": 1200.00,
+                                  "priceUnit": "MONTH",
+                                  "productType": "APARTMENT"
+                                },
+                                {
+                                  "listingId": 124,
+                                  "title": "Modern Studio near Park",
+                                  "price": 700.00,
+                                  "priceUnit": "MONTH",
+                                  "productType": "STUDIO"
+                                }
+                              ]
+                            }
+                            """
+                    )
                 )
             )
         }
     )
-    public ResponseEntity<List<ListingResponse>> getListings(
+    public ApiResponse<List<ListingResponse>> getListings(
         @RequestParam(value = "ids", required = false) Set<Long> ids,
         @RequestParam(value = "page", defaultValue = "0") int page,
         @RequestParam(value = "size", defaultValue = "20") int size
     ) {
         if (ids != null && !ids.isEmpty()) {
             List<ListingResponse> responses = listingService.getListingsByIds(ids);
-            return ResponseEntity.ok(responses);
+            return ApiResponse.<List<ListingResponse>>builder().data(responses).build();
         }
         List<ListingResponse> responses = listingService.getListings(page, size);
-        return ResponseEntity.ok(responses);
+        return ApiResponse.<List<ListingResponse>>builder().data(responses).build();
     }
 
     @Operation(
@@ -112,28 +236,69 @@ public class ListingController {
         },
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
-            content = @io.swagger.v3.oas.annotations.media.Content(
-                schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ListingRequest.class)
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ListingRequest.class),
+                examples = @ExampleObject(
+                    name = "Update Listing Example",
+                    value = """
+                        {
+                          "title": "Updated 2BR Apartment with New Photos",
+                          "description": "Now includes a renovated kitchen and updated bathroom.",
+                          "userId": 42,
+                          "expiryDate": "2026-01-31T23:59:59",
+                          "listingType": "RENT",
+                          "vipType": "VIP",
+                          "categoryId": 10,
+                          "productType": "APARTMENT",
+                          "price": 1300.00,
+                          "priceUnit": "MONTH",
+                          "addressId": 501,
+                          "area": 80.0,
+                          "bedrooms": 2,
+                          "bathrooms": 1,
+                          "direction": "NORTH",
+                          "furnishing": "FULLY_FURNISHED",
+                          "propertyType": "APARTMENT",
+                          "roomCapacity": 4,
+                          "amenityIds": [1, 2, 3]
+                        }
+                        """
+                )
             )
         ),
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
                 description = "Listing updated",
-                content = @io.swagger.v3.oas.annotations.media.Content(
-                    schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ListingResponse.class)
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class)
                 )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "404",
-                description = "Listing not found"
+                description = "Listing not found",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Not Found",
+                        value = """
+                            {
+                              "code": "404001",
+                              "message": "LISTING_NOT_FOUND",
+                              "data": null
+                            }
+                            """
+                    )
+                )
             )
         }
     )
     @PutMapping("/{id}")
-    public ResponseEntity<ListingResponse> updateListing(@PathVariable Long id, @RequestBody ListingRequest request) {
+    public ApiResponse<ListingResponse> updateListing(@PathVariable Long id, @RequestBody ListingRequest request) {
         ListingResponse response = listingService.updateListing(id, request);
-        return ResponseEntity.ok(response);
+        return ApiResponse.<ListingResponse>builder().data(response).build();
     }
 
     @Operation(
@@ -143,18 +308,41 @@ public class ListingController {
         },
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "204",
-                description = "Listing deleted"
+                responseCode = "200",
+                description = "Listing deleted",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Success",
+                        value = """
+                            { "code": "999999", "message": null, "data": null }
+                            """
+                    )
+                )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "404",
-                description = "Listing not found"
+                description = "Listing not found",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Not Found",
+                        value = """
+                            {
+                              "code": "404001",
+                              "message": "LISTING_NOT_FOUND",
+                              "data": null
+                            }
+                            """
+                    )
+                )
             )
         }
     )
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteListing(@PathVariable Long id) {
+    public ApiResponse<Void> deleteListing(@PathVariable Long id) {
         listingService.deleteListing(id);
-        return ResponseEntity.noContent().build();
+        return ApiResponse.<Void>builder().build();
     }
 }

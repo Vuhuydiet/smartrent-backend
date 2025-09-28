@@ -47,3 +47,13 @@ out/
 
 ### Docker ###
 docker-compose.override.yml
+
+### Logs ###
+logs/
+*.log
+
+### Local Spring profiles (never commit secrets) ###
+src/main/resources/application-local.yaml
+src/test/resources/application-local.yaml
+
+diff/

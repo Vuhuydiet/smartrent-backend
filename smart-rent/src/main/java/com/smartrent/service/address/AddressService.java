@@ -1,7 +1,7 @@
 package com.smartrent.service.address;
 
-import com.smartrent.controller.dto.request.AddressCreationRequest;
-import com.smartrent.controller.dto.response.*;
+import com.smartrent.dto.request.AddressCreationRequest;
+import com.smartrent.dto.response.*;
 
 import java.math.BigDecimal;
 import java.util.List;

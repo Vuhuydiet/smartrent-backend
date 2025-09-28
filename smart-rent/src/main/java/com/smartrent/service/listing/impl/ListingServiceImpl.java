@@ -1,9 +1,9 @@
 package com.smartrent.service.listing.impl;
 
-import com.smartrent.controller.dto.request.ListingCreationRequest;
-import com.smartrent.controller.dto.request.ListingRequest;
-import com.smartrent.controller.dto.response.ListingCreationResponse;
-import com.smartrent.controller.dto.response.ListingResponse;
+import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.mapper.ListingMapper;
@@ -76,8 +76,8 @@ public class ListingServiceImpl implements ListingService {
         if (request.getTitle() != null) existing.setTitle(request.getTitle());
         if (request.getDescription() != null) existing.setDescription(request.getDescription());
         if (request.getExpiryDate() != null) existing.setExpiryDate(request.getExpiryDate());
-    if (request.getVerified() != null) existing.setVerified(request.getVerified());
-    if (request.getIsVerify() != null) existing.setIsVerify(request.getIsVerify());
+        if (request.getVerified() != null) existing.setVerified(request.getVerified());
+        if (request.getIsVerify() != null) existing.setIsVerify(request.getIsVerify());
         if (request.getExpired() != null) existing.setExpired(request.getExpired());
         if (request.getPrice() != null) existing.setPrice(request.getPrice());
         if (request.getArea() != null) existing.setArea(request.getArea());

@@ -1,8 +1,8 @@
 package com.smartrent.mapper.impl;
 
-import com.smartrent.controller.dto.request.ListingCreationRequest;
-import com.smartrent.controller.dto.response.ListingResponse;
-import com.smartrent.controller.dto.response.ListingCreationResponse;
+import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.ListingMapper;
 import org.springframework.stereotype.Component;

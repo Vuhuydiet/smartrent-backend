@@ -1,6 +1,6 @@
 package com.smartrent.service.authentication.impl;
 
-import com.smartrent.controller.dto.request.VerifyCodeRequest;
+import com.smartrent.dto.request.VerifyCodeRequest;
 import com.smartrent.infra.exception.UserNotFoundException;
 import com.smartrent.infra.exception.VerifyCodeExpiredException;
 import com.smartrent.infra.exception.VerifyCodeNotFoundException;

@@ -1,8 +1,8 @@
 package com.smartrent.mapper.impl;
 
-import com.smartrent.controller.dto.request.AdminCreationRequest;
-import com.smartrent.controller.dto.response.AdminCreationResponse;
-import com.smartrent.controller.dto.response.GetAdminResponse;
+import com.smartrent.dto.request.AdminCreationRequest;
+import com.smartrent.dto.response.AdminCreationResponse;
+import com.smartrent.dto.response.GetAdminResponse;
 import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.Role;
 import com.smartrent.mapper.AdminMapper;

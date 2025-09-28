@@ -1,4 +1,4 @@
-package com.smartrent.service.storage;
+   package com.smartrent.service.storage;
 
 import com.smartrent.config.S3StorageProperties;
 import lombok.RequiredArgsConstructor;

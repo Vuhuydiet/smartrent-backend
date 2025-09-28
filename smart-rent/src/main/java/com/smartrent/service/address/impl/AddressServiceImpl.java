@@ -1,7 +1,7 @@
 package com.smartrent.service.address.impl;
 
-import com.smartrent.controller.dto.request.AddressCreationRequest;
-import com.smartrent.controller.dto.response.*;
+import com.smartrent.dto.request.AddressCreationRequest;
+import com.smartrent.dto.response.*;
 import com.smartrent.infra.repository.*;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.AddressMapper;
