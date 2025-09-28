@@ -1,7 +1,7 @@
 package com.smartrent.utility;
 
 import com.smartrent.config.Constants;
-import com.smartrent.infra.repository.entity.VerifyCode;
+import com.smartrent.service.authentication.domain.OtpData;
 
 public class EmailBuilder {
   
@@ -34,7 +34,7 @@ public class EmailBuilder {
     return htmlContent;
   }
 
-  public static String buildVerifyHtmlContent(String senderName, String firstName, String lastName, VerifyCode verifyCode, int otpDuration) {
+  public static String buildVerifyHtmlContent(String senderName, String firstName, String lastName, OtpData otpData, int otpDuration) {
     // HTML header with styles
     StringBuilder htmlContent = buildHtmlHeader(Constants.EMAIL_VERIFICATION_HEADER);
 
@@ -56,7 +56,7 @@ public class EmailBuilder {
 
     // OTP section
     htmlContent.append("<div class=\"otp-container\">");
-    htmlContent.append("<div class=\"otp-code\">%s</div>".formatted(verifyCode.getVerifyCode()));
+    htmlContent.append("<div class=\"otp-code\">%s</div>".formatted(otpData.getOtpCode()));
     htmlContent.append("</div>");
 
     // Expiry information

@@ -2,6 +2,7 @@ package com.smartrent.controller.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.io.Serializable;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,7 +19,7 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Response object containing user profile information")
-public class GetUserResponse {
+public class GetUserResponse implements Serializable {
 
   @Schema(
       description = "Unique identifier for the user",

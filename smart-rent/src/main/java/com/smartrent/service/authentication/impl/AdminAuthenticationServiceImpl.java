@@ -15,12 +15,11 @@ import com.smartrent.controller.dto.response.AuthenticationResponse;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AdminRepository;
-import com.smartrent.infra.repository.InvalidatedTokenRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.Admin;
-import com.smartrent.infra.repository.entity.InvalidatedToken;
 import com.smartrent.mapper.AdminMapper;
 import com.smartrent.mapper.UserMapper;
+import com.smartrent.service.authentication.TokenCacheService;
 import com.smartrent.service.authentication.domain.TokenType;
 import java.text.ParseException;
 import java.time.Instant;
@@ -45,14 +44,14 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
 
   @Autowired
   public AdminAuthenticationServiceImpl(
-      InvalidatedTokenRepository invalidatedTokenRepository,
+      TokenCacheService tokenCacheService,
       UserRepository userRepository,
       PasswordEncoder passwordEncoder,
       VerificationService verificationService,
       AdminRepository adminRepository,
       UserMapper userMapper,
       AdminMapper adminMapper) {
-    super(userRepository, userMapper, invalidatedTokenRepository, passwordEncoder, verificationService);
+    super(userRepository, userMapper, tokenCacheService, passwordEncoder, verificationService);
     this.adminRepository = adminRepository;
     this.adminMapper = adminMapper;
   }
@@ -82,11 +81,7 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
       LocalDateTime expirationTime = LocalDateTime.ofInstant(expirationInstant, ZoneId.systemDefault());
       expirationTime = expirationTime.plusSeconds(REFRESHABLE_DURATION - VALID_DURATION);
 
-      invalidatedTokenRepository.save(InvalidatedToken.builder()
-          .accessId(acId)
-          .refreshId(rfId)
-          .expirationTime(expirationTime)
-          .build());
+      tokenCacheService.invalidateTokens(acId, rfId, expirationTime);
 
       Admin admin = adminRepository.findById(signedJWT.getJWTClaimsSet().getSubject())
           .orElseThrow(() -> new DomainException(DomainCode.USER_NOT_FOUND));

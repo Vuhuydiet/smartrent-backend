@@ -22,12 +22,11 @@ import com.smartrent.infra.exception.IncorrectPasswordException;
 import com.smartrent.infra.exception.UserNotFoundException;
 import com.smartrent.infra.exception.UserNotVerifiedException;
 import com.smartrent.infra.exception.model.DomainCode;
-import com.smartrent.infra.repository.InvalidatedTokenRepository;
 import com.smartrent.infra.repository.UserRepository;
-import com.smartrent.infra.repository.entity.InvalidatedToken;
 import com.smartrent.infra.repository.entity.User;
 import com.smartrent.mapper.UserMapper;
 import com.smartrent.service.authentication.AuthenticationService;
+import com.smartrent.service.authentication.TokenCacheService;
 import com.smartrent.service.authentication.VerificationService;
 import com.smartrent.service.authentication.domain.TokenType;
 import lombok.AccessLevel;
@@ -60,7 +59,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
   UserMapper userMapper;
 
-  protected InvalidatedTokenRepository invalidatedTokenRepository;
+  protected TokenCacheService tokenCacheService;
 
   protected PasswordEncoder passwordEncoder;
 
@@ -133,11 +132,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       LocalDateTime expirationTime = LocalDateTime.ofInstant(expirationInstant, ZoneId.systemDefault());
       expirationTime = expirationTime.plusSeconds(REFRESHABLE_DURATION - VALID_DURATION);
 
-      invalidatedTokenRepository.save(InvalidatedToken.builder()
-          .accessId(acId)
-          .refreshId(rfId)
-          .expirationTime(expirationTime)
-          .build());
+      tokenCacheService.invalidateTokens(acId, rfId, expirationTime);
     } catch (ParseException e) {
       throw new DomainException(DomainCode.UNKNOWN_ERROR);
     }
@@ -155,11 +150,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       LocalDateTime expirationTime = LocalDateTime.ofInstant(expirationInstant, ZoneId.systemDefault());
       expirationTime = expirationTime.plusSeconds(REFRESHABLE_DURATION - VALID_DURATION);
 
-      invalidatedTokenRepository.save(InvalidatedToken.builder()
-          .accessId(acId)
-          .refreshId(rfId)
-          .expirationTime(expirationTime)
-          .build());
+      tokenCacheService.invalidateTokens(acId, rfId, expirationTime);
 
       User user = userRepository.findById(signedJWT.getJWTClaimsSet().getSubject())
           .orElseThrow(() -> new DomainException(DomainCode.USER_NOT_FOUND));
@@ -180,6 +171,10 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       throw new IncorrectPasswordException();
     }
 
+    if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+      throw new DomainException(DomainCode.PASSWORD_SAME);
+    }
+
     verificationService.verifyCode(VerifyCodeRequest.builder()
             .email(user.getEmail())
             .verificationCode(request.getVerificationCode())
@@ -191,7 +186,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
   @Override
   public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
-    User user = verificationService.verifyCode(request.getVerificationCode());
+    User user = verificationService.verifyCode(request.getVerificationCode(), request.getEmail());
     return buildForgotPasswordResponse(user);
   }
 
@@ -211,6 +206,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
   @Override
   public void resetPassword(ResetPasswordRequest request) {
     try {
+
       SignedJWT signedJWT = verifyToken(request.getResetPasswordToken(), TokenType.RESET_PASSWORD);
       String rsId = signedJWT.getJWTClaimsSet().getJWTID();
 
@@ -221,14 +217,14 @@ public class AuthenticationServiceImpl implements AuthenticationService {
       User user = userRepository.findById(userId)
           .orElseThrow(UserNotFoundException::new);
 
+      if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+        throw new DomainException(DomainCode.PASSWORD_SAME);
+      }
+
       user.setPassword(passwordEncoder.encode(request.getNewPassword()));
       userRepository.saveAndFlush(user);
 
-      invalidatedTokenRepository.save(InvalidatedToken.builder()
-          .accessId(rsId)
-          .refreshId(rsId)
-          .expirationTime(expirationTime)
-          .build());
+      tokenCacheService.invalidateToken(rsId, expirationTime);
     } catch (Exception e) {
       log.info(e.getMessage());
       throw new DomainException(DomainCode.UNKNOWN_ERROR);
@@ -272,7 +268,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         throw new DomainException(DomainCode.INVALID_TOKEN);
       }
 
-      if (invalidatedTokenRepository.existsByAccessIdOrRefreshId(id)) {
+      if (tokenCacheService.isTokenInvalidated(id)) {
         log.error("JWT token has been invalidated for token type: {}, token ID: {}", tokenType, id);
         throw new DomainException(DomainCode.INVALID_TOKEN);
       }

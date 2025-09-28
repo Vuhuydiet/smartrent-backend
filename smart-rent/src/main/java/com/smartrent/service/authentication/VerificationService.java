@@ -7,7 +7,7 @@ public interface VerificationService {
 
   void verifyCode(VerifyCodeRequest verifyCodeRequest);
 
-  User verifyCode(String verifyCode);
+  User verifyCode(String verifyCode, String email);
 
   void sendVerifyCode(String email);
 
