@@ -78,6 +78,11 @@ public class Listing {
     @Column(name = "vip_type", nullable = false)
     VipType vipType = VipType.NORMAL;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    ListingStatus status = ListingStatus.PENDING;
+
     @Column(name = "category_id", nullable = false)
     Long categoryId;
 
@@ -187,5 +192,9 @@ public class Listing {
 
     public enum PropertyType {
         APARTMENT, HOUSE, ROOM, STUDIO, OFFICE
+    }
+
+    public enum ListingStatus {
+        PENDING, APPROVED, REJECTED
     }
 }

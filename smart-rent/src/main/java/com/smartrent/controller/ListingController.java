@@ -38,8 +38,8 @@ public class ListingController {
                     name = "Create Listing Example",
                     value = """
                         {
-                          "title": "Cozy 2BR Apartment in Downtown",
-                          "description": "Spacious 2-bedroom apartment with balcony and city view.",
+                          "title": "Căn hộ 2PN thoáng mát quận 1",
+                          "description": "Căn hộ 2 phòng ngủ rộng rãi, có ban công và tầm nhìn đẹp ra thành phố. Gần chợ Bến Thành, tiện ích đầy đủ.",
                           "userId": "user-123e4567-e89b-12d3-a456-426614174000",
                           "expiryDate": "2025-12-31T23:59:59",
                           "listingType": "RENT",
@@ -49,7 +49,7 @@ public class ListingController {
                           "vipType": "NORMAL",
                           "categoryId": 10,
                           "productType": "APARTMENT",
-                          "price": 1200.00,
+                          "price": 15000000.00,
                           "priceUnit": "MONTH",
                           "addressId": 501,
                           "area": 78.5,
@@ -115,8 +115,8 @@ public class ListingController {
                               "message": null,
                               "data": {
                                 "listingId": 123,
-                                "title": "Cozy 2BR Apartment in Downtown",
-                                "description": "Spacious 2-bedroom apartment with balcony and city view.",
+                                "title": "Căn hộ 2PN thoáng mát quận 1",
+                                "description": "Căn hộ 2 phòng ngủ rộng rãi, có ban công và tầm nhìn đẹp ra thành phố. Gần chợ Bến Thành, tiện ích đầy đủ.",
                                 "userId": "user-123e4567-e89b-12d3-a456-426614174000",
                                 "postDate": "2025-09-01T10:00:00",
                                 "expiryDate": "2025-12-31T23:59:59",
@@ -127,7 +127,7 @@ public class ListingController {
                                 "vipType": "NORMAL",
                                 "categoryId": 10,
                                 "productType": "APARTMENT",
-                                "price": 1200.00,
+                                "price": 15000000.00,
                                 "priceUnit": "MONTH",
                                 "addressId": 501,
                                 "area": 78.5,
@@ -137,7 +137,32 @@ public class ListingController {
                                 "furnishing": "SEMI_FURNISHED",
                                 "propertyType": "APARTMENT",
                                 "roomCapacity": 4,
-                                "amenityIds": [1,3,5],
+                                "amenities": [
+                                  {
+                                    "amenityId": 1,
+                                    "name": "WiFi",
+                                    "icon": "wifi",
+                                    "description": "Internet không dây tốc độ cao",
+                                    "category": "connectivity",
+                                    "isActive": true
+                                  },
+                                  {
+                                    "amenityId": 3,
+                                    "name": "Chỗ đậu xe",
+                                    "icon": "car",
+                                    "description": "Chỗ đậu xe riêng biệt",
+                                    "category": "parking",
+                                    "isActive": true
+                                  },
+                                  {
+                                    "amenityId": 5,
+                                    "name": "Phòng gym",
+                                    "icon": "dumbbell",
+                                    "description": "Phòng tập gym 24/7",
+                                    "category": "fitness",
+                                    "isActive": true
+                                  }
+                                ],
                                 "createdAt": "2025-09-01T10:00:00",
                                 "updatedAt": "2025-09-01T10:00:00"
                               }
@@ -173,8 +198,8 @@ public class ListingController {
 
     @GetMapping
     @Operation(
-        summary = "List listings",
-        description = "When 'ids' is provided, returns those listings. Otherwise returns a paginated list using 'page' and 'size'.",
+        summary = "List listings with detailed information",
+        description = "When 'ids' is provided, returns those specific listings. Otherwise returns a paginated list using 'page' and 'size'. Returns full listing details including amenities, address, and timestamps.",
         parameters = {
             @Parameter(name = "ids", description = "Optional list of listing IDs to fetch explicitly"),
             @Parameter(name = "page", description = "Zero-based page index", example = "0"),
@@ -183,12 +208,12 @@ public class ListingController {
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "List of listings",
+                description = "List of detailed listings",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = ApiResponse.class),
                     examples = @ExampleObject(
-                        name = "Listings Example",
+                        name = "Detailed Listings Example",
                         value = """
                             {
                               "code": "999999",
@@ -196,17 +221,109 @@ public class ListingController {
                               "data": [
                                 {
                                   "listingId": 123,
-                                  "title": "Cozy 2BR Apartment in Downtown",
-                                  "price": 1200.00,
+                                  "title": "Căn hộ 2PN thoáng mát quận 1",
+                                  "description": "Căn hộ 2 phòng ngủ rộng rãi, có ban công và tầm nhìn đẹp ra thành phố. Gần chợ Bến Thành, tiện ích đầy đủ.",
+                                  "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                  "postDate": "2025-09-01T10:00:00",
+                                  "expiryDate": "2025-12-31T23:59:59",
+                                  "listingType": "RENT",
+                                  "verified": false,
+                                  "isVerify": false,
+                                  "expired": false,
+                                  "vipType": "NORMAL",
+                                  "categoryId": 10,
+                                  "productType": "APARTMENT",
+                                  "price": 15000000.00,
                                   "priceUnit": "MONTH",
-                                  "productType": "APARTMENT"
+                                  "addressId": 501,
+                                  "area": 78.5,
+                                  "bedrooms": 2,
+                                  "bathrooms": 1,
+                                  "direction": "NORTHEAST",
+                                  "furnishing": "SEMI_FURNISHED",
+                                  "propertyType": "APARTMENT",
+                                  "roomCapacity": 4,
+                                  "amenities": [
+                                    {
+                                      "amenityId": 1,
+                                      "name": "WiFi",
+                                      "icon": "wifi",
+                                      "description": "Internet không dây tốc độ cao",
+                                      "category": "connectivity",
+                                      "isActive": true
+                                    },
+                                    {
+                                      "amenityId": 3,
+                                      "name": "Chỗ đậu xe",
+                                      "icon": "car",
+                                      "description": "Chỗ đậu xe riêng biệt",
+                                      "category": "parking",
+                                      "isActive": true
+                                    },
+                                    {
+                                      "amenityId": 5,
+                                      "name": "Phòng gym",
+                                      "icon": "dumbbell",
+                                      "description": "Phòng tập gym 24/7",
+                                      "category": "fitness",
+                                      "isActive": true
+                                    }
+                                  ],
+                                  "createdAt": "2025-09-01T10:00:00",
+                                  "updatedAt": "2025-09-01T10:00:00"
                                 },
                                 {
                                   "listingId": 124,
-                                  "title": "Modern Studio near Park",
-                                  "price": 700.00,
+                                  "title": "Studio hiện đại gần công viên Tao Đàn",
+                                  "description": "Căn studio hiện đại với đầy đủ tiện nghi. Gần công viên Tao Đàn, yên tĩnh và thoáng mát.",
+                                  "userId": "user-456e7890-e12b-34c5-d678-901234567890",
+                                  "postDate": "2025-09-02T14:30:00",
+                                  "expiryDate": "2025-12-31T23:59:59",
+                                  "listingType": "RENT",
+                                  "verified": true,
+                                  "isVerify": true,
+                                  "expired": false,
+                                  "vipType": "VIP",
+                                  "categoryId": 12,
+                                  "productType": "STUDIO",
+                                  "price": 8500000.00,
                                   "priceUnit": "MONTH",
-                                  "productType": "STUDIO"
+                                  "addressId": 502,
+                                  "area": 35.0,
+                                  "bedrooms": 0,
+                                  "bathrooms": 1,
+                                  "direction": "SOUTH",
+                                  "furnishing": "FULLY_FURNISHED",
+                                  "propertyType": "STUDIO",
+                                  "roomCapacity": 2,
+                                  "amenities": [
+                                    {
+                                      "amenityId": 2,
+                                      "name": "Điều hòa",
+                                      "icon": "snowflake",
+                                      "description": "Điều hòa trung tâm",
+                                      "category": "climate",
+                                      "isActive": true
+                                    },
+                                    {
+                                      "amenityId": 4,
+                                      "name": "Ban công",
+                                      "icon": "home",
+                                      "description": "Ban công riêng với tầm nhìn ra thành phố",
+                                      "category": "outdoor",
+                                      "isActive": true
+                                    },
+                                    {
+                                      "amenityId": 6,
+                                      "name": "Bể bơi",
+                                      "icon": "swimmer",
+                                      "description": "Bể bơi ngoài trời",
+                                      "category": "recreation",
+                                      "isActive": true
+                                    }
+                                  ],
+                                  "createdAt": "2025-09-02T14:30:00",
+                                  "updatedAt": "2025-09-02T14:30:00"
                                 }
                               ]
                             }
@@ -243,15 +360,15 @@ public class ListingController {
                     name = "Update Listing Example",
                     value = """
                         {
-                          "title": "Updated 2BR Apartment with New Photos",
-                          "description": "Now includes a renovated kitchen and updated bathroom.",
+                          "title": "Căn hộ 2PN đã cải tạo mới quận 3",
+                          "description": "Căn hộ đã được cải tạo lại với bếp mới và phòng tắm hiện đại. Vị trí thuận lợi gần trung tâm.",
                           "userId": 42,
                           "expiryDate": "2026-01-31T23:59:59",
                           "listingType": "RENT",
                           "vipType": "VIP",
                           "categoryId": 10,
                           "productType": "APARTMENT",
-                          "price": 1300.00,
+                          "price": 16500000.00,
                           "priceUnit": "MONTH",
                           "addressId": 501,
                           "area": 80.0,

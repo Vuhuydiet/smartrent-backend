@@ -34,14 +34,14 @@ public class AddressController {
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Provinces retrieved",
+                description = "Lấy danh sách tỉnh thành thành công",
                 content = @Content(
                     mediaType = "application/json",
                     array = @ArraySchema(schema = @Schema(implementation = ProvinceResponse.class)),
                     examples = @ExampleObject(
-                        name = "Provinces Example",
+                        name = "Ví dụ danh sách tỉnh thành",
                         value = """
-                            [ { "provinceId": 1, "name": "Hanoi" }, { "provinceId": 2, "name": "Ho Chi Minh City" } ]
+                            [ { "provinceId": 1, "name": "Hà Nội" }, { "provinceId": 2, "name": "Thành phố Hồ Chí Minh" } ]
                             """
                     )
                 )
@@ -57,11 +57,11 @@ public class AddressController {
 
     @GetMapping("/provinces/{provinceId}")
     @Operation(
-        summary = "Get province by ID",
+        summary = "Lấy thông tin tỉnh theo ID",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Province retrieved",
+                description = "Lấy thông tin tỉnh thành công",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = ProvinceResponse.class)
@@ -69,7 +69,7 @@ public class AddressController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "404",
-                description = "Province not found"
+                description = "Không tìm thấy tỉnh"
             )
         }
     )
@@ -82,7 +82,7 @@ public class AddressController {
 
     @GetMapping("/provinces/search")
     @Operation(
-        summary = "Search provinces by keyword",
+        summary = "Tìm kiếm tỉnh theo từ khóa",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
@@ -104,11 +104,11 @@ public class AddressController {
     // District endpoints
     @GetMapping("/provinces/{provinceId}/districts")
     @Operation(
-        summary = "List districts by province",
+        summary = "Danh sách quận huyện theo tỉnh",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Districts retrieved",
+                description = "Lấy danh sách quận huyện thành công",
                 content = @Content(
                     mediaType = "application/json",
                     array = @ArraySchema(schema = @Schema(implementation = DistrictResponse.class))
@@ -125,11 +125,11 @@ public class AddressController {
 
     @GetMapping("/districts/{districtId}")
     @Operation(
-        summary = "Get district by ID",
+        summary = "Lấy thông tin quận huyện theo ID",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "District retrieved",
+                description = "Lấy thông tin quận huyện thành công",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = DistrictResponse.class)
@@ -137,7 +137,7 @@ public class AddressController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "404",
-                description = "District not found"
+                description = "Không tìm thấy quận huyện"
             )
         }
     )
@@ -151,11 +151,11 @@ public class AddressController {
     // Ward endpoints
     @GetMapping("/districts/{districtId}/wards")
     @Operation(
-        summary = "List wards by district",
+        summary = "Danh sách phường xã theo quận huyện",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Wards retrieved",
+                description = "Lấy danh sách phường xã thành công",
                 content = @Content(
                     mediaType = "application/json",
                     array = @ArraySchema(schema = @Schema(implementation = WardResponse.class))
@@ -172,11 +172,11 @@ public class AddressController {
 
     @GetMapping("/wards/{wardId}")
     @Operation(
-        summary = "Get ward by ID",
+        summary = "Lấy thông tin phường xã theo ID",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Ward retrieved",
+                description = "Lấy thông tin phường xã thành công",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = WardResponse.class)
@@ -184,7 +184,7 @@ public class AddressController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "404",
-                description = "Ward not found"
+                description = "Không tìm thấy phường xã"
             )
         }
     )
@@ -198,11 +198,11 @@ public class AddressController {
     // Street endpoints
     @GetMapping("/wards/{wardId}/streets")
     @Operation(
-        summary = "List streets by ward",
+        summary = "Danh sách đường phố theo phường xã",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Streets retrieved",
+                description = "Lấy danh sách đường phố thành công",
                 content = @Content(
                     mediaType = "application/json",
                     array = @ArraySchema(schema = @Schema(implementation = StreetResponse.class))
@@ -219,11 +219,11 @@ public class AddressController {
 
     @GetMapping("/streets/{streetId}")
     @Operation(
-        summary = "Get street by ID",
+        summary = "Lấy thông tin đường phố theo ID",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Street retrieved",
+                description = "Lấy thông tin đường phố thành công",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = StreetResponse.class)
@@ -231,7 +231,7 @@ public class AddressController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "404",
-                description = "Street not found"
+                description = "Không tìm thấy đường phố"
             )
         }
     )
@@ -245,7 +245,7 @@ public class AddressController {
     // Address endpoints
     @PostMapping
     @Operation(
-        summary = "Create address",
+        summary = "Tạo địa chỉ mới",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(
@@ -256,7 +256,7 @@ public class AddressController {
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Address created",
+                description = "Tạo địa chỉ thành công",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = AddressResponse.class)
@@ -274,11 +274,11 @@ public class AddressController {
 
     @GetMapping("/{addressId}")
     @Operation(
-        summary = "Get address by ID",
+        summary = "Lấy thông tin địa chỉ theo ID",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Address retrieved",
+                description = "Lấy thông tin địa chỉ thành công",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = AddressResponse.class)
@@ -286,7 +286,7 @@ public class AddressController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "404",
-                description = "Address not found"
+                description = "Không tìm thấy địa chỉ"
             )
         }
     )
@@ -299,7 +299,7 @@ public class AddressController {
 
     @GetMapping("/search")
     @Operation(
-        summary = "Search addresses",
+        summary = "Tìm kiếm địa chỉ",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
@@ -320,11 +320,11 @@ public class AddressController {
 
     @GetMapping("/suggest")
     @Operation(
-        summary = "Suggest addresses",
+        summary = "Gợi ý địa chỉ",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Suggestions returned",
+                description = "Trả về gợi ý địa chỉ",
                 content = @Content(
                     mediaType = "application/json",
                     array = @ArraySchema(schema = @Schema(implementation = AddressResponse.class))
@@ -341,12 +341,12 @@ public class AddressController {
 
     @GetMapping("/nearby")
     @Operation(
-        summary = "Nearby addresses by coordinates",
-        description = "Returns addresses within the specified radius (km) around the given latitude/longitude.",
+        summary = "Địa chỉ lân cận theo tọa độ",
+        description = "Trả về các địa chỉ trong bán kính (km) được chỉ định xung quanh vĩ độ/kinh độ cho trước.",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Nearby addresses",
+                description = "Danh sách địa chỉ lân cận",
                 content = @Content(
                     mediaType = "application/json",
                     array = @ArraySchema(schema = @Schema(implementation = AddressResponse.class))

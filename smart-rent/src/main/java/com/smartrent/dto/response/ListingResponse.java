@@ -10,7 +10,7 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Set;
+import java.util.List;
 
 @Getter
 @Setter
@@ -40,6 +40,8 @@ public class ListingResponse {
 
     String vipType;
 
+    String status;
+
     Long categoryId;
 
     String productType;
@@ -64,7 +66,7 @@ public class ListingResponse {
 
     Integer roomCapacity;
 
-    Set<Long> amenityIds;
+    List<AmenityResponse> amenities;
 
     LocalDateTime createdAt;
 

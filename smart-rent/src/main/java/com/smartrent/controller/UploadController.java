@@ -39,19 +39,19 @@ public class UploadController {
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200",
-            description = "Image uploaded successfully",
+            description = "Tải lên hình ảnh thành công",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = ApiResponse.class),
                 examples = @ExampleObject(
-                    name = "Success Response",
+                    name = "Phản hồi thành công",
                     value = """
                         {
                           "code": "999999",
                           "message": null,
                           "data": {
                             "status": "success",
-                            "url": "https://storage.example.com/images/12345.jpg"
+                            "url": "https://smartrent-storage.vn/images/can-ho-q1-phong-ngu.jpg"
                           }
                         }
                         """
@@ -60,15 +60,15 @@ public class UploadController {
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "400",
-            description = "Invalid file format or upload error",
+            description = "Định dạng tệp không hợp lệ hoặc lỗi tải lên",
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    name = "Error Response",
+                    name = "Phản hồi lỗi",
                     value = """
                         {
                           "code": "400001",
-                          "message": "INVALID_FILE_FORMAT",
+                          "message": "ĐỊNH_DẠNG_TẾP_KHÔNG_HỢP_LỆ",
                           "data": null
                         }
                         """
@@ -89,8 +89,8 @@ public class UploadController {
 
     @PostMapping("/video")
     @Operation(
-        summary = "Upload video",
-        description = "Uploads a video file and returns a public URL",
+        summary = "Tải lên video",
+        description = "Tải lên tệp video và trả về URL công khai",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(
@@ -102,19 +102,19 @@ public class UploadController {
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200",
-            description = "Video uploaded successfully",
+            description = "Tải lên video thành công",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = ApiResponse.class),
                 examples = @ExampleObject(
-                    name = "Success Response",
+                    name = "Phản hồi thành công",
                     value = """
                         {
                           "code": "999999",
                           "message": null,
                           "data": {
                             "status": "success",
-                            "url": "https://storage.example.com/videos/67890.mp4"
+                            "url": "https://smartrent-storage.vn/videos/gioi-thieu-can-ho-q1.mp4"
                           }
                         }
                         """
@@ -123,15 +123,15 @@ public class UploadController {
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "400",
-            description = "Invalid file format or upload error",
+            description = "Định dạng tệp không hợp lệ hoặc lỗi tải lên",
             content = @Content(
                 mediaType = "application/json",
                 examples = @ExampleObject(
-                    name = "Error Response",
+                    name = "Phản hồi lỗi",
                     value = """
                         {
                           "code": "400001",
-                          "message": "INVALID_FILE_FORMAT",
+                          "message": "ĐỊNH_DẠNG_TẾP_KHÔNG_HỢP_LỆ",
                           "data": null
                         }
                         """

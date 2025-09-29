@@ -42,6 +42,9 @@ public class ListingRequest {
     @Pattern(regexp = "NORMAL|VIP|PREMIUM", message = "vipType must be NORMAL, VIP, or PREMIUM")
     String vipType;
 
+    @Pattern(regexp = "PENDING|APPROVED|REJECTED", message = "status must be PENDING, APPROVED, or REJECTED")
+    String status;
+
     @NotNull
     Long categoryId;
 
