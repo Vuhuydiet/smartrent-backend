@@ -8,7 +8,7 @@ import com.smartrent.infra.connector.model.EmailInfo;
 import com.smartrent.infra.exception.UserNotFoundException;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.User;
-import com.smartrent.infra.repository.entity.VerifyCode;
+import com.smartrent.service.authentication.domain.OtpData;
 import com.smartrent.service.email.EmailService;
 import com.smartrent.service.email.VerificationEmailService;
 import com.smartrent.utility.EmailBuilder;
@@ -53,17 +53,17 @@ public class VerificationEmailServiceImpl implements VerificationEmailService {
 
 
   @Override
-  public VerifyCode sendCode(String id) {
+  public OtpData sendCode(String id) {
 
     User user = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
-    VerifyCode verifyCode = buildVerifyCode(user);
-    String htmlContent = EmailBuilder.buildVerifyHtmlContent(senderName, user.getFirstName(), user.getLastName(), verifyCode, otpDuration);
+    OtpData otpData = buildOtpData(user);
+    String htmlContent = EmailBuilder.buildVerifyHtmlContent(senderName, user.getFirstName(), user.getLastName(), otpData, otpDuration);
     EmailRequest emailRequest = buildEmailRequest(user, htmlContent);
 
     // send email
     emailService.sendEmail(emailRequest);
 
-    return verifyCode;
+    return otpData;
   }
 
 
@@ -78,10 +78,12 @@ public class VerificationEmailServiceImpl implements VerificationEmailService {
         .build();
   }
   
-  private VerifyCode buildVerifyCode(User user) {
-    return VerifyCode.builder()
-        .verifyCode(Utils.generateOTP(otpLength))
-        .user(user)
+  private OtpData buildOtpData(User user) {
+    return OtpData.builder()
+        .otpCode(Utils.generateOTP(otpLength))
+        .userId(user.getUserId())
+        .userEmail(user.getEmail())
+        .createdTime(LocalDateTime.now())
         .expirationTime(LocalDateTime.now().plusSeconds(otpDuration))
         .build();
   }

@@ -51,11 +51,6 @@ spring:
     password: ${DB_PASSWORD}
   flyway:
     enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-    baseline-version: 0
-    validate-on-migrate: true
-    out-of-order: false
   jpa:
     database: MYSQL
     openInView: true
@@ -72,6 +67,37 @@ spring:
         connection:
           provider_disables_autocommit: false
           handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_TRANSACTION
+  data:
+    redis:
+      username: "${REDIS_USERNAME:}"
+      password: "${REDIS_PWD:}"
+      port: 6379
+      host: "${REDIS_HOST:localhost}"
+      repositories:
+        enabled: true
+      ssl:
+        enabled: "${REDIS_SSL:false}"
+      timeout: "${REDIS_TIMEOUT:10s}"
+      connectTimeout: "${REDIS_CONNECTION_TIMEOUT:5s}"
+      lettuce.pool:
+        maxIdle: "${LETTUCE_MAX_IDLE:8}"
+        minIdle: "${LETTUCE_MIN_IDLE:4}"
+        maxActive: "${LETTUCE_MAX_ACTIVE:16}"
+        maxWait: "${LETTUCE_MAX_WAIT:10s}"
+  cache:
+    cacheNames:
+      - "user.details"
+      - "auth.accessToken"
+      - "auth.refreshToken"
+      - "auth.otp"
+      - "auth.invalidatedTokens"
+    type: "${CACHE_TYPE:redis}"
+    redis:
+      timeToLive: 1d
+      expires:
+        "[user.details]": 1m
+        "[auth.otp]": 5m
+        "[auth.invalidatedTokens]": 24h
 
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"
@@ -125,7 +151,17 @@ feign:
   client:
     config:
       brevo:
-        url: "${BREVO_URL}"
+        url: "https://api.brevo.com"
+      google:
+        auth:
+          url: "https://oauth2.googleapis.com"
+          client_id: ${CLIENT_ID}
+          client_secret: ${CLIENT_SECRET}
+          redirect_uri: ${GOOGLE_AUTH_CLIENT_REDIRECT_URI}
+          grant_type: "authorization_code"
+        client:
+          url: "https://www.googleapis.com"
+
 
 springdoc:
   api-docs:

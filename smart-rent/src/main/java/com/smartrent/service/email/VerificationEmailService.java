@@ -1,7 +1,7 @@
 package com.smartrent.service.email;
 
-import com.smartrent.infra.repository.entity.VerifyCode;
+import com.smartrent.service.authentication.domain.OtpData;
 
 public interface VerificationEmailService {
-  VerifyCode sendCode(String id);
+  OtpData sendCode(String id);
 }
