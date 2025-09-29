@@ -15,6 +15,7 @@ logging:
     com.smartrent.service.role: INFO
     com.smartrent.service.listing: INFO
     com.smartrent.service.payment: INFO
+    com.smartrent.service.vnpay: INFO
     com.smartrent.service.analytics: INFO
     com.smartrent.service.communication: INFO
     com.smartrent.service.content: INFO
@@ -86,10 +87,12 @@ application:
         - "/webjars/**"
         - "/actuator/health"
         - "/actuator/**"
+        - "/v1/payments/vnpay/callback"
       post:
         - "/v1/auth/**"
         - "/v1/users"
         - "/v1/admins"
+        - "/v1/payments/vnpay/ipn"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
@@ -126,6 +129,8 @@ feign:
     config:
       brevo:
         url: "${BREVO_URL}"
+      vnpay:
+        url: "${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}"
 
 springdoc:
   api-docs:
@@ -153,6 +158,23 @@ open:
       secretKey: ${S3_SECRET_KEY}
       bucketName: ${S3_BUCKET}
       publicUrl: ${S3_PUBLIC_URL}
+
+# VNPay Configuration
+vnpay:
+  tmn-code: "${VNPAY_TMN_CODE}"
+  hash-secret: "${VNPAY_HASH_SECRET}"
+  payment-url: "${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}"
+  query-url: "${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}"
+  refund-url: "${VNPAY_REFUND_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/refund}"
+  return-url: "${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payments/vnpay/callback}"
+  ipn-url: "${VNPAY_IPN_URL:http://localhost:8080/api/v1/payments/vnpay/ipn}"
+  version: "2.1.0"
+  command: "pay"
+  currency-code: "VND"
+  locale: "vn"
+  order-type: "other"
+  connect-timeout: 30000
+  read-timeout: 30000
 
 # Resilience4j Configuration for Circuit Breaker and Retry patterns
 resilience4j:
