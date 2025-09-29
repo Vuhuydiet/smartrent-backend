@@ -26,7 +26,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -52,7 +51,7 @@ public class PaymentController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request data"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    public ResponseEntity<ApiResponse<PaymentResponse>> createPayment(
+    public ApiResponse<PaymentResponse> createPayment(
             @Valid @RequestBody PaymentRequest request,
             HttpServletRequest httpRequest) {
 
@@ -61,29 +60,26 @@ public class PaymentController {
         try {
             PaymentResponse response = paymentService.createPayment(request, httpRequest);
 
-            return ResponseEntity.ok(ApiResponse.<PaymentResponse>builder()
+            return ApiResponse.<PaymentResponse>builder()
                     .code("200000")
                     .message("Payment created successfully")
                     .data(response)
-                    .build());
+                    .build();
 
         } catch (Exception e) {
             log.error("Error creating payment", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<PaymentResponse>builder()
-                            .code("500000")
-                            .message("Failed to create payment: " + e.getMessage())
-                            .build());
+            return ApiResponse.<PaymentResponse>builder()
+                    .code("500000")
+                    .message("Failed to create payment: " + e.getMessage())
+                    .build();
         }
     }
 
     @GetMapping("/callback/{provider}")
     @Operation(summary = "Payment callback", description = "Handle payment callback from any provider")
     public void handlePaymentCallback(
-            @Parameter(description = "Payment provider")
-            @PathVariable PaymentProvider provider,
-            @Parameter(description = "Callback parameters")
-            @RequestParam Map<String, String> params,
+            @Parameter(description = "Payment provider") @PathVariable PaymentProvider provider,
+            @Parameter(description = "Callback parameters") @RequestParam Map<String, String> params,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) throws IOException {
 
@@ -109,8 +105,7 @@ public class PaymentController {
     @PostMapping("/ipn/{provider}")
     @Operation(summary = "Payment IPN endpoint", description = "Handle Instant Payment Notification from any provider")
     public ResponseEntity<String> handlePaymentIPN(
-            @Parameter(description = "Payment provider")
-            @PathVariable PaymentProvider provider,
+            @Parameter(description = "Payment provider") @PathVariable PaymentProvider provider,
             @RequestParam Map<String, String> params,
             HttpServletRequest httpRequest) {
 
@@ -137,13 +132,10 @@ public class PaymentController {
 
     @PostMapping("/refund/{transactionRef}")
     @Operation(summary = "Refund payment", description = "Refund a payment")
-    public ResponseEntity<ApiResponse<PaymentCallbackResponse>> refundPayment(
-            @Parameter(description = "Transaction reference")
-            @PathVariable String transactionRef,
-            @Parameter(description = "Refund amount")
-            @RequestParam String amount,
-            @Parameter(description = "Refund reason")
-            @RequestParam String reason) {
+    public ApiResponse<PaymentCallbackResponse> refundPayment(
+            @Parameter(description = "Transaction reference") @PathVariable String transactionRef,
+            @Parameter(description = "Refund amount") @RequestParam String amount,
+            @Parameter(description = "Refund reason") @RequestParam String reason) {
 
         log.info("Refunding payment: {} with amount: {}", transactionRef, amount);
 
@@ -155,54 +147,48 @@ public class PaymentController {
                     .build();
             PaymentCallbackResponse response = paymentService.refundPayment(refundRequest);
 
-            return ResponseEntity.ok(ApiResponse.<PaymentCallbackResponse>builder()
+            return ApiResponse.<PaymentCallbackResponse>builder()
                     .code("200000")
                     .message("Payment refunded successfully")
                     .data(response)
-                    .build());
+                    .build();
 
         } catch (Exception e) {
             log.error("Error refunding payment: {}", transactionRef, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<PaymentCallbackResponse>builder()
-                            .code("500000")
-                            .message("Failed to refund payment: " + e.getMessage())
-                            .build());
+            return ApiResponse.<PaymentCallbackResponse>builder()
+                    .code("500000")
+                    .message("Failed to refund payment: " + e.getMessage())
+                    .build();
         }
     }
 
     @GetMapping("/providers")
     @Operation(summary = "Get available payment providers", description = "Get list of available payment providers")
-    public ResponseEntity<ApiResponse<List<PaymentProvider>>> getAvailableProviders() {
+    public ApiResponse<List<PaymentProvider>> getAvailableProviders() {
         try {
             List<PaymentProvider> providers = paymentService.getAvailableProviders();
 
-            return ResponseEntity.ok(ApiResponse.<List<PaymentProvider>>builder()
+            return ApiResponse.<List<PaymentProvider>>builder()
                     .code("200000")
                     .message("Available providers retrieved successfully")
                     .data(providers)
-                    .build());
+                    .build();
 
         } catch (Exception e) {
             log.error("Error getting available providers", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<List<PaymentProvider>>builder()
-                            .code("500000")
-                            .message("Failed to get providers: " + e.getMessage())
-                            .build());
+            return ApiResponse.<List<PaymentProvider>>builder()
+                    .code("500000")
+                    .message("Failed to get providers: " + e.getMessage())
+                    .build();
         }
     }
 
-
     @GetMapping("/history")
     @Operation(summary = "Get payment history", description = "Get user payment history with pagination")
-    public ResponseEntity<ApiResponse<Page<PaymentHistoryResponse>>> getPaymentHistory(
-            @Parameter(description = "User ID")
-            @RequestParam Long userId,
-            @Parameter(description = "Page number (0-based)")
-            @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size")
-            @RequestParam(defaultValue = "20") int size) {
+    public ApiResponse<Page<PaymentHistoryResponse>> getPaymentHistory(
+            @Parameter(description = "User ID") @RequestParam Long userId,
+            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
 
         log.info("Getting payment history for user: {}", userId);
 
@@ -210,33 +196,28 @@ public class PaymentController {
             Pageable pageable = PageRequest.of(page, size);
             Page<PaymentHistoryResponse> response = paymentService.getPaymentHistory(userId, pageable);
 
-            return ResponseEntity.ok(ApiResponse.<Page<PaymentHistoryResponse>>builder()
+            return ApiResponse.<Page<PaymentHistoryResponse>>builder()
                     .code("200000")
                     .message("Payment history retrieved successfully")
                     .data(response)
-                    .build());
+                    .build();
 
         } catch (Exception e) {
             log.error("Error getting payment history for user: {}", userId, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<Page<PaymentHistoryResponse>>builder()
-                            .code("500000")
-                            .message("Failed to get payment history: " + e.getMessage())
-                            .build());
+            return ApiResponse.<Page<PaymentHistoryResponse>>builder()
+                    .code("500000")
+                    .message("Failed to get payment history: " + e.getMessage())
+                    .build();
         }
     }
 
     @GetMapping("/history/status/{status}")
     @Operation(summary = "Get payment history by status", description = "Get user payment history filtered by status")
-    public ResponseEntity<ApiResponse<Page<PaymentHistoryResponse>>> getPaymentHistoryByStatus(
-            @Parameter(description = "User ID")
-            @RequestParam Long userId,
-            @Parameter(description = "Transaction status")
-            @PathVariable TransactionStatus status,
-            @Parameter(description = "Page number (0-based)")
-            @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size")
-            @RequestParam(defaultValue = "20") int size) {
+    public ApiResponse<Page<PaymentHistoryResponse>> getPaymentHistoryByStatus(
+            @Parameter(description = "User ID") @RequestParam Long userId,
+            @Parameter(description = "Transaction status") @PathVariable TransactionStatus status,
+            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
 
         log.info("Getting payment history for user: {} with status: {}", userId, status);
 
@@ -249,29 +230,26 @@ public class PaymentController {
                     .build();
             Page<PaymentHistoryResponse> response = paymentService.getPaymentHistoryByStatus(historyRequest);
 
-            return ResponseEntity.ok(ApiResponse.<Page<PaymentHistoryResponse>>builder()
+            return ApiResponse.<Page<PaymentHistoryResponse>>builder()
                     .code("200000")
                     .message("Payment history retrieved successfully")
                     .data(response)
-                    .build());
+                    .build();
 
         } catch (Exception e) {
             log.error("Error getting payment history for user: {} with status: {}", userId, status, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<Page<PaymentHistoryResponse>>builder()
-                            .code("500000")
-                            .message("Failed to get payment history: " + e.getMessage())
-                            .build());
+            return ApiResponse.<Page<PaymentHistoryResponse>>builder()
+                    .code("500000")
+                    .message("Failed to get payment history: " + e.getMessage())
+                    .build();
         }
     }
 
     @PostMapping("/cancel/{transactionRef}")
     @Operation(summary = "Cancel payment", description = "Cancel a pending payment")
-    public ResponseEntity<ApiResponse<Boolean>> cancelPayment(
-            @Parameter(description = "Transaction reference")
-            @PathVariable String transactionRef,
-            @Parameter(description = "Cancellation reason")
-            @RequestParam String reason) {
+    public ApiResponse<Boolean> cancelPayment(
+            @Parameter(description = "Transaction reference") @PathVariable String transactionRef,
+            @Parameter(description = "Cancellation reason") @RequestParam String reason) {
 
         log.info("Cancelling payment: {} with reason: {}", transactionRef, reason);
 
@@ -279,54 +257,50 @@ public class PaymentController {
             boolean cancelled = paymentService.cancelPayment(transactionRef, reason);
 
             if (cancelled) {
-                return ResponseEntity.ok(ApiResponse.<Boolean>builder()
+                return ApiResponse.<Boolean>builder()
                         .code("200000")
                         .message("Payment cancelled successfully")
                         .data(true)
-                        .build());
+                        .build();
             } else {
-                return ResponseEntity.badRequest()
-                        .body(ApiResponse.<Boolean>builder()
-                                .code("400000")
-                                .message("Failed to cancel payment")
-                                .data(false)
-                                .build());
+                return ApiResponse.<Boolean>builder()
+                        .code("400000")
+                        .message("Failed to cancel payment")
+                        .data(false)
+                        .build();
             }
 
         } catch (Exception e) {
             log.error("Error cancelling payment: {}", transactionRef, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<Boolean>builder()
-                            .code("500000")
-                            .message("Failed to cancel payment: " + e.getMessage())
-                            .data(false)
-                            .build());
+            return ApiResponse.<Boolean>builder()
+                    .code("500000")
+                    .message("Failed to cancel payment: " + e.getMessage())
+                    .data(false)
+                    .build();
         }
     }
 
     @GetMapping("/exists/{transactionRef}")
     @Operation(summary = "Check transaction existence", description = "Check if transaction reference exists")
-    public ResponseEntity<ApiResponse<Boolean>> checkTransactionExists(
-            @Parameter(description = "Transaction reference")
-            @PathVariable String transactionRef) {
+    public ApiResponse<Boolean> checkTransactionExists(
+            @Parameter(description = "Transaction reference") @PathVariable String transactionRef) {
 
         try {
             boolean exists = paymentService.transactionRefExists(transactionRef);
 
-            return ResponseEntity.ok(ApiResponse.<Boolean>builder()
+            return ApiResponse.<Boolean>builder()
                     .code("200000")
                     .message("Transaction existence checked")
                     .data(exists)
-                    .build());
+                    .build();
 
         } catch (Exception e) {
             log.error("Error checking transaction existence: {}", transactionRef, e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiResponse.<Boolean>builder()
-                            .code("500000")
-                            .message("Failed to check transaction: " + e.getMessage())
-                            .data(false)
-                            .build());
+            return ApiResponse.<Boolean>builder()
+                    .code("500000")
+                    .message("Failed to check transaction: " + e.getMessage())
+                    .data(false)
+                    .build();
         }
     }
 
