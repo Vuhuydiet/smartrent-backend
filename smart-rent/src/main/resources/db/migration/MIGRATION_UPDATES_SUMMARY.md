@@ -33,7 +33,7 @@ This document summarizes the migration files created to align the database schem
 
 **Rationale**: The Admin entity marks password as `nullable = false` but the migration allowed NULL values.
 
-### V6__Create_verify_codes_table.sql
+### V6__Create_verify_codes_table.sql (DEPRECATED)
 **Purpose**: Create missing verify_codes table for VerifyCode entity
 
 **Changes Made**:
@@ -42,7 +42,17 @@ This document summarizes the migration files created to align the database schem
 - Added performance indexes on user_id and expiration_time
 - Included standard created_at/updated_at timestamps
 
-**Rationale**: The VerifyCode entity was completely missing from the database schema.
+**Status**: DEPRECATED - Table removed in V11 as OTPs are now stored in Redis cache
+
+### V11__Drop_verify_codes_table.sql
+**Purpose**: Remove verify_codes table as OTPs are now stored in Redis cache
+
+**Changes Made**:
+- Dropped indexes on verify_codes table
+- Dropped verify_codes table completely
+- Part of cache-based OTP enhancement for better performance and scalability
+
+**Rationale**: OTPs are now stored in Redis cache with automatic expiration, eliminating the need for database storage and improving performance.
 
 ## Existing Migrations Status
 

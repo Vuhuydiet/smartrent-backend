@@ -26,6 +26,6 @@ public class BrevoEmailServiceImpl implements EmailService {
 
   @Override
   public EmailResponse sendEmail(EmailRequest emailRequest) {
-      return brevoConnector.sendEmail(apiKey, emailRequest);
+    return brevoConnector.sendEmail(apiKey, emailRequest);
   }
 }

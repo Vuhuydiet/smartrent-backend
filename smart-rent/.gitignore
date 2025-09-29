@@ -43,6 +43,7 @@ out/
 .env.staging
 .env.test
 *.env
+!sample.env
 
 ### Docker ###
 docker-compose.override.yml

@@ -1,9 +1,21 @@
 package com.smartrent.service.address.impl;
 
 import com.smartrent.dto.request.AddressCreationRequest;
-import com.smartrent.dto.response.*;
-import com.smartrent.infra.repository.*;
-import com.smartrent.infra.repository.entity.*;
+import com.smartrent.dto.response.AddressResponse;
+import com.smartrent.dto.response.DistrictResponse;
+import com.smartrent.dto.response.ProvinceResponse;
+import com.smartrent.dto.response.StreetResponse;
+import com.smartrent.dto.response.WardResponse;
+import com.smartrent.infra.repository.AddressRepository;
+import com.smartrent.infra.repository.DistrictRepository;
+import com.smartrent.infra.repository.ProvinceRepository;
+import com.smartrent.infra.repository.StreetRepository;
+import com.smartrent.infra.repository.WardRepository;
+import com.smartrent.infra.repository.entity.Address;
+import com.smartrent.infra.repository.entity.District;
+import com.smartrent.infra.repository.entity.Province;
+import com.smartrent.infra.repository.entity.Street;
+import com.smartrent.infra.repository.entity.Ward;
 import com.smartrent.mapper.AddressMapper;
 import com.smartrent.service.address.AddressService;
 import lombok.AccessLevel;

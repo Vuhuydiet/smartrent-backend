@@ -59,6 +59,9 @@ dependencies {
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
     implementation 'io.github.resilience4j:resilience4j-retry'
     implementation 'io.github.resilience4j:resilience4j-micrometer'
+
+    // Environment variables from .env file
+    implementation 'io.github.cdimascio:dotenv-java:3.0.0'
 }
 
 tasks.named('test') {
