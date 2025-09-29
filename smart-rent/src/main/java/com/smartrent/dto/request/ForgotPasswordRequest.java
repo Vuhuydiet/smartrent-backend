@@ -1,4 +1,4 @@
-package com.smartrent.controller.dto.request;
+package com.smartrent.dto.request;
 
 import com.smartrent.config.Constants;
 import io.swagger.v3.oas.annotations.media.Schema;

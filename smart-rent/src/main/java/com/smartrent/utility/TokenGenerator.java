@@ -8,7 +8,7 @@ import com.nimbusds.jose.Payload;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.smartrent.config.Constants;
-import com.smartrent.controller.dto.response.GetUserResponse;
+import com.smartrent.dto.response.GetUserResponse;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.entity.User;

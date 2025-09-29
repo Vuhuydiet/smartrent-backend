@@ -1,8 +1,8 @@
 package com.smartrent.service.authentication.impl;
 
-import com.smartrent.controller.dto.request.UserCreationRequest;
-import com.smartrent.controller.dto.response.AuthenticationResponse;
-import com.smartrent.controller.dto.response.GetUserResponse;
+import com.smartrent.dto.request.UserCreationRequest;
+import com.smartrent.dto.response.AuthenticationResponse;
+import com.smartrent.dto.response.GetUserResponse;
 import com.smartrent.infra.connector.GoogleAuthConnector;
 import com.smartrent.infra.connector.GoogleConnector;
 import com.smartrent.infra.connector.model.GoogleExchangeTokenRequest;

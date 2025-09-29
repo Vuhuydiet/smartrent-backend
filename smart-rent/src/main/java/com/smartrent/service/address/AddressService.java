@@ -1,7 +1,11 @@
 package com.smartrent.service.address;
 
 import com.smartrent.dto.request.AddressCreationRequest;
-import com.smartrent.dto.response.*;
+import com.smartrent.dto.response.AddressResponse;
+import com.smartrent.dto.response.DistrictResponse;
+import com.smartrent.dto.response.ProvinceResponse;
+import com.smartrent.dto.response.StreetResponse;
+import com.smartrent.dto.response.WardResponse;
 
 import java.math.BigDecimal;
 import java.util.List;
