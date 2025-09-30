@@ -1,17 +1,17 @@
 package com.smartrent.controller;
 
 import com.smartrent.config.Constants;
-import com.smartrent.controller.dto.request.AuthenticationRequest;
-import com.smartrent.controller.dto.request.ChangePasswordRequest;
-import com.smartrent.controller.dto.request.ForgotPasswordRequest;
-import com.smartrent.controller.dto.request.IntrospectRequest;
-import com.smartrent.controller.dto.request.LogoutRequest;
-import com.smartrent.controller.dto.request.RefreshTokenRequest;
-import com.smartrent.controller.dto.request.ResetPasswordRequest;
-import com.smartrent.controller.dto.response.ApiResponse;
-import com.smartrent.controller.dto.response.AuthenticationResponse;
-import com.smartrent.controller.dto.response.ForgotPasswordResponse;
-import com.smartrent.controller.dto.response.IntrospectResponse;
+import com.smartrent.dto.request.AuthenticationRequest;
+import com.smartrent.dto.request.ChangePasswordRequest;
+import com.smartrent.dto.request.ForgotPasswordRequest;
+import com.smartrent.dto.request.IntrospectRequest;
+import com.smartrent.dto.request.LogoutRequest;
+import com.smartrent.dto.request.RefreshTokenRequest;
+import com.smartrent.dto.request.ResetPasswordRequest;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.AuthenticationResponse;
+import com.smartrent.dto.response.ForgotPasswordResponse;
+import com.smartrent.dto.response.IntrospectResponse;
 import com.smartrent.service.authentication.AuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -436,10 +436,10 @@ public class AuthenticationController {
 
   @PostMapping("/forgot-password")
   @Operation(
-      summary = "Verify otp to get token to reset password.",
-      description = "Verify otp to get token to reset password.",
+      summary = "Verify OTP with email to get token to reset password",
+      description = "Verifies the OTP code sent to the user's email and returns a reset password token if valid. The email and OTP combination ensures better security by preventing OTP collision attacks.",
       requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-          description = "Forgot password request",
+          description = "Forgot password request containing email and verification code",
           required = true,
           content = @Content(
               mediaType = "application/json",
@@ -448,6 +448,7 @@ public class AuthenticationController {
                   name = "Forgot Password Example",
                   value = """
                       {
+                        "email": "john.doe@example.com",
                         "verificationCode": "123456"
                       }
                       """

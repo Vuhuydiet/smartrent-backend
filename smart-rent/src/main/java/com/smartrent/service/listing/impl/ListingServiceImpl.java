@@ -1,15 +1,15 @@
 package com.smartrent.service.listing.impl;
 
-import com.smartrent.controller.dto.request.ListingCreationRequest;
-import com.smartrent.controller.dto.request.ListingRequest;
-import com.smartrent.controller.dto.response.ListingCreationResponse;
-import com.smartrent.controller.dto.response.ListingResponse;
+import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
-import com.smartrent.controller.dto.request.ListingFilterRequest;
-import com.smartrent.controller.dto.response.ListingFilterResponse;
+import com.smartrent.dto.request.ListingFilterRequest;
+import com.smartrent.dto.response.ListingFilterResponse;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;

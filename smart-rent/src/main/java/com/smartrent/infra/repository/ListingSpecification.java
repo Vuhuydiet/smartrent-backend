@@ -1,6 +1,6 @@
 package com.smartrent.infra.repository;
 
-import com.smartrent.controller.dto.request.ListingFilterRequest;
+import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.infra.repository.entity.Listing;
 import jakarta.persistence.criteria.*;
 import org.springframework.data.jpa.domain.Specification;
@@ -15,8 +15,50 @@ public class ListingSpecification {
             if (filter.getAddressId() != null) {
                 predicates.add(cb.equal(root.get("addressId"), filter.getAddressId()));
             }
-            if (filter.getCategory() != null) {
-                predicates.add(cb.equal(root.get("categoryId"), filter.getCategory()));
+            // Name-based address filtering using subqueries to avoid changing entity mapping
+            if (filter.getProvinceId() != null || filter.getProvinceName() != null
+                    || filter.getDistrictId() != null || filter.getDistrictName() != null
+                    || filter.getWardName() != null
+                    || filter.getStreetId() != null || filter.getStreetName() != null
+                    || filter.getAddressText() != null) {
+
+                // Subquery selects addressId from Address matching the name/ids
+                Subquery<Long> addressSub = query.subquery(Long.class);
+                Root<com.smartrent.infra.repository.entity.Address> addr = addressSub.from(com.smartrent.infra.repository.entity.Address.class);
+                addressSub.select(addr.get("addressId"));
+
+                List<Predicate> addrPreds = new ArrayList<>();
+
+                if (filter.getProvinceId() != null) {
+                    addrPreds.add(cb.equal(addr.get("province").get("provinceId"), filter.getProvinceId()));
+                }
+                if (filter.getProvinceName() != null && !filter.getProvinceName().isBlank()) {
+                    addrPreds.add(cb.like(cb.lower(addr.get("province").get("name")), "%" + filter.getProvinceName().toLowerCase() + "%"));
+                }
+                if (filter.getDistrictId() != null) {
+                    addrPreds.add(cb.equal(addr.get("district").get("districtId"), filter.getDistrictId()));
+                }
+                if (filter.getDistrictName() != null && !filter.getDistrictName().isBlank()) {
+                    addrPreds.add(cb.like(cb.lower(addr.get("district").get("name")), "%" + filter.getDistrictName().toLowerCase() + "%"));
+                }
+                if (filter.getWardName() != null && !filter.getWardName().isBlank()) {
+                    addrPreds.add(cb.like(cb.lower(addr.get("ward").get("name")), "%" + filter.getWardName().toLowerCase() + "%"));
+                }
+                if (filter.getStreetId() != null) {
+                    addrPreds.add(cb.equal(addr.get("street").get("streetId"), filter.getStreetId()));
+                }
+                if (filter.getStreetName() != null && !filter.getStreetName().isBlank()) {
+                    addrPreds.add(cb.like(cb.lower(addr.get("street").get("name")), "%" + filter.getStreetName().toLowerCase() + "%"));
+                }
+                if (filter.getAddressText() != null && !filter.getAddressText().isBlank()) {
+                    addrPreds.add(cb.like(cb.lower(addr.get("fullAddress")), "%" + filter.getAddressText().toLowerCase() + "%"));
+                }
+
+                addressSub.where(cb.and(addrPreds.toArray(new Predicate[0])));
+                predicates.add(root.get("addressId").in(addressSub));
+            }
+            if (filter.getCategoryId() != null) {
+                predicates.add(cb.equal(root.get("categoryId"), filter.getCategoryId()));
             }
             if (filter.getPriceMin() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("price"), filter.getPriceMin()));

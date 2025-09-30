@@ -1,10 +1,10 @@
 package com.smartrent.controller;
 
 import com.smartrent.config.Constants;
-import com.smartrent.controller.dto.request.AdminCreationRequest;
-import com.smartrent.controller.dto.response.AdminCreationResponse;
-import com.smartrent.controller.dto.response.ApiResponse;
-import com.smartrent.controller.dto.response.GetAdminResponse;
+import com.smartrent.dto.request.AdminCreationRequest;
+import com.smartrent.dto.response.AdminCreationResponse;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.GetAdminResponse;
 import com.smartrent.service.admin.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

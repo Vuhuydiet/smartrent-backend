@@ -1,13 +1,13 @@
 package com.smartrent.controller;
 
 import com.smartrent.config.Constants;
-import com.smartrent.controller.dto.request.AuthenticationRequest;
-import com.smartrent.controller.dto.request.IntrospectRequest;
-import com.smartrent.controller.dto.request.LogoutRequest;
-import com.smartrent.controller.dto.request.RefreshTokenRequest;
-import com.smartrent.controller.dto.response.ApiResponse;
-import com.smartrent.controller.dto.response.AuthenticationResponse;
-import com.smartrent.controller.dto.response.IntrospectResponse;
+import com.smartrent.dto.request.AuthenticationRequest;
+import com.smartrent.dto.request.IntrospectRequest;
+import com.smartrent.dto.request.LogoutRequest;
+import com.smartrent.dto.request.RefreshTokenRequest;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.AuthenticationResponse;
+import com.smartrent.dto.response.IntrospectResponse;
 import com.smartrent.service.authentication.AuthenticationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -18,7 +18,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/v1/auth/admin")

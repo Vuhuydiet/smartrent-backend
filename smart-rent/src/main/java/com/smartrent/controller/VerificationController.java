@@ -1,7 +1,7 @@
 package com.smartrent.controller;
 
-import com.smartrent.controller.dto.request.VerifyCodeRequest;
-import com.smartrent.controller.dto.response.ApiResponse;
+import com.smartrent.dto.request.VerifyCodeRequest;
+import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.service.authentication.VerificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

@@ -1,6 +1,6 @@
 package com.smartrent.infra.repository;
 
-import com.smartrent.controller.dto.request.ListingFilterRequest;
+import com.smartrent.dto.request.ListingFilterRequest;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 

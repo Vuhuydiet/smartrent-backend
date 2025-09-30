@@ -23,16 +23,16 @@ SmartRent Backend follows a layered architecture pattern with clear separation o
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Presentation Layer                       │
-│  Controllers (REST APIs) + Swagger Documentation           │
+│  Controllers (REST APIs) + Swagger Documentation            │
 ├─────────────────────────────────────────────────────────────┤
-│                     Service Layer                          │
-│  Business Logic + Authentication + Email Services          │
+│                     Service Layer                           │
+│  Business Logic + Authentication + Email Services           │
 ├─────────────────────────────────────────────────────────────┤
-│                  Infrastructure Layer                      │
-│  Repositories + External Connectors + Configuration        │
+│                  Infrastructure Layer                       │
+│  Repositories + External Connectors + Configuration         │
 ├─────────────────────────────────────────────────────────────┤
-│                     Data Layer                             │
-│  MySQL Database + Redis Cache + Flyway Migrations         │
+│                     Data Layer                              │
+│  MySQL Database + Redis Cache + Flyway Migrations           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -64,7 +64,7 @@ SmartRent Backend follows a layered architecture pattern with clear separation o
 - Access and refresh token management
 - Token introspection and validation
 - Password change and reset functionality
-- Secure logout with token invalidation
+- Secure logout with Redis cache-based token invalidation
 
 ### Email Services
 - Email verification for new accounts
@@ -187,24 +187,23 @@ The application uses MySQL with Flyway for database migrations. Key entities inc
 - **admins** - Administrator accounts
 - **roles** - System roles (Super Admin, User Admin, etc.)
 - **admins_roles** - Many-to-many relationship between admins and roles
-- **verify_codes** - Email verification codes
-- **invalidated_tokens** - JWT token blacklist
 
 ### Migration Files
 
 - `V1__Create_users_admins_roles_tables.sql` - Initial schema
-- `V2__Create_invalidated_tokens_table.sql` - Token management
+- `V2__Create_invalidated_tokens_table.sql` - Token management (deprecated)
 - `V3__Rename_admin_roles_to_admins_roles.sql` - Relationship table
 - `V4__Add_missing_user_fields_and_constraints.sql` - User enhancements
 - `V5__Fix_admins_table_constraints.sql` - Admin constraints
-- `V6__Create_verify_codes_table.sql` - Email verification
+- `V6__Create_verify_codes_table.sql` - Email verification (deprecated)
+- `V10__Drop_invalidated_tokens_table.sql` - Remove token table (moved to cache)
+- `V11__Drop_verify_codes_table.sql` - Remove verify_codes table (moved to Redis cache)
 
 ### Entity Relationships
 
 ```
 Users (1) ←→ (1) VerifyCode
 Admins (M) ←→ (M) Roles
-Users/Admins → InvalidatedTokens (for logout)
 ```
 
 ## Authentication & Security

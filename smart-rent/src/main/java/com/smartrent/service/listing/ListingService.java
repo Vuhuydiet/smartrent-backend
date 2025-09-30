@@ -1,12 +1,14 @@
 package com.smartrent.service.listing;
 
-import com.smartrent.controller.dto.request.ListingCreationRequest;
-import com.smartrent.controller.dto.request.ListingRequest;
-import com.smartrent.controller.dto.response.ListingCreationResponse;
-import com.smartrent.controller.dto.response.ListingResponse;
+import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingResponse;
 
 import java.util.List;
 import java.util.Set;
+import com.smartrent.dto.request.ListingFilterRequest;
+import com.smartrent.dto.response.ListingFilterResponse;
 
 public interface ListingService {
     ListingCreationResponse createListing(ListingCreationRequest request);
@@ -17,5 +19,5 @@ public interface ListingService {
     void deleteListing(Long id);
 
     // Filter listings (feature)
-    com.smartrent.controller.dto.response.ListingFilterResponse filterListings(com.smartrent.controller.dto.request.ListingFilterRequest filterRequest);
+    ListingFilterResponse filterListings(ListingFilterRequest filterRequest);
 }

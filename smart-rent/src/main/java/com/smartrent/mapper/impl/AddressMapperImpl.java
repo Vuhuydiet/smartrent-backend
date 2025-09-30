@@ -1,6 +1,6 @@
 package com.smartrent.mapper.impl;
 
-import com.smartrent.controller.dto.response.*;
+import com.smartrent.dto.response.*;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.AddressMapper;
 import lombok.AccessLevel;

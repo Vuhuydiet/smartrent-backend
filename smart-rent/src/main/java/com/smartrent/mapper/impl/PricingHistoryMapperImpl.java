@@ -1,6 +1,6 @@
 package com.smartrent.mapper.impl;
 
-import com.smartrent.controller.dto.response.PricingHistoryResponse;
+import com.smartrent.dto.response.PricingHistoryResponse;
 import com.smartrent.infra.repository.entity.PricingHistory;
 import com.smartrent.mapper.PricingHistoryMapper;
 import lombok.AccessLevel;

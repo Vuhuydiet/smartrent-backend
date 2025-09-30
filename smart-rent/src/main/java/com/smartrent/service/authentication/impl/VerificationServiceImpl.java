@@ -1,14 +1,14 @@
 package com.smartrent.service.authentication.impl;
 
-import com.smartrent.controller.dto.request.VerifyCodeRequest;
+import com.smartrent.dto.request.VerifyCodeRequest;
 import com.smartrent.infra.exception.UserNotFoundException;
 import com.smartrent.infra.exception.VerifyCodeExpiredException;
 import com.smartrent.infra.exception.VerifyCodeNotFoundException;
 import com.smartrent.infra.repository.UserRepository;
-import com.smartrent.infra.repository.VerifyCodeRepository;
 import com.smartrent.infra.repository.entity.User;
-import com.smartrent.infra.repository.entity.VerifyCode;
+import com.smartrent.service.authentication.OtpCacheService;
 import com.smartrent.service.authentication.VerificationService;
+import com.smartrent.service.authentication.domain.OtpData;
 import com.smartrent.service.email.VerificationEmailService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class VerificationServiceImpl implements VerificationService {
 
-  VerifyCodeRepository verifyCodeRepository;
+  OtpCacheService otpCacheService;
 
   UserRepository userRepository;
 
@@ -28,33 +28,36 @@ public class VerificationServiceImpl implements VerificationService {
 
   @Override
   public void verifyCode(VerifyCodeRequest verifyCodeRequest) {
-    VerifyCode verifyCode = checkExisted(verifyCodeRequest.getEmail(), verifyCodeRequest.getVerificationCode());
+    OtpData otpData = otpCacheService.getOtp(verifyCodeRequest.getVerificationCode(), verifyCodeRequest.getEmail())
+        .orElseThrow(VerifyCodeNotFoundException::new);
 
-    if (checkExpiration(verifyCode)) {
-      verifyCodeRepository.delete(verifyCode);
+    if (otpData.isExpired()) {
+      otpCacheService.removeOtp(otpData.getUserId(), otpData.getOtpCode());
       throw new VerifyCodeExpiredException();
     }
 
-    User user = verifyCode.getUser();
+    User user = userRepository.findById(otpData.getUserId())
+        .orElseThrow(UserNotFoundException::new);
     user.setVerified(true);
     userRepository.saveAndFlush(user);
 
-    verifyCodeRepository.delete(verifyCode);
+    otpCacheService.removeOtp(otpData.getUserId(), otpData.getOtpCode());
   }
 
   @Override
-  public User verifyCode(String verifyCode) {
-    VerifyCode verifyCodeEntity = verifyCodeRepository.findById(verifyCode).orElseThrow(VerifyCodeNotFoundException::new);
+  public User verifyCode(String verifyCode, String email) {
+    OtpData otpData = otpCacheService.getOtp(verifyCode, email)
+        .orElseThrow(VerifyCodeNotFoundException::new);
 
-    if (checkExpiration(verifyCodeEntity)) {
-      verifyCodeRepository.delete(verifyCodeEntity);
+    if (otpData.isExpired()) {
+      otpCacheService.removeOtp(otpData.getUserId(), otpData.getOtpCode());
       throw new VerifyCodeExpiredException();
     }
 
-    User user = verifyCodeEntity.getUser();
-    user.setVerified(true);
-    userRepository.saveAndFlush(user);
-    verifyCodeRepository.delete(verifyCodeEntity);
+    User user = userRepository.findById(otpData.getUserId())
+        .orElseThrow(UserNotFoundException::new);
+
+    otpCacheService.removeOtp(otpData.getUserId(), otpData.getOtpCode());
 
     return user;
   }
@@ -63,18 +66,13 @@ public class VerificationServiceImpl implements VerificationService {
   public void sendVerifyCode(String email) {
     User user = userRepository.findByEmail(email)
         .orElseThrow(UserNotFoundException::new);
-    VerifyCode verifyCode = verificationEmailService.sendCode(user.getUserId());
 
-    verifyCodeRepository.deleteByUserId(user.getUserId());
-    verifyCodeRepository.saveAndFlush(verifyCode);
+    otpCacheService.removeUserOtps(user.getUserId());
+
+    OtpData otpData = verificationEmailService.sendCode(user.getUserId());
+
+    otpCacheService.storeOtp(otpData);
   }
 
-  private VerifyCode checkExisted(String userEmail, String verificationCode) {
-    return verifyCodeRepository.findByVerifyCodeAndUserEmail(verificationCode, userEmail)
-        .orElseThrow(VerifyCodeNotFoundException::new);
-  }
 
-  private boolean checkExpiration(VerifyCode verifyCode) {
-    return verifyCode.getExpirationTime().isBefore(java.time.LocalDateTime.now());
-  }
 }

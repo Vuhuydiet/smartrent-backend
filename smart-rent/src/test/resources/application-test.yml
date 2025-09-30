@@ -1,0 +1,80 @@
+spring:
+  application:
+    name: smart-rent-test
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+
+application:
+  client-url: "http://localhost:3000"
+  authentication:
+    jwt:
+      access-signer-key: "test-access-key"
+      refresh-signer-key: "test-refresh-key"
+      valid-duration: "3600"
+      refreshable-duration: "86400"
+  api-key:
+    brevo: "test-api-key"
+  email:
+    sender:
+      email: "test@example.com"
+      name: "Test Sender"
+    subject: "Test Subject"
+  otp:
+    length: 6
+    duration: 60
+  email-retry:
+    max-attempts: 3
+    base-wait-duration: 100 # faster for tests
+    exponential-multiplier: 2.0
+    jitter-percentage: 0.1 # less jitter for predictable tests
+    min-wait-duration: 50
+  circuit-breaker:
+    failure-rate-threshold: 50 # lower threshold for tests
+    wait-duration-in-open-state: 5 # shorter wait for tests
+    sliding-window-size: 5
+    minimum-number-of-calls: 3
+    permitted-calls-in-half-open: 2
+    timeout-duration: 5
+
+feign:
+  client:
+    config:
+      brevo:
+        url: "https://api.brevo.com"
+
+# Test-specific circuit breaker configuration
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 5
+        minimumNumberOfCalls: 3
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+    instances:
+      emailService:
+        baseConfig: default
+        
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 100ms
+    instances:
+      emailService:
+        baseConfig: default
+
+logging:
+  level:
+    com.smartrent.service.email: DEBUG
+    root: INFO

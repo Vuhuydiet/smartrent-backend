@@ -38,23 +38,29 @@ public class SecurityConfig {
 
     http.addFilterBefore(exceptionHandler, LogoutFilter.class);
 
-    http.authorizeHttpRequests(configurer -> {
-    configurer
-      .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs", "/swagger-resources/**", "/webjars/**")
-      .permitAll()
-      .requestMatchers(HttpMethod.POST, securityProperties.getMethods().getPost().toArray(new String[0]))
-      .permitAll()
-      .requestMatchers(HttpMethod.POST, "/v1/listings/filter")
-      .permitAll()
-      .requestMatchers(HttpMethod.GET, "/v1/listings/filter")
-      .permitAll()
-      .requestMatchers(HttpMethod.GET, securityProperties.getMethods().getGet().toArray(new String[0]))
-      .permitAll()
-      .requestMatchers(HttpMethod.OPTIONS, "/**")
-      .permitAll()
-      .anyRequest()
-      .authenticated();
-    });
+    http.authorizeHttpRequests(registry -> registry
+        // Swagger / OpenAPI docs
+        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs", "/swagger-resources/**", "/webjars/**")
+          .permitAll()
+        // Public listing endpoints (read + filter)
+        .requestMatchers(HttpMethod.GET, "/v1/listings/filter")
+          .permitAll()
+        .requestMatchers(HttpMethod.GET, "/v1/listings/**")
+          .permitAll()
+        // Public address lookup (if desired for FE filters)
+        .requestMatchers(HttpMethod.GET, "/v1/addresses/**")
+          .permitAll()
+        // Additional whitelisted endpoints from configuration
+        .requestMatchers(HttpMethod.POST, securityProperties.getMethods().getPost().toArray(new String[0]))
+          .permitAll()
+        .requestMatchers(HttpMethod.GET, securityProperties.getMethods().getGet().toArray(new String[0]))
+          .permitAll()
+        // CORS preflight
+        .requestMatchers(HttpMethod.OPTIONS, "/**")
+          .permitAll()
+        // Everything else requires authentication
+        .anyRequest().authenticated()
+    );
 
     http.csrf(AbstractHttpConfigurer::disable);
 

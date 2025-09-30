@@ -1,15 +1,15 @@
 package com.smartrent.service.authentication;
 
-import com.smartrent.controller.dto.request.AuthenticationRequest;
-import com.smartrent.controller.dto.request.ChangePasswordRequest;
-import com.smartrent.controller.dto.request.ForgotPasswordRequest;
-import com.smartrent.controller.dto.request.IntrospectRequest;
-import com.smartrent.controller.dto.request.LogoutRequest;
-import com.smartrent.controller.dto.request.RefreshTokenRequest;
-import com.smartrent.controller.dto.request.ResetPasswordRequest;
-import com.smartrent.controller.dto.response.AuthenticationResponse;
-import com.smartrent.controller.dto.response.ForgotPasswordResponse;
-import com.smartrent.controller.dto.response.IntrospectResponse;
+import com.smartrent.dto.request.AuthenticationRequest;
+import com.smartrent.dto.request.ChangePasswordRequest;
+import com.smartrent.dto.request.ForgotPasswordRequest;
+import com.smartrent.dto.request.IntrospectRequest;
+import com.smartrent.dto.request.LogoutRequest;
+import com.smartrent.dto.request.RefreshTokenRequest;
+import com.smartrent.dto.request.ResetPasswordRequest;
+import com.smartrent.dto.response.AuthenticationResponse;
+import com.smartrent.dto.response.ForgotPasswordResponse;
+import com.smartrent.dto.response.IntrospectResponse;
 
 public interface AuthenticationService {
   IntrospectResponse introspect(IntrospectRequest request);
