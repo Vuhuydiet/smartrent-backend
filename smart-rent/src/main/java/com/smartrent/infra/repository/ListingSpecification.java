@@ -15,7 +15,6 @@ public class ListingSpecification {
             if (filter.getAddressId() != null) {
                 predicates.add(cb.equal(root.get("addressId"), filter.getAddressId()));
             }
-            // Nếu muốn filter theo provinceId, districtId, streetId thì cần truyền vào danh sách addressId phù hợp từ service/controller
             if (filter.getCategory() != null) {
                 predicates.add(cb.equal(root.get("categoryId"), filter.getCategory()));
             }
@@ -46,7 +45,7 @@ public class ListingSpecification {
             if (filter.getDirection() != null) {
                 predicates.add(cb.equal(root.get("direction"), filter.getDirection()));
             }
-            // Amenities filter (join với bảng amenities)
+            // Amenities filter
             if (filter.getAmenities() != null && !filter.getAmenities().isEmpty()) {
                 Join<Object, Object> amenityJoin = root.join("amenities", JoinType.INNER);
                 predicates.add(amenityJoin.get("amenityId").in(filter.getAmenities()));

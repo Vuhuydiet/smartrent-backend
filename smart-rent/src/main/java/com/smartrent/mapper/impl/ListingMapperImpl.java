@@ -47,7 +47,6 @@ public class ListingMapperImpl implements ListingMapper {
                 .expiryDate(entity.getExpiryDate())
                 .listingType(entity.getListingType() != null ? entity.getListingType().name() : null)
                 .verified(entity.getVerified())
-                .isVerify(entity.getIsVerify())
                 .expired(entity.getExpired())
                 .vipType(entity.getVipType() != null ? entity.getVipType().name() : null)
                 .categoryId(entity.getCategoryId())
