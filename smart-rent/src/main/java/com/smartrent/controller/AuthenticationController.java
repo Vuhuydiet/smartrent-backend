@@ -436,10 +436,10 @@ public class AuthenticationController {
 
   @PostMapping("/forgot-password")
   @Operation(
-      summary = "Verify otp to get token to reset password.",
-      description = "Verify otp to get token to reset password.",
+      summary = "Verify OTP with email to get token to reset password",
+      description = "Verifies the OTP code sent to the user's email and returns a reset password token if valid. The email and OTP combination ensures better security by preventing OTP collision attacks.",
       requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-          description = "Forgot password request",
+          description = "Forgot password request containing email and verification code",
           required = true,
           content = @Content(
               mediaType = "application/json",
@@ -448,6 +448,7 @@ public class AuthenticationController {
                   name = "Forgot Password Example",
                   value = """
                       {
+                        "email": "john.doe@example.com",
                         "verificationCode": "123456"
                       }
                       """

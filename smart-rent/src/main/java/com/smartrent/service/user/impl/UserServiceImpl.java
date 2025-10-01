@@ -10,10 +10,10 @@ import com.smartrent.infra.exception.PhoneExistingException;
 import com.smartrent.infra.exception.TaxNumberExisting;
 import com.smartrent.infra.exception.UserNotFoundException;
 import com.smartrent.infra.repository.UserRepository;
-import com.smartrent.infra.repository.VerifyCodeRepository;
 import com.smartrent.infra.repository.entity.User;
-import com.smartrent.infra.repository.entity.VerifyCode;
 import com.smartrent.mapper.UserMapper;
+import com.smartrent.service.authentication.OtpCacheService;
+import com.smartrent.service.authentication.domain.OtpData;
 import com.smartrent.service.email.VerificationEmailService;
 import com.smartrent.service.user.UserService;
 import com.smartrent.utility.MaskingUtil;
@@ -22,8 +22,10 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.utils.StringUtils;
 
 @Slf4j
 @Service
@@ -39,7 +41,7 @@ public class UserServiceImpl implements UserService {
 
   VerificationEmailService verificationEmailService;
 
-  VerifyCodeRepository verifyCodeRepository;
+  OtpCacheService otpCacheService;
 
   @Override
   @Transactional
@@ -49,16 +51,19 @@ public class UserServiceImpl implements UserService {
       throw new EmailExistingException();
     }
 
-    if (userRepository.existsByPhoneCodeAndPhoneNumber(request.getPhoneCode(),
+    if (StringUtils.isNotBlank(request.getPhoneCode()) && StringUtils.isNotBlank(request.getPhoneNumber()) &&
+        userRepository.existsByPhoneCodeAndPhoneNumber(request.getPhoneCode(),
         request.getPhoneNumber())) {
       throw new PhoneExistingException();
     }
 
-    if (userRepository.existsByIdDocument(request.getIdDocument())) {
+    if (StringUtils.isNotBlank(request.getIdDocument()) &&
+        userRepository.existsByIdDocument(request.getIdDocument())) {
       throw new DocumentExistingException();
     }
 
-    if (userRepository.existsByTaxNumber(request.getTaxNumber())) {
+    if (StringUtils.isNotBlank(request.getTaxNumber()) &&
+        userRepository.existsByTaxNumber(request.getTaxNumber())) {
       throw new TaxNumberExisting();
     }
 
@@ -69,14 +74,15 @@ public class UserServiceImpl implements UserService {
 
     userRepository.saveAndFlush(user);
 
-    VerifyCode verifyCode = verificationEmailService.sendCode(user.getUserId());
-
-    verifyCodeRepository.saveAndFlush(verifyCode);
+    // Generate and send OTP, then store in cache
+    OtpData otpData = verificationEmailService.sendCode(user.getUserId());
+    otpCacheService.storeOtp(otpData);
 
     return userMapper.mapFromUserEntityToUserCreationResponse(user);
   }
 
   @Override
+  @Cacheable(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#id")
   public GetUserResponse getUserById(String id) {
     User user = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
 
@@ -90,5 +96,22 @@ public class UserServiceImpl implements UserService {
         MaskingUtil.maskEmail(user.getEmail()));
 
     return userMapper.mapFromUserEntityToGetUserResponse(user);
+  }
+
+  @Override
+  public User internalCreateUser(UserCreationRequest request) {
+
+    if (userRepository.existsByEmail(request.getEmail())) {
+      throw new EmailExistingException();
+    }
+
+    User user = userMapper.mapFromUserCreationRequestToUserEntity(request);
+
+    user.setPassword(passwordEncoder.encode(user.getPassword()));
+    user.setVerified(true);
+
+    userRepository.saveAndFlush(user);
+
+    return user;
   }
 }

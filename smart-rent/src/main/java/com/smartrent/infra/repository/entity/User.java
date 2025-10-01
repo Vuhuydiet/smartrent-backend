@@ -9,11 +9,11 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.SuperBuilder;
 
 @Entity(name = "users")
 @Table(name = "users",
@@ -22,34 +22,16 @@ import lombok.experimental.FieldDefaults;
     })
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class User {
+public class User extends AbstractUser{
 
   @Id
   @Column(name = "user_id")
   @GeneratedValue(strategy = GenerationType.UUID)
   String userId;
-
-  @Column(name = "phone_code")
-  String phoneCode;
-
-  @Column(name = "phone_number")
-  String phoneNumber;
-
-  @Column(name = "email")
-  String email;
-
-  @Column(name = "password")
-  String password;
-
-  @Column(name = "first_name", nullable = false)
-  String firstName;
-
-  @Column(name = "last_name", nullable = false)
-  String lastName;
 
   @Column(name = "id_document", unique = true)
   String idDocument;

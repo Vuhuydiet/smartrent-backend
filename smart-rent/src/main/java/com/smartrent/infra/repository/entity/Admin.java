@@ -14,11 +14,11 @@ import jakarta.persistence.UniqueConstraint;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.SuperBuilder;
 
 @Entity(name = "admins")
 @Table(name = "admins",
@@ -27,11 +27,11 @@ import lombok.experimental.FieldDefaults;
        })
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class Admin {
+public class Admin extends AbstractUser {
 
   @Id
   @Column(name = "admin_id")
@@ -43,18 +43,6 @@ public class Admin {
 
   @Column(name = "phone_number", nullable = false)
   String phoneNumber;
-
-  @Column(name = "email", nullable = false)
-  String email;
-
-  @Column(name = "password", nullable = false)
-  String password;
-
-  @Column(name = "first_name", nullable = false)
-  String firstName;
-
-  @Column(name = "last_name", nullable = false)
-  String lastName;
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
