@@ -237,6 +237,90 @@ public class ListingController {
         return ApiResponse.<List<ListingResponse>>builder().data(responses).build();
     }
 
+    // ----------------------------------------------------
+    // Filter Listings Endpoint (GET /v1/listings/filter)
+    // ----------------------------------------------------
+    @Operation(
+        summary = "Filter listings (GET)",
+        description = "Dynamic AND-based filtering across numeric, boolean, enum và vị trí. Hỗ trợ cả ID và tên địa lý (contains, case-insensitive). Khi truyền cả ID và tên cùng cấp (ví dụ provinceId & provinceName) chúng sẽ được kết hợp AND (có thể trả về rỗng nếu không khớp). Tham số q tìm trong fullAddress. amenities có thể lặp nhiều lần: amenities=1&amenities=2.",
+        parameters = {
+            @Parameter(name = "addressId", description = "Filter theo addressId cụ thể (ưu tiên tuyệt đối nếu cung cấp)", example = "501"),
+            @Parameter(name = "provinceId", description = "Province ID", example = "1"),
+            @Parameter(name = "provinceName", description = "Tên tỉnh/thành (LIKE %value%) ví dụ: Hà Nội, TP.HCM", example = "Hà Nội"),
+            @Parameter(name = "districtId", description = "District ID", example = "101"),
+            @Parameter(name = "districtName", description = "Tên quận/huyện (LIKE %value%)", example = "Quận 1"),
+            @Parameter(name = "wardName", description = "Tên phường/xã (LIKE %value%)", example = "Phường Bến Nghé"),
+            @Parameter(name = "streetId", description = "Street ID", example = "999"),
+            @Parameter(name = "streetName", description = "Tên đường/phố (LIKE %value%); không cần tiền tố 'Đường', 'Phố'", example = "Lê Lợi"),
+            @Parameter(name = "q", description = "Full text trên fullAddress (LIKE %value%)", example = "123 Lê Lợi Quận 1"),
+            @Parameter(name = "categoryId", description = "Category ID", example = "9"),
+            @Parameter(name = "priceMin", description = "Giá tối thiểu (>=)", example = "3000000"),
+            @Parameter(name = "priceMax", description = "Giá tối đa (<=)", example = "7000000"),
+            @Parameter(name = "areaMin", description = "Diện tích tối thiểu (m2)", example = "15"),
+            @Parameter(name = "areaMax", description = "Diện tích tối đa (m2)", example = "40"),
+            @Parameter(name = "amenities", description = "Danh sách amenityId (lặp param): amenities=1&amenities=2", example = "1"),
+            @Parameter(name = "status", description = "Trạng thái listing (nếu hệ thống dùng field status)", example = "ACTIVE"),
+            @Parameter(name = "verified", description = "Đã xác minh hay chưa", example = "true"),
+            @Parameter(name = "bedrooms", description = "Số phòng ngủ đúng bằng", example = "2"),
+            @Parameter(name = "direction", description = "Hướng (enum Listing.Direction)", example = "NORTH"),
+            @Parameter(name = "page", description = "Trang (0-based)", example = "0"),
+            @Parameter(name = "size", description = "Kích thước trang (1-100)", example = "20")
+        }
+    )
+    @GetMapping("/filter")
+    public ApiResponse<com.smartrent.dto.response.ListingFilterResponse> filterListings(
+        @RequestParam(required = false) Long addressId,
+        @RequestParam(required = false) Long provinceId,
+        @RequestParam(required = false) Long districtId,
+        @RequestParam(required = false) Long streetId,
+        @RequestParam(required = false) String provinceName,
+        @RequestParam(required = false) String districtName,
+        @RequestParam(required = false) String wardName,
+        @RequestParam(required = false) String streetName,
+        @RequestParam(required = false, name = "q") String addressText,
+    @RequestParam(required = false) Long categoryId,
+        @RequestParam(required = false) Long priceMin,
+        @RequestParam(required = false) Long priceMax,
+        @RequestParam(required = false) Integer areaMin,
+        @RequestParam(required = false) Integer areaMax,
+        @RequestParam(required = false) List<Long> amenities,
+        @RequestParam(required = false) String status,
+        @RequestParam(required = false) Boolean verified,
+        @RequestParam(required = false) Integer bedrooms,
+        @RequestParam(required = false) String direction,
+        @RequestParam(defaultValue = "0") Integer page,
+        @RequestParam(defaultValue = "20") Integer size
+    ) {
+        com.smartrent.dto.request.ListingFilterRequest filterRequest = com.smartrent.dto.request.ListingFilterRequest.builder()
+            .addressId(addressId)
+            .provinceId(provinceId)
+            .districtId(districtId)
+            .streetId(streetId)
+            .provinceName(provinceName)
+            .districtName(districtName)
+            .wardName(wardName)
+            .streetName(streetName)
+            .addressText(addressText)
+            .categoryId(categoryId)
+            .priceMin(priceMin)
+            .priceMax(priceMax)
+            .areaMin(areaMin)
+            .areaMax(areaMax)
+            .amenities(amenities)
+            .status(status)
+            .verified(verified)
+            .bedrooms(bedrooms)
+            .direction(direction)
+            .page(page)
+            .size(size)
+            .build();
+        var resp = listingService.filterListings(filterRequest);
+        return ApiResponse.<com.smartrent.dto.response.ListingFilterResponse>builder()
+            .code("999999")
+            .data(resp)
+            .build();
+    }
+
     @Operation(
         summary = "Update a listing",
         parameters = {

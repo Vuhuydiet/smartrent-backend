@@ -38,23 +38,29 @@ public class SecurityConfig {
 
     http.addFilterBefore(exceptionHandler, LogoutFilter.class);
 
-    http.authorizeHttpRequests(configurer -> {
-      configurer
-          .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs", "/swagger-resources/**", "/webjars/**")
+    http.authorizeHttpRequests(registry -> registry
+        // Swagger / OpenAPI docs
+        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs", "/swagger-resources/**", "/webjars/**")
           .permitAll()
-      .requestMatchers(HttpMethod.GET, "/v1/listings/**")
-      .permitAll()
-          .requestMatchers(HttpMethod.GET, "/v1/addresses/**")
+        // Public listing endpoints (read + filter)
+        .requestMatchers(HttpMethod.GET, "/v1/listings/filter")
           .permitAll()
-          .requestMatchers(HttpMethod.POST, securityProperties.getMethods().getPost().toArray(new String[0]))
+        .requestMatchers(HttpMethod.GET, "/v1/listings/**")
           .permitAll()
-          .requestMatchers(HttpMethod.GET, securityProperties.getMethods().getGet().toArray(new String[0]))
+        // Public address lookup (if desired for FE filters)
+        .requestMatchers(HttpMethod.GET, "/v1/addresses/**")
           .permitAll()
-          .requestMatchers(HttpMethod.OPTIONS, "/**")
+        // Additional whitelisted endpoints from configuration
+        .requestMatchers(HttpMethod.POST, securityProperties.getMethods().getPost().toArray(new String[0]))
           .permitAll()
-          .anyRequest()
-          .authenticated();
-    });
+        .requestMatchers(HttpMethod.GET, securityProperties.getMethods().getGet().toArray(new String[0]))
+          .permitAll()
+        // CORS preflight
+        .requestMatchers(HttpMethod.OPTIONS, "/**")
+          .permitAll()
+        // Everything else requires authentication
+        .anyRequest().authenticated()
+    );
 
     http.csrf(AbstractHttpConfigurer::disable);
 
