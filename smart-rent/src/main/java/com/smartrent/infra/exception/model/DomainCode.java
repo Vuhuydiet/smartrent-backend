@@ -28,13 +28,24 @@ public enum DomainCode {
   //    Not Found Error 4xxx
   USER_NOT_FOUND("4001", HttpStatus.NOT_FOUND, "User not found"),
   VERIFY_CODE_NOT_FOUND("4002", HttpStatus.NOT_FOUND, "Verify code not found"),
+  PAYMENT_NOT_FOUND("4003", HttpStatus.NOT_FOUND, "Payment not found: %s"),
   //    Unauthorized	Client	5xxx (Unauthenticated error)
   UNAUTHENTICATED("5001", HttpStatus.UNAUTHORIZED, "Unauthenticated"),
   INVALID_EMAIL_PASSWORD("5002", HttpStatus.UNAUTHORIZED, "Invalid email or password"),
   INVALID_TOKEN("5003", HttpStatus.UNAUTHORIZED, "Invalid token"),
   USER_NOT_VERIFIED("5004", HttpStatus.UNAUTHORIZED, "User not verified"),
   //    Forbidden	Client	6xxx (Unauthorized error)
-  UNAUTHORIZED("6001", HttpStatus.FORBIDDEN, "Don't have permission")
+  UNAUTHORIZED("6001", HttpStatus.FORBIDDEN, "Don't have permission"),
+  //    Payment Error 7xxx
+  PAYMENT_VALIDATION_ERROR("7001", HttpStatus.BAD_REQUEST, "Payment validation error: %s"),
+  INVALID_PAYMENT_AMOUNT("7002", HttpStatus.BAD_REQUEST, "Invalid payment amount: %s"),
+  INVALID_CURRENCY("7003", HttpStatus.BAD_REQUEST, "Invalid currency: %s"),
+  INVALID_TRANSACTION_REF("7004", HttpStatus.BAD_REQUEST, "Invalid transaction reference: %s"),
+  PAYMENT_PROVIDER_NOT_FOUND("7005", HttpStatus.SERVICE_UNAVAILABLE, "Payment provider not found: %s"),
+  PAYMENT_PROVIDER_INVALID_CONFIG("7006", HttpStatus.SERVICE_UNAVAILABLE, "Payment provider configuration is invalid: %s"),
+  PAYMENT_OPERATION_NOT_SUPPORTED("7007", HttpStatus.SERVICE_UNAVAILABLE, "%s not supported by %s"),
+  PAYMENT_PROVIDER_ERROR("7008", HttpStatus.SERVICE_UNAVAILABLE, "Payment provider error: %s"),
+  USER_NOT_AUTHENTICATED("7009", HttpStatus.UNAUTHORIZED, "User not authenticated for payment")
   ;
 
   private final String value;
