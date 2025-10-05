@@ -1,7 +1,7 @@
 package com.smartrent.service.sms.impl;
 
 import com.smartrent.dto.request.MockSmsRequest;
-import com.smartrent.dto.response.MockSmsResponse;
+import com.smartrent.dto.response.SmsResponse;
 import com.smartrent.service.sms.SmsService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +18,12 @@ import java.util.UUID;
 public class MockSmsServiceImpl implements SmsService {
 
     @Override
-    public MockSmsResponse sendMessage(MockSmsRequest smsRequest) {
-        log.info("Mock SMS Service: Sending message to {} with content: {}", 
+    public SmsResponse sendMessage(MockSmsRequest smsRequest) {
+        log.info("Mock SMS Service: Sending message to {} with content: {}",
                 smsRequest.getPhoneNumber(), smsRequest.getMessage());
-        
+
         // Mock successful response
-        return MockSmsResponse.builder()
+        return SmsResponse.builder()
                 .success(true)
                 .messageId(UUID.randomUUID().toString())
                 .errorMessage(null)
