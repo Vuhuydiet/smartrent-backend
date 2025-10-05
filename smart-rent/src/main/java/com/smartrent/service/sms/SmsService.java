@@ -1,8 +1,8 @@
 package com.smartrent.service.sms;
 
 import com.smartrent.dto.request.MockSmsRequest;
-import com.smartrent.dto.response.MockSmsResponse;
+import com.smartrent.dto.response.SmsResponse;
 
 public interface SmsService {
-    MockSmsResponse sendMessage(MockSmsRequest smsRequest);
+    SmsResponse sendMessage(MockSmsRequest smsRequest);
 }
