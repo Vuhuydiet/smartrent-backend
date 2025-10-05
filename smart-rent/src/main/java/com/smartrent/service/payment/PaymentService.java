@@ -1,10 +1,14 @@
 package com.smartrent.service.payment;
 
+import com.smartrent.dto.request.AddCreditRequest;
 import com.smartrent.dto.request.PaymentCallbackRequest;
 import com.smartrent.dto.request.PaymentHistoryByStatusRequest;
 import com.smartrent.dto.request.PaymentRefundRequest;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.request.PaymentStatusUpdateRequest;
+import com.smartrent.dto.request.SubtractCreditRequest;
+import com.smartrent.dto.response.CreditBalanceResponse;
+import com.smartrent.dto.response.CreditTransactionResponse;
 import com.smartrent.dto.response.PaymentCallbackResponse;
 import com.smartrent.dto.response.PaymentHistoryResponse;
 import com.smartrent.dto.response.PaymentResponse;
@@ -15,6 +19,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -100,4 +105,37 @@ public interface PaymentService {
      * Get provider configuration schemas
      */
     Map<PaymentProvider, Map<String, Object>> getProviderSchemas();
+
+    // Credit/Wallet Management Methods
+
+    /**
+     * Add credit to user wallet
+     */
+    CreditTransactionResponse addUserCredit(AddCreditRequest request);
+
+    /**
+     * Subtract credit from user wallet
+     */
+    CreditTransactionResponse subtractUserCredit(SubtractCreditRequest request);
+
+    /**
+     * Get user credit balance
+     */
+    CreditBalanceResponse getUserCreditBalance(Long userId);
+
+    /**
+     * Check if user has sufficient credit balance
+     */
+    boolean hasSufficientCredit(Long userId, BigDecimal amount);
+
+    /**
+     * Automatically add credit to user wallet when payment is successful
+     * This method is called internally during payment processing
+     */
+    void addCreditForSuccessfulPayment(Payment payment);
+
+    /**
+     * Get credit transaction history for user
+     */
+    Page<PaymentHistoryResponse> getCreditTransactionHistory(Long userId, Pageable pageable);
 }
