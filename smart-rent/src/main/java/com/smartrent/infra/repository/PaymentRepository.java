@@ -53,16 +53,6 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Page<Payment> findByTransactionTypeOrderByCreatedAtDesc(TransactionType transactionType, Pageable pageable);
 
     /**
-     * Find payments by user ID and transaction types (for credit transactions)
-     */
-    Page<Payment> findByUserIdAndTransactionTypeInOrderByCreatedAtDesc(Long userId, List<TransactionType> transactionTypes, Pageable pageable);
-
-    /**
-     * Check if transaction reference exists
-     */
-    boolean existsByTransactionRef(String transactionRef);
-
-    /**
      * Find payments by date range
      */
     @Query("SELECT p FROM payments p WHERE p.createdAt BETWEEN :startDate AND :endDate ORDER BY p.createdAt DESC")
@@ -81,6 +71,11 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
      * Count payments by user and status
      */
     long countByUserIdAndStatus(Long userId, TransactionStatus status);
+
+    /**
+     * Check if transaction reference exists
+     */
+    boolean existsByTransactionRef(String transactionRef);
 
     /**
      * Find successful payments by user ID

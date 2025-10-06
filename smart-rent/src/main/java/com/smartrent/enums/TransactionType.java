@@ -11,9 +11,7 @@ import lombok.experimental.FieldDefaults;
 public enum TransactionType {
     PAYMENT("payment", "Payment transaction"),
     REFUND("refund", "Refund transaction"),
-    QUERY("query", "Query transaction status"),
-    CREDIT_ADD("credit_add", "Add credit to user wallet"),
-    CREDIT_SUBTRACT("credit_subtract", "Subtract credit from user wallet");
+    QUERY("query", "Query transaction status");
 
     String code;
     String description;
