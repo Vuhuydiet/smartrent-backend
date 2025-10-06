@@ -8,7 +8,6 @@ import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.PaymentCallbackResponse;
 import com.smartrent.dto.response.PaymentHistoryResponse;
 import com.smartrent.dto.response.PaymentResponse;
-import com.smartrent.dto.response.CreditBalanceResponse;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.enums.TransactionStatus;
 import com.smartrent.service.payment.PaymentService;
@@ -27,8 +26,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -303,107 +300,6 @@ public class PaymentController {
                     .code("500000")
                     .message("Failed to check transaction: " + e.getMessage())
                     .data(false)
-                    .build();
-        }
-    }
-
-    // Wallet/Credit Management Endpoints
-
-    @GetMapping("/wallet/balance")
-    @Operation(
-            summary = "Get user wallet balance",
-            description = "Get current credit balance and wallet information for the authenticated user or any user (admin only)",
-            security = @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Balance retrieved successfully"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing authentication token"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Cannot access other user's wallet"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "User not found"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    @PreAuthorize("#userId.toString() == #authenticatedUserId or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
-    public ApiResponse<CreditBalanceResponse> getUserWalletBalance(
-            @Parameter(
-                    name = "X-User-Id",
-                    description = "The authenticated user ID from JWT token",
-                    required = true,
-                    example = "user-123e4567-e89b-12d3-a456-426614174000"
-            )
-            @RequestHeader(Constants.USER_ID) String authenticatedUserId,
-            @Parameter(description = "User ID to get balance for (defaults to authenticated user)")
-            @RequestParam(required = false) Long userId) {
-
-        // If userId is not provided, use the authenticated user's ID
-        Long targetUserId = userId != null ? userId : Long.valueOf(authenticatedUserId);
-
-        log.info("Getting wallet balance for user: {} (requested by: {})", targetUserId, authenticatedUserId);
-
-        try {
-            CreditBalanceResponse response = paymentService.getUserCreditBalance(targetUserId);
-
-            return ApiResponse.<CreditBalanceResponse>builder()
-                    .code("200000")
-                    .message("Wallet balance retrieved successfully")
-                    .data(response)
-                    .build();
-
-        } catch (Exception e) {
-            log.error("Error getting wallet balance for user: {} (requested by: {})", targetUserId, authenticatedUserId, e);
-            return ApiResponse.<CreditBalanceResponse>builder()
-                    .code("500000")
-                    .message("Failed to get wallet balance: " + e.getMessage())
-                    .build();
-        }
-    }
-
-    @GetMapping("/wallet/transactions")
-    @Operation(
-            summary = "Get wallet transaction history",
-            description = "Get credit transaction history for the authenticated user or any user (admin only) with pagination",
-            security = @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Transaction history retrieved successfully"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing authentication token"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden - Cannot access other user's transactions"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "User not found"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    @PreAuthorize("#userId == null or #userId.toString() == #authenticatedUserId or hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
-    public ApiResponse<Page<PaymentHistoryResponse>> getWalletTransactionHistory(
-            @Parameter(
-                    name = "X-User-Id",
-                    description = "The authenticated user ID from JWT token",
-                    required = true,
-                    example = "user-123e4567-e89b-12d3-a456-426614174000"
-            )
-            @RequestHeader(Constants.USER_ID) String authenticatedUserId,
-            @Parameter(description = "User ID to get transactions for (defaults to authenticated user)")
-            @RequestParam(required = false) Long userId,
-            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
-
-        // If userId is not provided, use the authenticated user's ID
-        Long targetUserId = userId != null ? userId : Long.valueOf(authenticatedUserId);
-
-        log.info("Getting wallet transaction history for user: {} (requested by: {})", targetUserId, authenticatedUserId);
-
-        try {
-            Pageable pageable = PageRequest.of(page, size);
-            Page<PaymentHistoryResponse> response = paymentService.getCreditTransactionHistory(targetUserId, pageable);
-
-            return ApiResponse.<Page<PaymentHistoryResponse>>builder()
-                    .code("200000")
-                    .message("Wallet transaction history retrieved successfully")
-                    .data(response)
-                    .build();
-
-        } catch (Exception e) {
-            log.error("Error getting wallet transaction history for user: {} (requested by: {})", targetUserId, authenticatedUserId, e);
-            return ApiResponse.<Page<PaymentHistoryResponse>>builder()
-                    .code("500000")
-                    .message("Failed to get wallet transaction history: " + e.getMessage())
                     .build();
         }
     }
