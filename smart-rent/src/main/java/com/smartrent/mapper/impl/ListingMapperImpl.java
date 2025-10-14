@@ -2,11 +2,17 @@ package com.smartrent.mapper.impl;
 
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.response.AmenityResponse;
+import com.smartrent.dto.response.ImageResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.PricingHistoryResponse;
+import com.smartrent.dto.response.VideoResponse;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.AmenityMapper;
+import com.smartrent.mapper.ImageMapper;
 import com.smartrent.mapper.ListingMapper;
+import com.smartrent.mapper.PricingHistoryMapper;
+import com.smartrent.mapper.VideoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +25,9 @@ import java.util.stream.Collectors;
 public class ListingMapperImpl implements ListingMapper {
 
     private final AmenityMapper amenityMapper;
+    private final PricingHistoryMapper pricingHistoryMapper;
+    private final ImageMapper imageMapper;
+    private final VideoMapper videoMapper;
     @Override
     public Listing toEntity(ListingCreationRequest req) {
         return Listing.builder()
@@ -55,6 +64,45 @@ public class ListingMapperImpl implements ListingMapper {
                     .collect(Collectors.toList());
         }
 
+        // Map images
+        List<ImageResponse> imageResponses = Collections.emptyList();
+        if (entity.getImages() != null && !entity.getImages().isEmpty()) {
+            imageResponses = entity.getImages().stream()
+                    .map(imageMapper::toResponse)
+                    .sorted((a, b) -> {
+                        // Primary images first, then by sortOrder
+                        if (a.getIsPrimary() && !b.getIsPrimary()) return -1;
+                        if (!a.getIsPrimary() && b.getIsPrimary()) return 1;
+                        return Integer.compare(a.getSortOrder(), b.getSortOrder());
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        // Map videos
+        List<VideoResponse> videoResponses = Collections.emptyList();
+        if (entity.getVideos() != null && !entity.getVideos().isEmpty()) {
+            videoResponses = entity.getVideos().stream()
+                    .map(videoMapper::toResponse)
+                    .sorted((a, b) -> Integer.compare(a.getSortOrder(), b.getSortOrder()))
+                    .collect(Collectors.toList());
+        }
+
+        // Map pricing history
+        PricingHistoryResponse currentPricing = null;
+        List<PricingHistoryResponse> priceHistory = Collections.emptyList();
+
+        if (entity.getPricingHistories() != null && !entity.getPricingHistories().isEmpty()) {
+            priceHistory = entity.getPricingHistories().stream()
+                    .map(pricingHistoryMapper::toResponse)
+                    .collect(Collectors.toList());
+
+            // Find current pricing
+            currentPricing = priceHistory.stream()
+                    .filter(PricingHistoryResponse::getIsCurrent)
+                    .findFirst()
+                    .orElse(null);
+        }
+
         return ListingResponse.builder()
                 .listingId(entity.getListingId())
                 .title(entity.getTitle())
@@ -81,6 +129,10 @@ public class ListingMapperImpl implements ListingMapper {
                 .propertyType(entity.getPropertyType() != null ? entity.getPropertyType().name() : null)
                 .roomCapacity(entity.getRoomCapacity())
                 .amenities(amenityResponses)
+                .images(imageResponses)
+                .videos(videoResponses)
+                .currentPricing(currentPricing)
+                .priceHistory(priceHistory)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();

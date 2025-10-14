@@ -211,7 +211,7 @@ public class OpenAPIConfig {
                             .group("file-upload")
                             .displayName("File Upload APIs")
                             .packagesToScan(packageToScan)
-                            .pathsToMatch("/upload/**")
+                            .pathsToMatch("/v1/upload/**")
                             .build();
     }
 

@@ -133,6 +133,7 @@ public class ListingController {
                                 "isVerify": false,
                                 "expired": false,
                                 "vipType": "NORMAL",
+                                "status": "ACTIVE",
                                 "categoryId": 10,
                                 "productType": "APARTMENT",
                                 "price": 15000000.00,
@@ -169,6 +170,77 @@ public class ListingController {
                                     "description": "Phòng tập gym 24/7",
                                     "category": "fitness",
                                     "isActive": true
+                                  }
+                                ],
+                                "images": [
+                                  {
+                                    "id": 1,
+                                    "url": "https://storage.example.com/listings/123/image1.jpg",
+                                    "altText": "Phòng khách rộng rãi",
+                                    "sortOrder": 0,
+                                    "isPrimary": true,
+                                    "fileSize": 524288,
+                                    "mimeType": "image/jpeg",
+                                    "createdAt": "2025-09-01T10:00:00",
+                                    "updatedAt": "2025-09-01T10:00:00"
+                                  },
+                                  {
+                                    "id": 2,
+                                    "url": "https://storage.example.com/listings/123/image2.jpg",
+                                    "altText": "Phòng ngủ chính",
+                                    "sortOrder": 1,
+                                    "isPrimary": false,
+                                    "fileSize": 612352,
+                                    "mimeType": "image/jpeg",
+                                    "createdAt": "2025-09-01T10:00:00",
+                                    "updatedAt": "2025-09-01T10:00:00"
+                                  }
+                                ],
+                                "videos": [
+                                  {
+                                    "id": 1,
+                                    "url": "https://storage.example.com/listings/123/tour.mp4",
+                                    "title": "Video giới thiệu căn hộ",
+                                    "description": "Tham quan toàn bộ căn hộ",
+                                    "durationSeconds": 120,
+                                    "fileSize": 15728640,
+                                    "mimeType": "video/mp4",
+                                    "thumbnailUrl": "https://storage.example.com/listings/123/tour-thumb.jpg",
+                                    "sortOrder": 0,
+                                    "createdAt": "2025-09-01T10:00:00",
+                                    "updatedAt": "2025-09-01T10:00:00"
+                                  }
+                                ],
+                                "currentPricing": {
+                                  "id": 10,
+                                  "listingId": 123,
+                                  "oldPrice": null,
+                                  "newPrice": 15000000.00,
+                                  "oldPriceUnit": null,
+                                  "newPriceUnit": "MONTH",
+                                  "changeType": "INITIAL",
+                                  "changePercentage": null,
+                                  "changeAmount": null,
+                                  "isCurrent": true,
+                                  "changedBy": "user-123e4567-e89b-12d3-a456-426614174000",
+                                  "changeReason": "Initial listing price",
+                                  "changedAt": "2025-09-01T10:00:00"
+                                },
+                                "priceHistory": [
+                                  {
+                                    "id": 10,
+                                    "listingId": 123,
+                                    "oldPrice": null,
+                                    "newPrice": 15000000.00,
+                                    "oldPriceUnit": null,
+                                    "newPriceUnit": "MONTH",
+                                    "changeType": "INITIAL",
+                                    "changePercentage": null,
+                                    "changeAmount": null,
+                                    "isCurrent": true,
+                                    "changedBy": "user-123e4567-e89b-12d3-a456-426614174000",
+                                    "changeReason": "Initial listing price",
+                                    "changedAt": "2025-09-01T10:00:00"
                                   }
                                 ],
                                 "createdAt": "2025-09-01T10:00:00",
@@ -239,6 +311,7 @@ public class ListingController {
                                   "isVerify": false,
                                   "expired": false,
                                   "vipType": "NORMAL",
+                                  "status": "ACTIVE",
                                   "categoryId": 10,
                                   "productType": "APARTMENT",
                                   "price": 15000000.00,
@@ -267,14 +340,66 @@ public class ListingController {
                                       "description": "Chỗ đậu xe riêng biệt",
                                       "category": "parking",
                                       "isActive": true
-                                    },
+                                    }
+                                  ],
+                                  "images": [
                                     {
-                                      "amenityId": 5,
-                                      "name": "Phòng gym",
-                                      "icon": "dumbbell",
-                                      "description": "Phòng tập gym 24/7",
-                                      "category": "fitness",
-                                      "isActive": true
+                                      "id": 1,
+                                      "url": "https://storage.example.com/listings/123/image1.jpg",
+                                      "altText": "Phòng khách rộng rãi",
+                                      "sortOrder": 0,
+                                      "isPrimary": true,
+                                      "fileSize": 524288,
+                                      "mimeType": "image/jpeg",
+                                      "createdAt": "2025-09-01T10:00:00",
+                                      "updatedAt": "2025-09-01T10:00:00"
+                                    }
+                                  ],
+                                  "videos": [
+                                    {
+                                      "id": 1,
+                                      "url": "https://storage.example.com/listings/123/tour.mp4",
+                                      "title": "Video giới thiệu căn hộ",
+                                      "description": "Tham quan toàn bộ căn hộ",
+                                      "durationSeconds": 120,
+                                      "fileSize": 15728640,
+                                      "mimeType": "video/mp4",
+                                      "thumbnailUrl": "https://storage.example.com/listings/123/tour-thumb.jpg",
+                                      "sortOrder": 0,
+                                      "createdAt": "2025-09-01T10:00:00",
+                                      "updatedAt": "2025-09-01T10:00:00"
+                                    }
+                                  ],
+                                  "currentPricing": {
+                                    "id": 10,
+                                    "listingId": 123,
+                                    "oldPrice": null,
+                                    "newPrice": 15000000.00,
+                                    "oldPriceUnit": null,
+                                    "newPriceUnit": "MONTH",
+                                    "changeType": "INITIAL",
+                                    "changePercentage": null,
+                                    "changeAmount": null,
+                                    "isCurrent": true,
+                                    "changedBy": "user-123e4567-e89b-12d3-a456-426614174000",
+                                    "changeReason": "Initial listing price",
+                                    "changedAt": "2025-09-01T10:00:00"
+                                  },
+                                  "priceHistory": [
+                                    {
+                                      "id": 10,
+                                      "listingId": 123,
+                                      "oldPrice": null,
+                                      "newPrice": 15000000.00,
+                                      "oldPriceUnit": null,
+                                      "newPriceUnit": "MONTH",
+                                      "changeType": "INITIAL",
+                                      "changePercentage": null,
+                                      "changeAmount": null,
+                                      "isCurrent": true,
+                                      "changedBy": "user-123e4567-e89b-12d3-a456-426614174000",
+                                      "changeReason": "Initial listing price",
+                                      "changedAt": "2025-09-01T10:00:00"
                                     }
                                   ],
                                   "createdAt": "2025-09-01T10:00:00",
@@ -292,6 +417,7 @@ public class ListingController {
                                   "isVerify": true,
                                   "expired": false,
                                   "vipType": "VIP",
+                                  "status": "ACTIVE",
                                   "categoryId": 12,
                                   "productType": "STUDIO",
                                   "price": 8500000.00,
@@ -312,22 +438,52 @@ public class ListingController {
                                       "description": "Điều hòa trung tâm",
                                       "category": "climate",
                                       "isActive": true
-                                    },
+                                    }
+                                  ],
+                                  "images": [
                                     {
-                                      "amenityId": 4,
-                                      "name": "Ban công",
-                                      "icon": "home",
-                                      "description": "Ban công riêng với tầm nhìn ra thành phố",
-                                      "category": "outdoor",
-                                      "isActive": true
-                                    },
+                                      "id": 3,
+                                      "url": "https://storage.example.com/listings/124/image1.jpg",
+                                      "altText": "Không gian studio hiện đại",
+                                      "sortOrder": 0,
+                                      "isPrimary": true,
+                                      "fileSize": 487424,
+                                      "mimeType": "image/jpeg",
+                                      "createdAt": "2025-09-02T14:30:00",
+                                      "updatedAt": "2025-09-02T14:30:00"
+                                    }
+                                  ],
+                                  "videos": [],
+                                  "currentPricing": {
+                                    "id": 11,
+                                    "listingId": 124,
+                                    "oldPrice": null,
+                                    "newPrice": 8500000.00,
+                                    "oldPriceUnit": null,
+                                    "newPriceUnit": "MONTH",
+                                    "changeType": "INITIAL",
+                                    "changePercentage": null,
+                                    "changeAmount": null,
+                                    "isCurrent": true,
+                                    "changedBy": "user-456e7890-e12b-34c5-d678-901234567890",
+                                    "changeReason": "Initial listing price",
+                                    "changedAt": "2025-09-02T14:30:00"
+                                  },
+                                  "priceHistory": [
                                     {
-                                      "amenityId": 6,
-                                      "name": "Bể bơi",
-                                      "icon": "swimmer",
-                                      "description": "Bể bơi ngoài trời",
-                                      "category": "recreation",
-                                      "isActive": true
+                                      "id": 11,
+                                      "listingId": 124,
+                                      "oldPrice": null,
+                                      "newPrice": 8500000.00,
+                                      "oldPriceUnit": null,
+                                      "newPriceUnit": "MONTH",
+                                      "changeType": "INITIAL",
+                                      "changePercentage": null,
+                                      "changeAmount": null,
+                                      "isCurrent": true,
+                                      "changedBy": "user-456e7890-e12b-34c5-d678-901234567890",
+                                      "changeReason": "Initial listing price",
+                                      "changedAt": "2025-09-02T14:30:00"
                                     }
                                   ],
                                   "createdAt": "2025-09-02T14:30:00",

@@ -68,6 +68,14 @@ public class ListingResponse {
 
     List<AmenityResponse> amenities;
 
+    List<ImageResponse> images;
+
+    List<VideoResponse> videos;
+
+    PricingHistoryResponse currentPricing;
+
+    List<PricingHistoryResponse> priceHistory;
+
     LocalDateTime createdAt;
 
     LocalDateTime updatedAt;

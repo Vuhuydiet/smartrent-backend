@@ -27,7 +27,7 @@ public class PricingHistoryResponse {
     String changeType;
     BigDecimal changePercentage;
     BigDecimal changeAmount;
-    boolean isCurrent;
+    Boolean isCurrent;  // Changed to Boolean wrapper to allow proper getter naming
     String changedBy;
     String changeReason;
     LocalDateTime changedAt;

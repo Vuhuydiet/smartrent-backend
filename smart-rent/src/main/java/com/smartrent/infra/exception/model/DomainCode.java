@@ -20,6 +20,10 @@ public enum DomainCode {
   VERIFY_CODE_EXPIRED("2006", HttpStatus.BAD_REQUEST, "Verify code expired"),
   INCORRECT_PASSWORD("2007", HttpStatus.BAD_REQUEST, "Incorrect password"),
   PASSWORD_SAME("2008", HttpStatus.BAD_REQUEST, "The same password"),
+  INVALID_FILE_TYPE("2009", HttpStatus.BAD_REQUEST, "Invalid file type. Allowed types: %s"),
+  FILE_SIZE_EXCEEDED("2010", HttpStatus.BAD_REQUEST, "File size exceeds maximum limit of %s MB"),
+  FILE_UPLOAD_FAILED("2011", HttpStatus.BAD_REQUEST, "File upload failed: %s"),
+  EMPTY_FILE("2012", HttpStatus.BAD_REQUEST, "File is empty"),
   //    Existing Error 3xxx
   EMAIL_EXISTING("3001", HttpStatus.CONFLICT, "Email already exists"),
   PHONE_EXISTING("3002", HttpStatus.CONFLICT, "Phone already exists"),
@@ -28,6 +32,7 @@ public enum DomainCode {
   //    Not Found Error 4xxx
   USER_NOT_FOUND("4001", HttpStatus.NOT_FOUND, "User not found"),
   VERIFY_CODE_NOT_FOUND("4002", HttpStatus.NOT_FOUND, "Verify code not found"),
+  FILE_NOT_FOUND("4003", HttpStatus.NOT_FOUND, "File not found: %s"),
   //    Unauthorized	Client	5xxx (Unauthenticated error)
   UNAUTHENTICATED("5001", HttpStatus.UNAUTHORIZED, "Unauthenticated"),
   INVALID_EMAIL_PASSWORD("5002", HttpStatus.UNAUTHORIZED, "Invalid email or password"),

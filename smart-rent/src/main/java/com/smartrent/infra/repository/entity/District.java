@@ -35,7 +35,8 @@ import java.util.List;
                 @Index(name = "idx_province_id", columnList = "province_id"),
                 @Index(name = "idx_name", columnList = "name"),
                 @Index(name = "idx_is_active", columnList = "is_active"),
-                @Index(name = "idx_effective_period", columnList = "effective_from, effective_to")
+                @Index(name = "idx_effective_period", columnList = "effective_from, effective_to"),
+                @Index(name = "idx_structure_version", columnList = "structure_version")
         },
         uniqueConstraints = {
                 @UniqueConstraint(name = "unique_province_district_code", columnNames = {"province_id", "code"})
@@ -75,6 +76,11 @@ public class District {
 
     @Column(name = "effective_to")
     LocalDate effectiveTo;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "structure_version", nullable = false)
+    @Builder.Default
+    AdministrativeStructure structureVersion = AdministrativeStructure.OLD;
 
     @OneToMany(mappedBy = "district", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<Ward> wards;

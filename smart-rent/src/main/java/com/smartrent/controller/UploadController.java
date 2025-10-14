@@ -1,8 +1,11 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.request.PresignedUrlRequest;
 import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.PresignedUrlResponse;
 import com.smartrent.dto.response.UploadResponse;
 import com.smartrent.service.storage.StorageService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.AccessLevel;
@@ -13,6 +16,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -151,5 +155,123 @@ public class UploadController {
         return ApiResponse.<UploadResponse>builder()
             .data(response)
             .build();
+    }
+
+    // ===== PRE-SIGNED URL ENDPOINTS =====
+
+    @PostMapping("/presigned-url/image")
+    @Operation(
+        summary = "Generate pre-signed URL for image upload",
+        description = "Returns a pre-signed URL that allows direct upload to S3 without going through the backend server",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = PresignedUrlRequest.class),
+                examples = @ExampleObject(
+                    name = "Request Example",
+                    value = """
+                        {
+                          "filename": "living-room.jpg",
+                          "contentType": "image/jpeg",
+                          "fileSize": 2048576
+                        }
+                        """
+                )
+            )
+        )
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Pre-signed URL generated successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ApiResponse.class),
+                examples = @ExampleObject(
+                    name = "Success Response",
+                    value = """
+                        {
+                          "code": "999999",
+                          "message": null,
+                          "data": {
+                            "uploadUrl": "https://pub-444e165e3cc34721a5620508f66c58b0.r2.dev/images/uuid-living-room.jpg?X-Amz-Algorithm=...",
+                            "fileUrl": "https://pub-444e165e3cc34721a5620508f66c58b0.r2.dev/images/uuid-living-room.jpg",
+                            "fileKey": "images/uuid-living-room.jpg",
+                            "expiresAt": "2025-10-04T11:00:00",
+                            "requiredHeaders": {
+                              "contentType": "image/jpeg"
+                            }
+                          }
+                        }
+                        """
+                )
+            )
+        )
+    })
+    public ApiResponse<PresignedUrlResponse> generateImagePresignedUrl(
+            @Valid @RequestBody PresignedUrlRequest request) {
+        PresignedUrlResponse response = storageService.generatePresignedImageUploadUrl(request);
+        return ApiResponse.<PresignedUrlResponse>builder()
+                .data(response)
+                .build();
+    }
+
+    @PostMapping("/presigned-url/video")
+    @Operation(
+        summary = "Generate pre-signed URL for video upload",
+        description = "Returns a pre-signed URL that allows direct upload to S3 without going through the backend server",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = PresignedUrlRequest.class),
+                examples = @ExampleObject(
+                    name = "Request Example",
+                    value = """
+                        {
+                          "filename": "apartment-tour.mp4",
+                          "contentType": "video/mp4",
+                          "fileSize": 10485760
+                        }
+                        """
+                )
+            )
+        )
+    )
+    @ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Pre-signed URL generated successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ApiResponse.class),
+                examples = @ExampleObject(
+                    name = "Success Response",
+                    value = """
+                        {
+                          "code": "999999",
+                          "message": null,
+                          "data": {
+                            "uploadUrl": "https://pub-444e165e3cc34721a5620508f66c58b0.r2.dev/videos/uuid-tour.mp4?X-Amz-Algorithm=...",
+                            "fileUrl": "https://pub-444e165e3cc34721a5620508f66c58b0.r2.dev/videos/uuid-tour.mp4",
+                            "fileKey": "videos/uuid-tour.mp4",
+                            "expiresAt": "2025-10-04T11:00:00",
+                            "requiredHeaders": {
+                              "contentType": "video/mp4"
+                            }
+                          }
+                        }
+                        """
+                )
+            )
+        )
+    })
+    public ApiResponse<PresignedUrlResponse> generateVideoPresignedUrl(
+            @Valid @RequestBody PresignedUrlRequest request) {
+        PresignedUrlResponse response = storageService.generatePresignedVideoUploadUrl(request);
+        return ApiResponse.<PresignedUrlResponse>builder()
+                .data(response)
+                .build();
     }
 }

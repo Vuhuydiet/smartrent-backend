@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Configuration
@@ -16,4 +18,7 @@ public class S3StorageProperties {
     private String secretKey;
     private String bucketName;
     private String publicUrl;
+    private long maxFileSizeMB;
+    private List<String> allowedImageTypes;
+    private List<String> allowedVideoTypes;
 }

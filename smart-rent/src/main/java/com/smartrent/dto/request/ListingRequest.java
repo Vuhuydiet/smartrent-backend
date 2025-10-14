@@ -11,6 +11,7 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -82,4 +83,8 @@ public class ListingRequest {
     Integer roomCapacity;
 
     Set<Long> amenityIds;
+
+    List<ImageRequest> images;
+
+    List<VideoRequest> videos;
 }

@@ -36,7 +36,8 @@ import java.util.List;
                 @Index(name = "idx_is_active", columnList = "is_active"),
                 @Index(name = "idx_effective_period", columnList = "effective_from, effective_to"),
                 @Index(name = "idx_parent_province", columnList = "parent_province_id"),
-                @Index(name = "idx_is_merged", columnList = "is_merged")
+                @Index(name = "idx_is_merged", columnList = "is_merged"),
+                @Index(name = "idx_structure_version", columnList = "structure_version")
         },
         uniqueConstraints = {
                 @UniqueConstraint(name = "unique_province_code", columnNames = {"code"})
@@ -90,6 +91,11 @@ public class Province {
 
     @Column(name = "original_name", length = 100)
     String originalName; // Store original name before merger
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "structure_version", nullable = false)
+    @Builder.Default
+    AdministrativeStructure structureVersion = AdministrativeStructure.BOTH;
 
     // Relationships with other entities
     @OneToMany(mappedBy = "province", cascade = CascadeType.ALL, fetch = FetchType.LAZY)

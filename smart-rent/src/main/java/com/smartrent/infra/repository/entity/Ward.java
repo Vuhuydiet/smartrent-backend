@@ -21,7 +21,10 @@ import java.util.List;
                 @Index(name = "idx_district_id", columnList = "district_id"),
                 @Index(name = "idx_name", columnList = "name"),
                 @Index(name = "idx_is_active", columnList = "is_active"),
-                @Index(name = "idx_effective_period", columnList = "effective_from, effective_to")
+                @Index(name = "idx_effective_period", columnList = "effective_from, effective_to"),
+                @Index(name = "idx_parent_ward", columnList = "parent_ward_id"),
+                @Index(name = "idx_is_merged", columnList = "is_merged"),
+                @Index(name = "idx_structure_version", columnList = "structure_version")
         },
         uniqueConstraints = {
                 @UniqueConstraint(name = "unique_district_ward_code", columnNames = {"district_id", "code"})
@@ -62,6 +65,29 @@ public class Ward {
     @Column(name = "effective_to")
     LocalDate effectiveTo;
 
+    // Self-referencing relationship for merged wards
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_ward_id")
+    Ward parentWard;
+
+    @OneToMany(mappedBy = "parentWard", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<Ward> mergedWards;
+
+    @Builder.Default
+    @Column(name = "is_merged", nullable = false)
+    Boolean isMerged = false;
+
+    @Column(name = "merged_date")
+    LocalDate mergedDate;
+
+    @Column(name = "original_name", length = 100)
+    String originalName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "structure_version", nullable = false)
+    @Builder.Default
+    AdministrativeStructure structureVersion = AdministrativeStructure.BOTH;
+
     @OneToMany(mappedBy = "ward", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<Street> streets;
 
@@ -75,5 +101,22 @@ public class Ward {
 
     public enum WardType {
         WARD, COMMUNE, TOWNSHIP
+    }
+
+    // Helper methods for merged ward logic
+    public boolean isParentWard() {
+        return mergedWards != null && !mergedWards.isEmpty();
+    }
+
+    public boolean isMergedWard() {
+        return parentWard != null;
+    }
+
+    public String getDisplayName() {
+        return isMergedWard() ? parentWard.getName() : name;
+    }
+
+    public List<Ward> getAllMergedWards() {
+        return isParentWard() ? mergedWards : List.of();
     }
 }

@@ -1,10 +1,13 @@
 package com.smartrent.controller;
 
+import com.smartrent.config.Constants;
 import com.smartrent.dto.request.PriceUpdateRequest;
 import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.PriceStatisticsResponse;
 import com.smartrent.dto.response.PricingHistoryResponse;
 import com.smartrent.service.pricing.PricingHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -67,7 +70,13 @@ public class PricingHistoryController {
     ApiResponse<PricingHistoryResponse> updatePrice(
             @PathVariable Long listingId,
             @RequestBody @Valid PriceUpdateRequest request,
-            @RequestHeader("user-id") String userId) {
+            @Parameter(
+                name = "X-User-Id",
+                description = "The unique identifier of the user",
+                required = true,
+                example = "user-123e4567-e89b-12d3-a456-426614174000"
+            )
+            @RequestHeader(Constants.USER_ID) String userId) {
         PricingHistoryResponse response = pricingHistoryService.updatePrice(listingId, request, userId);
         return ApiResponse.<PricingHistoryResponse>builder()
                 .data(response)
@@ -149,14 +158,39 @@ public class PricingHistoryController {
                 description = "Price statistics returned",
                 content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = PricingHistoryService.PriceStatistics.class)
+                    schema = @Schema(implementation = PriceStatisticsResponse.class),
+                    examples = @ExampleObject(
+                        name = "Price Statistics Example",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "minPrice": 8000000.00,
+                                "maxPrice": 18000000.00,
+                                "avgPrice": 12500000.00,
+                                "totalChanges": 5,
+                                "priceIncreases": 3,
+                                "priceDecreases": 2
+                              }
+                            }
+                            """
+                    )
                 )
             )
         }
     )
-    ApiResponse<PricingHistoryService.PriceStatistics> getPriceStatistics(@PathVariable Long listingId) {
-        PricingHistoryService.PriceStatistics response = pricingHistoryService.getPriceStatistics(listingId);
-        return ApiResponse.<PricingHistoryService.PriceStatistics>builder()
+    ApiResponse<PriceStatisticsResponse> getPriceStatistics(@PathVariable Long listingId) {
+        PricingHistoryService.PriceStatistics stats = pricingHistoryService.getPriceStatistics(listingId);
+        PriceStatisticsResponse response = PriceStatisticsResponse.builder()
+                .minPrice(stats.minPrice)
+                .maxPrice(stats.maxPrice)
+                .avgPrice(stats.avgPrice)
+                .totalChanges(stats.totalChanges)
+                .priceIncreases(stats.priceIncreases)
+                .priceDecreases(stats.priceDecreases)
+                .build();
+        return ApiResponse.<PriceStatisticsResponse>builder()
                 .data(response)
                 .build();
     }
