@@ -1,5 +1,6 @@
 package com.smartrent.service.push;
 
+import com.smartrent.infra.repository.entity.PushHistory;
 import com.smartrent.infra.repository.entity.PushSchedule;
 
 import java.time.LocalDateTime;
@@ -60,7 +61,7 @@ public interface PushService {
      * @param listingId The listing ID
      * @return List of push history records
      */
-    List<Object> getPushHistoryByListingId(Long listingId);
+    List<PushHistory> getPushHistoryByListingId(Long listingId);
 
     /**
      * Get push history for a specific schedule
@@ -68,5 +69,5 @@ public interface PushService {
      * @param scheduleId The schedule ID
      * @return List of push history records
      */
-    List<Object> getPushHistoryByScheduleId(Long scheduleId);
+    List<PushHistory> getPushHistoryByScheduleId(Long scheduleId);
 }
