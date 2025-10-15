@@ -193,6 +193,14 @@ open:
       secretKey: ${S3_SECRET_KEY}
       bucketName: ${S3_BUCKET}
       publicUrl: ${S3_PUBLIC_URL}
+      maxFileSizeMB: ${S3_MAX_FILE_SIZE_MB:10}
+      allowedImageTypes:
+        - image/jpeg
+        - image/png
+        - image/webp
+      allowedVideoTypes:
+        - video/mp4
+        - video/quicktime
 
 # VNPay Payment Gateway Configuration
 vnpay:
