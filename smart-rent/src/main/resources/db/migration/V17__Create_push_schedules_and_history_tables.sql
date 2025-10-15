@@ -24,7 +24,9 @@ CREATE TABLE push_schedules (
     INDEX idx_end_time (end_time),
 
     CONSTRAINT fk_push_schedules_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
-    CONSTRAINT unique_active_schedule_per_listing UNIQUE (listing_id, status)
+    -- Enforce uniqueness of ACTIVE schedule per listing using a generated column
+    , active_only BIGINT GENERATED ALWAYS AS (CASE WHEN status = 'ACTIVE' THEN listing_id ELSE NULL END) STORED
+    , UNIQUE KEY unique_active_schedule_per_listing (active_only)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='Stores push schedules for listings. Each listing can have at most one ACTIVE schedule.';
 
