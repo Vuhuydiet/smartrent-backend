@@ -5,9 +5,6 @@ import com.smartrent.dto.response.SavedListingResponse;
 import com.smartrent.service.listing.SavedListingService;
 import com.smartrent.dto.response.ApiResponse;
 
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
