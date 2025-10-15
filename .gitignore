@@ -48,5 +48,6 @@ out/
 docker-compose.override.yml
 
 diff/
-
 logs/
+
+.local/
