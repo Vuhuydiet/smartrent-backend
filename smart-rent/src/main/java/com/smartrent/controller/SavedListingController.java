@@ -5,6 +5,11 @@ import com.smartrent.dto.response.SavedListingResponse;
 import com.smartrent.service.listing.SavedListingService;
 import com.smartrent.dto.response.ApiResponse;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -30,6 +35,29 @@ public class SavedListingController {
     SavedListingService savedListingService;
 
     @PostMapping
+    @Operation(
+        summary = "Save a listing",
+        description = "Add a listing to the user's saved/favorite listings",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Listing saved successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = SavedListingResponse.class)
+            )
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "Listing not found"
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "409",
+            description = "Listing already saved"
+        )
+    })
     public ApiResponse<SavedListingResponse> saveListing(@Valid @RequestBody SavedListingRequest request) {
         SavedListingResponse response = savedListingService.saveListing(request);
         return ApiResponse.<SavedListingResponse>builder()
@@ -38,13 +66,47 @@ public class SavedListingController {
     }
 
     @DeleteMapping("/{listingId}")
-    public ApiResponse<Void> unsaveListing(@PathVariable Long listingId) {
+    @Operation(
+        summary = "Remove a saved listing",
+        description = "Remove a listing from the user's saved/favorite listings",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Listing removed from saved successfully"
+        ),
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "404",
+            description = "Saved listing not found"
+        )
+    })
+    public ApiResponse<Void> unsaveListing(
+            @Parameter(description = "ID of the listing to remove from saved", required = true)
+            @PathVariable Long listingId) {
         savedListingService.unsaveListing(listingId);
         return ApiResponse.<Void>builder()
                 .build();
     }
 
     @GetMapping("/my-saved")
+    @Operation(
+        summary = "Get my saved listings",
+        description = "Retrieve all listings saved by the current user",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Saved listings retrieved successfully",
+            content = @Content(
+                mediaType = "application/json",
+                array = @io.swagger.v3.oas.annotations.media.ArraySchema(
+                    schema = @Schema(implementation = SavedListingResponse.class)
+                )
+            )
+        )
+    })
     public ApiResponse<List<SavedListingResponse>> getMySavedListings() {
         List<SavedListingResponse> responses = savedListingService.getMySavedListings();
         return ApiResponse.<List<SavedListingResponse>>builder()
@@ -53,7 +115,24 @@ public class SavedListingController {
     }
 
     @GetMapping("/check/{listingId}")
-    public ApiResponse<Boolean> isListingSaved(@PathVariable Long listingId) {
+    @Operation(
+        summary = "Check if listing is saved",
+        description = "Check whether a specific listing is in the user's saved listings",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Check completed successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = Boolean.class)
+            )
+        )
+    })
+    public ApiResponse<Boolean> isListingSaved(
+            @Parameter(description = "ID of the listing to check", required = true)
+            @PathVariable Long listingId) {
         boolean isSaved = savedListingService.isListingSaved(listingId);
         return ApiResponse.<Boolean>builder()
                 .data(isSaved)
@@ -61,6 +140,21 @@ public class SavedListingController {
     }
 
     @GetMapping("/count")
+    @Operation(
+        summary = "Get saved listings count",
+        description = "Get the total number of listings saved by the current user",
+        security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+        @io.swagger.v3.oas.annotations.responses.ApiResponse(
+            responseCode = "200",
+            description = "Count retrieved successfully",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = Long.class)
+            )
+        )
+    })
     public ApiResponse<Long> getMySavedListingsCount() {
         long count = savedListingService.getMySavedListingsCount();
         return ApiResponse.<Long>builder()

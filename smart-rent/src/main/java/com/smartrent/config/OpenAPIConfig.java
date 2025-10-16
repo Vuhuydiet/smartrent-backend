@@ -63,7 +63,7 @@ public class OpenAPIConfig {
      */
     private String buildApiDescription(String baseDescription) {
         return baseDescription + "\n\n" +
-                "## 🔐 Authentication\n" +
+                "## Authentication\n" +
                 "This API uses JWT (JSON Web Token) for authentication. To access protected endpoints:\n" +
                 "1. **User Authentication**: Use `/v1/auth` endpoint to authenticate users\n" +
                 "2. **Admin Authentication**: Use `/v1/auth/admin` endpoint to authenticate administrators\n" +
@@ -71,22 +71,64 @@ public class OpenAPIConfig {
                 "4. **Token Refresh**: Use the refresh token to obtain new access tokens when they expire\n" +
                 "5. **Token Validation**: Use `/v1/auth/introspect` to validate token status\n\n" +
 
-                "## 📧 Email Verification\n" +
+                "## Email Verification\n" +
                 "User accounts require email verification before full activation:\n" +
                 "1. Create user account via `/v1/users`\n" +
                 "2. Send verification code via `/v1/verification/code`\n" +
                 "3. Verify email using `/v1/verification` with the received code\n\n" +
 
-                "## 🔄 Circuit Breaker & Resilience\n" +
+                "## VNPay Payment Integration\n" +
+                "SmartRent uses VNPay as the exclusive payment gateway:\n" +
+                "- **No Wallet System**: All payments go directly through VNPay\n" +
+                "- **Dual Payment Model**: Use membership quota (free) or pay-per-action\n" +
+                "- **Secure Transactions**: HMAC-SHA512 signature verification\n" +
+                "- **Payment Flows**: Membership purchase, pay-per-post, pay-per-boost\n" +
+                "- **Transaction Tracking**: Complete history of all payments\n" +
+                "- Initiate payments via `/v1/payments/*`\n" +
+                "- View transaction history via `/v1/payments/history`\n\n" +
+
+                "## Membership System\n" +
+                "SmartRent offers premium membership packages with exclusive benefits:\n" +
+                "- **Basic Package** (700,000 VND): 3 VIP posts, 1 Premium post, 5 boosts\n" +
+                "- **Standard Package** (1,400,000 VND): 7 VIP posts, 3 Premium posts, 13 boosts\n" +
+                "- **Advanced Package** (2,800,000 VND): 15 VIP posts, 7 Premium posts, 30 boosts\n" +
+                "- **Auto-Verification**: VIP/Premium posts skip manual review\n" +
+                "- Purchase memberships via `/v1/payments/membership`\n" +
+                "- Check quota availability via `/v1/listings/quota-check`\n\n" +
+
+                "## VIP Listing Creation\n" +
+                "Create premium listings with enhanced visibility:\n" +
+                "- **Normal Posts**: 90,000 VND/30 days\n" +
+                "- **VIP Posts**: 600,000 VND/30 days (or use quota)\n" +
+                "- **Premium Posts**: 1,800,000 VND/30 days (or use quota)\n" +
+                "- **Premium Shadow**: Premium posts auto-create a NORMAL shadow listing\n" +
+                "- Create VIP listings via `/v1/listings/vip`\n" +
+                "- Check quota before posting via `/v1/listings/quota-check`\n\n" +
+
+                "## Listing Boost\n" +
+                "Increase your listing visibility with boost features:\n" +
+                "- **Instant Boost**: Push listing to top immediately via `/v1/boosts/boost`\n" +
+                "- **Scheduled Boost**: Schedule automatic daily boosts via `/v1/boosts/schedule`\n" +
+                "- **Payment Options**: Use membership quota (free) or pay 40,000 VND\n" +
+                "- **Premium Auto-Boost**: Boosting Premium also boosts shadow listing\n" +
+                "- **History Tracking**: View boost history for analytics\n\n" +
+
+                "## Saved Listings\n" +
+                "Users can save favorite listings for later viewing:\n" +
+                "- Save listings via `/v1/saved-listings`\n" +
+                "- View saved listings via `/v1/saved-listings/my-saved`\n" +
+                "- Check if listing is saved via `/v1/saved-listings/check/{listingId}`\n\n" +
+
+                "## Circuit Breaker & Resilience\n" +
                 "The API implements circuit breaker patterns for email services to ensure reliability:\n" +
                 "- Automatic retry on transient failures\n" +
                 "- Circuit breaker protection for email service\n" +
                 "- Graceful degradation during service outages\n\n" +
 
-                "## 📊 Rate Limiting\n" +
+                "## Rate Limiting\n" +
                 "API requests are rate-limited to prevent abuse. If you exceed the rate limit, you'll receive a 429 status code.\n\n" +
 
-                "## ⚠️ Error Handling\n" +
+                "## Error Handling\n" +
                 "All API responses follow a consistent format:\n" +
                 "```json\n" +
                 "  \"data\": { /* response data */ }\n" +
@@ -99,10 +141,10 @@ public class OpenAPIConfig {
                 "- `4xxx`: Resource not found errors\n" +
                 "- `5xxx`: Authentication errors (unauthenticated)\n" +
 
-                "## 🏗️ API Versioning\n" +
+                "## API Versioning\n" +
                 "All endpoints are versioned with `/v1/` prefix. Future versions will use `/v2/`, etc.\n\n" +
 
-                "## 📱 Response Format\n" +
+                "## Response Format\n" +
                 "- All timestamps are in UTC format\n" +
                 "- Sensitive data (passwords, tokens) are masked in logs\n" +
                 "- Null fields are excluded from JSON responses\n" +
@@ -140,6 +182,58 @@ public class OpenAPIConfig {
                         .addProperty("code", new Schema<>().type("string").example("999999").description("Success code"))
                         .addProperty("message", new Schema<>().type("string").nullable(true).description("Success message"))
                         .addProperty("data", new Schema<>().type("object").description("Response data"))
+                )
+                .addSchemas("PaymentResponse", new Schema<>()
+                        .type("object")
+                        .description("VNPay payment URL response")
+                        .addProperty("paymentUrl", new Schema<>().type("string").description("VNPay payment URL to redirect user"))
+                        .addProperty("transactionId", new Schema<>().type("string").description("Internal transaction ID"))
+                        .addProperty("orderInfo", new Schema<>().type("string").description("Order description"))
+                        .addProperty("amount", new Schema<>().type("number").description("Payment amount in VND"))
+                )
+                .addSchemas("TransactionResponse", new Schema<>()
+                        .type("object")
+                        .description("Transaction details")
+                        .addProperty("transactionId", new Schema<>().type("string").description("Transaction ID"))
+                        .addProperty("userId", new Schema<>().type("string").description("User ID"))
+                        .addProperty("transactionType", new Schema<>().type("string").description("Type: MEMBERSHIP_PURCHASE, POST_FEE, BOOST_FEE"))
+                        .addProperty("amount", new Schema<>().type("number").description("Amount in VND"))
+                        .addProperty("status", new Schema<>().type("string").description("Status: PENDING, COMPLETED, FAILED"))
+                        .addProperty("paymentProvider", new Schema<>().type("string").description("Payment provider: VNPAY"))
+                        .addProperty("providerTransactionId", new Schema<>().type("string").description("VNPay transaction ID"))
+                        .addProperty("createdAt", new Schema<>().type("string").format("date-time").description("Creation timestamp"))
+                )
+                .addSchemas("QuotaStatusResponse", new Schema<>()
+                        .type("object")
+                        .description("Quota availability status")
+                        .addProperty("totalAvailable", new Schema<>().type("integer").description("Available quota"))
+                        .addProperty("totalUsed", new Schema<>().type("integer").description("Used quota"))
+                        .addProperty("totalGranted", new Schema<>().type("integer").description("Total granted quota"))
+                )
+                .addSchemas("InsufficientQuotaError", new Schema<>()
+                        .type("object")
+                        .description("Insufficient quota error response")
+                        .addProperty("code", new Schema<>().type("string").example("QUOTA_001").description("Error code"))
+                        .addProperty("message", new Schema<>().type("string").example("INSUFFICIENT_QUOTA").description("Error message"))
+                        .addProperty("data", new Schema<>()
+                                .type("object")
+                                .addProperty("userId", new Schema<>().type("string"))
+                                .addProperty("benefitType", new Schema<>().type("string"))
+                                .addProperty("required", new Schema<>().type("integer"))
+                                .addProperty("available", new Schema<>().type("integer"))
+                        )
+                )
+                .addSchemas("PaymentFailedError", new Schema<>()
+                        .type("object")
+                        .description("Payment failed error response")
+                        .addProperty("code", new Schema<>().type("string").example("PAYMENT_001").description("Error code"))
+                        .addProperty("message", new Schema<>().type("string").example("PAYMENT_FAILED").description("Error message"))
+                        .addProperty("data", new Schema<>()
+                                .type("object")
+                                .addProperty("transactionId", new Schema<>().type("string"))
+                                .addProperty("responseCode", new Schema<>().type("string"))
+                                .addProperty("reason", new Schema<>().type("string"))
+                        )
                 );
     }
 
@@ -147,7 +241,7 @@ public class OpenAPIConfig {
     public GroupedOpenApi publicApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
         return GroupedOpenApi.builder()
                 .group("smartrent-api")
-                .displayName("🏠 SmartRent Complete API")
+                .displayName("SmartRent Complete API")
                 .packagesToScan(packageToScan)
                 .pathsToMatch("/v1/**")
                 .build();
@@ -157,7 +251,7 @@ public class OpenAPIConfig {
     public GroupedOpenApi authApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
         return GroupedOpenApi.builder()
                 .group("authentication")
-                .displayName("🔐 Authentication & Verification")
+                .displayName("Authentication & Verification")
                 .packagesToScan(packageToScan)
                 .pathsToMatch("/v1/auth/**", "/v1/verification/**")
                 .build();
@@ -167,7 +261,7 @@ public class OpenAPIConfig {
     public GroupedOpenApi userApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
         return GroupedOpenApi.builder()
                 .group("user-management")
-                .displayName("👤 User Management")
+                .displayName("User Management")
                 .packagesToScan(packageToScan)
                 .pathsToMatch("/v1/users/**")
                 .build();
@@ -177,7 +271,7 @@ public class OpenAPIConfig {
     public GroupedOpenApi adminApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
         return GroupedOpenApi.builder()
                 .group("admin-management")
-                .displayName("👨‍💼 Admin Management & Roles")
+                .displayName("Admin Management & Roles")
                 .packagesToScan(packageToScan)
                 .pathsToMatch("/v1/admins/**", "/v1/auth/admin/**", "/v1/roles/**")
                 .build();
@@ -187,7 +281,7 @@ public class OpenAPIConfig {
     public GroupedOpenApi listingApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
             return GroupedOpenApi.builder()
                             .group("listings")
-                            .displayName("Listing APIs")
+                            .displayName("Property Listings")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/listings/**")
                             .build();
@@ -197,7 +291,7 @@ public class OpenAPIConfig {
     public GroupedOpenApi addressApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
             return GroupedOpenApi.builder()
                             .group("addresses")
-                            .displayName("Address APIs")
+                            .displayName("Address Management")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/addresses/**")
                             .build();
@@ -207,9 +301,9 @@ public class OpenAPIConfig {
     public GroupedOpenApi uploadApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
             return GroupedOpenApi.builder()
                             .group("file-upload")
-                            .displayName("File Upload APIs")
+                            .displayName("File Upload")
                             .packagesToScan(packageToScan)
-                            .pathsToMatch("/upload/**")
+                            .pathsToMatch("/v1/upload/**")
                             .build();
     }
 
@@ -217,15 +311,66 @@ public class OpenAPIConfig {
     public GroupedOpenApi pricingApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
             return GroupedOpenApi.builder()
                             .group("pricing")
-                            .displayName("Pricing & Price History APIs")
+                            .displayName("Pricing & Price History")
                             .packagesToScan(packageToScan)
                             .pathsToMatch(
                                             "/v1/listings/*/price",
                                             "/v1/listings/*/pricing-history",
                                             "/v1/listings/*/pricing-history/date-range",
                                             "/v1/listings/*/current-price",
+                                            "/v1/listings/*/price-statistics",
                                             "/v1/listings/recent-price-changes"
                             )
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi membershipApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("membership")
+                            .displayName("Membership Management")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/memberships/**")
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi boostApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("boost")
+                            .displayName("Boost & Promotion")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/boosts/**")
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi savedListingApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("saved-listings")
+                            .displayName("Saved Listings")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/saved-listings/**")
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi paymentApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("payments")
+                            .displayName("VNPay Payments & Transactions")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/payments/**", "/api/v1/payments/**")
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi quotaApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("quotas")
+                            .displayName("Quota Management")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/quotas/**")
                             .build();
     }
 }

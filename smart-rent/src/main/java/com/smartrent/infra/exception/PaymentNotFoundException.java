@@ -1,10 +1,13 @@
 package com.smartrent.infra.exception;
 
-import com.smartrent.infra.exception.model.DomainCode;
-
-public class PaymentNotFoundException extends DomainException {
+public class PaymentNotFoundException extends RuntimeException {
 
     public PaymentNotFoundException(String transactionRef) {
-        super(DomainCode.PAYMENT_NOT_FOUND, transactionRef);
+        super("Payment not found with transaction reference: " + transactionRef);
+    }
+
+    public PaymentNotFoundException(String message, Throwable cause) {
+        super(message, cause);
     }
 }
+

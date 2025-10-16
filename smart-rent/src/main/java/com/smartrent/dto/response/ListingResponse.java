@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,26 +19,43 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@Schema(description = "Listing details response")
 public class ListingResponse {
+    @Schema(description = "Listing ID", example = "1")
     Long listingId;
 
+    @Schema(description = "Listing title", example = "Cho thuê căn hộ 2PN Q7")
     String title;
 
+    @Schema(description = "Detailed description")
     String description;
 
+    @Schema(description = "User ID of the listing owner", example = "user-123")
     String userId;
 
+    @Schema(description = "Post date")
     LocalDateTime postDate;
 
+    @Schema(description = "Expiry date")
     LocalDateTime expiryDate;
 
+    @Schema(description = "Listing type", example = "RENT", allowableValues = {"RENT", "SALE", "SHARE"})
     String listingType;
 
-
+    @Schema(description = "Whether listing is verified")
     Boolean verified;
+
+    @Schema(description = "Whether listing is being verified")
     Boolean isVerify;
+
+    @Schema(description = "Whether listing is expired")
     Boolean expired;
 
+    @Schema(
+        description = "VIP tier: NORMAL, SILVER, GOLD, DIAMOND",
+        example = "SILVER",
+        allowableValues = {"NORMAL", "SILVER", "GOLD", "DIAMOND"}
+    )
     String vipType;
 
     Long categoryId;

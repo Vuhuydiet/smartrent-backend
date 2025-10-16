@@ -7,7 +7,7 @@ import com.smartrent.infra.exception.PaymentNotFoundException;
 import com.smartrent.infra.exception.PaymentProviderException;
 import com.smartrent.infra.exception.PaymentValidationException;
 import com.smartrent.infra.repository.PaymentRepository;
-import com.smartrent.infra.repository.entity.Payment;
+import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.utility.PaymentUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
@@ -30,37 +30,49 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
      * Create a payment record in the database
      */
     @Transactional
-    protected Payment createPaymentRecord(PaymentRequest request, HttpServletRequest httpRequest) {
+    protected Transaction createPaymentRecord(PaymentRequest request, HttpServletRequest httpRequest) {
         validatePaymentRequest(request);
 
         String txnRef = generateTransactionRef();
         String ipAddress = getClientIpAddress(httpRequest);
-        Long userId = getCurrentUserId();
+        String userId = getCurrentUserId();
 
-        Payment payment = Payment.builder()
+        // Build additional info with all payment details
+        StringBuilder additionalInfo = new StringBuilder();
+        additionalInfo.append("Order: ").append(request.getOrderInfo());
+        additionalInfo.append(" | IP: ").append(ipAddress);
+        additionalInfo.append(" | UserAgent: ").append(httpRequest.getHeader("User-Agent"));
+        if (request.getReturnUrl() != null) {
+            additionalInfo.append(" | ReturnURL: ").append(request.getReturnUrl());
+        }
+        if (request.getCancelUrl() != null) {
+            additionalInfo.append(" | CancelURL: ").append(request.getCancelUrl());
+        }
+        if (request.getNotes() != null) {
+            additionalInfo.append(" | Notes: ").append(request.getNotes());
+        }
+
+        Transaction transaction = Transaction.builder()
+                .transactionId(txnRef)
                 .userId(userId)
-                .listingId(request.getListingId())
-                .transactionRef(txnRef)
+                .transactionType(TransactionType.MEMBERSHIP_PURCHASE) // Default, can be overridden
                 .amount(request.getAmount())
-                .currency(request.getCurrency())
-                .transactionType(TransactionType.PAYMENT)
+                .referenceType(com.smartrent.enums.ReferenceType.LISTING)
+                .referenceId(request.getListingId() != null ? request.getListingId().toString() : null)
                 .status(TransactionStatus.PENDING)
+                .paymentProvider(request.getProvider())
+                .additionalInfo(additionalInfo.toString())
                 .orderInfo(request.getOrderInfo())
                 .ipAddress(ipAddress)
-                .userAgent(httpRequest.getHeader("User-Agent"))
-                .returnUrl(request.getReturnUrl())
-                .cancelUrl(request.getCancelUrl())
-                .notes(request.getNotes())
-                .metadata(request.getMetadata() != null ? request.getMetadata().toString() : null)
                 .build();
 
-        return paymentRepository.save(payment);
+        return paymentRepository.save(transaction);
     }
 
     /**
      * Find payment by transaction reference
      */
-    protected Optional<Payment> findPaymentByTransactionRef(String transactionRef) {
+    protected Optional<Transaction> findPaymentByTransactionRef(String transactionRef) {
         return paymentRepository.findByTransactionRef(transactionRef);
     }
 
@@ -68,28 +80,28 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
      * Update payment status
      */
     @Transactional
-    protected Payment updatePaymentStatus(String transactionRef, TransactionStatus status,
+    protected Transaction updatePaymentStatus(String transactionRef, TransactionStatus status,
                                           String responseCode, String responseMessage) {
-        Optional<Payment> paymentOpt = paymentRepository.findByTransactionRef(transactionRef);
-        if (paymentOpt.isEmpty()) {
+        Optional<Transaction> transactionOpt = paymentRepository.findByTransactionRef(transactionRef);
+        if (transactionOpt.isEmpty()) {
             throw new PaymentNotFoundException(transactionRef);
         }
 
-        Payment payment = paymentOpt.get();
-        payment.setStatus(status);
+        Transaction transaction = transactionOpt.get();
+        transaction.setStatus(status);
 
-        if (status.isSuccess()) {
-            payment.setPaymentDate(LocalDateTime.now());
-        }
+        // Append response info to additional info
+        String currentInfo = transaction.getAdditionalInfo() != null ? transaction.getAdditionalInfo() : "";
+        transaction.setAdditionalInfo(currentInfo + " | Response: " + responseCode + " - " + responseMessage);
 
-        return paymentRepository.save(payment);
+        return paymentRepository.save(transaction);
     }
 
     /**
      * Update payment with provider-specific data
      */
     @Transactional
-    protected Payment updatePaymentWithProviderData(String transactionRef,
+    protected Transaction updatePaymentWithProviderData(String transactionRef,
                                                      String providerTransactionId,
                                                      String paymentMethod,
                                                      String bankCode,
@@ -97,21 +109,25 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
                                                      TransactionStatus status,
                                                      String responseCode,
                                                      String responseMessage) {
-        Optional<Payment> paymentOpt = paymentRepository.findByTransactionRef(transactionRef);
-        if (paymentOpt.isEmpty()) {
+        Optional<Transaction> transactionOpt = paymentRepository.findByTransactionRef(transactionRef);
+        if (transactionOpt.isEmpty()) {
             throw new PaymentNotFoundException(transactionRef);
         }
 
-        Payment payment = paymentOpt.get();
-        payment.setProviderTransactionId(providerTransactionId);
-        payment.setPaymentMethod(paymentMethod);
-        payment.setStatus(status);
+        Transaction transaction = transactionOpt.get();
+        transaction.setProviderTransactionId(providerTransactionId);
+        transaction.setStatus(status);
 
-        if (status.isSuccess()) {
-            payment.setPaymentDate(LocalDateTime.now());
-        }
+        // Append provider-specific data to additional info
+        String currentInfo = transaction.getAdditionalInfo() != null ? transaction.getAdditionalInfo() : "";
+        StringBuilder providerInfo = new StringBuilder(currentInfo);
+        providerInfo.append(" | PaymentMethod: ").append(paymentMethod);
+        providerInfo.append(" | BankCode: ").append(bankCode);
+        providerInfo.append(" | BankTxnId: ").append(bankTransactionId);
+        providerInfo.append(" | Response: ").append(responseCode).append(" - ").append(responseMessage);
+        transaction.setAdditionalInfo(providerInfo.toString());
 
-        return paymentRepository.save(payment);
+        return paymentRepository.save(transaction);
     }
 
     /**
@@ -135,19 +151,14 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
     /**
      * Get current user ID from security context
      */
-    protected Long getCurrentUserId() {
+    protected String getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             throw PaymentValidationException.userNotAuthenticated();
         }
 
-        try {
-            // Assuming the principal contains the user ID
-            String userId = authentication.getName();
-            return Long.parseLong(userId);
-        } catch (NumberFormatException e) {
-            throw new PaymentValidationException("Invalid user ID format in authentication");
-        }
+        // Return the user ID as String (matches Transaction entity)
+        return authentication.getName();
     }
 
 
@@ -183,7 +194,7 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
         }
 
         if (request.getAmount() == null || request.getAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
-            throw PaymentValidationException.invalidAmount(request.getAmount() != null ? request.getAmount().toString() : "null");
+            throw PaymentValidationException.invalidAmount();
         }
 
         if (request.getCurrency() == null || request.getCurrency().trim().isEmpty()) {

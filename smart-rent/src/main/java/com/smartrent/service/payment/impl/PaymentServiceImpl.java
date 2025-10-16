@@ -11,7 +11,7 @@ import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.mapper.PaymentMapper;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.infra.repository.PaymentRepository;
-import com.smartrent.infra.repository.entity.Payment;
+import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.service.payment.PaymentService;
 import com.smartrent.service.payment.provider.PaymentProviderFactory;
 import com.smartrent.service.payment.provider.PaymentProvider.PaymentFeature;
@@ -127,13 +127,13 @@ public class PaymentServiceImpl implements PaymentService {
     // Payment Management Methods
 
     @Override
-    public Payment getPaymentByTransactionRef(String transactionRef) {
+    public Transaction getPaymentByTransactionRef(String transactionRef) {
         return paymentRepository.findByTransactionRef(transactionRef)
                 .orElseThrow(() -> new RuntimeException("Payment not found: " + transactionRef));
     }
 
     @Override
-    public Page<PaymentHistoryResponse> getPaymentHistory(Long userId, Pageable pageable) {
+    public Page<PaymentHistoryResponse> getPaymentHistory(String userId, Pageable pageable) {
         return paymentRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
                 .map(paymentMapper::toPaymentHistoryResponse);
     }
@@ -141,7 +141,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public Page<PaymentHistoryResponse> getPaymentHistoryByStatus(PaymentHistoryByStatusRequest request) {
         return paymentRepository.findByUserIdAndStatusOrderByCreatedAtDesc(
-                request.getUserId(), request.getStatus(), request.getPageable())
+                String.valueOf(request.getUserId()), request.getStatus(), request.getPageable())
                 .map(paymentMapper::toPaymentHistoryResponse);
     }
 
@@ -169,13 +169,11 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public Payment updatePaymentStatus(PaymentStatusUpdateRequest request) {
-        Payment payment = getPaymentByTransactionRef(request.getTransactionRef());
-        payment.setStatus(request.getStatus());
-        if (request.getStatus().isSuccess()) {
-            payment.setPaymentDate(java.time.LocalDateTime.now());
-        }
-        return paymentRepository.save(payment);
+    public Transaction updatePaymentStatus(PaymentStatusUpdateRequest request) {
+        Transaction transaction = getPaymentByTransactionRef(request.getTransactionRef());
+        transaction.setStatus(request.getStatus());
+        // updatedAt will be automatically set by @UpdateTimestamp
+        return paymentRepository.save(transaction);
     }
 
     // Provider Management Methods

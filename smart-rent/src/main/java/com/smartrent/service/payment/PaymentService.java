@@ -9,7 +9,7 @@ import com.smartrent.dto.response.PaymentCallbackResponse;
 import com.smartrent.dto.response.PaymentHistoryResponse;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.enums.PaymentProvider;
-import com.smartrent.infra.repository.entity.Payment;
+import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.service.payment.provider.PaymentProvider.PaymentFeature;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.Page;
@@ -50,14 +50,14 @@ public interface PaymentService {
     // Payment Management Methods
 
     /**
-     * Get payment by transaction reference
+     * Get transaction by transaction ID
      */
-    Payment getPaymentByTransactionRef(String transactionRef);
+    Transaction getPaymentByTransactionRef(String transactionId);
 
     /**
      * Get payment history for user
      */
-    Page<PaymentHistoryResponse> getPaymentHistory(Long userId, Pageable pageable);
+    Page<PaymentHistoryResponse> getPaymentHistory(String userId, Pageable pageable);
 
     /**
      * Get payment history by status
@@ -67,17 +67,17 @@ public interface PaymentService {
     /**
      * Cancel payment
      */
-    boolean cancelPayment(String transactionRef, String reason);
+    boolean cancelPayment(String transactionId, String reason);
 
     /**
      * Check if transaction reference exists
      */
-    boolean transactionRefExists(String transactionRef);
+    boolean transactionRefExists(String transactionId);
 
     /**
      * Update payment status
      */
-    Payment updatePaymentStatus(PaymentStatusUpdateRequest request);
+    Transaction updatePaymentStatus(PaymentStatusUpdateRequest request);
 
     // Provider Management Methods
 

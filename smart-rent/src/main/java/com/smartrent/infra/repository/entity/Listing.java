@@ -1,5 +1,6 @@
 package com.smartrent.infra.repository.entity;
 
+import com.smartrent.enums.PostSource;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -92,6 +93,24 @@ public class Listing {
     @Column(name = "vip_type", nullable = false)
     VipType vipType = VipType.NORMAL;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "post_source")
+    PostSource postSource = PostSource.QUOTA;
+
+    @Column(name = "transaction_id", length = 36)
+    String transactionId;
+
+    @Builder.Default
+    @Column(name = "is_shadow", nullable = false)
+    Boolean isShadow = false;
+
+    @Column(name = "parent_listing_id")
+    Long parentListingId;
+
+    @Column(name = "pushed_at")
+    LocalDateTime pushedAt;
+
     @Column(name = "category_id", nullable = false)
     Long categoryId;
 
@@ -179,7 +198,7 @@ public class Listing {
     }
 
     public enum VipType {
-        NORMAL, VIP, PREMIUM
+        NORMAL, SILVER, GOLD, DIAMOND
     }
 
     public enum ProductType {
@@ -201,5 +220,62 @@ public class Listing {
 
     public enum PropertyType {
         APARTMENT, HOUSE, ROOM, STUDIO, OFFICE
+    }
+
+    // Helper methods for VIP types
+    public boolean isNormal() {
+        return vipType == VipType.NORMAL;
+    }
+
+    public boolean isSilver() {
+        return vipType == VipType.SILVER;
+    }
+
+    public boolean isGold() {
+        return vipType == VipType.GOLD;
+    }
+
+    public boolean isDiamond() {
+        return vipType == VipType.DIAMOND;
+    }
+
+    // Helper methods for shadow listings
+    public boolean isShadowListing() {
+        return isShadow != null && isShadow;
+    }
+
+    public boolean hasParentListing() {
+        return parentListingId != null;
+    }
+
+    // Helper methods for verification
+    public boolean isAutoVerified() {
+        return isVerify != null && isVerify;
+    }
+
+    public boolean isManuallyVerified() {
+        return verified != null && verified;
+    }
+
+    // Helper methods for post source
+    public boolean isCreatedWithQuota() {
+        return postSource == PostSource.QUOTA;
+    }
+
+    public boolean isCreatedWithDirectPayment() {
+        return postSource == PostSource.DIRECT_PAYMENT;
+    }
+
+    public boolean hasLinkedTransaction() {
+        return transactionId != null && !transactionId.isEmpty();
+    }
+
+    // Helper methods for expiry
+    public boolean isExpiredListing() {
+        return expired != null && expired;
+    }
+
+    public boolean isActive() {
+        return !isExpiredListing() && (isAutoVerified() || isManuallyVerified());
     }
 }
