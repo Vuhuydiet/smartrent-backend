@@ -1,5 +1,6 @@
 package com.smartrent.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -19,27 +20,42 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@Schema(description = "Request to update or filter listings")
 public class ListingRequest {
     @Size(max = 200)
+    @Schema(description = "Listing title", example = "Cho thuê căn hộ 2PN Q7")
     String title;
 
     @Size(max = 10000)
+    @Schema(description = "Detailed description", example = "Căn hộ đẹp, view sông")
     String description;
 
     @NotNull
+    @Schema(description = "User ID", example = "1", required = true)
     Long userId;
 
+    @Schema(description = "Expiry date of the listing")
     LocalDateTime expiryDate;
 
     @Pattern(regexp = "RENT|SALE|SHARE", message = "listingType must be RENT, SALE, or SHARE")
+    @Schema(description = "Listing type", example = "RENT", allowableValues = {"RENT", "SALE", "SHARE"})
     String listingType;
 
-
+    @Schema(description = "Whether listing is verified")
     Boolean verified;
+
+    @Schema(description = "Whether listing is being verified")
     Boolean isVerify;
+
+    @Schema(description = "Whether listing is expired")
     Boolean expired;
 
-    @Pattern(regexp = "NORMAL|VIP|PREMIUM", message = "vipType must be NORMAL, VIP, or PREMIUM")
+    @Pattern(regexp = "NORMAL|SILVER|GOLD|DIAMOND", message = "vipType must be NORMAL, SILVER, GOLD, or DIAMOND")
+    @Schema(
+        description = "VIP tier: NORMAL (2.7k/day), SILVER (50k/day), GOLD (110k/day), DIAMOND (280k/day)",
+        example = "SILVER",
+        allowableValues = {"NORMAL", "SILVER", "GOLD", "DIAMOND"}
+    )
     String vipType;
 
     @NotNull
