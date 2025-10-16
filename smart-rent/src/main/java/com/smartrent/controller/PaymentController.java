@@ -26,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -186,7 +187,7 @@ public class PaymentController {
     @GetMapping("/history")
     @Operation(summary = "Get payment history", description = "Get user payment history with pagination")
     public ApiResponse<Page<PaymentHistoryResponse>> getPaymentHistory(
-            @Parameter(description = "User ID") @RequestParam Long userId,
+            @Parameter(description = "User ID") @RequestParam String userId,
             @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
 

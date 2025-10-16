@@ -1,7 +1,7 @@
 package com.smartrent.mapper.impl;
 
 import com.smartrent.dto.response.PaymentHistoryResponse;
-import com.smartrent.infra.repository.entity.Payment;
+import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.mapper.PaymentMapper;
 import org.springframework.stereotype.Component;
 
@@ -9,23 +9,26 @@ import org.springframework.stereotype.Component;
 public class PaymentMapperImpl implements PaymentMapper {
 
     @Override
-    public PaymentHistoryResponse toPaymentHistoryResponse(Payment payment) {
+    public PaymentHistoryResponse toPaymentHistoryResponse(Transaction transaction) {
+        if (transaction == null) {
+            return null;
+        }
+
         return PaymentHistoryResponse.builder()
-                .paymentId(payment.getId())
-                .transactionRef(payment.getTransactionRef())
-                .providerTransactionId(payment.getProviderTransactionId())
-                .amount(payment.getAmount())
-                .currency(payment.getCurrency())
-                .transactionType(payment.getTransactionType())
-                .status(payment.getStatus())
-                .orderInfo(payment.getOrderInfo())
-                .paymentMethod(payment.getPaymentMethod())
-                .paymentDate(payment.getPaymentDate())
-                .listingId(payment.getListingId())
-                .userId(payment.getUserId())
-                .createdAt(payment.getCreatedAt())
-                .updatedAt(payment.getUpdatedAt())
-                .notes(payment.getNotes())
+                .transactionRef(transaction.getTransactionId())
+                .providerTransactionId(transaction.getProviderTransactionId())
+                .amount(transaction.getAmount())
+                .currency("VND") // Default currency
+                .transactionType(transaction.getTransactionType())
+                .status(transaction.getStatus())
+                .orderInfo(transaction.getAdditionalInfo())
+                .paymentMethod(transaction.getPaymentProvider() != null ? transaction.getPaymentProvider().name() : null)
+                .paymentDate(transaction.isCompleted() ? transaction.getUpdatedAt() : null)
+                .userId(transaction.getUserId() != null ? Long.parseLong(transaction.getUserId()) : null)
+                .createdAt(transaction.getCreatedAt())
+                .updatedAt(transaction.getUpdatedAt())
+                .notes(transaction.getAdditionalInfo())
                 .build();
     }
 }
+

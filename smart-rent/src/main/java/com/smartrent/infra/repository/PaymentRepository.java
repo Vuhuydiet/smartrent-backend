@@ -1,8 +1,7 @@
 package com.smartrent.infra.repository;
 
 import com.smartrent.enums.TransactionStatus;
-import com.smartrent.enums.TransactionType;
-import com.smartrent.infra.repository.entity.Payment;
+import com.smartrent.infra.repository.entity.Transaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,82 +9,47 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
+/**
+ * PaymentRepository - Alias for TransactionRepository for payment-specific operations
+ * This provides backward compatibility with payment service code that expects PaymentRepository
+ */
 @Repository
-public interface PaymentRepository extends JpaRepository<Payment, Long> {
+public interface PaymentRepository extends JpaRepository<Transaction, String> {
 
     /**
-     * Find payment by transaction reference
+     * Find transaction by transaction ID (used as transaction reference in payment system)
      */
-    Optional<Payment> findByTransactionRef(String transactionRef);
+    default Optional<Transaction> findByTransactionRef(String transactionRef) {
+        return findById(transactionRef);
+    }
 
     /**
-     * Find payment by VNPay transaction ID
+     * Check if transaction exists by transaction reference
      */
-    Optional<Payment> findByVnpayTransactionId(String vnpayTransactionId);
+    default boolean existsByTransactionRef(String transactionRef) {
+        return existsById(transactionRef);
+    }
 
     /**
-     * Find payments by user ID
+     * Find transactions by user ID ordered by creation date
      */
-    Page<Payment> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+    @Query("SELECT t FROM transactions t WHERE t.userId = :userId ORDER BY t.createdAt DESC")
+    Page<Transaction> findByUserIdOrderByCreatedAtDesc(@Param("userId") String userId, Pageable pageable);
 
     /**
-     * Find payments by user ID and status
+     * Find transactions by user ID and status ordered by creation date
      */
-    Page<Payment> findByUserIdAndStatusOrderByCreatedAtDesc(Long userId, TransactionStatus status, Pageable pageable);
+    @Query("SELECT t FROM transactions t WHERE t.userId = :userId AND t.status = :status ORDER BY t.createdAt DESC")
+    Page<Transaction> findByUserIdAndStatusOrderByCreatedAtDesc(
+            @Param("userId") String userId,
+            @Param("status") TransactionStatus status,
+            Pageable pageable);
 
     /**
-     * Find payments by listing ID
+     * Find transaction by provider transaction ID
      */
-    Page<Payment> findByListingIdOrderByCreatedAtDesc(Long listingId, Pageable pageable);
-
-    /**
-     * Find payments by status
-     */
-    Page<Payment> findByStatusOrderByCreatedAtDesc(TransactionStatus status, Pageable pageable);
-
-    /**
-     * Find payments by transaction type
-     */
-    Page<Payment> findByTransactionTypeOrderByCreatedAtDesc(TransactionType transactionType, Pageable pageable);
-
-    /**
-     * Find payments by date range
-     */
-    @Query("SELECT p FROM payments p WHERE p.createdAt BETWEEN :startDate AND :endDate ORDER BY p.createdAt DESC")
-    Page<Payment> findByDateRange(@Param("startDate") LocalDateTime startDate,
-                                  @Param("endDate") LocalDateTime endDate,
-                                  Pageable pageable);
-
-    /**
-     * Find pending payments older than specified time
-     */
-    @Query("SELECT p FROM payments p WHERE p.status = :status AND p.createdAt < :cutoffTime")
-    List<Payment> findPendingPaymentsOlderThan(@Param("status") TransactionStatus status,
-                                               @Param("cutoffTime") LocalDateTime cutoffTime);
-
-    /**
-     * Count payments by user and status
-     */
-    long countByUserIdAndStatus(Long userId, TransactionStatus status);
-
-    /**
-     * Check if transaction reference exists
-     */
-    boolean existsByTransactionRef(String transactionRef);
-
-    /**
-     * Find successful payments by user ID
-     */
-    @Query("SELECT p FROM payments p WHERE p.userId = :userId AND p.status = 'SUCCESS' ORDER BY p.createdAt DESC")
-    List<Payment> findSuccessfulPaymentsByUserId(@Param("userId") Long userId);
-
-    /**
-     * Find payments by multiple statuses
-     */
-    @Query("SELECT p FROM payments p WHERE p.status IN :statuses ORDER BY p.createdAt DESC")
-    Page<Payment> findByStatusIn(@Param("statuses") List<TransactionStatus> statuses, Pageable pageable);
+    Optional<Transaction> findByProviderTransactionId(String providerTransactionId);
 }
+
