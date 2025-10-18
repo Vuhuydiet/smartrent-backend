@@ -52,6 +52,7 @@ spring:
     password: ${DB_PASSWORD}
   flyway:
     enabled: true
+    out-of-order: true
   jpa:
     database: MYSQL
     openInView: true
@@ -114,6 +115,10 @@ application:
         - "/actuator/health"
         - "/actuator/**"
         - "/v1/payments/vnpay/callback"
+        - "/v1/listings/**"
+        - "/v1/addresses/**"
+        - "/v1/memberships/packages"
+        - "/v1/memberships/packages/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
