@@ -1,9 +1,6 @@
 package com.smartrent.service.push;
 
-import com.smartrent.infra.repository.entity.PushSchedule;
-
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 
 /**
@@ -11,19 +8,6 @@ import java.util.List;
  * Handles pushing listings at scheduled times and recording push history.
  */
 public interface PushService {
-
-    /**
-     * Create a new push schedule for a listing.
-     * Validates that listing doesn't already have an active schedule.
-     *
-     * @param listingId The ID of the listing to schedule
-     * @param scheduledTime The time of day to push (e.g., 09:00, 15:00)
-     * @param endTime The expiration time for this schedule
-     * @return The created PushSchedule
-     * @throws IllegalStateException if listing already has an active schedule
-     * @throws IllegalArgumentException if listing doesn't exist
-     */
-    PushSchedule createSchedule(Long listingId, LocalTime scheduledTime, LocalDateTime endTime);
 
     /**
      * Push a listing by updating its pushed_at timestamp and recording the operation in history.

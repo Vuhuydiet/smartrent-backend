@@ -39,51 +39,6 @@ public class PushServiceImpl implements PushService {
      */
     @Override
     @Transactional
-    public PushSchedule createSchedule(Long listingId, LocalTime scheduledTime, LocalDateTime endTime) {
-        log.info("Creating push schedule: listingId={}, scheduledTime={}, endTime={}",
-                listingId, scheduledTime, endTime);
-
-        // Validate listing exists
-        if (!listingRepository.existsById(listingId)) {
-            log.error("Cannot create schedule: Listing not found: listingId={}", listingId);
-            throw new IllegalArgumentException("Listing not found with ID: " + listingId);
-        }
-
-        // Check if listing already has an active schedule
-        boolean hasActiveSchedule = pushScheduleRepository
-                .existsByListingIdAndStatus(listingId, PushSchedule.ScheduleStatus.ACTIVE);
-
-        if (hasActiveSchedule) {
-            log.error("Cannot create schedule: Listing already has an active schedule: listingId={}", listingId);
-            throw new IllegalStateException("Listing already has an active schedule. Deactivate or delete the existing schedule first.");
-        }
-
-        // Validate end time is in the future
-        if (endTime.isBefore(LocalDateTime.now())) {
-            log.error("Cannot create schedule: End time is in the past: endTime={}", endTime);
-            throw new IllegalArgumentException("End time must be in the future");
-        }
-
-        // Create the schedule
-        PushSchedule schedule = PushSchedule.builder()
-                .listingId(listingId)
-                .scheduledTime(scheduledTime)
-                .endTime(endTime)
-                .status(PushSchedule.ScheduleStatus.ACTIVE)
-                .build();
-
-        PushSchedule savedSchedule = pushScheduleRepository.save(schedule);
-        log.info("Successfully created push schedule: scheduleId={}, listingId={}",
-                savedSchedule.getScheduleId(), listingId);
-
-        return savedSchedule;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    @Transactional
     public boolean pushListing(Long scheduleId, Long listingId, LocalDateTime pushTime) {
         log.info("Attempting to push listing: listingId={}, scheduleId={}, pushTime={}",
                 listingId, scheduleId, pushTime);
