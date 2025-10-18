@@ -1,39 +1,8 @@
-#DB
-IDENTITY_SERVICE_DB_URL: "jdbc:mysql://localhost:3306/smartrent"
-DB_USERNAME: root
-DB_PASSWORD: vuhuydiet
-
-#Redis
-REDIS_USERNAME: ""
-REDIS_PWD: ""
-REDIS_HOST: localhost
-CACHE_TYPE: redis
-
-# Authentication
-ACCESS_SIGNER_KEY: "ZN2uFsiHCTJHBOswZc6smoWDSawP61Qf8KDuqII7ysLnbLtVFWMBhyrOTo7LP1e0LXxLX93tZYBMIoXtxMNb3F7oupMV9xmcOhtbVxSWpsj3ovC1vMSbncykU6gSj18eg8zIboL8oeHU8gdj2aKNxx3v4XO8yQux2UBgACFrjGuOUSUDCflu16mrPpBFm80rIF80awofCLXbj1eARvPnohasRqsgjGXEugamEscAuVvRtn4xVPDqoPo7ue4KyCMV"
-REFRESH_SIGNER_KEY: "7MZ1RbjusfkXVtYXNt7BUf12iyRxANEXRsgoJnns4LXjRSj89NzKOQzdqeq1uzj47HR4SBrbKGZEPsWaezkiU9MdhMs8uPXBzSRe9abegfVMWoborCRg75eAtSyeiUUTq36XPcamfG4fBMcAzWPYmTgGa4Yt3D2vB8cUibFxF676lAq1kKqavVTQiphBSi9JnFCUpyDUX8QcZUcpopesRwOOZDWuA7Xvdsf2xWdWJYihUUCsi00e6gP0ZotAjXXf"
-RESET_PASSWORD_SIGNER_KEY: "haU3SKNLul7lHqHCEWvDX4PhGZglxusY2Z3r0zKBjIZJzYfixVvZf03RSQ8U5YUolZw0k1pVRQWc8JIfsx1akkfSFmvqeZMsGZ4EzeI97oIwjloYItHQpRrlD23u9xLaFX2W9ezSURXWScdj1oMhl9EbXVuuHyfIzUNijJ9KdVmKrdXZ1u3jUAkCMfLTPNkPGQHzubXdDApNc2eG0vswI8WcqCZz1D3txb9nsUBYQiGNZXWz1bgHqOAFtiV5969E"
-VALID_DURATION: 3600 # in seconds
-REFRESHABLE_DURATION: 86400 # in seconds
-RESET_PASSWORD_DURATION: 900 # in seconds
-
-# Email
-BREVO_API_KEY: "${BREVO_API_KEY}"
-SENDER_EMAIL: "${SENDER_EMAIL}"
-SENDER_NAME: "${SENDER_NAME}"
-
-# Google Auth
-CLIENT_ID: "${CLIENT_ID}"
-CLIENT_SECRET: "${CLIENT_SECRET}"
-GOOGLE_AUTH_CLIENT_REDIRECT_URI: "http://localhost:8080/v1/auth/google"
-
-# S3 Storage (Local Development - using dummy values)
-S3_ENDPOINT: "https://dummy.endpoint.com"
-S3_REGION: "us-east-1"
-S3_ACCESS_KEY: "dummy-access-key"
-S3_SECRET_KEY: "dummy-secret-key"
-S3_BUCKET: "dummy-bucket"
-S3_PUBLIC_URL: "https://dummy.public.url.com"
+# Spring Cloud compatibility
+spring:
+  cloud:
+    compatibility-verifier:
+      enabled: false
 
 # VNPay Configuration (Local Development - using sandbox/test values)
 vnpay:
@@ -51,22 +20,34 @@ vnpay:
   secure-hash-type: "SHA512"
   timeout-minutes: 15
 
-# Spring Cloud compatibility
-spring:
-  cloud:
-    compatibility-verifier:
-      enabled: false
-
+# Application-specific configuration for local development
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"
   authorize-ignored:
     methods:
       get:
-        - "/v1/users/**"
-        - "/v1/admins/**"
-        - "/**/actuator/**"
+        - "/swagger-ui/**"
+        - "/swagger-ui.html"
+        - "/v3/api-docs/**"
+        - "/v3/api-docs"
+        - "/swagger-resources/**"
+        - "/webjars/**"
+        - "/actuator/health"
+        - "/actuator/**"
+        - "/v1/payments/vnpay/callback"
+        - "/v1/listings/**"
+        - "/v1/addresses/**"
+        - "/v1/memberships/packages"
+        - "/v1/memberships/packages/**"
       post:
         - "/v1/auth/**"
-        - "/v1/users/**"
-        - "/v1/admins/**"
-        - "/v1/verification/**"
+        - "/v1/users"
+        - "/v1/admins"
+        - "/v1/payments/vnpay/ipn"
+
+# Enable debug logging for authentication
+logging:
+  level:
+    com.smartrent.config.security: DEBUG
+    com.smartrent.service.authentication: DEBUG
+    org.springframework.security: DEBUG
