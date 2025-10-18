@@ -1,5 +1,6 @@
 package com.smartrent.service.email.impl;
 
+import com.smartrent.config.TestCacheConfig;
 import com.smartrent.infra.connector.model.EmailInfo;
 import com.smartrent.infra.connector.model.EmailRequest;
 import com.smartrent.infra.connector.model.EmailResponse;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import feign.FeignException;
 import feign.Request;
@@ -27,6 +29,7 @@ import static org.mockito.Mockito.*;
  */
 @SpringBootTest
 @ActiveProfiles("test")
+@Import(TestCacheConfig.class)
 class EmailServiceIntegrationTest {
 
     @Autowired
@@ -42,7 +45,7 @@ class EmailServiceIntegrationTest {
                 .email("test@example.com")
                 .name("Test User")
                 .build();
-        
+
         EmailRequest emailRequest = EmailRequest.builder()
                 .to(List.of(emailInfo))
                 .subject("Test Subject")
@@ -76,7 +79,7 @@ class EmailServiceIntegrationTest {
                 .email("invalid-email")
                 .name("Test User")
                 .build();
-        
+
         EmailRequest emailRequest = EmailRequest.builder()
                 .to(List.of(emailInfo))
                 .subject("Test Subject")
@@ -89,9 +92,9 @@ class EmailServiceIntegrationTest {
                 .thenThrow(badRequest);
 
         // When & Then
-        DomainException exception = assertThrows(DomainException.class, 
+        DomainException exception = assertThrows(DomainException.class,
                 () -> emailService.sendEmail(emailRequest));
-        
+
         // Should only try once for non-retryable errors
         verify(brevoEmailService, times(1)).sendEmail(any(EmailRequest.class));
     }
@@ -103,7 +106,7 @@ class EmailServiceIntegrationTest {
                 .email("test@example.com")
                 .name("Test User")
                 .build();
-        
+
         EmailRequest emailRequest = EmailRequest.builder()
                 .to(List.of(emailInfo))
                 .subject("Test Subject")
@@ -116,9 +119,9 @@ class EmailServiceIntegrationTest {
                 .thenThrow(serverError);
 
         // When & Then
-        DomainException exception = assertThrows(DomainException.class, 
+        DomainException exception = assertThrows(DomainException.class,
                 () -> emailService.sendEmail(emailRequest));
-        
+
         // Should try 3 times for retryable errors
         verify(brevoEmailService, times(3)).sendEmail(any(EmailRequest.class));
     }
@@ -130,7 +133,7 @@ class EmailServiceIntegrationTest {
                 .email("test@example.com")
                 .name("Test User")
                 .build();
-        
+
         EmailRequest emailRequest = EmailRequest.builder()
                 .to(List.of(emailInfo))
                 .subject("Test Subject")
@@ -168,7 +171,7 @@ class EmailServiceIntegrationTest {
                 null,
                 new RequestTemplate()
         );
-        
+
         return new FeignException.FeignServerException(status, message, request, null, null);
     }
 }

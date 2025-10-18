@@ -1,25 +1,29 @@
 package com.smartrent.infra.repository.entity;
 
-import com.smartrent.enums.ScheduleSource;
-import com.smartrent.enums.ScheduleStatus;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
 
+/**
+ * Entity representing a push schedule for listings.
+ * Manages scheduled automatic pushes for listings.
+ */
 @Entity(name = "push_schedule")
 @Table(name = "push_schedule",
         indexes = {
-                @Index(name = "idx_user_id", columnList = "user_id"),
                 @Index(name = "idx_listing_id", columnList = "listing_id"),
                 @Index(name = "idx_status", columnList = "status"),
-                @Index(name = "idx_scheduled_time", columnList = "scheduled_time"),
-                @Index(name = "idx_user_listing_status", columnList = "user_id, listing_id, status")
+                @Index(name = "idx_scheduled_time", columnList = "scheduled_time")
         })
 @Getter
 @Setter
@@ -30,23 +34,30 @@ import java.util.List;
 public class PushSchedule {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "schedule_id")
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long scheduleId;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, length = 36)
     String userId;
 
     @Column(name = "listing_id", nullable = false)
     Long listingId;
 
+    /**
+     * Time of day to push the listing (e.g., 09:00:00, 15:00:00)
+     */
     @Column(name = "scheduled_time", nullable = false)
     LocalTime scheduledTime;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "source", nullable = false)
-    ScheduleSource source;
+    PushSource source;
 
+    /**
+     * Reference to the source that created this schedule
+     * Could be user_membership_id for MEMBERSHIP source
+     */
     @Column(name = "source_id")
     Long sourceId;
 
@@ -63,41 +74,67 @@ public class PushSchedule {
     @Column(name = "status", nullable = false)
     ScheduleStatus status = ScheduleStatus.ACTIVE;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaction_id")
-    Transaction transaction;
+    @Column(name = "transaction_id", length = 36)
+    String transactionId;
 
-    @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    List<PushHistory> pushHistories;
-
-    @CreationTimestamp
     @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
     LocalDateTime createdAt;
 
-    @UpdateTimestamp
     @Column(name = "updated_at")
+    @UpdateTimestamp
     LocalDateTime updatedAt;
 
-    // Helper methods
-    public Integer getPushesRemaining() {
-        return totalPushes - usedPushes;
+    // Relationships
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "listing_id", insertable = false, updatable = false)
+    Listing listing;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transaction_id", insertable = false, updatable = false)
+    Transaction transaction;
+
+    /**
+     * Enum for push source
+     */
+    public enum PushSource {
+        MEMBERSHIP,
+        DIRECT_PURCHASE
     }
 
-    public boolean hasRemainingPushes() {
-        return status == ScheduleStatus.ACTIVE && usedPushes < totalPushes;
+    /**
+     * Enum for schedule status
+     */
+    public enum ScheduleStatus {
+        ACTIVE,
+        COMPLETED,
+        CANCELLED
+    }
+
+    // Helper methods
+    public boolean isActive() {
+        return status == ScheduleStatus.ACTIVE;
     }
 
     public boolean isCompleted() {
-        return status == ScheduleStatus.COMPLETED || usedPushes >= totalPushes;
+        return status == ScheduleStatus.COMPLETED;
     }
 
     public boolean isCancelled() {
         return status == ScheduleStatus.CANCELLED;
     }
 
+    public boolean hasRemainingPushes() {
+        return usedPushes < totalPushes;
+    }
+
     public void incrementUsedPushes() {
         this.usedPushes++;
-        if (usedPushes >= totalPushes) {
+        if (this.usedPushes >= this.totalPushes) {
             this.status = ScheduleStatus.COMPLETED;
         }
     }
@@ -105,13 +142,4 @@ public class PushSchedule {
     public void cancel() {
         this.status = ScheduleStatus.CANCELLED;
     }
-
-    public boolean isFromMembership() {
-        return source == ScheduleSource.MEMBERSHIP;
-    }
-
-    public boolean isFromDirectPurchase() {
-        return source == ScheduleSource.DIRECT_PURCHASE;
-    }
 }
-

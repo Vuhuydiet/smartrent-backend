@@ -69,7 +69,7 @@ public class UserMembershipBenefit {
     @Column(name = "status", nullable = false)
     BenefitStatus status = BenefitStatus.ACTIVE;
 
-    @OneToMany(mappedBy = "userBenefit", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "userMembershipBenefit", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<PushHistory> pushHistories;
 
     @CreationTimestamp
@@ -86,8 +86,8 @@ public class UserMembershipBenefit {
     }
 
     public boolean hasQuotaAvailable() {
-        return status == BenefitStatus.ACTIVE && 
-               quantityUsed < totalQuantity && 
+        return status == BenefitStatus.ACTIVE &&
+               quantityUsed < totalQuantity &&
                LocalDateTime.now().isBefore(expiresAt);
     }
 

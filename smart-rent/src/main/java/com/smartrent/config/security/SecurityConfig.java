@@ -38,27 +38,34 @@ public class SecurityConfig {
 
     http.addFilterBefore(exceptionHandler, LogoutFilter.class);
 
+    // Get patterns from configuration
+    String[] getPatterns = securityProperties.getMethods().getGet() != null
+        ? securityProperties.getMethods().getGet().toArray(new String[0])
+        : new String[0];
+    String[] postPatterns = securityProperties.getMethods().getPost() != null
+        ? securityProperties.getMethods().getPost().toArray(new String[0])
+        : new String[0];
+
     http.authorizeHttpRequests(configurer -> {
       configurer
-          .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/v3/api-docs", "/swagger-resources/**", "/webjars/**")
+          // Configure public POST endpoints from YAML
+          .requestMatchers(HttpMethod.POST, postPatterns)
           .permitAll()
-      .requestMatchers(HttpMethod.GET, "/v1/listings/**")
-      .permitAll()
-          .requestMatchers(HttpMethod.GET, "/v1/addresses/**")
+          // Configure public GET endpoints from YAML
+          .requestMatchers(HttpMethod.GET, getPatterns)
           .permitAll()
-          .requestMatchers(HttpMethod.POST, securityProperties.getMethods().getPost().toArray(new String[0]))
-          .permitAll()
-          .requestMatchers(HttpMethod.GET, securityProperties.getMethods().getGet().toArray(new String[0]))
-          .permitAll()
+          // Allow all OPTIONS requests (for CORS preflight)
           .requestMatchers(HttpMethod.OPTIONS, "/**")
           .permitAll()
+          // All other requests require authentication
           .anyRequest()
           .authenticated();
     });
 
     http.csrf(AbstractHttpConfigurer::disable);
 
-    http.oauth2ResourceServer(configurer -> configurer.jwt(jwtConfigurer -> jwtConfigurer
+    http.oauth2ResourceServer(configurer -> configurer
+        .jwt(jwtConfigurer -> jwtConfigurer
             .decoder(decoder)
             .jwtAuthenticationConverter(jwtAuthenticationConverter()))
         .authenticationEntryPoint(new JwtAuthenticationEntryPoint())

@@ -20,7 +20,7 @@ CREATE TABLE membership_packages (
     description TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+
     INDEX idx_package_level (package_level),
     INDEX idx_is_active (is_active),
     INDEX idx_package_code (package_code)
@@ -36,7 +36,7 @@ CREATE TABLE membership_package_benefits (
     benefit_name_display VARCHAR(200) NOT NULL,
     quantity_per_month INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_mpb_membership FOREIGN KEY (membership_id) REFERENCES membership_packages(membership_id) ON DELETE CASCADE,
     INDEX idx_membership_id (membership_id),
     INDEX idx_benefit_type (benefit_type)
@@ -56,7 +56,7 @@ CREATE TABLE user_memberships (
     total_paid DECIMAL(15, 0) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_um_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     CONSTRAINT fk_um_membership FOREIGN KEY (membership_id) REFERENCES membership_packages(membership_id),
     INDEX idx_user_id (user_id),
@@ -81,7 +81,7 @@ CREATE TABLE user_membership_benefits (
     status ENUM('ACTIVE', 'FULLY_USED', 'EXPIRED') NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_umb_user_membership FOREIGN KEY (user_membership_id) REFERENCES user_memberships(user_membership_id) ON DELETE CASCADE,
     CONSTRAINT fk_umb_benefit FOREIGN KEY (benefit_id) REFERENCES membership_package_benefits(benefit_id),
     CONSTRAINT fk_umb_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
@@ -111,7 +111,7 @@ CREATE TABLE transactions (
     provider_transaction_id VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_transaction_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_transaction_type (transaction_type),
@@ -122,28 +122,7 @@ CREATE TABLE transactions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
--- 6. PUSH HISTORY TABLE
--- =====================================================
-CREATE TABLE push_history (
-    push_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    listing_id BIGINT NOT NULL,
-    user_id VARCHAR(36) NOT NULL,
-    push_source ENUM('MEMBERSHIP_QUOTA', 'DIRECT_PURCHASE', 'SCHEDULED', 'ADMIN') NOT NULL,
-    user_benefit_id BIGINT,
-    schedule_id BIGINT,
-    pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT fk_ph_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ph_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ph_user_benefit FOREIGN KEY (user_benefit_id) REFERENCES user_membership_benefits(user_benefit_id) ON DELETE SET NULL,
-    INDEX idx_listing_id (listing_id),
-    INDEX idx_user_id (user_id),
-    INDEX idx_pushed_at (pushed_at),
-    INDEX idx_listing_pushed (listing_id, pushed_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- =====================================================
--- 7. PUSH SCHEDULE TABLE
+-- 6. PUSH SCHEDULE TABLE
 -- =====================================================
 CREATE TABLE push_schedule (
     schedule_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -158,15 +137,36 @@ CREATE TABLE push_schedule (
     transaction_id VARCHAR(36),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT fk_ps_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     CONSTRAINT fk_ps_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
     CONSTRAINT fk_ps_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id) ON DELETE SET NULL,
-    INDEX idx_user_id (user_id),
     INDEX idx_listing_id (listing_id),
     INDEX idx_status (status),
-    INDEX idx_scheduled_time (scheduled_time),
-    INDEX idx_user_listing_status (user_id, listing_id, status)
+    INDEX idx_scheduled_time (scheduled_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- =====================================================
+-- 7. PUSH HISTORY TABLE
+-- =====================================================
+CREATE TABLE push_history (
+    push_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    listing_id BIGINT NOT NULL,
+    push_source ENUM('MEMBERSHIP_QUOTA', 'DIRECT_PURCHASE', 'SCHEDULED', 'ADMIN', 'DIRECT_PAYMENT') NOT NULL,
+    user_benefit_id BIGINT,
+    schedule_id BIGINT,
+    transaction_id VARCHAR(36),
+    status ENUM('SUCCESS', 'FAIL') DEFAULT 'SUCCESS',
+    message VARCHAR(500),
+    pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_ph_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
+    CONSTRAINT fk_ph_benefit FOREIGN KEY (user_benefit_id) REFERENCES user_membership_benefits(user_benefit_id) ON DELETE SET NULL,
+    CONSTRAINT fk_ph_schedule FOREIGN KEY (schedule_id) REFERENCES push_schedule(schedule_id) ON DELETE SET NULL,
+    CONSTRAINT fk_ph_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id) ON DELETE SET NULL,
+    INDEX idx_listing_id (listing_id),
+    INDEX idx_pushed_at (pushed_at),
+    INDEX idx_listing_pushed (listing_id, pushed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
