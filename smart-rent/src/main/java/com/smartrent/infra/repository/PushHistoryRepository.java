@@ -41,6 +41,14 @@ public interface PushHistoryRepository extends JpaRepository<PushHistory, Long> 
     List<PushHistory> findByStatus(PushHistory.PushStatus status);
 
     /**
+     * Find push history records by push source
+     *
+     * @param pushSource The push source
+     * @return List of push history records
+     */
+    List<PushHistory> findByPushSource(PushHistory.PushSource pushSource);
+
+    /**
      * Find push history records within a date range
      *
      * @param startDate Start date
@@ -86,4 +94,20 @@ public interface PushHistoryRepository extends JpaRepository<PushHistory, Long> 
     @Query("SELECT COUNT(ph) FROM push_history ph WHERE ph.scheduleId = :scheduleId " +
             "AND ph.status = 'FAIL'")
     Long countFailedPushesByScheduleId(@Param("scheduleId") Long scheduleId);
+
+    /**
+     * Find push history for a listing ordered by pushed date (newest first)
+     *
+     * @param listingId The listing ID
+     * @return List of push history records ordered by pushedAt descending
+     */
+    List<PushHistory> findByListingIdOrderByPushedAtDesc(Long listingId);
+
+    /**
+     * Find push history for multiple listings ordered by pushed date (newest first)
+     *
+     * @param listingIds The list of listing IDs
+     * @return List of push history records ordered by pushedAt descending
+     */
+    List<PushHistory> findByListingIdInOrderByPushedAtDesc(List<Long> listingIds);
 }

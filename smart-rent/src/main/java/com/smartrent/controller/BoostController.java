@@ -4,7 +4,7 @@ import com.smartrent.dto.request.BoostListingRequest;
 import com.smartrent.dto.request.ScheduleBoostRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.BoostResponse;
-import com.smartrent.service.boost.BoostService;
+import com.smartrent.service.push.PushService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -27,7 +27,7 @@ import java.util.List;
 @Tag(name = "Boost Management", description = "APIs for boosting listings to increase visibility")
 public class BoostController {
 
-    BoostService boostService;
+    PushService pushService;
 
     @PostMapping("/boost")
     @Operation(
@@ -53,7 +53,7 @@ public class BoostController {
             @RequestHeader("user-id") String userId,
             @RequestBody @Valid BoostListingRequest request) {
         log.info("User {} boosting listing {}", userId, request.getListingId());
-        BoostResponse response = boostService.boostListing(userId, request);
+        BoostResponse response = pushService.boostListing(userId, request);
         return ApiResponse.<BoostResponse>builder()
                 .data(response)
                 .build();
@@ -83,7 +83,7 @@ public class BoostController {
             @RequestHeader("user-id") String userId,
             @RequestBody @Valid ScheduleBoostRequest request) {
         log.info("User {} scheduling boost for listing {}", userId, request.getListingId());
-        BoostResponse response = boostService.scheduleBoost(userId, request);
+        BoostResponse response = pushService.scheduleBoost(userId, request);
         return ApiResponse.<BoostResponse>builder()
                 .data(response)
                 .build();
@@ -106,7 +106,7 @@ public class BoostController {
     )
     public ApiResponse<List<BoostResponse>> getListingBoostHistory(@PathVariable Long listingId) {
         log.info("Getting boost history for listing: {}", listingId);
-        List<BoostResponse> history = boostService.getBoostHistory(listingId);
+        List<BoostResponse> history = pushService.getBoostHistory(listingId);
         return ApiResponse.<List<BoostResponse>>builder()
                 .data(history)
                 .build();
@@ -115,7 +115,7 @@ public class BoostController {
     @GetMapping("/my-history")
     @Operation(
         summary = "Get user's boost history",
-        description = "Returns all boost history for the current user",
+        description = "Returns all boost history for all listings owned by the current user",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
@@ -130,7 +130,7 @@ public class BoostController {
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
     public ApiResponse<List<BoostResponse>> getMyBoostHistory(@RequestHeader("user-id") String userId) {
         log.info("Getting boost history for user: {}", userId);
-        List<BoostResponse> history = boostService.getUserBoostHistory(userId);
+        List<BoostResponse> history = pushService.getUserBoostHistory(userId);
         return ApiResponse.<List<BoostResponse>>builder()
                 .data(history)
                 .build();
@@ -156,7 +156,7 @@ public class BoostController {
             @RequestHeader("user-id") String userId,
             @PathVariable Long scheduleId) {
         log.info("User {} cancelling scheduled boost {}", userId, scheduleId);
-        boostService.cancelScheduledBoost(userId, scheduleId);
+        pushService.cancelScheduledBoost(userId, scheduleId);
         return ApiResponse.<Void>builder()
                 .message("Scheduled boost cancelled successfully")
                 .build();
