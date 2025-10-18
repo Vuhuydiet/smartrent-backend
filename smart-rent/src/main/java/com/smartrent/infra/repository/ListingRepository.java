@@ -15,6 +15,12 @@ import org.springframework.stereotype.Repository;
 public interface ListingRepository extends JpaRepository<Listing, Long> {
     List<Listing> findByListingIdIn(Collection<Long> listingIds);
 
+    List<Listing> findByUserId(String userId);
+
+    Optional<Listing> findShadowListingByMainListingId(Long mainListingId);
+
+
+
     @Query("SELECT l FROM listings l LEFT JOIN FETCH l.amenities WHERE l.listingId = :id")
     Optional<Listing> findByIdWithAmenities(@Param("id") Long id);
 
