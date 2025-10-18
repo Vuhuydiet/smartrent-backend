@@ -72,14 +72,4 @@ public interface PushScheduleRepository extends JpaRepository<PushSchedule, Long
     @Query("SELECT ps FROM push_schedules ps WHERE ps.status = 'ACTIVE' " +
             "AND ps.endTime <= :currentTime")
     List<PushSchedule> findExpiredSchedules(@Param("currentTime") LocalDateTime currentTime);
-
-    /**
-     * Find active schedules that should run at the given time
-     *
-     * @param scheduledTime The time to match
-     * @return List of active schedules matching the time
-     */
-    @Query("SELECT ps FROM push_schedules ps WHERE ps.scheduledTime = :scheduledTime " +
-            "AND ps.status = 'ACTIVE'")
-    List<PushSchedule> findActiveSchedulesByTime(@Param("scheduledTime") LocalTime scheduledTime);
 }

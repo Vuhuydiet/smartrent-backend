@@ -29,9 +29,11 @@ import java.time.LocalDateTime;
 @Entity(name = "push_history")
 @Table(name = "push_history",
         indexes = {
+                @Index(name = "idx_schedule_id", columnList = "schedule_id"),
                 @Index(name = "idx_listing_id", columnList = "listing_id"),
+                @Index(name = "idx_status", columnList = "status"),
                 @Index(name = "idx_pushed_at", columnList = "pushed_at"),
-                @Index(name = "idx_listing_pushed", columnList = "listing_id, pushed_at")
+                @Index(name = "idx_schedule_status", columnList = "schedule_id, status")
         })
 @Getter
 @Setter
@@ -42,83 +44,44 @@ import java.time.LocalDateTime;
 public class PushHistory {
 
     @Id
-    @Column(name = "push_id")
+    @Column(name = "push_history_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long pushId;
+    Long pushHistoryId;
+
+    @Column(name = "schedule_id", nullable = false)
+    Long scheduleId;
 
     @Column(name = "listing_id", nullable = false)
     Long listingId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "push_source", nullable = false)
-    PushSource pushSource;
-
-    @Column(name = "user_benefit_id")
-    Long userBenefitId;
-
-    @Column(name = "schedule_id")
-    Long scheduleId;
-
-    @Column(name = "transaction_id", length = 36)
-    String transactionId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20)
+    @Column(name = "status", nullable = false)
     PushStatus status;
 
+    /**
+     * Reason for failure or additional information about the push
+     */
     @Column(name = "message", length = 500)
     String message;
 
+    /**
+     * Actual time when push was executed
+     */
     @Column(name = "pushed_at")
-    @CreationTimestamp
     LocalDateTime pushedAt;
+
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    LocalDateTime createdAt;
 
     // Relationships
     @ManyToOne
+    @JoinColumn(name = "schedule_id", insertable = false, updatable = false)
+    PushSchedule pushSchedule;
+
+    @ManyToOne
     @JoinColumn(name = "listing_id", insertable = false, updatable = false)
     Listing listing;
-
-    @ManyToOne
-    @JoinColumn(name = "user_benefit_id", insertable = false, updatable = false)
-    UserMembershipBenefit userMembershipBenefit;
-
-    @ManyToOne
-    @JoinColumn(name = "schedule_id", insertable = false, updatable = false)
-    PushSchedule schedule;
-
-    @ManyToOne
-    @JoinColumn(name = "transaction_id", insertable = false, updatable = false)
-    Transaction transaction;
-
-    /**
-     * Enum for push source
-     */
-    public enum PushSource {
-        /**
-         * Push from membership quota
-         */
-        MEMBERSHIP_QUOTA,
-
-        /**
-         * Direct purchase/payment
-         */
-        DIRECT_PURCHASE,
-
-        /**
-         * Direct payment (after completing payment)
-         */
-        DIRECT_PAYMENT,
-
-        /**
-         * Scheduled push
-         */
-        SCHEDULED,
-
-        /**
-         * Admin push
-         */
-        ADMIN
-    }
 
     /**
      * Enum for push status
