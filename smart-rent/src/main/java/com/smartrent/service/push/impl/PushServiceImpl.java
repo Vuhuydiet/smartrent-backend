@@ -193,22 +193,22 @@ public class PushServiceImpl implements PushService {
      * {@inheritDoc}
      */
     @Override
-    public List<PushHistory> getPushHistoryByListingId(Long listingId) {
+    public List<Object> getPushHistoryByListingId(Long listingId) {
         log.info("Fetching push history for listing: listingId={}", listingId);
         List<PushHistory> history = pushHistoryRepository.findByListingId(listingId);
         log.info("Found {} push history records for listing: listingId={}", history.size(), listingId);
-        return history;
+        return history.stream().map(h -> (Object) h).toList();
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public List<PushHistory> getPushHistoryByScheduleId(Long scheduleId) {
+    public List<Object> getPushHistoryByScheduleId(Long scheduleId) {
         log.info("Fetching push history for schedule: scheduleId={}", scheduleId);
         List<PushHistory> history = pushHistoryRepository.findByScheduleId(scheduleId);
         log.info("Found {} push history records for schedule: scheduleId={}", history.size(), scheduleId);
-        return history;
+        return history.stream().map(h -> (Object) h).toList();
     }
 
     /**
