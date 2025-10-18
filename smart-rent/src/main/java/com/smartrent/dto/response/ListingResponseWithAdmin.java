@@ -12,7 +12,6 @@ import lombok.experimental.FieldDefaults;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 @Getter
 @Setter
@@ -20,8 +19,9 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Schema(description = "Listing details response")
-public class ListingResponse {
+@Schema(description = "Listing details response with admin verification information")
+public class ListingResponseWithAdmin {
+
     @Schema(description = "Listing ID", example = "1")
     Long listingId;
 
@@ -86,7 +86,13 @@ public class ListingResponse {
     @Schema(description = "List of amenities associated with this listing")
     List<AmenityResponse> amenities;
 
+    @Schema(description = "Admin verification information")
+    AdminVerificationInfo adminVerification;
+
     LocalDateTime createdAt;
 
     LocalDateTime updatedAt;
+
+    @Schema(description = "ID of admin who last updated the listing")
+    Long updatedBy;
 }

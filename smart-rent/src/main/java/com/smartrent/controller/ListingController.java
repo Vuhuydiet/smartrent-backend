@@ -6,6 +6,7 @@ import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.QuotaStatusResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.service.listing.ListingService;
@@ -52,8 +53,8 @@ public class ListingController {
                     name = "Create Listing Example",
                     value = """
                         {
-                          "title": "Cozy 2BR Apartment in Downtown",
-                          "description": "Spacious 2-bedroom apartment with balcony and city view.",
+                          "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
+                          "description": "Căn hộ rộng rãi 2 phòng ngủ có ban công và tầm nhìn thành phố.",
                           "userId": "user-123e4567-e89b-12d3-a456-426614174000",
                           "expiryDate": "2025-12-31T23:59:59",
                           "listingType": "RENT",
@@ -129,8 +130,8 @@ public class ListingController {
                               "message": null,
                               "data": {
                                 "listingId": 123,
-                                "title": "Cozy 2BR Apartment in Downtown",
-                                "description": "Spacious 2-bedroom apartment with balcony and city view.",
+                                "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
+                                "description": "Căn hộ rộng rãi 2 phòng ngủ có ban công và tầm nhìn thành phố.",
                                 "userId": "user-123e4567-e89b-12d3-a456-426614174000",
                                 "postDate": "2025-09-01T10:00:00",
                                 "expiryDate": "2025-12-31T23:59:59",
@@ -151,7 +152,32 @@ public class ListingController {
                                 "furnishing": "SEMI_FURNISHED",
                                 "propertyType": "APARTMENT",
                                 "roomCapacity": 4,
-                                "amenityIds": [1,3,5],
+                                "amenities": [
+                                  {
+                                    "amenityId": 1,
+                                    "name": "Điều hòa",
+                                    "icon": "ac-icon",
+                                    "description": "Máy điều hòa không khí",
+                                    "category": "BASIC",
+                                    "isActive": true
+                                  },
+                                  {
+                                    "amenityId": 3,
+                                    "name": "Máy giặt",
+                                    "icon": "washing-machine-icon",
+                                    "description": "Máy giặt tự động",
+                                    "category": "BASIC",
+                                    "isActive": true
+                                  },
+                                  {
+                                    "amenityId": 5,
+                                    "name": "WiFi miễn phí",
+                                    "icon": "wifi-icon",
+                                    "description": "Kết nối internet tốc độ cao",
+                                    "category": "CONVENIENCE",
+                                    "isActive": true
+                                  }
+                                ],
                                 "createdAt": "2025-09-01T10:00:00",
                                 "updatedAt": "2025-09-01T10:00:00"
                               }
@@ -210,17 +236,101 @@ public class ListingController {
                               "data": [
                                 {
                                   "listingId": 123,
-                                  "title": "Cozy 2BR Apartment in Downtown",
+                                  "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
+                                  "description": "Căn hộ rộng rãi 2 phòng ngủ có ban công và tầm nhìn thành phố.",
+                                  "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                  "postDate": "2025-09-01T10:00:00",
+                                  "expiryDate": "2025-12-31T23:59:59",
+                                  "listingType": "RENT",
+                                  "verified": false,
+                                  "isVerify": false,
+                                  "expired": false,
+                                  "vipType": "NORMAL",
+                                  "categoryId": 10,
+                                  "productType": "APARTMENT",
                                   "price": 1200.00,
                                   "priceUnit": "MONTH",
-                                  "productType": "APARTMENT"
+                                  "addressId": 501,
+                                  "area": 78.5,
+                                  "bedrooms": 2,
+                                  "bathrooms": 1,
+                                  "direction": "NORTHEAST",
+                                  "furnishing": "SEMI_FURNISHED",
+                                  "propertyType": "APARTMENT",
+                                  "roomCapacity": 4,
+                                  "amenities": [
+                                    {
+                                      "amenityId": 1,
+                                      "name": "Điều hòa",
+                                      "icon": "ac-icon",
+                                      "description": "Máy điều hòa không khí",
+                                      "category": "BASIC",
+                                      "isActive": true
+                                    },
+                                    {
+                                      "amenityId": 3,
+                                      "name": "Máy giặt",
+                                      "icon": "washing-machine-icon",
+                                      "description": "Máy giặt tự động",
+                                      "category": "BASIC",
+                                      "isActive": true
+                                    },
+                                    {
+                                      "amenityId": 5,
+                                      "name": "WiFi miễn phí",
+                                      "icon": "wifi-icon",
+                                      "description": "Kết nối internet tốc độ cao",
+                                      "category": "CONVENIENCE",
+                                      "isActive": true
+                                    }
+                                  ],
+                                  "createdAt": "2025-09-01T10:00:00",
+                                  "updatedAt": "2025-09-01T10:00:00"
                                 },
                                 {
                                   "listingId": 124,
-                                  "title": "Modern Studio near Park",
+                                  "title": "Căn hộ Studio hiện đại gần công viên",
+                                  "description": "Studio hiện đại với đầy đủ tiện nghi gần công viên lớn.",
+                                  "userId": "user-456e7890-e89b-12d3-a456-426614174001",
+                                  "postDate": "2025-09-05T14:30:00",
+                                  "expiryDate": "2025-12-31T23:59:59",
+                                  "listingType": "RENT",
+                                  "verified": true,
+                                  "isVerify": false,
+                                  "expired": false,
+                                  "vipType": "SILVER",
+                                  "categoryId": 11,
+                                  "productType": "STUDIO",
                                   "price": 700.00,
                                   "priceUnit": "MONTH",
-                                  "productType": "STUDIO"
+                                  "addressId": 502,
+                                  "area": 35.0,
+                                  "bedrooms": 0,
+                                  "bathrooms": 1,
+                                  "direction": "SOUTH",
+                                  "furnishing": "FULLY_FURNISHED",
+                                  "propertyType": "APARTMENT",
+                                  "roomCapacity": 2,
+                                  "amenities": [
+                                    {
+                                      "amenityId": 1,
+                                      "name": "Điều hòa",
+                                      "icon": "ac-icon",
+                                      "description": "Máy điều hòa không khí",
+                                      "category": "BASIC",
+                                      "isActive": true
+                                    },
+                                    {
+                                      "amenityId": 5,
+                                      "name": "WiFi miễn phí",
+                                      "icon": "wifi-icon",
+                                      "description": "Kết nối internet tốc độ cao",
+                                      "category": "CONVENIENCE",
+                                      "isActive": true
+                                    }
+                                  ],
+                                  "createdAt": "2025-09-05T14:30:00",
+                                  "updatedAt": "2025-09-05T14:30:00"
                                 }
                               ]
                             }
@@ -257,8 +367,8 @@ public class ListingController {
                     name = "Update Listing Example",
                     value = """
                         {
-                          "title": "Updated 2BR Apartment with New Photos",
-                          "description": "Now includes a renovated kitchen and updated bathroom.",
+                          "title": "Căn hộ 2 phòng ngủ đã cập nhật với ảnh mới",
+                          "description": "Hiện bao gồm bếp được cải tạo và phòng tắm đã nâng cấp.",
                           "userId": 42,
                           "expiryDate": "2026-01-31T23:59:59",
                           "listingType": "RENT",
@@ -384,8 +494,8 @@ public class ListingController {
                         name = "VIP with Quota",
                         value = """
                             {
-                              "title": "Luxury Apartment in District 1",
-                              "description": "Beautiful 2BR apartment",
+                              "title": "Căn hộ cao cấp tại Quận 1",
+                              "description": "Căn hộ 2 phòng ngủ đẹp",
                               "listingType": "RENT",
                               "vipType": "VIP",
                               "categoryId": 1,
@@ -405,8 +515,8 @@ public class ListingController {
                         name = "Premium with Payment",
                         value = """
                             {
-                              "title": "Premium Villa in District 2",
-                              "description": "Stunning 4BR villa",
+                              "title": "Biệt thự Premium tại Quận 2",
+                              "description": "Biệt thự 4 phòng ngủ tuyệt đẹp",
                               "listingType": "RENT",
                               "vipType": "PREMIUM",
                               "categoryId": 1,
@@ -440,7 +550,7 @@ public class ListingController {
                                 {
                                   "data": {
                                     "listingId": "550e8400-e29b-41d4-a716-446655440000",
-                                    "title": "Luxury Apartment in District 1",
+                                    "title": "Căn hộ cao cấp tại Quận 1",
                                     "vipType": "VIP",
                                     "postSource": "QUOTA",
                                     "status": "ACTIVE"
@@ -455,7 +565,7 @@ public class ListingController {
                                   "data": {
                                     "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_Amount=...",
                                     "transactionId": "550e8400-e29b-41d4-a716-446655440000",
-                                    "orderInfo": "Premium Post - 30 days",
+                                    "orderInfo": "Đăng tin Premium - 30 ngày",
                                     "amount": 1800000
                                   }
                                 }
@@ -567,5 +677,123 @@ public class ListingController {
                 "diamondPosts", diamondQuota,
                 "boosts", boostQuota
         )).build();
+    }
+
+    /**
+     * Get listing by ID with admin verification information (Admin only)
+     * GET /v1/listings/{id}/admin
+     */
+    @GetMapping("/{id}/admin")
+    @Operation(
+        summary = "Get listing with admin verification info (Admin only)",
+        description = "Retrieves listing details including admin verification information and status. This endpoint is for administrators only.",
+        parameters = {
+            @Parameter(name = "id", description = "Listing ID", required = true),
+            @Parameter(name = "X-Admin-Id", description = "Admin ID from authentication header", required = true)
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Listing found with admin verification info",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Listing with Admin Info Example",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "listingId": 123,
+                                "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
+                                "description": "Căn hộ rộng rãi 2 phòng ngủ có ban công và tầm nhìn thành phố.",
+                                "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                "postDate": "2025-09-01T10:00:00",
+                                "expiryDate": "2025-12-31T23:59:59",
+                                "listingType": "RENT",
+                                "verified": true,
+                                "isVerify": false,
+                                "expired": false,
+                                "vipType": "NORMAL",
+                                "categoryId": 10,
+                                "productType": "APARTMENT",
+                                "price": 1200.00,
+                                "priceUnit": "MONTH",
+                                "addressId": 501,
+                                "area": 78.5,
+                                "bedrooms": 2,
+                                "bathrooms": 1,
+                                "direction": "NORTHEAST",
+                                "furnishing": "SEMI_FURNISHED",
+                                "propertyType": "APARTMENT",
+                                "roomCapacity": 4,
+                                "amenities": [
+                                  {
+                                    "amenityId": 1,
+                                    "name": "Điều hòa",
+                                    "icon": "ac-icon",
+                                    "description": "Máy điều hòa không khí",
+                                    "category": "BASIC",
+                                    "isActive": true
+                                  },
+                                  {
+                                    "amenityId": 3,
+                                    "name": "Máy giặt",
+                                    "icon": "washing-machine-icon",
+                                    "description": "Máy giặt tự động",
+                                    "category": "BASIC",
+                                    "isActive": true
+                                  },
+                                  {
+                                    "amenityId": 5,
+                                    "name": "WiFi miễn phí",
+                                    "icon": "wifi-icon",
+                                    "description": "Kết nối internet tốc độ cao",
+                                    "category": "CONVENIENCE",
+                                    "isActive": true
+                                  }
+                                ],
+                                "adminVerification": {
+                                  "adminId": "admin-123e4567-e89b-12d3-a456-426614174000",
+                                  "adminName": "Jane Smith",
+                                  "adminEmail": "admin@smartrent.com",
+                                  "verifiedAt": "2025-09-01T11:30:00",
+                                  "verificationStatus": "APPROVED",
+                                  "verificationNotes": "Verified property documents and ownership. All information is accurate."
+                                },
+                                "createdAt": "2025-09-01T10:00:00",
+                                "updatedAt": "2025-09-01T11:30:00",
+                                "updatedBy": 1
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Listing not found",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Not Found",
+                        value = """
+                            {
+                              "code": "404001",
+                              "message": "LISTING_NOT_FOUND",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<ListingResponseWithAdmin> getListingByIdWithAdmin(
+            @PathVariable Long id,
+            @RequestHeader("X-Admin-Id") String adminId) {
+        ListingResponseWithAdmin response = listingService.getListingByIdWithAdmin(id, adminId);
+        return ApiResponse.<ListingResponseWithAdmin>builder().data(response).build();
     }
 }

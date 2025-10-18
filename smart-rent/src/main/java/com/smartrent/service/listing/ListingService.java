@@ -5,6 +5,7 @@ import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
 
 import java.util.List;
@@ -31,4 +32,12 @@ public interface ListingService {
     List<ListingResponse> getListings(int page, int size);
     ListingResponse updateListing(Long id, ListingRequest request);
     void deleteListing(Long id);
+
+    /**
+     * Get listing by ID with admin verification information (Admin only)
+     * @param id Listing ID
+     * @param adminId Admin ID who is requesting the listing details
+     * @return ListingResponseWithAdmin containing listing details and admin verification info
+     */
+    ListingResponseWithAdmin getListingByIdWithAdmin(Long id, String adminId);
 }

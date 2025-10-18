@@ -46,7 +46,8 @@ public enum DomainCode {
   PAYMENT_PROVIDER_INVALID_CONFIG("7006", HttpStatus.SERVICE_UNAVAILABLE, "Payment provider configuration is invalid: %s"),
   PAYMENT_OPERATION_NOT_SUPPORTED("7007", HttpStatus.SERVICE_UNAVAILABLE, "%s not supported by %s"),
   PAYMENT_PROVIDER_ERROR("7008", HttpStatus.SERVICE_UNAVAILABLE, "Payment provider error: %s"),
-  USER_NOT_AUTHENTICATED("7009", HttpStatus.UNAUTHORIZED, "User not authenticated for payment")
+  USER_NOT_AUTHENTICATED("7009", HttpStatus.UNAUTHORIZED, "User not authenticated for payment"),
+    INVALID_FILE_TYPE("8001", HttpStatus.BAD_REQUEST, "Invalid file type: %s")
   ;
 
   private final String value;

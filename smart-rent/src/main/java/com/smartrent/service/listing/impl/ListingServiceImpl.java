@@ -7,11 +7,14 @@ import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.PostSource;
+import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.TransactionRepository;
+import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.mapper.ListingMapper;
@@ -40,6 +43,7 @@ import java.util.stream.Collectors;
 public class ListingServiceImpl implements ListingService {
 
     ListingRepository listingRepository;
+    AdminRepository adminRepository;
     ListingMapper listingMapper;
     QuotaService quotaService;
     TransactionService transactionService;
@@ -229,7 +233,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional(readOnly = true)
     public ListingResponse getListingById(Long id) {
-        Listing listing = listingRepository.findById(id)
+        Listing listing = listingRepository.findByIdWithAmenities(id)
                 .orElseThrow(() -> new RuntimeException("Listing not found"));
         return listingMapper.toResponse(listing);
     }
@@ -237,7 +241,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional(readOnly = true)
     public List<ListingResponse> getListingsByIds(Set<Long> ids) {
-        return listingRepository.findByListingIdIn(ids).stream()
+        return listingRepository.findByIdsWithAmenities(ids).stream()
                 .map(listingMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -283,5 +287,38 @@ public class ListingServiceImpl implements ListingService {
             throw new RuntimeException("Listing not found");
         }
         listingRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ListingResponseWithAdmin getListingByIdWithAdmin(Long id, String adminId) {
+        log.info("Admin {} requesting listing {} with verification info", adminId, id);
+
+        // Get listing with amenities
+        Listing listing = listingRepository.findByIdWithAmenities(id)
+                .orElseThrow(() -> new RuntimeException("Listing not found"));
+
+        // Get admin information if updatedBy is set
+        Admin verifyingAdmin = null;
+        if (listing.getUpdatedBy() != null) {
+            // Convert Long updatedBy to String adminId for lookup
+            verifyingAdmin = adminRepository.findById(String.valueOf(listing.getUpdatedBy()))
+                    .orElse(null);
+        }
+
+        // Determine verification status based on listing state
+        String verificationStatus;
+        if (listing.getVerified()) {
+            verificationStatus = "APPROVED";
+        } else if (listing.getIsVerify()) {
+            verificationStatus = "PENDING";
+        } else {
+            verificationStatus = "PENDING";
+        }
+
+        // For now, verification notes can be null - in the future, this could be stored in a separate table
+        String verificationNotes = null;
+
+        return listingMapper.toResponseWithAdmin(listing, verifyingAdmin, verificationStatus, verificationNotes);
     }
 }
