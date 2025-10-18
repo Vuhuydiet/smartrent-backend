@@ -93,4 +93,5 @@ flyway {
     baselineOnMigrate = true
     baselineVersion = '0'
     validateOnMigrate = true
+    outOfOrder = true
 }

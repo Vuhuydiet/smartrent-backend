@@ -52,6 +52,7 @@ spring:
     password: ${DB_PASSWORD}
   flyway:
     enabled: true
+    out-of-order: true
   jpa:
     database: MYSQL
     openInView: true
