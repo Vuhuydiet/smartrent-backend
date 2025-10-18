@@ -374,4 +374,113 @@ public class AddressController {
                 .data(addresses)
                 .build();
     }
+//
+//    // External API integration endpoints
+//    @GetMapping("/external/provinces")
+//    @Operation(
+//        summary = "Get provinces from external API",
+//        description = "Fetches all provinces from tinhthanhpho.com API with caching",
+//        responses = {
+//            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+//                responseCode = "200",
+//                description = "Provinces retrieved from external API",
+//                content = @Content(
+//                    mediaType = "application/json",
+//                    array = @ArraySchema(schema = @Schema(implementation = ProvinceResponse.class))
+//                )
+//            )
+//        }
+//    )
+//    ApiResponse<List<ProvinceResponse>> getProvincesFromExternalApi() {
+//        List<ProvinceResponse> provinces = addressLocationService.getAllProvinces();
+//        return ApiResponse.<List<ProvinceResponse>>builder()
+//                .data(provinces)
+//                .build();
+//    }
+//
+//    @GetMapping("/external/provinces/{externalId}/districts")
+//    @Operation(
+//        summary = "Get districts from external API",
+//        description = "Fetches districts for a province from tinhthanhpho.com API",
+//        responses = {
+//            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+//                responseCode = "200",
+//                description = "Districts retrieved from external API",
+//                content = @Content(
+//                    mediaType = "application/json",
+//                    array = @ArraySchema(schema = @Schema(implementation = DistrictResponse.class))
+//                )
+//            )
+//        }
+//    )
+//    ApiResponse<List<DistrictResponse>> getDistrictsFromExternalApi(@PathVariable String externalId) {
+//        List<DistrictResponse> districts = addressLocationService.getDistrictsByProvinceExternalId(externalId);
+//        return ApiResponse.<List<DistrictResponse>>builder()
+//                .data(districts)
+//                .build();
+//    }
+//
+//    @GetMapping("/external/districts/{externalId}/wards")
+//    @Operation(
+//        summary = "Get wards from external API",
+//        description = "Fetches wards for a district from tinhthanhpho.com API",
+//        responses = {
+//            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+//                responseCode = "200",
+//                description = "Wards retrieved from external API",
+//                content = @Content(
+//                    mediaType = "application/json",
+//                    array = @ArraySchema(schema = @Schema(implementation = WardResponse.class))
+//                )
+//            )
+//        }
+//    )
+//    ApiResponse<List<WardResponse>> getWardsFromExternalApi(@PathVariable String externalId) {
+//        List<WardResponse> wards = addressLocationService.getWardsByDistrictExternalId(externalId);
+//        return ApiResponse.<List<WardResponse>>builder()
+//                .data(wards)
+//                .build();
+//    }
+//
+//    @PostMapping("/sync/provinces")
+//    @Operation(
+//        summary = "Sync provinces from external API (Admin only)",
+//        description = "Synchronizes province data from tinhthanhpho.com to local database",
+//        responses = {
+//            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+//                responseCode = "200",
+//                description = "Provinces synced successfully",
+//                content = @Content(
+//                    mediaType = "application/json",
+//                    schema = @Schema(implementation = ApiResponse.class)
+//                )
+//            )
+//        }
+//    )
+//    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+//    ApiResponse<String> syncProvinces() {
+//        int count = addressLocationService.syncProvincesFromExternalApi();
+//        return ApiResponse.<String>builder()
+//                .data("Synced " + count + " provinces from external API")
+//                .build();
+//    }
+//
+//    @PostMapping("/cache/clear")
+//    @Operation(
+//        summary = "Clear location caches (Admin only)",
+//        description = "Clears all location data from Redis cache",
+//        responses = {
+//            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+//                responseCode = "200",
+//                description = "Caches cleared successfully"
+//            )
+//        }
+//    )
+//    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+//    ApiResponse<String> clearLocationCaches() {
+//        addressLocationService.clearAllCaches();
+//        return ApiResponse.<String>builder()
+//                .data("All location caches cleared")
+//                .build();
+//    }
 }
