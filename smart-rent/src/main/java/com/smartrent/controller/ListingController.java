@@ -2,10 +2,14 @@ package com.smartrent.controller;
 
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.dto.response.QuotaStatusResponse;
+import com.smartrent.enums.BenefitType;
 import com.smartrent.service.listing.ListingService;
+import com.smartrent.service.quota.QuotaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -20,6 +24,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,6 +39,7 @@ import java.util.Set;
 public class ListingController {
 
     private final ListingService listingService;
+    private final QuotaService quotaService;
 
     @Operation(
         summary = "Create a new listing",
@@ -352,5 +358,214 @@ public class ListingController {
     public ApiResponse<Void> deleteListing(@PathVariable Long id) {
         listingService.deleteListing(id);
         return ApiResponse.<Void>builder().build();
+    }
+
+    /**
+     * Create VIP or Premium listing with quota check and payment flow
+     * POST /v1/listings/vip
+     */
+    @PostMapping("/vip")
+    @Operation(
+        summary = "Create VIP or Premium listing",
+        description = """
+            Creates a VIP or Premium listing with dual payment model:
+            1. If useMembershipQuota=true and user has quota: Creates listing immediately using quota
+            2. If useMembershipQuota=false or no quota: Returns VNPay payment URL
+
+            Premium listings automatically create a shadow NORMAL listing for double visibility.
+            """,
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = VipListingCreationRequest.class),
+                examples = {
+                    @ExampleObject(
+                        name = "VIP with Quota",
+                        value = """
+                            {
+                              "title": "Luxury Apartment in District 1",
+                              "description": "Beautiful 2BR apartment",
+                              "listingType": "RENT",
+                              "vipType": "VIP",
+                              "categoryId": 1,
+                              "productType": "APARTMENT",
+                              "price": 15000000,
+                              "priceUnit": "MONTH",
+                              "addressId": 123,
+                              "area": 80.5,
+                              "bedrooms": 2,
+                              "bathrooms": 2,
+                              "useMembershipQuota": true,
+                              "durationDays": 30
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Premium with Payment",
+                        value = """
+                            {
+                              "title": "Premium Villa in District 2",
+                              "description": "Stunning 4BR villa",
+                              "listingType": "RENT",
+                              "vipType": "PREMIUM",
+                              "categoryId": 1,
+                              "productType": "HOUSE",
+                              "price": 50000000,
+                              "priceUnit": "MONTH",
+                              "addressId": 456,
+                              "area": 250.0,
+                              "bedrooms": 4,
+                              "bathrooms": 3,
+                              "useMembershipQuota": false,
+                              "durationDays": 30,
+                              "paymentProvider": "VNPAY",
+                              "returnUrl": "http://localhost:3000/payment/result"
+                            }
+                            """
+                    )
+                }
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Listing created or payment URL returned",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = {
+                        @ExampleObject(
+                            name = "Listing Created (Quota)",
+                            value = """
+                                {
+                                  "data": {
+                                    "listingId": "550e8400-e29b-41d4-a716-446655440000",
+                                    "title": "Luxury Apartment in District 1",
+                                    "vipType": "VIP",
+                                    "postSource": "QUOTA",
+                                    "status": "ACTIVE"
+                                  }
+                                }
+                                """
+                        ),
+                        @ExampleObject(
+                            name = "Payment Required",
+                            value = """
+                                {
+                                  "data": {
+                                    "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_Amount=...",
+                                    "transactionId": "550e8400-e29b-41d4-a716-446655440000",
+                                    "orderInfo": "Premium Post - 30 days",
+                                    "amount": 1800000
+                                  }
+                                }
+                                """
+                        )
+                    }
+                )
+            )
+        }
+    )
+    public ApiResponse<Object> createVipListing(
+            @Parameter(description = "User ID from authentication header", required = true)
+            @RequestHeader("X-User-Id") String userId,
+            @Valid @RequestBody VipListingCreationRequest request) {
+
+        request.setUserId(userId);
+        Object response = listingService.createVipListing(request);
+        return ApiResponse.builder().data(response).build();
+    }
+
+    /**
+     * Check available posting quota for VIP and Premium listings
+     * GET /v1/listings/quota-check
+     */
+    @GetMapping("/quota-check")
+    @Operation(
+        summary = "Check posting quota",
+        description = "Check available VIP and Premium posting quota for current user. Returns all quotas if vipType not specified.",
+        parameters = {
+            @Parameter(
+                name = "vipType",
+                description = "Specific VIP type to check (VIP or PREMIUM). If not provided, returns all quotas.",
+                required = false
+            )
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Quota information retrieved",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = {
+                        @ExampleObject(
+                            name = "All Quotas",
+                            value = """
+                                {
+                                  "data": {
+                                    "vipPosts": {
+                                      "totalAvailable": 5,
+                                      "totalUsed": 2,
+                                      "totalGranted": 7
+                                    },
+                                    "premiumPosts": {
+                                      "totalAvailable": 2,
+                                      "totalUsed": 1,
+                                      "totalGranted": 3
+                                    },
+                                    "boosts": {
+                                      "totalAvailable": 10,
+                                      "totalUsed": 3,
+                                      "totalGranted": 13
+                                    }
+                                  }
+                                }
+                                """
+                        ),
+                        @ExampleObject(
+                            name = "Specific Quota",
+                            value = """
+                                {
+                                  "data": {
+                                    "totalAvailable": 5,
+                                    "totalUsed": 2,
+                                    "totalGranted": 7
+                                  }
+                                }
+                                """
+                        )
+                    }
+                )
+            )
+        }
+    )
+    public ApiResponse<Object> checkPostingQuota(
+            @Parameter(description = "User ID from authentication header", required = true)
+            @RequestHeader("X-User-Id") String userId,
+            @RequestParam(required = false) String vipType) {
+
+        if (vipType != null) {
+            BenefitType benefitType = switch (vipType.toUpperCase()) {
+                case "SILVER" -> BenefitType.POST_SILVER;
+                case "GOLD" -> BenefitType.POST_GOLD;
+                case "DIAMOND" -> BenefitType.POST_DIAMOND;
+                default -> BenefitType.POST_SILVER;
+            };
+            QuotaStatusResponse quota = quotaService.checkQuotaAvailability(userId, benefitType);
+            return ApiResponse.builder().data(quota).build();
+        }
+
+        // Return all VIP tier quotas
+        QuotaStatusResponse silverQuota = quotaService.checkQuotaAvailability(userId, BenefitType.POST_SILVER);
+        QuotaStatusResponse goldQuota = quotaService.checkQuotaAvailability(userId, BenefitType.POST_GOLD);
+        QuotaStatusResponse diamondQuota = quotaService.checkQuotaAvailability(userId, BenefitType.POST_DIAMOND);
+        QuotaStatusResponse boostQuota = quotaService.checkQuotaAvailability(userId, BenefitType.BOOST);
+
+        return ApiResponse.builder().data(java.util.Map.of(
+                "silverPosts", silverQuota,
+                "goldPosts", goldQuota,
+                "diamondPosts", diamondQuota,
+                "boosts", boostQuota
+        )).build();
     }
 }

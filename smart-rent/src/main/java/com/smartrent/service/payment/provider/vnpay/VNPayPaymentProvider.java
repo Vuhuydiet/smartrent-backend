@@ -8,7 +8,7 @@ import com.smartrent.infra.connector.VNPayConnector;
 import com.smartrent.infra.connector.model.VNPayQueryRequest;
 import com.smartrent.infra.connector.model.VNPayQueryResponse;
 import com.smartrent.infra.repository.PaymentRepository;
-import com.smartrent.infra.repository.entity.Payment;
+import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.service.payment.provider.AbstractPaymentProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -45,11 +45,11 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
 
         try {
             // Create payment record
-            Payment payment = createPaymentRecord(request, httpRequest);
+            Transaction transaction = createPaymentRecord(request, httpRequest);
             String ipAddress = getClientIpAddress(httpRequest);
 
             // Build VNPay parameters
-            Map<String, String> vnpParams = buildVNPayParams(payment, request, ipAddress);
+            Map<String, String> vnpParams = buildVNPayParams(transaction, request, ipAddress);
 
             // Generate secure hash
             String secureHash = VNPayUtil.generateSecureHash(vnpParams, vnPayProperties.getHashSecret());
@@ -58,18 +58,17 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             // Build payment URL
             String paymentUrl = vnPayProperties.getPaymentUrl() + "?" + VNPayUtil.buildQueryString(vnpParams);
 
-            log.info("VNPay payment created successfully. Transaction ref: {}", payment.getTransactionRef());
+            log.info("VNPay payment created successfully. Transaction ref: {}", transaction.getTransactionId());
 
             return PaymentResponse.builder()
-                    .paymentId(payment.getId())
                     .provider(getProviderType())
-                    .transactionRef(payment.getTransactionRef())
+                    .transactionRef(transaction.getTransactionId())
                     .paymentUrl(paymentUrl)
-                    .amount(payment.getAmount())
-                    .currency(payment.getCurrency())
-                    .orderInfo(payment.getOrderInfo())
-                    .createdAt(payment.getCreatedAt())
-                    .expiresAt(payment.getCreatedAt().plusMinutes(15)) // VNPay default expiry
+                    .amount(transaction.getAmount())
+                    .currency("VND") // Default currency
+                    .orderInfo(request.getOrderInfo())
+                    .createdAt(transaction.getCreatedAt())
+                    .expiresAt(transaction.getCreatedAt().plusMinutes(15)) // VNPay default expiry
                     .build();
 
         } catch (Exception e) {
@@ -92,18 +91,18 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                 return buildCallbackResponse(null, false, "Invalid signature");
             }
 
-            // Find payment
-            Optional<Payment> paymentOpt = findPaymentByTransactionRef(txnRef);
-            if (paymentOpt.isEmpty()) {
-                log.warn("Payment not found for transaction: {}", txnRef);
-                return buildCallbackResponse(null, false, "Payment not found");
+            // Find transaction
+            Optional<Transaction> transactionOpt = findPaymentByTransactionRef(txnRef);
+            if (transactionOpt.isEmpty()) {
+                log.warn("Transaction not found for transaction ref: {}", txnRef);
+                return buildCallbackResponse(null, false, "Transaction not found");
             }
 
-            Payment payment = paymentOpt.get();
+            Transaction transaction = transactionOpt.get();
 
-            // Update payment with VNPay response
+            // Update transaction with VNPay response
             VNPayTransactionStatus status = VNPayTransactionStatus.fromCode(params.get("vnp_ResponseCode"));
-            payment = updatePaymentWithProviderData(
+            transaction = updatePaymentWithProviderData(
                     txnRef,
                     params.get("vnp_TransactionNo"),
                     params.get("vnp_CardType"),
@@ -117,9 +116,9 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             boolean success = VNPayUtil.isSuccessResponseCode(params.get("vnp_ResponseCode"));
             String message = success ? "Payment processed successfully" : "Payment failed";
 
-            log.info("VNPay callback processed. Transaction: {}, Status: {}", txnRef, payment.getStatus());
+            log.info("VNPay callback processed. Transaction: {}, Status: {}", txnRef, transaction.getStatus());
 
-            return buildCallbackResponse(payment, signatureValid, message);
+            return buildCallbackResponse(transaction, signatureValid, message);
 
         } catch (Exception e) {
             log.error("Error processing VNPay callback", e);
@@ -146,21 +145,21 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                     .build();
         }
 
-        // Find and update payment
-        Optional<Payment> paymentOpt = findPaymentByTransactionRef(txnRef);
-        if (paymentOpt.isEmpty()) {
-            log.warn("Payment not found for IPN transaction: {}", txnRef);
+        // Find and update transaction
+        Optional<Transaction> transactionOpt = findPaymentByTransactionRef(txnRef);
+        if (transactionOpt.isEmpty()) {
+            log.warn("Transaction not found for IPN transaction: {}", txnRef);
             return PaymentCallbackResponse.builder()
                     .provider(getProviderType())
                     .success(false)
                     .signatureValid(true)
-                    .message("Payment not found")
+                    .message("Transaction not found")
                     .build();
         }
 
-        Payment payment = paymentOpt.get();
+        Transaction transaction = transactionOpt.get();
         VNPayTransactionStatus status = VNPayTransactionStatus.fromCode(params.get("vnp_ResponseCode"));
-        payment = updatePaymentWithProviderData(
+        transaction = updatePaymentWithProviderData(
                 txnRef,
                 params.get("vnp_TransactionNo"),
                 params.get("vnp_CardType"),
@@ -173,7 +172,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
 
         boolean success = VNPayUtil.isSuccessResponseCode(params.get("vnp_ResponseCode"));
 
-        return buildCallbackResponse(payment, true, success ? "IPN processed successfully" : "Payment failed");
+        return buildCallbackResponse(transaction, true, success ? "IPN processed successfully" : "Payment failed");
     }
 
     @Override
@@ -181,16 +180,16 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         log.info("Querying VNPay transaction: {}", transactionRef);
 
         try {
-            Optional<Payment> paymentOpt = findPaymentByTransactionRef(transactionRef);
-            if (paymentOpt.isEmpty()) {
+            Optional<Transaction> transactionOpt = findPaymentByTransactionRef(transactionRef);
+            if (transactionOpt.isEmpty()) {
                 return PaymentCallbackResponse.builder()
                         .provider(getProviderType())
                         .success(false)
-                        .message("Payment not found")
+                        .message("Transaction not found")
                         .build();
             }
 
-            Payment payment = paymentOpt.get();
+            Transaction transaction = transactionOpt.get();
 
             // Build query request
             VNPayQueryRequest queryRequest = VNPayQueryRequest.builder()
@@ -199,10 +198,10 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                     .vnp_Command("querydr")
                     .vnp_TmnCode(vnPayProperties.getTmnCode())
                     .vnp_TxnRef(transactionRef)
-                    .vnp_OrderInfo(payment.getOrderInfo())
-                    .vnp_TransactionDate(VNPayUtil.formatDateTime(payment.getCreatedAt()))
+                    .vnp_OrderInfo(transaction.getOrderInfo())
+                    .vnp_TransactionDate(VNPayUtil.formatDateTime(transaction.getCreatedAt()))
                     .vnp_CreateDate(VNPayUtil.formatCurrentDateTime())
-                    .vnp_IpAddr(payment.getIpAddress())
+                    .vnp_IpAddr(transaction.getIpAddress())
                     .build();
 
             // Generate secure hash for query
@@ -213,16 +212,16 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             // Query VNPay
             VNPayQueryResponse response = vnPayConnector.queryTransaction(queryRequest);
 
-            // Update payment if status changed
+            // Update transaction if status changed
             if (response.getVnp_ResponseCode().equals("00")) {
                 VNPayTransactionStatus newStatus = VNPayTransactionStatus.fromCode(response.getVnp_TransactionStatus());
-                if (!payment.getStatus().equals(VNPayStatusConverter.toGenericStatus(newStatus))) {
-                    payment = updatePaymentStatus(transactionRef, VNPayStatusConverter.toGenericStatus(newStatus),
+                if (!transaction.getStatus().equals(VNPayStatusConverter.toGenericStatus(newStatus))) {
+                    transaction = updatePaymentStatus(transactionRef, VNPayStatusConverter.toGenericStatus(newStatus),
                             response.getVnp_ResponseCode(), response.getVnp_Message());
                 }
             }
 
-            return buildCallbackResponse(payment, true, "Query completed");
+            return buildCallbackResponse(transaction, true, "Query completed");
 
         } catch (Exception e) {
             log.error("Error querying VNPay transaction: {}", transactionRef, e);
@@ -240,13 +239,13 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         log.info("Cancelling VNPay payment: {}", transactionRef);
 
         try {
-            Optional<Payment> paymentOpt = findPaymentByTransactionRef(transactionRef);
-            if (paymentOpt.isEmpty()) {
+            Optional<Transaction> transactionOpt = findPaymentByTransactionRef(transactionRef);
+            if (transactionOpt.isEmpty()) {
                 return false;
             }
 
-            Payment payment = paymentOpt.get();
-            if (!payment.isPending()) {
+            Transaction transaction = transactionOpt.get();
+            if (!transaction.isPending()) {
                 log.warn("Cannot cancel non-pending VNPay payment: {}", transactionRef);
                 return false;
             }
@@ -295,18 +294,18 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
 
     // Private helper methods
 
-    private Map<String, String> buildVNPayParams(Payment payment, PaymentRequest request, String ipAddress) {
+    private Map<String, String> buildVNPayParams(Transaction transaction, PaymentRequest request, String ipAddress) {
         Map<String, String> params = new HashMap<>();
         params.put("vnp_Version", vnPayProperties.getVersion());
         params.put("vnp_Command", vnPayProperties.getCommand());
         params.put("vnp_TmnCode", vnPayProperties.getTmnCode());
-        params.put("vnp_Amount", VNPayUtil.formatAmount(payment.getAmount().longValue()));
+        params.put("vnp_Amount", VNPayUtil.formatAmount(transaction.getAmount().longValue()));
         params.put("vnp_CurrCode", vnPayProperties.getCurrencyCode());
-        params.put("vnp_TxnRef", payment.getTransactionRef());
-        params.put("vnp_OrderInfo", payment.getOrderInfo());
+        params.put("vnp_TxnRef", transaction.getTransactionId());
+        params.put("vnp_OrderInfo", request.getOrderInfo());
         params.put("vnp_OrderType", vnPayProperties.getOrderType());
         params.put("vnp_Locale", getLanguageFromMetadata(request));
-        params.put("vnp_ReturnUrl", payment.getReturnUrl() != null ? payment.getReturnUrl() : vnPayProperties.getReturnUrl());
+        params.put("vnp_ReturnUrl", request.getReturnUrl() != null ? request.getReturnUrl() : vnPayProperties.getReturnUrl());
         params.put("vnp_IpAddr", ipAddress);
         params.put("vnp_CreateDate", VNPayUtil.formatCurrentDateTime());
 
@@ -332,8 +331,8 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         return params;
     }
 
-    private PaymentCallbackResponse buildCallbackResponse(Payment payment, boolean signatureValid, String message) {
-        if (payment == null) {
+    private PaymentCallbackResponse buildCallbackResponse(Transaction transaction, boolean signatureValid, String message) {
+        if (transaction == null) {
             return PaymentCallbackResponse.builder()
                     .provider(getProviderType())
                     .success(false)
@@ -343,17 +342,13 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         }
 
         return PaymentCallbackResponse.builder()
-                .paymentId(payment.getId())
                 .provider(getProviderType())
-                .transactionRef(payment.getTransactionRef())
-                .providerTransactionId(payment.getProviderTransactionId())
-                .status(payment.getStatus())
-                .amount(payment.getAmount())
-                .currency(payment.getCurrency())
-                .orderInfo(payment.getOrderInfo())
-                .paymentMethod(payment.getPaymentMethod())
-                .paymentDate(payment.getPaymentDate())
-                .success(payment.isSuccessful())
+                .transactionRef(transaction.getTransactionId())
+                .providerTransactionId(transaction.getProviderTransactionId())
+                .status(transaction.getStatus())
+                .amount(transaction.getAmount())
+                .currency("VND") // Default currency for VNPay
+                .success(transaction.isCompleted())
                 .signatureValid(signatureValid)
                 .message(message)
                 .build();

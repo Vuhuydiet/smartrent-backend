@@ -1,30 +1,33 @@
 package com.smartrent.infra.exception;
 
-import com.smartrent.infra.exception.model.DomainCode;
-
-public class PaymentValidationException extends DomainException {
+public class PaymentValidationException extends RuntimeException {
 
     public PaymentValidationException(String message) {
-        super(DomainCode.PAYMENT_VALIDATION_ERROR, message);
+        super(message);
     }
 
-    public PaymentValidationException(DomainCode domainCode, Object... args) {
-        super(domainCode, args);
+    public PaymentValidationException(String message, Throwable cause) {
+        super(message, cause);
     }
 
-    public static PaymentValidationException invalidAmount(String amount) {
-        return new PaymentValidationException(DomainCode.INVALID_PAYMENT_AMOUNT, amount);
+    public static PaymentValidationException invalidAmount() {
+        return new PaymentValidationException("Payment amount must be greater than zero");
     }
 
     public static PaymentValidationException invalidCurrency(String currency) {
-        return new PaymentValidationException(DomainCode.INVALID_CURRENCY, currency);
+        return new PaymentValidationException("Invalid currency: " + currency);
     }
 
-    public static PaymentValidationException invalidTransactionRef(String transactionRef) {
-        return new PaymentValidationException(DomainCode.INVALID_TRANSACTION_REF, transactionRef);
+    public static PaymentValidationException missingRequiredField(String fieldName) {
+        return new PaymentValidationException("Missing required field: " + fieldName);
+    }
+
+    public static PaymentValidationException invalidProvider(String provider) {
+        return new PaymentValidationException("Invalid payment provider: " + provider);
     }
 
     public static PaymentValidationException userNotAuthenticated() {
-        return new PaymentValidationException(DomainCode.USER_NOT_AUTHENTICATED);
+        return new PaymentValidationException("User is not authenticated");
     }
 }
+

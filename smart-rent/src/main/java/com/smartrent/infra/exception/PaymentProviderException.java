@@ -1,26 +1,37 @@
 package com.smartrent.infra.exception;
 
-import com.smartrent.infra.exception.model.DomainCode;
-
-public class PaymentProviderException extends DomainException {
+public class PaymentProviderException extends RuntimeException {
 
     public PaymentProviderException(String message) {
-        super(DomainCode.PAYMENT_PROVIDER_ERROR, message);
+        super(message);
     }
 
-    public PaymentProviderException(DomainCode domainCode, Object... args) {
-        super(domainCode, args);
+    public PaymentProviderException(String message, Throwable cause) {
+        super(message, cause);
     }
 
-    public static PaymentProviderException providerNotFound(String providerType) {
-        return new PaymentProviderException(DomainCode.PAYMENT_PROVIDER_NOT_FOUND, providerType);
+    public static PaymentProviderException providerNotFound(String providerName) {
+        return new PaymentProviderException("Payment provider not found: " + providerName);
     }
 
-    public static PaymentProviderException invalidConfiguration(String providerType) {
-        return new PaymentProviderException(DomainCode.PAYMENT_PROVIDER_INVALID_CONFIG, providerType);
+    public static PaymentProviderException invalidConfiguration(String providerName) {
+        return new PaymentProviderException("Invalid configuration for payment provider: " + providerName);
     }
 
-    public static PaymentProviderException operationNotSupported(String operation, String providerType) {
-        return new PaymentProviderException(DomainCode.PAYMENT_OPERATION_NOT_SUPPORTED, operation, providerType);
+    public static PaymentProviderException providerUnavailable(String providerName) {
+        return new PaymentProviderException("Payment provider is unavailable: " + providerName);
+    }
+
+    public static PaymentProviderException invalidSignature() {
+        return new PaymentProviderException("Invalid payment signature");
+    }
+
+    public static PaymentProviderException paymentFailed(String reason) {
+        return new PaymentProviderException("Payment failed: " + reason);
+    }
+
+    public static PaymentProviderException operationNotSupported(String operation, String providerName) {
+        return new PaymentProviderException("Operation '" + operation + "' is not supported by provider: " + providerName);
     }
 }
+

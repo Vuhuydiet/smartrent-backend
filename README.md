@@ -271,33 +271,6 @@ application:
 
 Access comprehensive API documentation at: http://localhost:8080/swagger-ui.html
 
-### API Groups
-
-- **Authentication & Verification** - Login, logout, token management
-- **User Management** - User CRUD operations
-- **Admin Management & Roles** - Admin operations and role management
-- **Health & Monitoring** - System health and metrics
-
-### Key Endpoints
-
-#### Authentication
-- `POST /v1/auth` - User authentication
-- `POST /v1/auth/admin` - Admin authentication
-- `POST /v1/auth/refresh` - Token refresh
-- `POST /v1/auth/logout` - User logout
-- `PATCH /v1/auth/change-password` - Password change
-
-#### User Management
-- `POST /v1/users` - Create user account
-- `GET /v1/users` - Get user profile
-- `POST /v1/verification` - Verify email
-- `POST /v1/verification/code` - Send verification code
-
-#### Admin Management
-- `POST /v1/admins` - Create admin account
-- `GET /v1/admins` - Get admin profile
-- `GET /v1/roles` - List available roles
-
 ### Response Format
 
 All API responses follow a consistent format:
