@@ -86,6 +86,9 @@ public class ListingResponse {
     @Schema(description = "List of amenities associated with this listing")
     List<AmenityResponse> amenities;
 
+    @Schema(description = "Location-based pricing information for this listing and similar listings in the same area")
+    LocationPricingResponse locationPricing;
+
     LocalDateTime createdAt;
 
     LocalDateTime updatedAt;

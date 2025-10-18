@@ -22,10 +22,15 @@ public interface ProvinceRepository extends JpaRepository<Province, Long> {
     // Find by code
     Optional<Province> findByCodeAndIsActiveTrue(String code);
 
+    Optional<Province> findByCode(String code);
+
     // Get merged provinces for a parent
     List<Province> findByParentProvinceProvinceIdAndIsActiveTrueOrderByName(Long parentId);
 
     // Search provinces by name (for autocomplete)
     List<Province> findByNameContainingIgnoreCaseOrOriginalNameContainingIgnoreCaseAndIsActiveTrueOrderByName(
             String nameSearchTerm, String originalNameSearchTerm);
+
+    // Get all active provinces (simplified)
+    List<Province> findByIsActiveTrue();
 }

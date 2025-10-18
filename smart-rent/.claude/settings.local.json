@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://tinhthanhpho.com/api-docs\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

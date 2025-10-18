@@ -29,7 +29,11 @@ public enum DomainCode {
   USER_NOT_FOUND("4001", HttpStatus.NOT_FOUND, "User not found"),
   VERIFY_CODE_NOT_FOUND("4002", HttpStatus.NOT_FOUND, "Verify code not found"),
   PAYMENT_NOT_FOUND("4003", HttpStatus.NOT_FOUND, "Payment not found: %s"),
-  LISTING_NOT_FOUND("4003", HttpStatus.NOT_FOUND, "Listing not found"),
+  LISTING_NOT_FOUND("4004", HttpStatus.NOT_FOUND, "Listing not found"),
+  ADDRESS_NOT_FOUND("4005", HttpStatus.NOT_FOUND, "Address not found"),
+  PROVINCE_NOT_FOUND("4006", HttpStatus.NOT_FOUND, "Province not found"),
+  DISTRICT_NOT_FOUND("4007", HttpStatus.NOT_FOUND, "District not found"),
+  WARD_NOT_FOUND("4008", HttpStatus.NOT_FOUND, "Ward not found"),
   //    Unauthorized	Client	5xxx (Unauthenticated error)
   UNAUTHENTICATED("5001", HttpStatus.UNAUTHORIZED, "Unauthenticated"),
   INVALID_EMAIL_PASSWORD("5002", HttpStatus.UNAUTHORIZED, "Invalid email or password"),
@@ -47,7 +51,12 @@ public enum DomainCode {
   PAYMENT_OPERATION_NOT_SUPPORTED("7007", HttpStatus.SERVICE_UNAVAILABLE, "%s not supported by %s"),
   PAYMENT_PROVIDER_ERROR("7008", HttpStatus.SERVICE_UNAVAILABLE, "Payment provider error: %s"),
   USER_NOT_AUTHENTICATED("7009", HttpStatus.UNAUTHORIZED, "User not authenticated for payment"),
-    INVALID_FILE_TYPE("8001", HttpStatus.BAD_REQUEST, "Invalid file type: %s")
+  //    File Storage Error 8xxx
+  INVALID_FILE_TYPE("8001", HttpStatus.BAD_REQUEST, "Invalid file type: %s"),
+  //    External Service Error 9xxx
+  EXTERNAL_SERVICE_ERROR("9001", HttpStatus.SERVICE_UNAVAILABLE, "External service error"),
+  TOO_MANY_REQUESTS("9002", HttpStatus.TOO_MANY_REQUESTS, "Too many requests to external service"),
+  BAD_REQUEST_ERROR("9003", HttpStatus.BAD_REQUEST, "Bad request to external service")
   ;
 
   private final String value;

@@ -11,14 +11,17 @@ import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.PostSource;
+import com.smartrent.infra.repository.AddressRepository;
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.TransactionRepository;
+import com.smartrent.infra.repository.entity.Address;
 import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
+import com.smartrent.service.pricing.LocationPricingService;
 import com.smartrent.service.quota.QuotaService;
 import com.smartrent.service.payment.PaymentService;
 import com.smartrent.service.transaction.TransactionService;
@@ -43,8 +46,10 @@ import java.util.stream.Collectors;
 public class ListingServiceImpl implements ListingService {
 
     ListingRepository listingRepository;
+    AddressRepository addressRepository;
     AdminRepository adminRepository;
     ListingMapper listingMapper;
+    LocationPricingService locationPricingService;
     QuotaService quotaService;
     TransactionService transactionService;
     TransactionRepository transactionRepository;
@@ -235,7 +240,25 @@ public class ListingServiceImpl implements ListingService {
     public ListingResponse getListingById(Long id) {
         Listing listing = listingRepository.findByIdWithAmenities(id)
                 .orElseThrow(() -> new RuntimeException("Listing not found"));
-        return listingMapper.toResponse(listing);
+
+        // Get address to determine location IDs
+        Address address = addressRepository.findById(listing.getAddressId()).orElse(null);
+
+        // Build basic response
+        ListingResponse response = listingMapper.toResponse(listing);
+
+        // Add location pricing if address is available
+        if (address != null) {
+            Long wardId = address.getWard() != null ? address.getWard().getWardId() : null;
+            Long districtId = address.getDistrict() != null ? address.getDistrict().getDistrictId() : null;
+            Long provinceId = address.getProvince() != null ? address.getProvince().getProvinceId() : null;
+
+            response.setLocationPricing(
+                    locationPricingService.getLocationPricing(listing, wardId, districtId, provinceId)
+            );
+        }
+
+        return response;
     }
 
     @Override

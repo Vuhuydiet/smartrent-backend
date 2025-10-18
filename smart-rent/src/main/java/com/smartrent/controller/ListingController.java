@@ -178,6 +178,53 @@ public class ListingController {
                                     "isActive": true
                                   }
                                 ],
+                                "locationPricing": {
+                                  "wardPricing": {
+                                    "locationType": "WARD",
+                                    "locationId": 1001,
+                                    "locationName": "Phường Bến Nghé",
+                                    "totalListings": 45,
+                                    "averagePrice": 1500000,
+                                    "minPrice": 800000,
+                                    "maxPrice": 3500000,
+                                    "medianPrice": 1400000,
+                                    "priceUnit": "MONTH",
+                                    "productType": "APARTMENT",
+                                    "averageArea": 65.5,
+                                    "averagePricePerSqm": 22900
+                                  },
+                                  "districtPricing": {
+                                    "locationType": "DISTRICT",
+                                    "locationId": 100,
+                                    "totalListings": 320,
+                                    "averagePrice": 1600000,
+                                    "priceUnit": "MONTH"
+                                  },
+                                  "provincePricing": {
+                                    "locationType": "PROVINCE",
+                                    "locationId": 10,
+                                    "totalListings": 5420,
+                                    "averagePrice": 1750000,
+                                    "priceUnit": "MONTH"
+                                  },
+                                  "similarListingsInWard": [
+                                    {
+                                      "listingId": 124,
+                                      "title": "Căn hộ 2PN tương tự",
+                                      "price": 1100000,
+                                      "priceUnit": "MONTH",
+                                      "area": 70.0,
+                                      "pricePerSqm": 15714,
+                                      "bedrooms": 2,
+                                      "bathrooms": 1,
+                                      "productType": "APARTMENT",
+                                      "vipType": "NORMAL",
+                                      "verified": true
+                                    }
+                                  ],
+                                  "priceComparison": "BELOW_AVERAGE",
+                                  "percentageDifferenceFromAverage": -20.0
+                                },
                                 "createdAt": "2025-09-01T10:00:00",
                                 "updatedAt": "2025-09-01T10:00:00"
                               }
