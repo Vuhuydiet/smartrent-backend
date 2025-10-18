@@ -1,42 +1,25 @@
 package com.smartrent.infra.repository.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.smartrent.enums.ScheduleSource;
+import com.smartrent.enums.ScheduleStatus;
+import jakarta.persistence.*;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
-/**
- * Entity representing a push schedule for listings.
- * Each listing can have at most one ACTIVE schedule at a time.
- * The scheduled_time field stores the hour of the day when the listing should be pushed.
- */
-@Entity(name = "push_schedules")
-@Table(name = "push_schedules",
+@Entity(name = "push_schedule")
+@Table(name = "push_schedule",
         indexes = {
+                @Index(name = "idx_user_id", columnList = "user_id"),
                 @Index(name = "idx_listing_id", columnList = "listing_id"),
-                @Index(name = "idx_scheduled_time", columnList = "scheduled_time"),
                 @Index(name = "idx_status", columnList = "status"),
-                @Index(name = "idx_listing_status", columnList = "listing_id, status"),
-                @Index(name = "idx_end_time", columnList = "end_time")
+                @Index(name = "idx_scheduled_time", columnList = "scheduled_time"),
+                @Index(name = "idx_user_listing_status", columnList = "user_id, listing_id, status")
         })
 @Getter
 @Setter
@@ -47,61 +30,88 @@ import java.time.LocalTime;
 public class PushSchedule {
 
     @Id
-    @Column(name = "schedule_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "schedule_id")
     Long scheduleId;
+
+    @Column(name = "user_id", nullable = false)
+    String userId;
 
     @Column(name = "listing_id", nullable = false)
     Long listingId;
 
-    /**
-     * Hour of the day to push (e.g., 09:00:00, 15:00:00)
-     * The push will occur at the start of this hour
-     */
     @Column(name = "scheduled_time", nullable = false)
     LocalTime scheduledTime;
 
-    /**
-     * After this time, the schedule will no longer be processed
-     */
-    @Column(name = "end_time", nullable = false)
-    LocalDateTime endTime;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source", nullable = false)
+    ScheduleSource source;
+
+    @Column(name = "source_id")
+    Long sourceId;
+
+    @Builder.Default
+    @Column(name = "total_pushes", nullable = false)
+    Integer totalPushes = 1;
+
+    @Builder.Default
+    @Column(name = "used_pushes", nullable = false)
+    Integer usedPushes = 0;
 
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     ScheduleStatus status = ScheduleStatus.ACTIVE;
 
-    @Column(name = "created_at", updatable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "transaction_id")
+    Transaction transaction;
+
+    @OneToMany(mappedBy = "schedule", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<PushHistory> pushHistories;
+
     @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
     @UpdateTimestamp
+    @Column(name = "updated_at")
     LocalDateTime updatedAt;
 
-    // Relationship to Listing
-    @ManyToOne
-    @JoinColumn(name = "listing_id", insertable = false, updatable = false)
-    Listing listing;
+    // Helper methods
+    public Integer getPushesRemaining() {
+        return totalPushes - usedPushes;
+    }
 
-    /**
-     * Enum for schedule status
-     */
-    public enum ScheduleStatus {
-        /**
-         * Schedule is active and will be processed
-         */
-        ACTIVE,
+    public boolean hasRemainingPushes() {
+        return status == ScheduleStatus.ACTIVE && usedPushes < totalPushes;
+    }
 
-        /**
-         * Schedule is temporarily inactive
-         */
-        INACTIVE,
+    public boolean isCompleted() {
+        return status == ScheduleStatus.COMPLETED || usedPushes >= totalPushes;
+    }
 
-        /**
-         * Schedule has expired (end_time has passed)
-         */
-        EXPIRED
+    public boolean isCancelled() {
+        return status == ScheduleStatus.CANCELLED;
+    }
+
+    public void incrementUsedPushes() {
+        this.usedPushes++;
+        if (usedPushes >= totalPushes) {
+            this.status = ScheduleStatus.COMPLETED;
+        }
+    }
+
+    public void cancel() {
+        this.status = ScheduleStatus.CANCELLED;
+    }
+
+    public boolean isFromMembership() {
+        return source == ScheduleSource.MEMBERSHIP;
+    }
+
+    public boolean isFromDirectPurchase() {
+        return source == ScheduleSource.DIRECT_PURCHASE;
     }
 }
+

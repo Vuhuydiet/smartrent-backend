@@ -185,9 +185,6 @@ public class Listing {
     @CreationTimestamp
     LocalDateTime createdAt;
 
-    @Column(name = "pushed_at")
-    LocalDateTime pushedAt;
-
     @Column(name = "updated_at")
     @UpdateTimestamp
     LocalDateTime updatedAt;
