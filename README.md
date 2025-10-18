@@ -23,16 +23,16 @@ SmartRent Backend follows a layered architecture pattern with clear separation o
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Presentation Layer                       │
-│  Controllers (REST APIs) + Swagger Documentation            │
+│  Controllers (REST APIs) + Swagger Documentation           │
 ├─────────────────────────────────────────────────────────────┤
-│                     Service Layer                           │
-│  Business Logic + Authentication + Email Services           │
+│                     Service Layer                          │
+│  Business Logic + Authentication + Email Services          │
 ├─────────────────────────────────────────────────────────────┤
-│                  Infrastructure Layer                       │
-│  Repositories + External Connectors + Configuration         │
+│                  Infrastructure Layer                      │
+│  Repositories + External Connectors + Configuration        │
 ├─────────────────────────────────────────────────────────────┤
-│                     Data Layer                              │
-│  MySQL Database + Redis Cache + Flyway Migrations           │
+│                     Data Layer                             │
+│  MySQL Database + Redis Cache + Flyway Migrations         │
 └─────────────────────────────────────────────────────────────┘
 ```
 

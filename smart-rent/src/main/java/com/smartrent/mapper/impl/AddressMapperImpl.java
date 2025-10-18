@@ -96,7 +96,7 @@ public class AddressMapperImpl implements AddressMapper {
                 .type(district.getType() != null ? district.getType().name() : null)
                 .provinceId(district.getProvince() != null ? district.getProvince().getProvinceId() : null)
                 .provinceName(district.getProvince() != null ? district.getProvince().getDisplayName() : null)
-                .isActive(district.getIsActive() != null ? district.getIsActive() : false)
+                .isActive(district.getIsActive())
                 .build();
     }
 
@@ -112,8 +112,8 @@ public class AddressMapperImpl implements AddressMapper {
                 .code(province.getCode())
                 .type(province.getType() != null ? province.getType().name() : null)
                 .displayName(province.getDisplayName())
-                .isActive(province.getIsActive() != null ? province.getIsActive() : false)
-                .isMerged(province.getIsMerged() != null ? province.getIsMerged() : false)
+                .isActive(province.getIsActive())
+                .isMerged(province.getIsMerged())
                 .isParentProvince(province.isParentProvince())
                 .parentProvinceId(province.getParentProvince() != null ?
                                  province.getParentProvince().getProvinceId() : null)

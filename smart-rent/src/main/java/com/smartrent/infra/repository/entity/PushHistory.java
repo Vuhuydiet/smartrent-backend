@@ -1,35 +1,18 @@
 package com.smartrent.infra.repository.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.smartrent.enums.PushSource;
+import jakarta.persistence.*;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
-/**
- * Entity representing the history of listing push operations.
- * Records each push attempt with its status and any relevant messages.
- */
 @Entity(name = "push_history")
 @Table(name = "push_history",
         indexes = {
                 @Index(name = "idx_listing_id", columnList = "listing_id"),
+                @Index(name = "idx_user_id", columnList = "user_id"),
                 @Index(name = "idx_pushed_at", columnList = "pushed_at"),
                 @Index(name = "idx_listing_pushed", columnList = "listing_id, pushed_at")
         })
@@ -42,96 +25,54 @@ import java.time.LocalDateTime;
 public class PushHistory {
 
     @Id
-    @Column(name = "push_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "push_id")
     Long pushId;
 
     @Column(name = "listing_id", nullable = false)
     Long listingId;
 
+    @Column(name = "user_id", nullable = false)
+    String userId;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "push_source", nullable = false)
     PushSource pushSource;
 
-    @Column(name = "user_benefit_id")
-    Long userBenefitId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_benefit_id")
+    UserMembershipBenefit userBenefit;
 
-    @Column(name = "schedule_id")
-    Long scheduleId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "schedule_id")
+    PushSchedule schedule;
 
     @Column(name = "transaction_id", length = 36)
     String transactionId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20)
-    PushStatus status;
-
-    @Column(name = "message", length = 500)
-    String message;
-
-    @Column(name = "pushed_at")
     @CreationTimestamp
+    @Column(name = "pushed_at")
     LocalDateTime pushedAt;
 
-    // Relationships
-    @ManyToOne
-    @JoinColumn(name = "listing_id", insertable = false, updatable = false)
-    Listing listing;
-
-    @ManyToOne
-    @JoinColumn(name = "user_benefit_id", insertable = false, updatable = false)
-    UserMembershipBenefit userMembershipBenefit;
-
-    @ManyToOne
-    @JoinColumn(name = "schedule_id", insertable = false, updatable = false)
-    PushSchedule schedule;
-
-    @ManyToOne
-    @JoinColumn(name = "transaction_id", insertable = false, updatable = false)
-    Transaction transaction;
-
-    /**
-     * Enum for push source
-     */
-    public enum PushSource {
-        /**
-         * Push from membership quota
-         */
-        MEMBERSHIP_QUOTA,
-
-        /**
-         * Direct purchase/payment
-         */
-        DIRECT_PURCHASE,
-
-        /**
-         * Direct payment (after completing payment)
-         */
-        DIRECT_PAYMENT,
-
-        /**
-         * Scheduled push
-         */
-        SCHEDULED,
-
-        /**
-         * Admin push
-         */
-        ADMIN
+    // Helper methods
+    public boolean isFromMembershipQuota() {
+        return pushSource == PushSource.MEMBERSHIP_QUOTA;
     }
 
-    /**
-     * Enum for push status
-     */
-    public enum PushStatus {
-        /**
-         * Push was successful
-         */
-        SUCCESS,
+    public boolean isFromDirectPayment() {
+        return pushSource == PushSource.DIRECT_PAYMENT;
+    }
 
-        /**
-         * Push failed
-         */
-        FAIL
+    public boolean isScheduled() {
+        return pushSource == PushSource.SCHEDULED;
+    }
+
+    public boolean isAdminPush() {
+        return pushSource == PushSource.ADMIN;
+    }
+
+    public boolean hasLinkedTransaction() {
+        return transactionId != null && !transactionId.isEmpty();
     }
 }
+
