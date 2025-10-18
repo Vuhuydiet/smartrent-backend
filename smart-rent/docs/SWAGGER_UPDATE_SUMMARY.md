@@ -20,9 +20,9 @@ Added **6 new API groups** to organize the new endpoints:
    - Display Name: "Membership Management"
    - Covers all membership package and subscription endpoints
 
-2. **Boost & Promotion** (`/v1/boosts/**`)
-   - Group: `boost`
-   - Display Name: "Boost & Promotion"
+2. **Push & Promotion** (`/v1/pushes/**`)
+   - Group: `push`
+   - Display Name: "Push & Promotion"
    - Covers listing boost and promotion features
 
 3. **Saved Listings** (`/v1/saved-listings/**`)
@@ -156,8 +156,8 @@ All existing controllers already have proper Swagger documentation:
 - Quota checking documented
 - Purchase flow documented
 
-✅ **BoostController.java**
-- Boost endpoints documented
+✅ **PushController.java**
+- Push endpoints documented
 - Scheduling documented
 - History tracking documented
 
@@ -175,7 +175,7 @@ All existing controllers already have proper Swagger documentation:
 7. File Upload
 8. Pricing & Price History
 9. Membership Management (NEW)
-10. Boost & Promotion (NEW)
+10. Push & Promotion (NEW)
 11. Saved Listings (NEW)
 12. VNPay Payments & Transactions (NEW)
 13. Quota Management (NEW)
@@ -192,7 +192,7 @@ All existing controllers already have proper Swagger documentation:
 - PricingHistoryController
 - VerificationController
 - MembershipController
-- BoostController
+- PushController
 - SavedListingController
 - PaymentController
 - QuotaController
@@ -228,16 +228,16 @@ All endpoints now have complete Swagger documentation including:
 
 ### Membership System
 - Multiple membership tiers (BASIC, STANDARD, PREMIUM, VIP)
-- Quota-based benefits (VIP Posts, Premium Posts, Boost Quota)
+- Quota-based benefits (VIP Posts, Premium Posts, Push Quota)
 - Automatic benefit allocation
 - Membership history tracking
 - Real-time quota checking
 
-### Boost System
-- Instant boost functionality
-- Scheduled automatic boosts
+### Push System
+- Instant push functionality
+- Scheduled automatic pushes
 - Payment options (membership quota or direct purchase)
-- Boost history tracking
+- Push history tracking
 - Source tracking (membership vs. direct)
 
 ### Pricing System
@@ -355,7 +355,7 @@ Use the dropdown menu to select from 13 organized API groups
 ## Related Documentation
 
 - **API Overview**: `smart-rent/docs/SWAGGER_API_OVERVIEW.md`
-- **Membership & Boost Details**: `smart-rent/docs/API_DOCUMENTATION.md`
+- **Membership & Push Details**: `smart-rent/docs/API_DOCUMENTATION.md`
 - **Implementation Summary**: `smart-rent/IMPLEMENTATION_SUMMARY.md`
 
 ---

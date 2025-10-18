@@ -18,6 +18,8 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -134,8 +136,8 @@ public class UserController {
 
   @GetMapping
   @Operation(
-      summary = "Get user profile by ID",
-      description = "Retrieves the profile information of the authenticated user. The user ID is extracted from the request header.",
+      summary = "Get user profile",
+      description = "Retrieves the profile information of the authenticated user. The user ID is automatically extracted from the JWT token.",
       security = @SecurityRequirement(name = "Bearer Authentication")
   )
   @ApiResponses(value = {
@@ -201,15 +203,12 @@ public class UserController {
           )
       )
   })
-  ApiResponse<GetUserResponse> getUserById(
-      @Parameter(
-          name = "X-User-Id",
-          description = "The unique identifier of the user",
-          required = true,
-          example = "user-123e4567-e89b-12d3-a456-426614174000"
-      )
-      @RequestHeader(Constants.USER_ID) String id) {
-    GetUserResponse getUserResponse = userService.getUserById(id);
+  ApiResponse<GetUserResponse> getUserById() {
+    // Extract user ID from JWT token in SecurityContext
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String userId = authentication.getName();
+
+    GetUserResponse getUserResponse = userService.getUserById(userId);
     return ApiResponse.<GetUserResponse>builder()
         .data(getUserResponse)
         .build();

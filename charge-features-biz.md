@@ -69,7 +69,7 @@ Features:
 - Đẩy Kim Cương → Tin Thường đi kèm cũng được đẩy free
 ```
 
-### 5. **BOOST (ĐẨY TIN)**
+### 5. **PUSH (ĐẨY TIN)**
 ```
 Giá: 40,000 VND/lần
 - Đẩy tin lên đầu danh sách
@@ -226,7 +226,7 @@ PSH-20250103-283947
 - **01/01/2025 10:00** - Minh mua Gói Tiêu Chuẩn 1 tháng qua VNPay
 - **02/01/2025 14:00** - Minh đăng tin VIP Bạc (dùng quota)
 - **03/01/2025 15:00** - Minh đẩy tin (dùng quota)
-- **05/01/2025 11:00** - Minh đẩy tin lần 2 (hết quota, trả per-boost)
+- **05/01/2025 11:00** - Minh đẩy tin lần 2 (hết quota, trả per-push)
 - **10/01/2025 16:00** - Minh đăng tin VIP Kim Cương (dùng quota)
 - **15/01/2025 09:00** - Minh đăng tin VIP Vàng (hết quota, trả per-post)
 - **01/02/2025 00:00** - Membership hết hạn
@@ -242,7 +242,7 @@ benefit_id   | benefit_name              | benefit_type | metadata
 BNF-VIP-001  | Đăng VIP Bạc miễn phí     | POST_SILVER  | ...
 BNF-VIP-002  | Đăng VIP Vàng miễn phí    | POST_GOLD    | ...
 BNF-VIP-003  | Đăng VIP KC miễn phí      | POST_DIAMOND | ...
-BNF-BST-001  | Đẩy bài miễn phí          | BOOST        | ...
+BNF-PSH-001  | Đẩy bài miễn phí          | PUSH         | ...
 BNF-APV-001  | Kiểm duyệt tự động        | AUTO_APPROVE | ...
 BNF-BDG-001  | Badge đối tác tin cậy     | BADGE        | ...
 ```
@@ -293,7 +293,7 @@ BNF-BDG-001 | PKG-ADVANCED-1M | Badge đối tác tin cậy       | 1
 - 10 VIP Bạc/tháng × 1 = **10 tin VIP Bạc**
 - 5 VIP Vàng/tháng × 1 = **5 tin VIP Vàng**
 - 2 VIP KC/tháng × 1 = **2 tin VIP KC**
-- 20 Boost/tháng × 1 = **20 lượt Boost**
+- 20 Push/tháng × 1 = **20 lượt Push**
 
 ### transactions
 ```
@@ -325,7 +325,7 @@ UMB-20250101-84743  | USRM-20250101-57382 | BNF-APV-001 | USR-20250101-84729 | 2
 10 VIP Bạc × 1.2M = 12,225,000
 5 VIP Vàng × 2.7M = 13,447,500
 2 VIP KC × 6.8M = 13,692,000
-20 Boost × 40k = 800,000
+20 Push × 40k = 800,000
 ------------------------
 Total value: 40,164,500 VND
 Paid: 1,400,000 VND
@@ -360,7 +360,7 @@ user_benefit_id     | benefit_id  | total_quantity | quantity_used | status
 UMB-20250101-84739  | BNF-VIP-001 | 10             | 1             | ACTIVE (9/10)
 UMB-20250101-84740  | BNF-VIP-002 | 5              | 0             | ACTIVE
 UMB-20250101-84741  | BNF-VIP-003 | 2              | 0             | ACTIVE
-UMB-20250101-84742  | BNF-BST-001 | 20             | 0             | ACTIVE
+UMB-20250101-84742  | BNF-PSH-001 | 20             | 0             | ACTIVE
 UMB-20250101-84743  | BNF-APV-001 | 1              | 0             | ACTIVE
 ```
 
@@ -384,7 +384,7 @@ user_benefit_id     | benefit_id  | total_quantity | quantity_used | status
 UMB-20250101-84739  | BNF-VIP-001 | 10             | 1             | ACTIVE
 UMB-20250101-84740  | BNF-VIP-002 | 5              | 0             | ACTIVE
 UMB-20250101-84741  | BNF-VIP-003 | 2              | 0             | ACTIVE
-UMB-20250101-84742  | BNF-BST-001 | 20             | 1             | ACTIVE (19/20)
+UMB-20250101-84742  | BNF-PSH-001 | 20             | 1             | ACTIVE (19/20)
 UMB-20250101-84743  | BNF-APV-001 | 1              | 0             | ACTIVE
 ```
 
@@ -406,17 +406,17 @@ user_benefit_id     | benefit_id  | total_quantity | quantity_used | status
 UMB-20250101-84739  | BNF-VIP-001 | 10             | 1             | ACTIVE
 UMB-20250101-84740  | BNF-VIP-002 | 5              | 0             | ACTIVE
 UMB-20250101-84741  | BNF-VIP-003 | 2              | 0             | ACTIVE
-UMB-20250101-84742  | BNF-BST-001 | 20             | 20            | FULLY_USED
+UMB-20250101-84742  | BNF-PSH-001 | 20             | 20            | FULLY_USED
 UMB-20250101-84743  | BNF-APV-001 | 1              | 0             | ACTIVE
 ```
 
 ---
 
-## BƯỚC 5: Minh hết quota boost, trả tiền (05/01/2025 11:00)
+## BƯỚC 5: Minh hết quota push, trả tiền (05/01/2025 11:00)
 
 **Flow:**
 1. Minh click "Đẩy tin" trên listing
-2. System check: Hết quota boost (20/20)
+2. System check: Hết quota push (20/20)
 3. Hiển thị popup:
 ```
 ┌────────────────────────────────────────┐
@@ -436,7 +436,7 @@ UMB-20250101-84743  | BNF-APV-001 | 1              | 0             | ACTIVE
 ```
 transaction_id        | user_id            | amount | transaction_type | reference_type | reference_id       | status    | payment_provider | provider_tx_id | created_at
 ----------------------|--------------------|--------|------------------|----------------|--------------------|-----------|------------------|----------------|--------------------
-TXN-20250105-BST-4729 | USR-20250101-84729 | 40,000 | BOOST_FEE        | BOOST          | LST-20250102-19284 | COMPLETED | VNPAY            | VNP20250105002 | 2025-01-05 11:00:00
+TXN-20250105-PSH-4729 | USR-20250101-84729 | 40,000 | PUSH_FEE         | PUSH           | LST-20250102-19284 | COMPLETED | VNPAY            | VNP20250105002 | 2025-01-05 11:00:00
 ```
 
 ### push_history
@@ -561,7 +561,7 @@ UMB-20250101-84743  | BNF-APV-001 | 1              | 0             | EXPIRED
 ### Chi tiêu qua VNPay
 ```
 01/01: Membership          1,400,000 VND
-05/01: Boost per-post         40,000 VND
+05/01: Push per-post          40,000 VND
 15/01: VIP Vàng per-post   2,689,500 VND
 -------------------------------------------
 TOTAL:                     4,129,500 VND
@@ -572,7 +572,7 @@ TOTAL:                     4,129,500 VND
 VIP Bạc:   1/10 (tiết kiệm 1,222,500) - MẤT 9
 VIP Vàng:  5/5  (tiết kiệm 13,447,500)
 VIP KC:    1/2  (tiết kiệm 6,846,000) - MẤT 1
-Boost:    20/20 (tiết kiệm 800,000)
+Push:     20/20 (tiết kiệm 800,000)
 ```
 
 ### Listings đã tạo
@@ -595,7 +595,7 @@ Subtotal: 22,382,000 VND
 
 Từ Per-post (2,729,500):
 - 1 VIP Vàng = 2,689,500
-- 1 Boost = 40,000
+- 1 Push = 40,000
 Subtotal: 2,729,500 VND
 
 GRAND TOTAL VALUE: 25,111,500 VND
@@ -627,7 +627,7 @@ CREATE TABLE users (
 CREATE TABLE benefits (
     benefit_id VARCHAR(50) PRIMARY KEY,
     benefit_name VARCHAR(255) NOT NULL,
-    benefit_type ENUM('POST_SILVER', 'POST_GOLD', 'POST_DIAMOND', 'BOOST', 'AUTO_APPROVE', 'BADGE') NOT NULL,
+    benefit_type ENUM('POST_SILVER', 'POST_GOLD', 'POST_DIAMOND', 'PUSH', 'AUTO_APPROVE', 'BADGE') NOT NULL,
     description TEXT,
     metadata JSON,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -678,8 +678,8 @@ CREATE TABLE transactions (
     transaction_id VARCHAR(50) PRIMARY KEY,
     user_id VARCHAR(50) NOT NULL,
     amount DECIMAL(15,2) NOT NULL,
-    transaction_type ENUM('MEMBERSHIP', 'POST_FEE', 'BOOST_FEE') NOT NULL,
-    reference_type ENUM('MEMBERSHIP', 'LISTING', 'BOOST') NOT NULL,
+    transaction_type ENUM('MEMBERSHIP', 'POST_FEE', 'PUSH_FEE') NOT NULL,
+    reference_type ENUM('MEMBERSHIP', 'LISTING', 'PUSH') NOT NULL,
     reference_id VARCHAR(50),
     status ENUM('PENDING', 'COMPLETED', 'FAILED', 'CANCELLED') NOT NULL,
     payment_provider VARCHAR(20) NOT NULL DEFAULT 'VNPAY',
@@ -820,7 +820,7 @@ NORMAL:    66,000 VND
 VIP BẠC:   1,222,500 VND
 VIP VÀNG:  2,689,500 VND
 VIP KC:    6,846,000 VND
-BOOST:     40,000 VND/lần
+PUSH:      40,000 VND/lần
 ```
 
 ### 5. Duration Discount
@@ -950,7 +950,7 @@ Response:
 }
 ```
 
-### POST /api/boost/push-listing
+### POST /api/push/push-listing
 ```json
 Request:
 {

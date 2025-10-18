@@ -14,6 +14,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -76,9 +78,10 @@ public class QuotaController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<Map<String, QuotaStatusResponse>> checkAllQuotas(
-            @Parameter(description = "User ID from authentication header", required = true)
-            @RequestHeader("X-User-Id") String userId) {
+    public ApiResponse<Map<String, QuotaStatusResponse>> checkAllQuotas() {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
 
         log.info("Checking all quotas for user: {}", userId);
         Map<String, QuotaStatusResponse> quotas = quotaService.checkAllQuotas(userId);
@@ -95,7 +98,7 @@ public class QuotaController {
         parameters = {
             @Parameter(
                 name = "benefitType",
-                description = "Type of benefit (POST_SILVER, POST_GOLD, POST_DIAMOND, BOOST)",
+                description = "Type of benefit (POST_SILVER, POST_GOLD, POST_DIAMOND, PUSH)",
                 required = true
             )
         },
@@ -123,10 +126,10 @@ public class QuotaController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<QuotaStatusResponse> checkQuota(
-            @Parameter(description = "User ID from authentication header", required = true)
-            @RequestHeader("X-User-Id") String userId,
-            @PathVariable String benefitType) {
+    public ApiResponse<QuotaStatusResponse> checkQuota(@PathVariable String benefitType) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
 
         log.info("Checking {} quota for user: {}", benefitType, userId);
         BenefitType type = BenefitType.valueOf(benefitType);
@@ -153,9 +156,10 @@ public class QuotaController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<QuotaStatusResponse> getSilverPostQuota(
-            @Parameter(description = "User ID from authentication header", required = true)
-            @RequestHeader("X-User-Id") String userId) {
+    public ApiResponse<QuotaStatusResponse> getSilverPostQuota() {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
 
         log.info("Checking Silver post quota for user: {}", userId);
         QuotaStatusResponse quota = quotaService.checkQuotaAvailability(userId, BenefitType.POST_SILVER);
@@ -181,9 +185,10 @@ public class QuotaController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<QuotaStatusResponse> getGoldPostQuota(
-            @Parameter(description = "User ID from authentication header", required = true)
-            @RequestHeader("X-User-Id") String userId) {
+    public ApiResponse<QuotaStatusResponse> getGoldPostQuota() {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
 
         log.info("Checking Gold post quota for user: {}", userId);
         QuotaStatusResponse quota = quotaService.checkQuotaAvailability(userId, BenefitType.POST_GOLD);
@@ -209,9 +214,10 @@ public class QuotaController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<QuotaStatusResponse> getDiamondPostQuota(
-            @Parameter(description = "User ID from authentication header", required = true)
-            @RequestHeader("X-User-Id") String userId) {
+    public ApiResponse<QuotaStatusResponse> getDiamondPostQuota() {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
 
         log.info("Checking Diamond post quota for user: {}", userId);
         QuotaStatusResponse quota = quotaService.checkQuotaAvailability(userId, BenefitType.POST_DIAMOND);
@@ -221,14 +227,14 @@ public class QuotaController {
                 .build();
     }
 
-    @GetMapping("/boosts")
+    @GetMapping("/pushes")
     @Operation(
-        summary = "Check boost quota",
-        description = "Check available boost quota for current user",
+        summary = "Check push quota",
+        description = "Check available push quota for current user",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Boost quota retrieved",
+                description = "Push quota retrieved",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = QuotaStatusResponse.class)
@@ -237,12 +243,13 @@ public class QuotaController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<QuotaStatusResponse> getBoostQuota(
-            @Parameter(description = "User ID from authentication header", required = true)
-            @RequestHeader("X-User-Id") String userId) {
+    public ApiResponse<QuotaStatusResponse> getPushQuota() {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
 
-        log.info("Checking boost quota for user: {}", userId);
-        QuotaStatusResponse quota = quotaService.checkQuotaAvailability(userId, BenefitType.BOOST);
+        log.info("Checking push quota for user: {}", userId);
+        QuotaStatusResponse quota = quotaService.checkQuotaAvailability(userId, BenefitType.PUSH);
 
         return ApiResponse.<QuotaStatusResponse>builder()
                 .data(quota)
@@ -273,13 +280,14 @@ public class QuotaController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<Map<String, Boolean>> hasActiveMembership(
-            @Parameter(description = "User ID from authentication header", required = true)
-            @RequestHeader("X-User-Id") String userId) {
-        
+    public ApiResponse<Map<String, Boolean>> hasActiveMembership() {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         log.info("Checking active membership for user: {}", userId);
         boolean hasActive = quotaService.hasActiveMembership(userId);
-        
+
         return ApiResponse.<Map<String, Boolean>>builder()
                 .data(Map.of("hasActiveMembership", hasActive))
                 .build();

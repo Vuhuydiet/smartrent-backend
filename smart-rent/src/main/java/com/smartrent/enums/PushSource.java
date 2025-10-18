@@ -1,31 +1,31 @@
 package com.smartrent.enums;
 
 /**
- * Enum representing the source of a listing boost/push
+ * Enum representing the source of a listing push
  *
- * MEMBERSHIP_QUOTA: Boost using membership quota (free)
- * DIRECT_PAYMENT: Boost by paying per-boost via VNPay
- * SCHEDULED: Automated scheduled boost
- * ADMIN: Manual boost by admin
+ * MEMBERSHIP_QUOTA: Push using membership quota (free)
+ * DIRECT_PAYMENT: Push by paying per-push via VNPay
+ * SCHEDULED: Automated scheduled push
+ * ADMIN: Manual push by admin
  */
 public enum PushSource {
     /**
-     * Boost using membership quota
+     * Push using membership quota
      */
     MEMBERSHIP_QUOTA,
 
     /**
-     * Boost by direct payment via VNPay
+     * Push by direct payment via VNPay
      */
     DIRECT_PAYMENT,
 
     /**
-     * Automated scheduled boost
+     * Automated scheduled push
      */
     SCHEDULED,
 
     /**
-     * Manual boost by admin
+     * Manual push by admin
      */
     ADMIN
 }

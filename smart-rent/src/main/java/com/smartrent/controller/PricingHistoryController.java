@@ -15,6 +15,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -66,8 +68,11 @@ public class PricingHistoryController {
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
     ApiResponse<PricingHistoryResponse> updatePrice(
             @PathVariable Long listingId,
-            @RequestBody @Valid PriceUpdateRequest request,
-            @RequestHeader("user-id") String userId) {
+            @RequestBody @Valid PriceUpdateRequest request) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         PricingHistoryResponse response = pricingHistoryService.updatePrice(listingId, request, userId);
         return ApiResponse.<PricingHistoryResponse>builder()
                 .data(response)

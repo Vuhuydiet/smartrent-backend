@@ -67,8 +67,8 @@ public class MembershipPackageBenefit {
         return benefitType == BenefitType.POST_DIAMOND;
     }
 
-    public boolean isBoostBenefit() {
-        return benefitType == BenefitType.BOOST;
+    public boolean isPushBenefit() {
+        return benefitType == BenefitType.PUSH;
     }
 
     public boolean isAutoApproveBenefit() {

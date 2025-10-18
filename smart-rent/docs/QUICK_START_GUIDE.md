@@ -50,17 +50,17 @@ GET /v1/memberships/quota/premium-posts
 Headers: user-id: {userId}
 ```
 
-**Check Boost Quota**
+**Check Push Quota**
 ```http
-GET /v1/memberships/quota/boosts
+GET /v1/memberships/quota/pushes
 Headers: user-id: {userId}
 ```
 
-#### Boost Management
+#### Push Management
 
-**Boost Listing (Immediate)**
+**Push Listing (Immediate)**
 ```http
-POST /v1/boosts/boost
+POST /v1/pushes/boost
 Headers: user-id: {userId}
 Body:
 {
@@ -69,9 +69,9 @@ Body:
 }
 ```
 
-**Schedule Automatic Boosts**
+**Schedule Automatic Pushes**
 ```http
-POST /v1/boosts/schedule
+POST /v1/pushes/schedule
 Headers: user-id: {userId}
 Body:
 {
@@ -82,9 +82,9 @@ Body:
 }
 ```
 
-**Get Boost History**
+**Get Push History**
 ```http
-GET /v1/boosts/my-history
+GET /v1/pushes/my-history
 Headers: user-id: {userId}
 ```
 
@@ -106,7 +106,7 @@ POST /v1/memberships/purchase
 // Response: UserMembershipResponse with benefits:
 // - 10 VIP posts
 // - 5 Premium posts
-// - 20 boosts
+// - 20 pushes
 // - Auto-verify enabled
 ```
 
@@ -131,29 +131,29 @@ GET /v1/memberships/quota/vip-posts
 // Response: { "totalAvailable": 9, ... }
 ```
 
-### Scenario 3: User Boosts Listing
+### Scenario 3: User Pushes Listing
 
 ```java
-// 1. Check boost quota
-GET /v1/memberships/quota/boosts
+// 1. Check push quota
+GET /v1/memberships/quota/pushes
 // Response: { "totalAvailable": 20 }
 
-// 2. Boost listing
-POST /v1/boosts/boost
+// 2. Push listing
+POST /v1/pushes/boost
 {
   "listingId": 101,
   "useMembershipQuota": true
 }
 
 // 3. Listing is pushed to top
-// 4. If Premium listing, shadow listing also boosted FREE
+// 4. If Premium listing, shadow listing also pushed FREE
 ```
 
-### Scenario 4: User Schedules Daily Boosts
+### Scenario 4: User Schedules Daily Pushes
 
 ```java
-// Schedule 10 automatic boosts at 9 AM daily
-POST /v1/boosts/schedule
+// Schedule 10 automatic pushes at 9 AM daily
+POST /v1/pushes/schedule
 {
   "listingId": 101,
   "scheduledTime": "09:00:00",
@@ -161,7 +161,7 @@ POST /v1/boosts/schedule
   "useMembershipQuota": true
 }
 
-// Cron job will execute boost daily at 9 AM
+// Cron job will execute push daily at 9 AM
 // Consumes 1 quota per execution
 ```
 
@@ -177,9 +177,9 @@ NORMAL_POST_FEE = 90,000 VND
 VIP_POST_FEE = 600,000 VND
 PREMIUM_POST_FEE = 1,800,000 VND
 
-// Boost fees
-SINGLE_BOOST_FEE = 50,000 VND
-BOOST_PACKAGE_3 = 120,000 VND (40,000 each)
+// Push fees
+SINGLE_PUSH_FEE = 50,000 VND
+PUSH_PACKAGE_3 = 120,000 VND (40,000 each)
 ```
 
 ### VIP Type Limits
@@ -202,12 +202,12 @@ public void expireMemberships() {
 }
 ```
 
-### 2. Scheduled Boost Executor
+### 2. Scheduled Push Executor
 
 ```java
 @Scheduled(cron = "0 * * * * *") // Every minute
-public void executeScheduledBoosts() {
-    boostService.executeScheduledBoosts();
+public void executeScheduledPushes() {
+    pushService.executeScheduledPushes();
 }
 ```
 
@@ -216,7 +216,7 @@ public void executeScheduledBoosts() {
 ### One-Time Benefit Grant
 - When user purchases membership, ALL benefits granted immediately
 - `total_quantity = quantity_per_month × duration_months`
-- Example: 1-month STANDARD = 10 VIP + 5 Premium + 20 Boosts
+- Example: 1-month STANDARD = 10 VIP + 5 Premium + 20 Pushes
 
 ### No Quota Rollover
 - Unused quotas are LOST when membership expires
@@ -225,7 +225,7 @@ public void executeScheduledBoosts() {
 ### Premium Shadow Listings
 - Premium post automatically creates shadow NORMAL listing
 - Shadow listing syncs with parent
-- Boosting Premium also boosts shadow FREE
+- Pushing Premium also pushes shadow FREE
 
 ### Auto-Verification
 - Users with AUTO_VERIFY benefit get instant listing approval
@@ -239,12 +239,12 @@ The migration creates 3 packages:
 
 1. **BASIC (ID: 1)** - 700,000 VND
    - 5 VIP posts
-   - 10 boosts
+   - 10 pushes
 
 2. **STANDARD (ID: 2)** - 1,400,000 VND
    - 10 VIP posts
    - 5 Premium posts
-   - 20 boosts
+   - 20 pushes
    - Auto-verify
 
 3. **ADVANCED (ID: 3)** - 2,800,000 VND
@@ -270,8 +270,8 @@ curl -X POST http://localhost:8080/v1/memberships/purchase \
 curl -X GET http://localhost:8080/v1/memberships/quota/vip-posts \
   -H "user-id: test-user-123"
 
-# 4. Boost listing
-curl -X POST http://localhost:8080/v1/boosts/boost \
+# 4. Push listing
+curl -X POST http://localhost:8080/v1/pushes/boost \
   -H "user-id: test-user-123" \
   -H "Content-Type: application/json" \
   -d '{"listingId": 101, "useMembershipQuota": true}'

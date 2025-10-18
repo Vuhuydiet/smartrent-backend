@@ -3,7 +3,7 @@ package com.smartrent.enums;
 public enum TransactionType {
     MEMBERSHIP_PURCHASE,
     POST_FEE,
-    BOOST_FEE,
+    PUSH_FEE,
     WALLET_TOPUP,
     REFUND
 }

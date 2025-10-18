@@ -18,6 +18,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -466,10 +468,10 @@ public class ListingController {
             )
         }
     )
-    public ApiResponse<Object> createVipListing(
-            @Parameter(description = "User ID from authentication header", required = true)
-            @RequestHeader("X-User-Id") String userId,
-            @Valid @RequestBody VipListingCreationRequest request) {
+    public ApiResponse<Object> createVipListing(@Valid @RequestBody VipListingCreationRequest request) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
 
         request.setUserId(userId);
         Object response = listingService.createVipListing(request);
@@ -539,10 +541,10 @@ public class ListingController {
             )
         }
     )
-    public ApiResponse<Object> checkPostingQuota(
-            @Parameter(description = "User ID from authentication header", required = true)
-            @RequestHeader("X-User-Id") String userId,
-            @RequestParam(required = false) String vipType) {
+    public ApiResponse<Object> checkPostingQuota(@RequestParam(required = false) String vipType) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
 
         if (vipType != null) {
             BenefitType benefitType = switch (vipType.toUpperCase()) {
@@ -559,13 +561,13 @@ public class ListingController {
         QuotaStatusResponse silverQuota = quotaService.checkQuotaAvailability(userId, BenefitType.POST_SILVER);
         QuotaStatusResponse goldQuota = quotaService.checkQuotaAvailability(userId, BenefitType.POST_GOLD);
         QuotaStatusResponse diamondQuota = quotaService.checkQuotaAvailability(userId, BenefitType.POST_DIAMOND);
-        QuotaStatusResponse boostQuota = quotaService.checkQuotaAvailability(userId, BenefitType.BOOST);
+        QuotaStatusResponse pushQuota = quotaService.checkQuotaAvailability(userId, BenefitType.PUSH);
 
         return ApiResponse.builder().data(java.util.Map.of(
                 "silverPosts", silverQuota,
                 "goldPosts", goldQuota,
                 "diamondPosts", diamondQuota,
-                "boosts", boostQuota
+                "pushes", pushQuota
         )).build();
     }
 }

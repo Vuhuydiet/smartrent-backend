@@ -37,15 +37,15 @@ public interface TransactionService {
     String createPostFeeTransaction(String userId, BigDecimal amount, String vipType, int durationDays, String paymentProvider);
 
     /**
-     * Create a boost fee transaction (pay-per-boost)
-     * 
+     * Create a push fee transaction (pay-per-push)
+     *
      * @param userId User ID
      * @param listingId Listing ID
      * @param amount Payment amount
      * @param paymentProvider Payment provider
      * @return Transaction ID
      */
-    String createBoostFeeTransaction(String userId, Long listingId, BigDecimal amount, String paymentProvider);
+    String createPushFeeTransaction(String userId, Long listingId, BigDecimal amount, String paymentProvider);
 
     /**
      * Complete a transaction after successful payment

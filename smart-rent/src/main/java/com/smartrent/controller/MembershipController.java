@@ -14,6 +14,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -99,8 +101,11 @@ public class MembershipController {
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
     public ApiResponse<UserMembershipResponse> purchaseMembership(
-            @RequestHeader("user-id") String userId,
             @RequestBody @Valid MembershipPurchaseRequest request) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         log.info("User {} purchasing membership package {}", userId, request.getMembershipId());
         UserMembershipResponse response = membershipService.purchaseMembership(userId, request);
         return ApiResponse.<UserMembershipResponse>builder()
@@ -128,7 +133,11 @@ public class MembershipController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<UserMembershipResponse> getMyMembership(@RequestHeader("user-id") String userId) {
+    public ApiResponse<UserMembershipResponse> getMyMembership() {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         log.info("Getting active membership for user: {}", userId);
         UserMembershipResponse response = membershipService.getActiveMembership(userId);
         return ApiResponse.<UserMembershipResponse>builder()
@@ -152,7 +161,11 @@ public class MembershipController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<List<UserMembershipResponse>> getMembershipHistory(@RequestHeader("user-id") String userId) {
+    public ApiResponse<List<UserMembershipResponse>> getMembershipHistory() {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         log.info("Getting membership history for user: {}", userId);
         List<UserMembershipResponse> history = membershipService.getMembershipHistory(userId);
         return ApiResponse.<List<UserMembershipResponse>>builder()
@@ -176,9 +189,11 @@ public class MembershipController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<Void> cancelMembership(
-            @RequestHeader("user-id") String userId,
-            @PathVariable Long userMembershipId) {
+    public ApiResponse<Void> cancelMembership(@PathVariable Long userMembershipId) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         log.info("User {} cancelling membership {}", userId, userMembershipId);
         membershipService.cancelMembership(userId, userMembershipId);
         return ApiResponse.<Void>builder()

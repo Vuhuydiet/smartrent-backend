@@ -16,7 +16,7 @@ public class QuotaStatusResponse {
     @Schema(
         description = "Benefit type being checked",
         example = "POST_SILVER",
-        allowableValues = {"POST_SILVER", "POST_GOLD", "POST_DIAMOND", "BOOST"}
+        allowableValues = {"POST_SILVER", "POST_GOLD", "POST_DIAMOND", "PUSH"}
     )
     String benefitType;
 

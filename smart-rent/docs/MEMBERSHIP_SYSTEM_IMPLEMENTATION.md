@@ -14,13 +14,13 @@ This document describes the implementation of the comprehensive membership and c
   - `user_memberships` - Tracks user membership subscriptions
   - `user_membership_benefits` - Tracks individual benefit quotas
   - `transactions` - Records all financial transactions
-  - `push_history` - Logs all listing boosts
-  - `push_schedule` - Manages scheduled automatic boosts
+  - `push_history` - Logs all listing pushes
+  - `push_schedule` - Manages scheduled automatic pushes
   
 - **Listing Table Updates:**
   - Added `is_shadow` - Identifies shadow listings (for Premium double display)
   - Added `parent_listing_id` - Links shadow to parent Premium listing
-  - Added `pushed_at` - Tracks last boost timestamp
+  - Added `pushed_at` - Tracks last push timestamp
 
 - **Default Data:**
   - 3 membership packages pre-configured
@@ -39,7 +39,7 @@ All JPA entities created with proper relationships:
 
 #### 3. Enums
 - `PackageLevel` (BASIC, STANDARD, ADVANCED)
-- `BenefitType` (VIP_POSTS, PREMIUM_POSTS, BOOST_QUOTA, AUTO_VERIFY, TRUSTED_BADGE)
+- `BenefitType` (VIP_POSTS, PREMIUM_POSTS, PUSH_QUOTA, AUTO_VERIFY, TRUSTED_BADGE)
 - `MembershipStatus` (ACTIVE, EXPIRED, CANCELLED)
 - `BenefitStatus` (ACTIVE, FULLY_USED, EXPIRED)
 - `TransactionType`, `TransactionStatus`, `ReferenceType`
@@ -59,8 +59,8 @@ All Spring Data JPA repositories with custom queries:
 #### 5. DTOs
 **Request DTOs:**
 - `MembershipPurchaseRequest`
-- `BoostListingRequest`
-- `ScheduleBoostRequest`
+- `PushListingRequest`
+- `SchedulePushRequest`
 - `VipListingCreationRequest`
 
 **Response DTOs:**
@@ -69,7 +69,7 @@ All Spring Data JPA repositories with custom queries:
 - `UserMembershipResponse`
 - `UserMembershipBenefitResponse`
 - `TransactionResponse`
-- `BoostResponse`
+- `PushResponse`
 - `QuotaStatusResponse`
 
 #### 6. Core Services
@@ -84,13 +84,13 @@ All Spring Data JPA repositories with custom queries:
 - ✅ Cancel membership
 - ✅ One-time benefit grant (total_quantity = quantity_per_month × duration_months)
 
-**BoostService** (`BoostServiceImpl`)
-- ✅ Boost listing immediately
-- ✅ Schedule automatic boosts
-- ✅ Execute scheduled boosts (for cron job)
-- ✅ Get boost history
-- ✅ Cancel scheduled boost
-- ✅ Auto-boost shadow listings when Premium is boosted
+**PushService** (`PushServiceImpl`)
+- ✅ Push listing immediately
+- ✅ Schedule automatic pushes
+- ✅ Execute scheduled pushes (for cron job)
+- ✅ Get push history
+- ✅ Cancel scheduled push
+- ✅ Auto-push shadow listings when Premium is boosted
 
 ### 🚧 Remaining Tasks
 
@@ -114,14 +114,14 @@ Create `TransactionService` for:
 #### 3. REST Controllers
 Create controllers with Swagger documentation:
 - `MembershipController` - Package browsing, purchase, status
-- `BoostController` - Boost operations, history
+- `PushController` - Push operations, history
 - `TransactionController` - Transaction history, status
 - Update `ListingController` - Add VIP posting endpoints
 
 #### 4. Scheduled Jobs
 Create cron jobs:
 - Membership expiration checker (daily)
-- Scheduled boost executor (every minute or configurable)
+- Scheduled push executor (every minute or configurable)
 - Benefit expiration checker (daily)
 
 #### 5. Validators
@@ -135,7 +135,7 @@ Create validation logic:
 Create MapStruct mappers for:
 - Membership entities ↔ DTOs
 - Transaction entities ↔ DTOs
-- Boost entities ↔ DTOs
+- Push entities ↔ DTOs
 
 ## Key Business Rules Implemented
 
@@ -146,7 +146,7 @@ When user purchases a membership:
 - Example: 1-month STANDARD package
   - 10 VIP posts/month × 1 month = 10 VIP posts total
   - 5 Premium posts/month × 1 month = 5 Premium posts total
-  - 20 boosts/month × 1 month = 20 boosts total
+  - 20 pushes/month × 1 month = 20 pushes total
 
 ### 2. No Quota Rollover ✅
 - Unused quotas are LOST when membership expires
@@ -156,7 +156,7 @@ When user purchases a membership:
 ### 3. Premium Shadow Listings ✅
 - When posting Premium listing → automatically create shadow NORMAL listing
 - Shadow listing has same content, synced updates
-- When boosting Premium → shadow also boosted FREE
+- When pushing Premium → shadow also pushed FREE
 - Doubles visibility without extra cost
 
 ### 4. VIP Type Features
@@ -183,8 +183,8 @@ When user purchases a membership:
 - Shadow NORMAL listing included FREE
 
 ### 5. Boost System ✅
-- Manual boost: Push listing to top immediately
-- Scheduled boost: Auto-push at specific time daily
+- Manual push: Push listing to top immediately
+- Scheduled push: Auto-push at specific time daily
 - Quota-based: Use membership quota
 - Direct purchase: Pay per boost (50,000 VND)
 - Premium boost → Shadow also boosted
@@ -200,7 +200,7 @@ user_memberships (1) ←→ (N) user_membership_benefits
     transactions
 ```
 
-### Boost Flow
+### Push Flow
 ```
 listings ←→ push_history
     ↓
@@ -219,7 +219,7 @@ user_membership_benefits (quota tracking)
 - **STANDARD**: 2,000,000 → 1,400,000 VND
   - 10 VIP posts
   - 5 Premium posts
-  - 20 boosts
+  - 20 pushes
   - Auto-verify
   
 - **ADVANCED**: 4,000,000 → 2,800,000 VND
@@ -235,8 +235,8 @@ user_membership_benefits (quota tracking)
 - PREMIUM: 1,800,000 VND
 
 ### Boost Fees
-- Single boost: 50,000 VND
-- 3-boost package: 120,000 VND (40,000 each)
+- Single push: 50,000 VND
+- 3-push package: 120,000 VND (40,000 each)
 
 ## Next Steps
 
@@ -277,14 +277,14 @@ MembershipPurchaseRequest request = MembershipPurchaseRequest.builder()
 UserMembershipResponse response = membershipService.purchaseMembership(userId, request);
 ```
 
-### Boost Listing
+### Push Listing
 ```java
-BoostListingRequest request = BoostListingRequest.builder()
+PushListingRequest request = PushListingRequest.builder()
     .listingId(101L)
     .useMembershipQuota(true) // Use quota instead of paying
     .build();
 
-BoostResponse response = boostService.boostListing(userId, request);
+PushResponse response = pushService.pushListing(userId, request);
 ```
 
 ### Check Quota
@@ -321,7 +321,7 @@ QuotaStatusResponse quota = membershipService.checkQuotaAvailability(
 
 ### Services (4 files)
 - MembershipService + Impl
-- BoostService + Impl
+- PushService + Impl
 
 **Total: ~40 new files created**
 
