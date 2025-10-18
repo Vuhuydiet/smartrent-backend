@@ -19,18 +19,15 @@ import java.util.Optional;
 public interface PushScheduleRepository extends JpaRepository<PushSchedule, Long> {
 
     /**
-     * Find all active schedules for a specific scheduled time that haven't expired yet
+     * Find all active schedules for a specific scheduled time
      *
      * @param scheduledTime The time of day to find schedules for
-     * @param currentTime Current timestamp to check against end_time
      * @return List of active schedules
      */
-    @Query("SELECT ps FROM push_schedules ps WHERE ps.scheduledTime = :scheduledTime " +
-            "AND ps.status = 'ACTIVE' " +
-            "AND ps.endTime > :currentTime")
+    @Query("SELECT ps FROM push_schedule ps WHERE ps.scheduledTime = :scheduledTime " +
+            "AND ps.status = 'ACTIVE'")
     List<PushSchedule> findActiveSchedulesByScheduledTime(
-            @Param("scheduledTime") LocalTime scheduledTime,
-            @Param("currentTime") LocalDateTime currentTime
+            @Param("scheduledTime") LocalTime scheduledTime
     );
 
     /**
@@ -64,14 +61,12 @@ public interface PushScheduleRepository extends JpaRepository<PushSchedule, Long
     List<PushSchedule> findByListingId(Long listingId);
 
     /**
-     * Find all expired schedules (end_time has passed but status is still ACTIVE)
+     * Find all completed or cancelled schedules
      *
-     * @param currentTime Current timestamp
-     * @return List of expired schedules
+     * @return List of completed or cancelled schedules
      */
-    @Query("SELECT ps FROM push_schedules ps WHERE ps.status = 'ACTIVE' " +
-            "AND ps.endTime <= :currentTime")
-    List<PushSchedule> findExpiredSchedules(@Param("currentTime") LocalDateTime currentTime);
+    @Query("SELECT ps FROM push_schedule ps WHERE ps.status IN ('COMPLETED', 'CANCELLED')")
+    List<PushSchedule> findCompletedOrCancelledSchedules();
 
     /**
      * Find active schedules that should run at the given time
@@ -79,7 +74,7 @@ public interface PushScheduleRepository extends JpaRepository<PushSchedule, Long
      * @param scheduledTime The time to match
      * @return List of active schedules matching the time
      */
-    @Query("SELECT ps FROM push_schedules ps WHERE ps.scheduledTime = :scheduledTime " +
+    @Query("SELECT ps FROM push_schedule ps WHERE ps.scheduledTime = :scheduledTime " +
             "AND ps.status = 'ACTIVE'")
     List<PushSchedule> findActiveSchedulesByTime(@Param("scheduledTime") LocalTime scheduledTime);
 }

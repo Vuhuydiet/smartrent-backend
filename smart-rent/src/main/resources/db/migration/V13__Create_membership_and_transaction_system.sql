@@ -122,10 +122,11 @@ CREATE TABLE transactions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
--- 7. PUSH SCHEDULE TABLE
+-- 6. PUSH SCHEDULE TABLE
 -- =====================================================
 CREATE TABLE push_schedule (
     schedule_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
     listing_id BIGINT NOT NULL,
     scheduled_time TIME NOT NULL,
     source ENUM('MEMBERSHIP', 'DIRECT_PURCHASE') NOT NULL,
@@ -134,23 +135,22 @@ CREATE TABLE push_schedule (
     used_pushes INT NOT NULL DEFAULT 0,
     status ENUM('ACTIVE', 'COMPLETED', 'CANCELLED') NOT NULL DEFAULT 'ACTIVE',
     transaction_id VARCHAR(36),
-    status ENUM('ACTIVE', 'INACTIVE', 'EXPIRED') NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
+    CONSTRAINT fk_ps_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     CONSTRAINT fk_ps_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
     CONSTRAINT fk_ps_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id) ON DELETE SET NULL,
     INDEX idx_listing_id (listing_id),
     INDEX idx_status (status),
-    INDEX idx_scheduled_time (scheduled_time),
-    INDEX idx_user_listing_status (user_id, listing_id, status)
+    INDEX idx_scheduled_time (scheduled_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
--- 6. PUSH HISTORY TABLE
+-- 7. PUSH HISTORY TABLE
 -- =====================================================
 CREATE TABLE push_history (
-    push_history_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    push_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     listing_id BIGINT NOT NULL,
     push_source ENUM('MEMBERSHIP_QUOTA', 'DIRECT_PURCHASE', 'SCHEDULED', 'ADMIN', 'DIRECT_PAYMENT') NOT NULL,
     user_benefit_id BIGINT,
@@ -161,12 +161,12 @@ CREATE TABLE push_history (
     pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_ph_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ph_benefit FOREIGN KEY (user_benefit_id) REFERENCES user_membership_benefits(benefit_id) ON DELETE SET NULL,
+    CONSTRAINT fk_ph_benefit FOREIGN KEY (user_benefit_id) REFERENCES user_membership_benefits(user_benefit_id) ON DELETE SET NULL,
+    CONSTRAINT fk_ph_schedule FOREIGN KEY (schedule_id) REFERENCES push_schedule(schedule_id) ON DELETE SET NULL,
     CONSTRAINT fk_ph_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id) ON DELETE SET NULL,
     INDEX idx_listing_id (listing_id),
     INDEX idx_pushed_at (pushed_at),
-    INDEX idx_listing_pushed (listing_id, pushed_at),
-    INDEX idx_status (status)
+    INDEX idx_listing_pushed (listing_id, pushed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================
