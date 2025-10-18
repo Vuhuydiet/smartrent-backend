@@ -1,9 +1,9 @@
 package com.smartrent.controller;
 
-import com.smartrent.dto.request.BoostListingRequest;
-import com.smartrent.dto.request.ScheduleBoostRequest;
+import com.smartrent.dto.request.PushListingRequest;
+import com.smartrent.dto.request.SchedulePushRequest;
 import com.smartrent.dto.response.ApiResponse;
-import com.smartrent.dto.response.BoostResponse;
+import com.smartrent.dto.response.PushResponse;
 import com.smartrent.service.push.PushService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -21,25 +21,25 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/v1/boosts")
+@RequestMapping("/v1/pushes")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-@Tag(name = "Boost Management", description = "APIs for boosting listings to increase visibility")
-public class BoostController {
+@Tag(name = "Push Management", description = "APIs for pushing listings to increase visibility")
+public class PushController {
 
     PushService pushService;
 
-    @PostMapping("/boost")
+    @PostMapping("/push")
     @Operation(
-        summary = "Boost a listing",
+        summary = "Push a listing",
         description = "Push a listing to the top of search results. Can use membership quota or direct purchase.",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Successfully boosted listing",
+                description = "Successfully pushed listing",
                 content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = BoostResponse.class)
+                    schema = @Schema(implementation = PushResponse.class)
                 )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -49,27 +49,27 @@ public class BoostController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<BoostResponse> boostListing(
+    public ApiResponse<PushResponse> pushListing(
             @RequestHeader("user-id") String userId,
-            @RequestBody @Valid BoostListingRequest request) {
-        log.info("User {} boosting listing {}", userId, request.getListingId());
-        BoostResponse response = pushService.boostListing(userId, request);
-        return ApiResponse.<BoostResponse>builder()
+            @RequestBody @Valid PushListingRequest request) {
+        log.info("User {} pushing listing {}", userId, request.getListingId());
+        PushResponse response = pushService.pushListing(userId, request);
+        return ApiResponse.<PushResponse>builder()
                 .data(response)
                 .build();
     }
 
     @PostMapping("/schedule")
     @Operation(
-        summary = "Schedule automatic boosts",
-        description = "Schedule automatic daily boosts for a listing at a specific time",
+        summary = "Schedule automatic pushes",
+        description = "Schedule automatic daily pushes for a listing at a specific time",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Successfully scheduled boosts",
+                description = "Successfully scheduled pushes",
                 content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = BoostResponse.class)
+                    schema = @Schema(implementation = PushResponse.class)
                 )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -79,67 +79,67 @@ public class BoostController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<BoostResponse> scheduleBoost(
+    public ApiResponse<PushResponse> schedulePush(
             @RequestHeader("user-id") String userId,
-            @RequestBody @Valid ScheduleBoostRequest request) {
-        log.info("User {} scheduling boost for listing {}", userId, request.getListingId());
-        BoostResponse response = pushService.scheduleBoost(userId, request);
-        return ApiResponse.<BoostResponse>builder()
+            @RequestBody @Valid SchedulePushRequest request) {
+        log.info("User {} scheduling push for listing {}", userId, request.getListingId());
+        PushResponse response = pushService.schedulePush(userId, request);
+        return ApiResponse.<PushResponse>builder()
                 .data(response)
                 .build();
     }
 
     @GetMapping("/listing/{listingId}/history")
     @Operation(
-        summary = "Get boost history for a listing",
-        description = "Returns all boost history for a specific listing",
+        summary = "Get push history for a listing",
+        description = "Returns all push history for a specific listing",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
                 description = "Successfully retrieved history",
                 content = @Content(
                     mediaType = "application/json",
-                    array = @ArraySchema(schema = @Schema(implementation = BoostResponse.class))
+                    array = @ArraySchema(schema = @Schema(implementation = PushResponse.class))
                 )
             )
         }
     )
-    public ApiResponse<List<BoostResponse>> getListingBoostHistory(@PathVariable Long listingId) {
-        log.info("Getting boost history for listing: {}", listingId);
-        List<BoostResponse> history = pushService.getBoostHistory(listingId);
-        return ApiResponse.<List<BoostResponse>>builder()
+    public ApiResponse<List<PushResponse>> getListingPushHistory(@PathVariable Long listingId) {
+        log.info("Getting push history for listing: {}", listingId);
+        List<PushResponse> history = pushService.getPushHistory(listingId);
+        return ApiResponse.<List<PushResponse>>builder()
                 .data(history)
                 .build();
     }
 
     @GetMapping("/my-history")
     @Operation(
-        summary = "Get user's boost history",
-        description = "Returns all boost history for all listings owned by the current user",
+        summary = "Get user's push history",
+        description = "Returns all push history for all listings owned by the current user",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
                 description = "Successfully retrieved history",
                 content = @Content(
                     mediaType = "application/json",
-                    array = @ArraySchema(schema = @Schema(implementation = BoostResponse.class))
+                    array = @ArraySchema(schema = @Schema(implementation = PushResponse.class))
                 )
             )
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<List<BoostResponse>> getMyBoostHistory(@RequestHeader("user-id") String userId) {
-        log.info("Getting boost history for user: {}", userId);
-        List<BoostResponse> history = pushService.getUserBoostHistory(userId);
-        return ApiResponse.<List<BoostResponse>>builder()
+    public ApiResponse<List<PushResponse>> getMyPushHistory(@RequestHeader("user-id") String userId) {
+        log.info("Getting push history for user: {}", userId);
+        List<PushResponse> history = pushService.getUserPushHistory(userId);
+        return ApiResponse.<List<PushResponse>>builder()
                 .data(history)
                 .build();
     }
 
     @DeleteMapping("/schedule/{scheduleId}")
     @Operation(
-        summary = "Cancel scheduled boost",
-        description = "Cancel a scheduled automatic boost",
+        summary = "Cancel scheduled push",
+        description = "Cancel a scheduled automatic push",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
@@ -152,14 +152,13 @@ public class BoostController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<Void> cancelScheduledBoost(
+    public ApiResponse<Void> cancelScheduledPush(
             @RequestHeader("user-id") String userId,
             @PathVariable Long scheduleId) {
-        log.info("User {} cancelling scheduled boost {}", userId, scheduleId);
-        pushService.cancelScheduledBoost(userId, scheduleId);
+        log.info("User {} cancelling scheduled push {}", userId, scheduleId);
+        pushService.cancelScheduledPush(userId, scheduleId);
         return ApiResponse.<Void>builder()
-                .message("Scheduled boost cancelled successfully")
+                .message("Scheduled push cancelled successfully")
                 .build();
     }
 }
-

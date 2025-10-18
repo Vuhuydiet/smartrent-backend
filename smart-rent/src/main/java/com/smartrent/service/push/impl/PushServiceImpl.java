@@ -1,10 +1,10 @@
 package com.smartrent.service.push.impl;
 
 import com.smartrent.constants.PricingConstants;
-import com.smartrent.dto.request.BoostListingRequest;
+import com.smartrent.dto.request.PushListingRequest;
 import com.smartrent.dto.request.PaymentRequest;
-import com.smartrent.dto.request.ScheduleBoostRequest;
-import com.smartrent.dto.response.BoostResponse;
+import com.smartrent.dto.request.SchedulePushRequest;
+import com.smartrent.dto.response.PushResponse;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.enums.*;
 import com.smartrent.infra.repository.*;
@@ -46,12 +46,12 @@ public class PushServiceImpl implements PushService {
     TransactionService transactionService;
     PaymentService paymentService;
 
-    // ========== Boost/Push Listing Methods ==========
+    // ========== Push Listing Methods ==========
 
     @Override
     @Transactional
-    public BoostResponse boostListing(String userId, BoostListingRequest request) {
-        log.info("Boosting listing {} for user {}", request.getListingId(), userId);
+    public PushResponse pushListing(String userId, PushListingRequest request) {
+        log.info("Pushing listing {} for user {}", request.getListingId(), userId);
 
         // Validate listing exists and belongs to user
         Listing listing = listingRepository.findById(request.getListingId())
@@ -91,20 +91,20 @@ public class PushServiceImpl implements PushService {
                 // Save push history
                 pushHistory = pushHistoryRepository.save(pushHistory);
 
-                // If listing is Gold or Diamond, also boost its shadow listing
+                // If listing is Gold or Diamond, also push its shadow listing
                 if ((listing.isGold() || listing.isDiamond()) && !listing.isShadowListing()) {
-                    boostShadowListing(listing, userId);
+                    pushShadowListing(listing, userId);
                 }
 
-                log.info("Successfully boosted listing {} using quota", request.getListingId());
-                return mapToBoostResponse(pushHistory, "Listing boosted successfully using quota");
+                log.info("Successfully pushed listing {} using quota", request.getListingId());
+                return mapToPushResponse(pushHistory, "Listing pushed successfully using quota");
             }
         }
 
         // No quota or user chose not to use quota - require payment
-        log.info("No quota available or user chose payment - initiating payment flow for boost");
+        log.info("No quota available or user chose payment - initiating payment flow for push");
 
-        // Create PENDING transaction for boost
+        // Create PENDING transaction for push
         String transactionId = transactionService.createBoostFeeTransaction(
                 userId,
                 request.getListingId(),
@@ -117,16 +117,16 @@ public class PushServiceImpl implements PushService {
                 .provider(PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(PricingConstants.BOOST_PER_TIME)
-                .orderInfo("Boost listing #" + request.getListingId())
+                .orderInfo("Push listing #" + request.getListingId())
                 .returnUrl(request.getReturnUrl())
                 .build();
 
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
 
-        log.info("Payment URL generated for boost transaction: {}", transactionId);
+        log.info("Payment URL generated for push transaction: {}", transactionId);
 
-        // Return payment response wrapped in BoostResponse
-        return BoostResponse.builder()
+        // Return payment response wrapped in PushResponse
+        return PushResponse.builder()
                 .listingId(request.getListingId())
                 .userId(userId)
                 .pushSource("PAYMENT_REQUIRED")
@@ -138,8 +138,8 @@ public class PushServiceImpl implements PushService {
 
     @Override
     @Transactional
-    public BoostResponse completeBoostAfterPayment(String transactionId) {
-        log.info("Completing boost after payment for transaction: {}", transactionId);
+    public PushResponse completePushAfterPayment(String transactionId) {
+        log.info("Completing push after payment for transaction: {}", transactionId);
 
         // Get transaction
         Transaction transaction = transactionRepository.findById(transactionId)
@@ -175,19 +175,19 @@ public class PushServiceImpl implements PushService {
         // Save push history
         pushHistory = pushHistoryRepository.save(pushHistory);
 
-        // If listing is Gold or Diamond, also boost its shadow listing
+        // If listing is Gold or Diamond, also push its shadow listing
         if ((listing.isGold() || listing.isDiamond()) && !listing.isShadowListing()) {
-            boostShadowListing(listing, transaction.getUserId());
+            pushShadowListing(listing, transaction.getUserId());
         }
 
-        log.info("Successfully boosted listing {} after payment", listingId);
-        return mapToBoostResponse(pushHistory, "Listing boosted successfully after payment");
+        log.info("Successfully pushed listing {} after payment", listingId);
+        return mapToPushResponse(pushHistory, "Listing pushed successfully after payment");
     }
 
     @Override
     @Transactional
-    public BoostResponse scheduleBoost(String userId, ScheduleBoostRequest request) {
-        log.info("Scheduling boost for listing {} at time {}", request.getListingId(), request.getScheduledTime());
+    public PushResponse schedulePush(String userId, SchedulePushRequest request) {
+        log.info("Scheduling push for listing {} at time {}", request.getListingId(), request.getScheduledTime());
 
         // Validate listing
         Listing listing = listingRepository.findById(request.getListingId())
@@ -207,7 +207,7 @@ public class PushServiceImpl implements PushService {
                     userId, BenefitType.BOOST, LocalDateTime.now());
 
             if (availableQuota == null || availableQuota < request.getTotalPushes()) {
-                throw new RuntimeException("Insufficient boost quota. Available: " + availableQuota +
+                throw new RuntimeException("Insufficient push quota. Available: " + availableQuota +
                         ", Required: " + request.getTotalPushes());
             }
 
@@ -238,19 +238,19 @@ public class PushServiceImpl implements PushService {
 
         schedule = pushScheduleRepository.save(schedule);
 
-        log.info("Successfully scheduled boost for listing {}", request.getListingId());
-        return BoostResponse.builder()
+        log.info("Successfully scheduled push for listing {}", request.getListingId());
+        return PushResponse.builder()
                 .listingId(request.getListingId())
                 .userId(userId)
                 .pushSource(source.name())
-                .message("Boost scheduled successfully for " + request.getScheduledTime())
+                .message("Push scheduled successfully for " + request.getScheduledTime())
                 .build();
     }
 
     @Override
     @Transactional
-    public int executeScheduledBoosts() {
-        log.info("Executing scheduled boosts");
+    public int executeScheduledPushes() {
+        log.info("Executing scheduled pushes");
         LocalTime currentTime = LocalTime.now().withSecond(0).withNano(0);
 
         List<PushSchedule> schedules = pushScheduleRepository.findActiveSchedulesByTime(currentTime);
@@ -258,22 +258,22 @@ public class PushServiceImpl implements PushService {
 
         for (PushSchedule schedule : schedules) {
             try {
-                executeScheduledBoost(schedule);
+                executeScheduledPush(schedule);
                 executedCount++;
             } catch (Exception e) {
-                log.error("Failed to execute scheduled boost for schedule {}: {}",
+                log.error("Failed to execute scheduled push for schedule {}: {}",
                         schedule.getScheduleId(), e.getMessage());
             }
         }
 
-        log.info("Executed {} scheduled boosts", executedCount);
+        log.info("Executed {} scheduled pushes", executedCount);
         return executedCount;
     }
 
     @Override
     @Transactional
-    public void cancelScheduledBoost(String userId, Long scheduleId) {
-        log.info("Cancelling scheduled boost {} for user {}", scheduleId, userId);
+    public void cancelScheduledPush(String userId, Long scheduleId) {
+        log.info("Cancelling scheduled push {} for user {}", scheduleId, userId);
 
         PushSchedule schedule = pushScheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new RuntimeException("Schedule not found: " + scheduleId));
@@ -285,23 +285,23 @@ public class PushServiceImpl implements PushService {
         schedule.cancel();
         pushScheduleRepository.save(schedule);
 
-        log.info("Successfully cancelled scheduled boost {}", scheduleId);
+        log.info("Successfully cancelled scheduled push {}", scheduleId);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<BoostResponse> getBoostHistory(Long listingId) {
-        log.info("Getting boost history for listing: {}", listingId);
+    public List<PushResponse> getPushHistory(Long listingId) {
+        log.info("Getting push history for listing: {}", listingId);
         return pushHistoryRepository.findByListingIdOrderByPushedAtDesc(listingId)
                 .stream()
-                .map(ph -> mapToBoostResponse(ph, null))
+                .map(ph -> mapToPushResponse(ph, null))
                 .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<BoostResponse> getUserBoostHistory(String userId) {
-        log.info("Getting boost history for user: {}", userId);
+    public List<PushResponse> getUserPushHistory(String userId) {
+        log.info("Getting push history for user: {}", userId);
 
         // Find all listings owned by the user
         List<Listing> userListings = listingRepository.findByUserId(userId);
@@ -317,165 +317,11 @@ public class PushServiceImpl implements PushService {
         // Find all push history for these listings
         return pushHistoryRepository.findByListingIdInOrderByPushedAtDesc(listingIds)
                 .stream()
-                .map(ph -> mapToBoostResponse(ph, null))
+                .map(ph -> mapToPushResponse(ph, null))
                 .collect(Collectors.toList());
     }
 
-    // ========== Legacy Push Schedule Methods ==========
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    @Transactional
-    public PushSchedule createSchedule(Long listingId, LocalTime scheduledTime, LocalDateTime endTime) {
-        log.info("Creating push schedule: listingId={}, scheduledTime={}, endTime={}",
-                listingId, scheduledTime, endTime);
-
-        // Validate listing exists
-        if (!listingRepository.existsById(listingId)) {
-            log.error("Cannot create schedule: Listing not found: listingId={}", listingId);
-            throw new IllegalArgumentException("Listing not found with ID: " + listingId);
-        }
-
-        // Check if listing already has an active schedule
-        boolean hasActiveSchedule = pushScheduleRepository
-                .existsByListingIdAndStatus(listingId, PushSchedule.ScheduleStatus.ACTIVE);
-
-        if (hasActiveSchedule) {
-            log.error("Cannot create schedule: Listing already has an active schedule: listingId={}", listingId);
-            throw new IllegalStateException("Listing already has an active schedule. Deactivate or delete the existing schedule first.");
-        }
-
-        // Validate end time is in the future
-        if (endTime.isBefore(LocalDateTime.now())) {
-            log.error("Cannot create schedule: End time is in the past: endTime={}", endTime);
-            throw new IllegalArgumentException("End time must be in the future");
-        }
-
-        // Create the schedule
-        PushSchedule schedule = PushSchedule.builder()
-                .listingId(listingId)
-                .scheduledTime(scheduledTime)
-                .status(PushSchedule.ScheduleStatus.ACTIVE)
-                .build();
-
-        PushSchedule savedSchedule = pushScheduleRepository.save(schedule);
-        log.info("Successfully created push schedule: scheduleId={}, listingId={}",
-                savedSchedule.getScheduleId(), listingId);
-
-        return savedSchedule;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    @Transactional
-    public boolean pushListing(Long scheduleId, Long listingId, LocalDateTime pushTime) {
-        log.info("Attempting to push listing: listingId={}, scheduleId={}, pushTime={}",
-                listingId, scheduleId, pushTime);
-
-        try {
-            // Verify listing exists
-            Optional<Listing> listingOpt = listingRepository.findById(listingId);
-            if (listingOpt.isEmpty()) {
-                log.warn("Listing not found: listingId={}", listingId);
-                createPushHistory(scheduleId, listingId, PushHistory.PushStatus.FAIL,
-                        "Listing not found", pushTime);
-                return false;
-            }
-
-            Listing listing = listingOpt.get();
-
-            // Update pushed_at timestamp
-            listing.setPushedAt(pushTime);
-            listingRepository.save(listing);
-
-            // Create success history record
-            createPushHistory(scheduleId, listingId, PushHistory.PushStatus.SUCCESS,
-                    "Successfully pushed listing", pushTime);
-
-            log.info("Successfully pushed listing: listingId={}, scheduleId={}", listingId, scheduleId);
-            return true;
-
-        } catch (Exception e) {
-            log.error("Failed to push listing: listingId={}, scheduleId={}, error={}",
-                    listingId, scheduleId, e.getMessage(), e);
-
-            // Create failure history record
-            createPushHistory(scheduleId, listingId, PushHistory.PushStatus.FAIL,
-                    "Error: " + e.getMessage(), pushTime);
-            return false;
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    @Transactional
-    public int processScheduledPushes(LocalDateTime currentTime) {
-        log.info("Processing scheduled pushes for time: {}", currentTime);
-
-        // Extract the hour component (e.g., 09:00:00 from 2025-10-16 09:30:45)
-        LocalTime scheduledTime = LocalTime.of(currentTime.getHour(), 0, 0);
-
-        // Find all active schedules for this hour
-        List<PushSchedule> schedules = pushScheduleRepository
-                .findActiveSchedulesByScheduledTime(scheduledTime, currentTime);
-
-        log.info("Found {} active schedules for time: {}", schedules.size(), scheduledTime);
-
-        int successCount = 0;
-        for (PushSchedule schedule : schedules) {
-            try {
-                boolean success = pushListing(
-                        schedule.getScheduleId(),
-                        schedule.getListingId(),
-                        currentTime
-                );
-                if (success) {
-                    successCount++;
-                }
-            } catch (Exception e) {
-                log.error("Error processing schedule: scheduleId={}, listingId={}, error={}",
-                        schedule.getScheduleId(), schedule.getListingId(), e.getMessage(), e);
-            }
-        }
-
-        log.info("Completed processing scheduled pushes. Success: {}/{}", successCount, schedules.size());
-        return successCount;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    @Transactional
-    public int expireOldSchedules(LocalDateTime currentTime) {
-        log.info("Checking for expired schedules at: {}", currentTime);
-
-        List<PushSchedule> expiredSchedules = pushScheduleRepository.findExpiredSchedules(currentTime);
-        log.info("Found {} expired schedules", expiredSchedules.size());
-
-        int expiredCount = 0;
-        for (PushSchedule schedule : expiredSchedules) {
-            try {
-                schedule.setStatus(PushSchedule.ScheduleStatus.COMPLETED);
-                pushScheduleRepository.save(schedule);
-                expiredCount++;
-                log.info("Marked schedule as expired: scheduleId={}, listingId={}",
-                        schedule.getScheduleId(), schedule.getListingId());
-            } catch (Exception e) {
-                log.error("Error expiring schedule: scheduleId={}, error={}",
-                        schedule.getScheduleId(), e.getMessage(), e);
-            }
-        }
-
-        log.info("Expired {} schedules", expiredCount);
-        return expiredCount;
-    }
+    // ========== Helper Methods ==========
 
     /**
      * {@inheritDoc}
@@ -500,44 +346,10 @@ public class PushServiceImpl implements PushService {
     }
 
     /**
-     * Helper method to create a push history record.
-     * Encapsulates the history creation logic to avoid code duplication.
-     *
-     * @param scheduleId The schedule ID
-     * @param listingId The listing ID
-     * @param status The push status
-     * @param message The message describing the push result
-     * @param pushTime The time of the push
+     * Execute a single scheduled push
      */
-    private void createPushHistory(Long scheduleId, Long listingId, PushHistory.PushStatus status,
-                                    String message, LocalDateTime pushTime) {
-        try {
-            PushHistory history = PushHistory.builder()
-                    .scheduleId(scheduleId)
-                    .listingId(listingId)
-                    .pushSource(PushHistory.PushSource.SCHEDULED)
-                    .status(status)
-                    .message(message)
-                    .pushedAt(pushTime)
-                    .build();
-
-            pushHistoryRepository.save(history);
-            log.debug("Created push history: scheduleId={}, listingId={}, status={}",
-                    scheduleId, listingId, status);
-        } catch (Exception e) {
-            log.error("Failed to create push history: scheduleId={}, listingId={}, error={}",
-                    scheduleId, listingId, e.getMessage(), e);
-            // Don't throw exception to avoid disrupting the main push operation
-        }
-    }
-
-    // ========== Boost Helper Methods ==========
-
-    /**
-     * Execute a single scheduled boost
-     */
-    private void executeScheduledBoost(PushSchedule schedule) {
-        log.info("Executing scheduled boost: scheduleId={}, listingId={}",
+    private void executeScheduledPush(PushSchedule schedule) {
+        log.info("Executing scheduled push: scheduleId={}, listingId={}",
                 schedule.getScheduleId(), schedule.getListingId());
 
         // Check if schedule has remaining pushes
@@ -586,18 +398,18 @@ public class PushServiceImpl implements PushService {
         }
         pushScheduleRepository.save(schedule);
 
-        // If listing is Gold or Diamond, also boost shadow
+        // If listing is Gold or Diamond, also push shadow
         if ((listing.isGold() || listing.isDiamond()) && !listing.isShadowListing()) {
-            boostShadowListing(listing, schedule.getUserId());
+            pushShadowListing(listing, schedule.getUserId());
         }
 
-        log.info("Successfully executed scheduled boost for listing {}", listing.getListingId());
+        log.info("Successfully executed scheduled push for listing {}", listing.getListingId());
     }
 
     /**
-     * Boost the shadow listing associated with a Gold/Diamond listing
+     * Push the shadow listing associated with a Gold/Diamond listing
      */
-    private void boostShadowListing(Listing mainListing, String userId) {
+    private void pushShadowListing(Listing mainListing, String userId) {
         try {
             // Find shadow listing
             Listing shadowListing = listingRepository.findShadowListingByMainListingId(mainListing.getListingId())
@@ -616,30 +428,55 @@ public class PushServiceImpl implements PushService {
             // Create push history for shadow listing
             PushHistory shadowHistory = PushHistory.builder()
                     .listingId(shadowListing.getListingId())
-                    .pushSource(PushHistory.PushSource.ADMIN) // Shadow boosts are automatic
+                    .pushSource(PushHistory.PushSource.ADMIN) // Shadow pushes are automatic
                     .status(PushHistory.PushStatus.SUCCESS)
                     .pushedAt(LocalDateTime.now())
                     .build();
             pushHistoryRepository.save(shadowHistory);
 
-            log.info("Boosted shadow listing {} for main listing {}",
+            log.info("Pushed shadow listing {} for main listing {}",
                     shadowListing.getListingId(), mainListing.getListingId());
         } catch (Exception e) {
-            log.error("Failed to boost shadow listing for {}: {}",
+            log.error("Failed to push shadow listing for {}: {}",
                     mainListing.getListingId(), e.getMessage());
         }
     }
 
     /**
-     * Map PushHistory entity to BoostResponse DTO
+     * Map PushHistory entity to PushResponse DTO
      */
-    private BoostResponse mapToBoostResponse(PushHistory pushHistory, String message) {
-        return BoostResponse.builder()
+    private PushResponse mapToPushResponse(PushHistory pushHistory, String message) {
+        return PushResponse.builder()
                 .listingId(pushHistory.getListingId())
                 .pushSource(pushHistory.getPushSource() != null ? pushHistory.getPushSource().name() : null)
                 .pushedAt(pushHistory.getPushedAt())
                 .transactionId(pushHistory.getTransactionId())
-                .message(message != null ? message : "Boost history retrieved")
+                .message(message != null ? message : "Push history retrieved")
                 .build();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<PushHistory> getPushHistoryByUserId(String userId) {
+        log.info("Getting push history entities for user: {}", userId);
+
+        // Find all listings owned by the user
+        List<Listing> userListings = listingRepository.findByUserId(userId);
+        List<Long> listingIds = userListings.stream()
+                .map(Listing::getListingId)
+                .collect(Collectors.toList());
+
+        if (listingIds.isEmpty()) {
+            log.info("No listings found for user: {}", userId);
+            return List.of();
+        }
+
+        // Find all push history for these listings
+        List<PushHistory> history = pushHistoryRepository.findByListingIdInOrderByPushedAtDesc(listingIds);
+        log.info("Found {} push history records for user: {}", history.size(), userId);
+        return history;
     }
 }

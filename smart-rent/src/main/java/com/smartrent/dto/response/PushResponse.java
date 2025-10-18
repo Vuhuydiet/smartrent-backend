@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class BoostResponse {
+public class PushResponse {
 
     Long pushId;
     Long listingId;
@@ -24,4 +24,3 @@ public class BoostResponse {
     String paymentUrl;
     String transactionId;
 }
-

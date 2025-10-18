@@ -4,27 +4,20 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.time.LocalTime;
-
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class ScheduleBoostRequest {
+public class PushListingRequest {
 
     @NotNull(message = "Listing ID is required")
     Long listingId;
 
-    @NotNull(message = "Scheduled time is required")
-    LocalTime scheduledTime;
+    Boolean useMembershipQuota; // true = use quota, false = direct purchase
 
-    @NotNull(message = "Total pushes is required")
-    Integer totalPushes;
+    String paymentProvider; // Only needed if useMembershipQuota = false
 
-    Boolean useMembershipQuota;
-
-    String paymentProvider;
+    String returnUrl; // URL to return after payment (for VNPay callback)
 }
-

@@ -27,7 +27,7 @@ public class ListingPushScheduler {
     PushService pushService;
 
     /**
-     * Process scheduled pushes at the start of every hour.
+     * Execute scheduled pushes at the start of every hour.
      * Cron expression: "0 0 * * * *" means:
      * - Second: 0 (at the start of the minute)
      * - Minute: 0 (at the start of the hour)
@@ -39,39 +39,14 @@ public class ListingPushScheduler {
      * This will run at 00:00, 01:00, 02:00, etc.
      */
     @Scheduled(cron = "0 0 * * * *")
-    public void processScheduledPushes() {
-        LocalDateTime currentTime = LocalDateTime.now();
-        log.info("=== Starting scheduled push processing at {} ===", currentTime);
+    public void executeScheduledPushes() {
+        log.info("=== Starting scheduled push execution ===");
 
         try {
-            int pushedCount = pushService.processScheduledPushes(currentTime);
-            log.info("=== Completed scheduled push processing. Pushed {} listings ===", pushedCount);
+            int pushedCount = pushService.executeScheduledPushes();
+            log.info("=== Completed scheduled push execution. Pushed {} listings ===", pushedCount);
         } catch (Exception e) {
-            log.error("=== Error during scheduled push processing: {} ===", e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Cleanup task to mark expired schedules.
-     * Runs every day at 1:00 AM to clean up schedules that have passed their end_time.
-     * Cron expression: "0 0 1 * * *" means:
-     * - Second: 0
-     * - Minute: 0
-     * - Hour: 1 (1 AM)
-     * - Day of month: * (every day)
-     * - Month: * (every month)
-     * - Day of week: * (every day of week)
-     */
-    @Scheduled(cron = "0 0 1 * * *")
-    public void cleanupExpiredSchedules() {
-        LocalDateTime currentTime = LocalDateTime.now();
-        log.info("=== Starting cleanup of expired schedules at {} ===", currentTime);
-
-        try {
-            int expiredCount = pushService.expireOldSchedules(currentTime);
-            log.info("=== Completed cleanup. Expired {} schedules ===", expiredCount);
-        } catch (Exception e) {
-            log.error("=== Error during cleanup of expired schedules: {} ===", e.getMessage(), e);
+            log.error("=== Error during scheduled push execution: {} ===", e.getMessage(), e);
         }
     }
 
