@@ -3,7 +3,7 @@ package com.smartrent.enums;
 public enum ReferenceType {
     MEMBERSHIP,
     LISTING,
-    BOOST,
+    PUSH,
     WALLET
 }
 

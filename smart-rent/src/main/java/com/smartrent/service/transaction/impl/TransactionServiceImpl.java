@@ -81,24 +81,24 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     @Transactional
-    public String createBoostFeeTransaction(String userId, Long listingId, BigDecimal amount, String paymentProvider) {
-        log.info("Creating boost fee transaction for user: {}, listing: {}", userId, listingId);
+    public String createPushFeeTransaction(String userId, Long listingId, BigDecimal amount, String paymentProvider) {
+        log.info("Creating push fee transaction for user: {}, listing: {}", userId, listingId);
 
         Transaction transaction = Transaction.builder()
                 .transactionId(UUID.randomUUID().toString())
                 .userId(userId)
-                .transactionType(TransactionType.BOOST_FEE)
+                .transactionType(TransactionType.PUSH_FEE)
                 .amount(amount)
-                .referenceType(ReferenceType.BOOST)
+                .referenceType(ReferenceType.PUSH)
                 .referenceId(listingId.toString())
                 .status(TransactionStatus.PENDING)
                 .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "VNPAY"))
-                .additionalInfo("Pay-per-boost fee")
+                .additionalInfo("Pay-per-push fee")
                 .build();
 
         transaction = transactionRepository.save(transaction);
-        log.info("Created boost fee transaction: {}", transaction.getTransactionId());
-        
+        log.info("Created push fee transaction: {}", transaction.getTransactionId());
+
         return transaction.getTransactionId();
     }
 

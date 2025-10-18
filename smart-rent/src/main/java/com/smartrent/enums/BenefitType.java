@@ -22,9 +22,9 @@ public enum BenefitType {
     POST_DIAMOND,
 
     /**
-     * Free boost/push quota
+     * Free push quota
      */
-    BOOST,
+    PUSH,
 
     /**
      * Auto-verify listings immediately

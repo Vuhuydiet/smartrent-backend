@@ -24,6 +24,9 @@ public class AfterBearerTokenExceptionHandler extends OncePerRequestFilter {
     try {
       filterChain.doFilter(request, response);
     } catch (Exception e) {
+      log.error("Exception caught in AfterBearerTokenExceptionHandler for request: {} {}",
+          request.getMethod(), request.getRequestURI(), e);
+
       DomainCode domainCode = DomainCode.UNAUTHENTICATED;
       response.setStatus(domainCode.getStatus().value());
       response.setContentType(MediaType.APPLICATION_JSON_VALUE);

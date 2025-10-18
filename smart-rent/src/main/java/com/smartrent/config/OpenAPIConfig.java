@@ -82,16 +82,16 @@ public class OpenAPIConfig {
                 "- **No Wallet System**: All payments go directly through VNPay\n" +
                 "- **Dual Payment Model**: Use membership quota (free) or pay-per-action\n" +
                 "- **Secure Transactions**: HMAC-SHA512 signature verification\n" +
-                "- **Payment Flows**: Membership purchase, pay-per-post, pay-per-boost\n" +
+                "- **Payment Flows**: Membership purchase, pay-per-post, pay-per-push\n" +
                 "- **Transaction Tracking**: Complete history of all payments\n" +
                 "- Initiate payments via `/v1/payments/*`\n" +
                 "- View transaction history via `/v1/payments/history`\n\n" +
 
                 "## Membership System\n" +
                 "SmartRent offers premium membership packages with exclusive benefits:\n" +
-                "- **Basic Package** (700,000 VND): 3 VIP posts, 1 Premium post, 5 boosts\n" +
-                "- **Standard Package** (1,400,000 VND): 7 VIP posts, 3 Premium posts, 13 boosts\n" +
-                "- **Advanced Package** (2,800,000 VND): 15 VIP posts, 7 Premium posts, 30 boosts\n" +
+                "- **Basic Package** (700,000 VND): 3 VIP posts, 1 Premium post, 5 pushes\n" +
+                "- **Standard Package** (1,400,000 VND): 7 VIP posts, 3 Premium posts, 13 pushes\n" +
+                "- **Advanced Package** (2,800,000 VND): 15 VIP posts, 7 Premium posts, 30 pushes\n" +
                 "- **Auto-Verification**: VIP/Premium posts skip manual review\n" +
                 "- Purchase memberships via `/v1/payments/membership`\n" +
                 "- Check quota availability via `/v1/listings/quota-check`\n\n" +
@@ -105,13 +105,13 @@ public class OpenAPIConfig {
                 "- Create VIP listings via `/v1/listings/vip`\n" +
                 "- Check quota before posting via `/v1/listings/quota-check`\n\n" +
 
-                "## Listing Boost\n" +
-                "Increase your listing visibility with boost features:\n" +
-                "- **Instant Boost**: Push listing to top immediately via `/v1/boosts/boost`\n" +
-                "- **Scheduled Boost**: Schedule automatic daily boosts via `/v1/boosts/schedule`\n" +
+                "## Listing Push\n" +
+                "Increase your listing visibility with push features:\n" +
+                "- **Instant Push**: Push listing to top immediately via `/v1/pushes/push`\n" +
+                "- **Scheduled Push**: Schedule automatic daily pushes via `/v1/pushes/schedule`\n" +
                 "- **Payment Options**: Use membership quota (free) or pay 40,000 VND\n" +
-                "- **Premium Auto-Boost**: Boosting Premium also boosts shadow listing\n" +
-                "- **History Tracking**: View boost history for analytics\n\n" +
+                "- **Premium Auto-Push**: Pushing Premium also pushes shadow listing\n" +
+                "- **History Tracking**: View push history for analytics\n\n" +
 
                 "## Saved Listings\n" +
                 "Users can save favorite listings for later viewing:\n" +
@@ -196,7 +196,7 @@ public class OpenAPIConfig {
                         .description("Transaction details")
                         .addProperty("transactionId", new Schema<>().type("string").description("Transaction ID"))
                         .addProperty("userId", new Schema<>().type("string").description("User ID"))
-                        .addProperty("transactionType", new Schema<>().type("string").description("Type: MEMBERSHIP_PURCHASE, POST_FEE, BOOST_FEE"))
+                        .addProperty("transactionType", new Schema<>().type("string").description("Type: MEMBERSHIP_PURCHASE, POST_FEE, PUSH_FEE"))
                         .addProperty("amount", new Schema<>().type("number").description("Amount in VND"))
                         .addProperty("status", new Schema<>().type("string").description("Status: PENDING, COMPLETED, FAILED"))
                         .addProperty("paymentProvider", new Schema<>().type("string").description("Payment provider: VNPAY"))
@@ -335,12 +335,12 @@ public class OpenAPIConfig {
     }
 
     @Bean
-    public GroupedOpenApi boostApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+    public GroupedOpenApi pushApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
             return GroupedOpenApi.builder()
-                            .group("boost")
-                            .displayName("Boost & Promotion")
+                            .group("push")
+                            .displayName("Push & Promotion")
                             .packagesToScan(packageToScan)
-                            .pathsToMatch("/v1/boosts/**")
+                            .pathsToMatch("/v1/pushes/**")
                             .build();
     }
 
@@ -371,6 +371,26 @@ public class OpenAPIConfig {
                             .displayName("Quota Management")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/quotas/**")
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi vipTierApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("vip-tiers")
+                            .displayName("VIP Tier Details")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/vip-tiers/**")
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi pushDetailApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("push-details")
+                            .displayName("Push Pricing Details")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/push-details/**")
                             .build();
     }
 }

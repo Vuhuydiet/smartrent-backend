@@ -57,15 +57,15 @@ public class PaymentAmountValidator {
     }
 
     /**
-     * Validate boost payment amount
+     * Validate push payment amount
      */
-    public boolean validateBoostAmount(BigDecimal amount) {
-        boolean isValid = amount.compareTo(PricingConstants.BOOST_PER_TIME) == 0;
-        
+    public boolean validatePushAmount(BigDecimal amount) {
+        boolean isValid = amount.compareTo(PricingConstants.PUSH_PER_TIME) == 0;
+
         if (!isValid) {
-            log.warn("Invalid boost amount. Expected: {}, Got: {}", PricingConstants.BOOST_PER_TIME, amount);
+            log.warn("Invalid push amount. Expected: {}, Got: {}", PricingConstants.PUSH_PER_TIME, amount);
         }
-        
+
         return isValid;
     }
 

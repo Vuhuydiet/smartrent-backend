@@ -1,4 +1,4 @@
-# SmartRent Membership & Boost API Documentation
+# SmartRent Membership & Push API Documentation
 
 ## Base URL
 ```
@@ -47,7 +47,7 @@ Headers:
         },
         {
           "benefitId": 2,
-          "benefitType": "BOOST_QUOTA",
+          "benefitType": "PUSH_QUOTA",
           "benefitNameDisplay": "10 lượt đẩy tin miễn phí",
           "quantityPerMonth": 10
         }
@@ -123,7 +123,7 @@ Headers:
       },
       {
         "userBenefitId": 3,
-        "benefitType": "BOOST_QUOTA",
+        "benefitType": "PUSH_QUOTA",
         "benefitNameDisplay": "20 lượt đẩy tin miễn phí",
         "totalQuantity": 20,
         "quantityUsed": 0,
@@ -203,9 +203,9 @@ Headers:
 
 ---
 
-### 8. Check Boost Quota
+### 8. Check Push Quota
 
-**Endpoint:** `GET /memberships/quota/boosts`
+**Endpoint:** `GET /memberships/quota/pushes`
 
 **Headers:** `user-id: {userId}`
 
@@ -231,11 +231,11 @@ Headers:
 
 ---
 
-## 🚀 Boost Management APIs
+## 🚀 Push Management APIs
 
-### 1. Boost Listing (Immediate)
+### 1. Push Listing (Immediate)
 
-**Endpoint:** `POST /boosts/boost`
+**Endpoint:** `POST /pushes/boost`
 
 **Headers:** `user-id: {userId}`
 
@@ -248,7 +248,7 @@ Headers:
 ```
 
 **Parameters:**
-- `listingId` - ID of listing to boost
+- `listingId` - ID of listing to push
 - `useMembershipQuota` - true = use quota, false = direct purchase
 - `paymentProvider` - Required if useMembershipQuota = false
 
@@ -261,16 +261,16 @@ Headers:
     "userId": "user-123",
     "pushSource": "MEMBERSHIP_QUOTA",
     "pushedAt": "2025-01-03T15:00:00",
-    "message": "Listing boosted successfully"
+    "message": "Listing pushed successfully"
   }
 }
 ```
 
 ---
 
-### 2. Schedule Automatic Boosts
+### 2. Schedule Automatic Pushes
 
-**Endpoint:** `POST /boosts/schedule`
+**Endpoint:** `POST /pushes/schedule`
 
 **Headers:** `user-id: {userId}`
 
@@ -285,9 +285,9 @@ Headers:
 ```
 
 **Parameters:**
-- `listingId` - ID of listing to boost
-- `scheduledTime` - Time to boost daily (HH:mm:ss)
-- `totalPushes` - Number of times to boost
+- `listingId` - ID of listing to push
+- `scheduledTime` - Time to push daily (HH:mm:ss)
+- `totalPushes` - Number of times to push
 - `useMembershipQuota` - true = use quota, false = direct purchase
 
 **Response:**
@@ -297,16 +297,16 @@ Headers:
     "listingId": 101,
     "userId": "user-123",
     "pushSource": "MEMBERSHIP",
-    "message": "Boost scheduled successfully for 09:00:00"
+    "message": "Push scheduled successfully for 09:00:00"
   }
 }
 ```
 
 ---
 
-### 3. Get Listing Boost History
+### 3. Get Listing Push History
 
-**Endpoint:** `GET /boosts/listing/{listingId}/history`
+**Endpoint:** `GET /pushes/listing/{listingId}/history`
 
 **Parameters:**
 - `listingId` (path) - Listing ID
@@ -335,19 +335,19 @@ Headers:
 
 ---
 
-### 4. Get My Boost History
+### 4. Get My Push History
 
-**Endpoint:** `GET /boosts/my-history`
+**Endpoint:** `GET /pushes/my-history`
 
 **Headers:** `user-id: {userId}`
 
-**Response:** Same as listing boost history
+**Response:** Same as listing push history
 
 ---
 
-### 5. Cancel Scheduled Boost
+### 5. Cancel Scheduled Push
 
-**Endpoint:** `DELETE /boosts/schedule/{scheduleId}`
+**Endpoint:** `DELETE /pushes/schedule/{scheduleId}`
 
 **Headers:** `user-id: {userId}`
 
@@ -357,7 +357,7 @@ Headers:
 **Response:**
 ```json
 {
-  "message": "Scheduled boost cancelled successfully"
+  "message": "Scheduled push cancelled successfully"
 }
 ```
 
@@ -385,15 +385,15 @@ curl -X GET http://localhost:8080/v1/memberships/my-membership \
   -H "user-id: user-123"
 ```
 
-### Example 2: Boost Listing with Quota
+### Example 2: Push Listing with Quota
 
 ```bash
-# Step 1: Check boost quota
-curl -X GET http://localhost:8080/v1/memberships/quota/boosts \
+# Step 1: Check push quota
+curl -X GET http://localhost:8080/v1/memberships/quota/pushes \
   -H "user-id: user-123"
 
-# Step 2: Boost listing
-curl -X POST http://localhost:8080/v1/boosts/boost \
+# Step 2: Push listing
+curl -X POST http://localhost:8080/v1/pushes/boost \
   -H "user-id: user-123" \
   -H "Content-Type: application/json" \
   -d '{
@@ -401,8 +401,8 @@ curl -X POST http://localhost:8080/v1/boosts/boost \
     "useMembershipQuota": true
   }'
 
-# Step 3: View boost history
-curl -X GET http://localhost:8080/v1/boosts/my-history \
+# Step 3: View push history
+curl -X GET http://localhost:8080/v1/pushes/my-history \
   -H "user-id: user-123"
 ```
 
@@ -410,7 +410,7 @@ curl -X GET http://localhost:8080/v1/boosts/my-history \
 
 ```bash
 # Schedule 10 boosts at 9 AM daily
-curl -X POST http://localhost:8080/v1/boosts/schedule \
+curl -X POST http://localhost:8080/v1/pushes/schedule \
   -H "user-id: user-123" \
   -H "Content-Type: application/json" \
   -d '{
@@ -453,7 +453,7 @@ curl -X POST http://localhost:8080/v1/boosts/schedule \
 ```json
 {
   "error": "Insufficient quota",
-  "message": "No boost quota available"
+  "message": "No push quota available"
 }
 ```
 

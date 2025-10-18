@@ -28,8 +28,8 @@ import java.util.stream.Collectors;
 
 /**
  * Implementation of PushService.
- * Handles listing push/boost operations with proper transaction management and error handling.
- * Consolidated service for both immediate boosts and scheduled pushes.
+ * Handles listing push operations with proper transaction management and error handling.
+ * Consolidated service for both immediate pushes and scheduled pushes.
  */
 @Slf4j
 @Service
@@ -66,13 +66,13 @@ public class PushServiceImpl implements PushService {
 
         if (useQuota) {
             // Check quota availability
-            var quotaStatus = quotaService.checkQuotaAvailability(userId, BenefitType.BOOST);
+            var quotaStatus = quotaService.checkQuotaAvailability(userId, BenefitType.PUSH);
 
             if (quotaStatus.getTotalAvailable() > 0) {
                 // Use membership quota
-                boolean consumed = quotaService.consumeQuota(userId, BenefitType.BOOST, 1);
+                boolean consumed = quotaService.consumeQuota(userId, BenefitType.PUSH, 1);
                 if (!consumed) {
-                    throw new RuntimeException("Failed to consume boost quota");
+                    throw new RuntimeException("Failed to consume push quota");
                 }
 
                 // Create push history with MEMBERSHIP_QUOTA source
@@ -105,10 +105,10 @@ public class PushServiceImpl implements PushService {
         log.info("No quota available or user chose payment - initiating payment flow for push");
 
         // Create PENDING transaction for push
-        String transactionId = transactionService.createBoostFeeTransaction(
+        String transactionId = transactionService.createPushFeeTransaction(
                 userId,
                 request.getListingId(),
-                PricingConstants.BOOST_PER_TIME,
+                PricingConstants.PUSH_PER_TIME,
                 request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
         );
 
@@ -116,7 +116,7 @@ public class PushServiceImpl implements PushService {
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .provider(PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
-                .amount(PricingConstants.BOOST_PER_TIME)
+                .amount(PricingConstants.PUSH_PER_TIME)
                 .orderInfo("Push listing #" + request.getListingId())
                 .returnUrl(request.getReturnUrl())
                 .build();
@@ -149,8 +149,8 @@ public class PushServiceImpl implements PushService {
             throw new RuntimeException("Transaction is not completed: " + transactionId);
         }
 
-        if (!transaction.isBoostFee()) {
-            throw new RuntimeException("Transaction is not a boost fee: " + transactionId);
+        if (!transaction.isPushFee()) {
+            throw new RuntimeException("Transaction is not a push fee: " + transactionId);
         }
 
         // Get listing ID from transaction reference
@@ -204,7 +204,7 @@ public class PushServiceImpl implements PushService {
         if (Boolean.TRUE.equals(request.getUseMembershipQuota())) {
             // Check if user has enough quota
             Integer availableQuota = userBenefitRepository.getTotalAvailableQuota(
-                    userId, BenefitType.BOOST, LocalDateTime.now());
+                    userId, BenefitType.PUSH, LocalDateTime.now());
 
             if (availableQuota == null || availableQuota < request.getTotalPushes()) {
                 throw new RuntimeException("Insufficient push quota. Available: " + availableQuota +
@@ -214,10 +214,10 @@ public class PushServiceImpl implements PushService {
             source = PushSchedule.PushSource.MEMBERSHIP;
         } else {
             // Direct purchase - create transaction
-            String txnId = transactionService.createBoostFeeTransaction(
+            String txnId = transactionService.createPushFeeTransaction(
                     userId,
                     request.getListingId(),
-                    PricingConstants.BOOST_PER_TIME.multiply(java.math.BigDecimal.valueOf(request.getTotalPushes())),
+                    PricingConstants.PUSH_PER_TIME.multiply(java.math.BigDecimal.valueOf(request.getTotalPushes())),
                     request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
             );
 
@@ -366,7 +366,7 @@ public class PushServiceImpl implements PushService {
 
         // If using membership quota, consume it
         if (schedule.getSource() == PushSchedule.PushSource.MEMBERSHIP) {
-            boolean consumed = quotaService.consumeQuota(schedule.getUserId(), BenefitType.BOOST, 1);
+            boolean consumed = quotaService.consumeQuota(schedule.getUserId(), BenefitType.PUSH, 1);
             if (!consumed) {
                 log.error("Failed to consume quota for schedule {}", schedule.getScheduleId());
                 return;

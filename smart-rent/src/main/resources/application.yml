@@ -119,6 +119,8 @@ application:
         - "/v1/addresses/**"
         - "/v1/memberships/packages"
         - "/v1/memberships/packages/**"
+        - "/v1/vip-tiers/**"
+        - "/v1/push-details/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"

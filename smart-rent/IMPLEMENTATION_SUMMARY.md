@@ -34,11 +34,11 @@ This document summarizes the implementation of the comprehensive membership and 
   - Benefit consumption
   - Expiration handling
   
-- ✅ **BoostService** - Full implementation
-  - Manual boost
-  - Scheduled boost
+- ✅ **PushService** - Full implementation
+  - Manual push
+  - Scheduled push
   - Quota consumption
-  - Shadow listing boost
+  - Shadow listing push
   - History tracking
 
 - ⏳ **TransactionService** - Not yet implemented
@@ -55,8 +55,8 @@ This document summarizes the implementation of the comprehensive membership and 
 - ✅ **MembershipController** - Complete with Swagger docs
   - 9 endpoints for membership management
   
-- ✅ **BoostController** - Complete with Swagger docs
-  - 5 endpoints for boost operations
+- ✅ **PushController** - Complete with Swagger docs
+  - 5 endpoints for push operations
 
 - ⏳ **TransactionController** - Not yet implemented
 - ⏳ **Enhanced ListingController** - VIP endpoints needed
@@ -109,18 +109,18 @@ This document summarizes the implementation of the comprehensive membership and 
    - Cancellation support
    - Benefit expiration
 
-### ✅ Boost System
-1. **Manual Boost**
+### ✅ Push System
+1. **Manual Push**
    - Immediate listing push
    - Quota or direct purchase
-   - Shadow listing auto-boost
+   - Shadow listing auto-push
 
-2. **Scheduled Boost**
-   - Daily automatic boost
+2. **Scheduled Push**
+   - Daily automatic push
    - Configurable time
    - Quota tracking
 
-3. **Boost History**
+3. **Push History**
    - Per-listing history
    - Per-user history
    - Source tracking
@@ -155,7 +155,7 @@ This document summarizes the implementation of the comprehensive membership and 
 Purchase STANDARD (1 month):
 - 10 VIP posts/month × 1 = 10 total
 - 5 Premium posts/month × 1 = 5 total
-- 20 boosts/month × 1 = 20 total
+- 20 pushes/month × 1 = 20 total
 ALL granted immediately, no monthly cycles
 ```
 
@@ -168,12 +168,12 @@ User posts VIP listing:
 4. Update quota: 10 → 9
 ```
 
-### 3. Boost Propagation ✅
+### 3. Push Propagation ✅
 ```
-User boosts Premium listing:
-1. Boost Premium listing
+User pushes Premium listing:
+1. Push Premium listing
 2. Find shadow listing
-3. Auto-boost shadow (FREE)
+3. Auto-push shadow (FREE)
 4. Update both post_date and pushed_at
 ```
 
@@ -225,8 +225,8 @@ smart-rent/
 │   │
 │   ├── dto/request/
 │   │   ├── MembershipPurchaseRequest.java
-│   │   ├── BoostListingRequest.java
-│   │   ├── ScheduleBoostRequest.java
+│   │   ├── PushListingRequest.java
+│   │   ├── SchedulePushRequest.java
 │   │   └── VipListingCreationRequest.java
 │   │
 │   ├── dto/response/
@@ -235,20 +235,20 @@ smart-rent/
 │   │   ├── UserMembershipResponse.java
 │   │   ├── UserMembershipBenefitResponse.java
 │   │   ├── TransactionResponse.java
-│   │   ├── BoostResponse.java
+│   │   ├── PushResponse.java
 │   │   └── QuotaStatusResponse.java
 │   │
 │   ├── service/membership/
 │   │   ├── MembershipService.java
 │   │   └── impl/MembershipServiceImpl.java
 │   │
-│   ├── service/boost/
-│   │   ├── BoostService.java
-│   │   └── impl/BoostServiceImpl.java
+│   ├── service/push/
+│   │   ├── PushService.java
+│   │   └── impl/PushServiceImpl.java
 │   │
 │   └── controller/
 │       ├── MembershipController.java
-│       └── BoostController.java
+│       └── PushController.java
 │
 ├── src/main/resources/db/migration/
 │   └── V13__Create_membership_and_transaction_system.sql

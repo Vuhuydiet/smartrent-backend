@@ -127,8 +127,8 @@ public class Transaction {
         return transactionType == TransactionType.POST_FEE;
     }
 
-    public boolean isBoostFee() {
-        return transactionType == TransactionType.BOOST_FEE;
+    public boolean isPushFee() {
+        return transactionType == TransactionType.PUSH_FEE;
     }
 
     public boolean isWalletTopup() {

@@ -105,19 +105,19 @@ The SmartRent API is organized into **12 logical groups** for easy navigation:
 - Purchase membership
 - Get active membership
 - Get membership history
-- Check quota (VIP posts, Premium posts, Boosts)
+- Check quota (VIP posts, Premium posts, Pushes)
 - Cancel membership
 
-### 10. Boost & Promotion
-**Group**: `boost`
-**Description**: Listing boost features to increase visibility
-**Paths**: `/v1/boosts/**`
+### 10. Push & Promotion
+**Group**: `push`
+**Description**: Listing push features to increase visibility
+**Paths**: `/v1/pushes/**`
 
 **Key Endpoints**:
-- Boost listing immediately
-- Schedule automatic boosts
-- Get boost history (by listing or user)
-- Cancel scheduled boost
+- Push listing immediately
+- Schedule automatic pushes
+- Get push history (by listing or user)
+- Cancel scheduled push
 
 ### 11. Saved Listings
 **Group**: `saved-listings`
@@ -139,7 +139,7 @@ The SmartRent API is organized into **12 logical groups** for easy navigation:
 **Key Endpoints**:
 - Initiate membership payment
 - Initiate post payment
-- Initiate boost payment
+- Initiate push payment
 - Payment callback handling
 - Get transaction history
 
@@ -223,18 +223,18 @@ All API responses follow a consistent format:
 - Quota-based benefits:
   - VIP Posts
   - Premium Posts
-  - Boost Quota
+  - Push Quota
   - Priority Support
 - Automatic benefit allocation upon purchase
 - Membership history tracking
 - Real-time quota checking
 
-### 2. Boost System
-- **Instant Boost**: Push listing to top immediately
-- **Scheduled Boost**: Automatic daily boosts at specific times
+### 2. Push System
+- **Instant Push**: Push listing to top immediately
+- **Scheduled Push**: Automatic daily pushes at specific times
 - **Payment Options**: Use membership quota or direct purchase
-- **History Tracking**: View all boost activities
-- **Source Tracking**: Track boost source (membership vs. direct purchase)
+- **History Tracking**: View all push activities
+- **Source Tracking**: Track push source (membership vs. direct purchase)
 
 ### 3. Dynamic Pricing
 - Update listing prices with effective dates
@@ -302,7 +302,7 @@ Navigate to: `http://localhost:8080/swagger-ui.html`
 
 ### New API Groups Added:
 1. **Membership Management** - Complete membership package system
-2. **Boost & Promotion** - Listing visibility enhancement
+2. **Push & Promotion** - Listing visibility enhancement
 3. **Saved Listings** - User favorites management
 4. **Pricing & Price History** - Dynamic pricing with history
 5. **VNPay Payments & Transactions** - Payment processing

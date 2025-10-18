@@ -19,9 +19,9 @@ public class UserMembershipBenefitResponse {
     Long userBenefitId;
 
     @Schema(
-        description = "Benefit type: POST_SILVER, POST_GOLD, POST_DIAMOND, BOOST, AUTO_APPROVE, BADGE",
+        description = "Benefit type: POST_SILVER, POST_GOLD, POST_DIAMOND, PUSH, AUTO_APPROVE, BADGE",
         example = "POST_SILVER",
-        allowableValues = {"POST_SILVER", "POST_GOLD", "POST_DIAMOND", "BOOST", "AUTO_APPROVE", "BADGE"}
+        allowableValues = {"POST_SILVER", "POST_GOLD", "POST_DIAMOND", "PUSH", "AUTO_APPROVE", "BADGE"}
     )
     String benefitType;
 

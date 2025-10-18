@@ -64,14 +64,14 @@ public class QuotaAvailabilityValidator {
     }
 
     /**
-     * Check if user has boost quota
+     * Check if user has push quota
      */
-    public boolean hasBoostQuota(String userId) {
-        QuotaStatusResponse quota = quotaService.checkQuotaAvailability(userId, BenefitType.BOOST);
+    public boolean hasPushQuota(String userId) {
+        QuotaStatusResponse quota = quotaService.checkQuotaAvailability(userId, BenefitType.PUSH);
         boolean hasQuota = quota.getTotalAvailable() > 0;
 
         if (!hasQuota) {
-            log.info("User {} has no boost quota available", userId);
+            log.info("User {} has no push quota available", userId);
         }
 
         return hasQuota;

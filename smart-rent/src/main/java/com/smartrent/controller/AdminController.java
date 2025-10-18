@@ -19,6 +19,8 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -237,14 +239,11 @@ public class AdminController {
           )
       )
   })
-  ApiResponse<GetAdminResponse> getAdminById(
-      @Parameter(
-          name = "X-Admin-Id",
-          description = "The unique identifier of the administrator",
-          required = true,
-          example = "admin-123e4567-e89b-12d3-a456-426614174000"
-      )
-      @RequestHeader(Constants.ADMIN_ID) String id) {
+  ApiResponse<GetAdminResponse> getAdminById() {
+    // Extract admin ID from JWT token
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String id = authentication.getName();
+
     GetAdminResponse getAdminResponse = adminService.getAdminById(id);
     return ApiResponse.<GetAdminResponse>builder()
         .data(getAdminResponse)

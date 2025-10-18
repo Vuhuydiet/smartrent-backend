@@ -15,6 +15,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -49,9 +51,11 @@ public class PushController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<PushResponse> pushListing(
-            @RequestHeader("user-id") String userId,
-            @RequestBody @Valid PushListingRequest request) {
+    public ApiResponse<PushResponse> pushListing(@RequestBody @Valid PushListingRequest request) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         log.info("User {} pushing listing {}", userId, request.getListingId());
         PushResponse response = pushService.pushListing(userId, request);
         return ApiResponse.<PushResponse>builder()
@@ -79,9 +83,11 @@ public class PushController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<PushResponse> schedulePush(
-            @RequestHeader("user-id") String userId,
-            @RequestBody @Valid SchedulePushRequest request) {
+    public ApiResponse<PushResponse> schedulePush(@RequestBody @Valid SchedulePushRequest request) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         log.info("User {} scheduling push for listing {}", userId, request.getListingId());
         PushResponse response = pushService.schedulePush(userId, request);
         return ApiResponse.<PushResponse>builder()
@@ -128,7 +134,11 @@ public class PushController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<List<PushResponse>> getMyPushHistory(@RequestHeader("user-id") String userId) {
+    public ApiResponse<List<PushResponse>> getMyPushHistory() {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         log.info("Getting push history for user: {}", userId);
         List<PushResponse> history = pushService.getUserPushHistory(userId);
         return ApiResponse.<List<PushResponse>>builder()
@@ -152,9 +162,11 @@ public class PushController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<Void> cancelScheduledPush(
-            @RequestHeader("user-id") String userId,
-            @PathVariable Long scheduleId) {
+    public ApiResponse<Void> cancelScheduledPush(@PathVariable Long scheduleId) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
         log.info("User {} cancelling scheduled push {}", userId, scheduleId);
         pushService.cancelScheduledPush(userId, scheduleId);
         return ApiResponse.<Void>builder()

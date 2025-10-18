@@ -60,13 +60,13 @@ public final class PricingConstants {
     public static final BigDecimal DISCOUNT_30_DAYS = new BigDecimal("0.185");
 
     // =====================================================
-    // BOOST PRICES
+    // PUSH PRICES
     // =====================================================
 
     /**
-     * Boost price per time: 40,000 VND
+     * Push price per time: 40,000 VND
      */
-    public static final BigDecimal BOOST_PER_TIME = new BigDecimal("40000");
+    public static final BigDecimal PUSH_PER_TIME = new BigDecimal("40000");
 
     // =====================================================
     // STANDARD PRICES (30 days with 18.5% discount)
@@ -173,12 +173,12 @@ public final class PricingConstants {
     }
 
     /**
-     * Calculate price for multiple boosts
-     * @param count Number of boosts
+     * Calculate price for multiple pushes
+     * @param count Number of pushes
      * @return Total price
      */
-    public static BigDecimal calculateBoostPrice(int count) {
-        return BOOST_PER_TIME.multiply(new BigDecimal(count));
+    public static BigDecimal calculatePushPrice(int count) {
+        return PUSH_PER_TIME.multiply(new BigDecimal(count));
     }
 
     // =====================================================

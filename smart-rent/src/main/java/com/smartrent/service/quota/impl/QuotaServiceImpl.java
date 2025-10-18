@@ -67,7 +67,7 @@ public class QuotaServiceImpl implements QuotaService {
         quotas.put("silverPosts", checkQuotaAvailability(userId, BenefitType.POST_SILVER));
         quotas.put("goldPosts", checkQuotaAvailability(userId, BenefitType.POST_GOLD));
         quotas.put("diamondPosts", checkQuotaAvailability(userId, BenefitType.POST_DIAMOND));
-        quotas.put("boosts", checkQuotaAvailability(userId, BenefitType.BOOST));
+        quotas.put("pushes", checkQuotaAvailability(userId, BenefitType.PUSH));
 
         return quotas;
     }
