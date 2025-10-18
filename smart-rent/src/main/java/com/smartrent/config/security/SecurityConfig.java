@@ -46,16 +46,6 @@ public class SecurityConfig {
         ? securityProperties.getMethods().getPost().toArray(new String[0])
         : new String[0];
 
-    // Log configured patterns for debugging
-    log.info("Configured {} public GET patterns", getPatterns.length);
-    log.info("Configured {} public POST patterns", postPatterns.length);
-    for (int i = 0; i < getPatterns.length; i++) {
-      log.info("  GET pattern[{}]: '{}'", i, getPatterns[i]);
-    }
-    for (int i = 0; i < postPatterns.length; i++) {
-      log.info("  POST pattern[{}]: '{}'", i, postPatterns[i]);
-    }
-
     http.authorizeHttpRequests(configurer -> {
       configurer
           // Configure public POST endpoints from YAML
