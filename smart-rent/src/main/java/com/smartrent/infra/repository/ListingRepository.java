@@ -17,7 +17,11 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
 
     List<Listing> findByUserId(String userId);
 
-    Optional<Listing> findShadowListingByMainListingId(Long mainListingId);
+    Optional<Listing> findByParentListingId(Long parentListingId);
+
+    default Optional<Listing> findShadowListingByMainListingId(Long mainListingId) {
+        return findByParentListingId(mainListingId);
+    }
 
 
 
@@ -32,8 +36,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
      */
     @Query("""
         SELECT l FROM listings l
-        JOIN addresses a ON l.addressId = a.addressId
-        WHERE a.ward.wardId = :wardId
+        WHERE l.address.ward.wardId = :wardId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -51,8 +54,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
      */
     @Query("""
         SELECT l FROM listings l
-        JOIN addresses a ON l.addressId = a.addressId
-        WHERE a.district.districtId = :districtId
+        WHERE l.address.district.districtId = :districtId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -70,8 +72,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
      */
     @Query("""
         SELECT l FROM listings l
-        JOIN addresses a ON l.addressId = a.addressId
-        WHERE a.province.provinceId = :provinceId
+        WHERE l.address.province.provinceId = :provinceId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -96,8 +97,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
             AVG(l.area),
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
-        JOIN addresses a ON l.addressId = a.addressId
-        WHERE a.ward.wardId = :wardId
+        WHERE l.address.ward.wardId = :wardId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -120,8 +120,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
             AVG(l.area),
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
-        JOIN addresses a ON l.addressId = a.addressId
-        WHERE a.district.districtId = :districtId
+        WHERE l.address.district.districtId = :districtId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -144,8 +143,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
             AVG(l.area),
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
-        JOIN addresses a ON l.addressId = a.addressId
-        WHERE a.province.provinceId = :provinceId
+        WHERE l.address.province.provinceId = :provinceId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit

@@ -173,10 +173,6 @@ feign:
           url: "https://www.googleapis.com"
       vnpay:
         url: "${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}"
-      tinhthanhpho:
-        url: "${TINHTHANHPHO_API_URL:https://tinhthanhpho.com}"
-        connectTimeout: 5000
-        readTimeout: 10000
 
 springdoc:
   api-docs:
@@ -247,11 +243,6 @@ resilience4j:
       emailService:
         baseConfig: default
         recordFailurePredicate: com.smartrent.config.retry.email.EmailServiceFailurePredicate
-      tinhthanhpho:
-        baseConfig: default
-        failureRateThreshold: 60
-        waitDurationInOpenState: 120s
-        slidingWindowSize: 20
 
   retry:
     configs:
@@ -269,10 +260,6 @@ resilience4j:
     instances:
       emailService:
         baseConfig: default
-      tinhthanhpho:
-        baseConfig: default
-        maxAttempts: 3
-        waitDuration: 2s
 
   timelimiter:
     configs:
@@ -282,9 +269,6 @@ resilience4j:
     instances:
       emailService:
         baseConfig: default
-      tinhthanhpho:
-        baseConfig: default
-        timeoutDuration: 15s
 
 # Management endpoints for monitoring circuit breaker health
 management:

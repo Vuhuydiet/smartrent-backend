@@ -19,7 +19,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AddressCreationRequest {
-    @NotBlank(message = "Street number is required")
+
     String streetNumber;
 
     @NotNull(message = "Street ID is required")
@@ -28,12 +28,19 @@ public class AddressCreationRequest {
     @NotNull(message = "Ward ID is required")
     Long wardId;
 
+
     @NotNull(message = "District ID is required")
     Long districtId;
+
 
     @NotNull(message = "Province ID is required")
     Long provinceId;
 
+    String fullAddress;
+
     BigDecimal latitude;
+
     BigDecimal longitude;
+
+    Boolean isVerified;
 }

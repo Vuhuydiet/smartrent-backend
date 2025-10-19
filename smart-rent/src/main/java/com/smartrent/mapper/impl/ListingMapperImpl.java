@@ -37,7 +37,8 @@ public class ListingMapperImpl implements ListingMapper {
                 .productType(req.getProductType() != null ? Listing.ProductType.valueOf(req.getProductType()) : null)
                 .price(req.getPrice())
                 .priceUnit(req.getPriceUnit() != null ? Listing.PriceUnit.valueOf(req.getPriceUnit()) : null)
-                .addressId(req.getAddressId())
+                // Note: address is NOT set here - it will be set in the service layer after creation
+                // to ensure transactional integrity between Address and Listing creation
                 .area(req.getArea())
                 .bedrooms(req.getBedrooms())
                 .bathrooms(req.getBathrooms())
@@ -81,7 +82,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .productType(entity.getProductType() != null ? entity.getProductType().name() : null)
                 .price(entity.getPrice())
                 .priceUnit(entity.getPriceUnit() != null ? entity.getPriceUnit().name() : null)
-                .addressId(entity.getAddressId())
+                .addressId(entity.getAddress() != null ? entity.getAddress().getAddressId() : null)
                 .area(entity.getArea())
                 .bedrooms(entity.getBedrooms())
                 .bathrooms(entity.getBathrooms())
@@ -148,7 +149,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .productType(entity.getProductType() != null ? entity.getProductType().name() : null)
                 .price(entity.getPrice())
                 .priceUnit(entity.getPriceUnit() != null ? entity.getPriceUnit().name() : null)
-                .addressId(entity.getAddressId())
+                .addressId(entity.getAddress() != null ? entity.getAddress().getAddressId() : null)
                 .area(entity.getArea())
                 .bedrooms(entity.getBedrooms())
                 .bathrooms(entity.getBathrooms())

@@ -48,13 +48,23 @@ public class Ward {
     @Column(nullable = false)
     WardType type;
 
+    // District relationship - nullable to support 2025 structure (Province -> Ward directly)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "district_id", nullable = false)
+    @JoinColumn(name = "district_id", nullable = true)
     District district;
+
+    // Direct province relationship for 2025 structure (no districts)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "province_id", nullable = true)
+    Province province;
 
     @Builder.Default
     @Column(name = "is_active", nullable = false)
     Boolean isActive = true;
+
+    @Builder.Default
+    @Column(name = "is_2025_structure", nullable = false)
+    Boolean is2025Structure = false; // true if belongs to new province-only structure
 
     @Column(name = "effective_from")
     LocalDate effectiveFrom;
@@ -75,5 +85,21 @@ public class Ward {
 
     public enum WardType {
         WARD, COMMUNE, TOWNSHIP
+    }
+
+    // Helper methods for 2025 structure
+    public Province getEffectiveProvince() {
+        if (is2025Structure != null && is2025Structure) {
+            return province;
+        }
+        return district != null ? district.getProvince() : null;
+    }
+
+    public boolean hasDistrict() {
+        return district != null;
+    }
+
+    public boolean usesNewStructure() {
+        return is2025Structure != null && is2025Structure;
     }
 }

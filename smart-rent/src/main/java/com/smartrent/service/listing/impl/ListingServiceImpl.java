@@ -55,11 +55,28 @@ public class ListingServiceImpl implements ListingService {
     TransactionRepository transactionRepository;
     PaymentService paymentService;
 
+    com.smartrent.infra.repository.StreetRepository streetRepository;
+    com.smartrent.infra.repository.WardRepository wardRepository;
+    com.smartrent.infra.repository.DistrictRepository districtRepository;
+    com.smartrent.infra.repository.ProvinceRepository provinceRepository;
+
     @Override
     @Transactional
     public ListingCreationResponse createListing(ListingCreationRequest request) {
+        log.info("Creating listing with address - User: {}, Title: {}", request.getUserId(), request.getTitle());
+
+        // Create address first (within the same transaction)
+        Address address = createAddress(request.getAddress());
+
+        // Create listing and set the address
         Listing listing = listingMapper.toEntity(request);
+        listing.setAddress(address);
+
+        // Save listing
         Listing saved = listingRepository.save(listing);
+        log.info("Listing created successfully with id: {} and address id: {}",
+                saved.getListingId(), address.getAddressId());
+
         return listingMapper.toCreationResponse(saved);
     }
 
@@ -93,8 +110,11 @@ public class ListingServiceImpl implements ListingService {
                     throw new RuntimeException("Failed to consume quota");
                 }
 
+                // Create address first (within the same transaction)
+                Address address = createAddress(request.getAddress());
+
                 // Create listing with postSource = QUOTA
-                Listing listing = buildListingFromVipRequest(request);
+                Listing listing = buildListingFromVipRequest(request, address);
                 listing.setPostSource(PostSource.QUOTA);
                 listing.setTransactionId(null);
 
@@ -176,7 +196,7 @@ public class ListingServiceImpl implements ListingService {
         throw new RuntimeException("Complete VIP listing creation requires listing data - not yet implemented");
     }
 
-    private Listing buildListingFromVipRequest(VipListingCreationRequest request) {
+    private Listing buildListingFromVipRequest(VipListingCreationRequest request, Address address) {
         return Listing.builder()
                 .title(request.getTitle())
                 .description(request.getDescription())
@@ -187,7 +207,7 @@ public class ListingServiceImpl implements ListingService {
                 .productType(Listing.ProductType.valueOf(request.getProductType()))
                 .price(request.getPrice())
                 .priceUnit(Listing.PriceUnit.valueOf(request.getPriceUnit()))
-                .addressId(request.getAddressId())
+                .address(address)  // Use Address entity instead of addressId
                 .area(request.getArea())
                 .bedrooms(request.getBedrooms())
                 .bathrooms(request.getBathrooms())
@@ -214,7 +234,7 @@ public class ListingServiceImpl implements ListingService {
                 .productType(premiumListing.getProductType())
                 .price(premiumListing.getPrice())
                 .priceUnit(premiumListing.getPriceUnit())
-                .addressId(premiumListing.getAddressId())
+                .address(premiumListing.getAddress())  // Use same Address entity
                 .area(premiumListing.getArea())
                 .bedrooms(premiumListing.getBedrooms())
                 .bathrooms(premiumListing.getBathrooms())
@@ -241,13 +261,11 @@ public class ListingServiceImpl implements ListingService {
         Listing listing = listingRepository.findByIdWithAmenities(id)
                 .orElseThrow(() -> new RuntimeException("Listing not found"));
 
-        // Get address to determine location IDs
-        Address address = addressRepository.findById(listing.getAddressId()).orElse(null);
-
         // Build basic response
         ListingResponse response = listingMapper.toResponse(listing);
 
         // Add location pricing if address is available
+        Address address = listing.getAddress();
         if (address != null) {
             Long wardId = address.getWard() != null ? address.getWard().getWardId() : null;
             Long districtId = address.getDistrict() != null ? address.getDistrict().getDistrictId() : null;
@@ -343,5 +361,65 @@ public class ListingServiceImpl implements ListingService {
         String verificationNotes = null;
 
         return listingMapper.toResponseWithAdmin(listing, verifyingAdmin, verificationStatus, verificationNotes);
+    }
+
+    /**
+     * Helper method to create an Address from AddressCreationRequest.
+     * This ensures that address creation is part of the same transaction as listing creation,
+     * preventing orphaned data.
+     *
+     * @param addressRequest the address creation request
+     * @return the created and persisted Address entity
+     * @throws RuntimeException if any required entity (street, ward, district, province) is not found
+     */
+    private Address createAddress(com.smartrent.dto.request.AddressCreationRequest addressRequest) {
+        log.info("Creating address for listing - Province: {}, District: {}, Ward: {}, Street: {}",
+                addressRequest.getProvinceId(), addressRequest.getDistrictId(),
+                addressRequest.getWardId(), addressRequest.getStreetId());
+
+        // Fetch required entities
+        var street = streetRepository.findById(addressRequest.getStreetId())
+                .orElseThrow(() -> new RuntimeException("Street not found with id: " + addressRequest.getStreetId()));
+
+        var ward = wardRepository.findById(addressRequest.getWardId())
+                .orElseThrow(() -> new RuntimeException("Ward not found with id: " + addressRequest.getWardId()));
+
+        var district = districtRepository.findById(addressRequest.getDistrictId())
+                .orElseThrow(() -> new RuntimeException("District not found with id: " + addressRequest.getDistrictId()));
+
+        var province = provinceRepository.findById(addressRequest.getProvinceId())
+                .orElseThrow(() -> new RuntimeException("Province not found with id: " + addressRequest.getProvinceId()));
+
+        // Build full address if not provided
+        String fullAddress = addressRequest.getFullAddress();
+        if (fullAddress == null || fullAddress.isBlank()) {
+            StringBuilder sb = new StringBuilder();
+            if (addressRequest.getStreetNumber() != null && !addressRequest.getStreetNumber().isBlank()) {
+                sb.append(addressRequest.getStreetNumber()).append(" ");
+            }
+            sb.append(street.getName()).append(", ");
+            sb.append(ward.getName()).append(", ");
+            sb.append(district.getName()).append(", ");
+            sb.append(province.getName());
+            fullAddress = sb.toString();
+        }
+
+        // Create address entity
+        Address address = Address.builder()
+                .streetNumber(addressRequest.getStreetNumber())
+                .street(street)
+                .ward(ward)
+                .district(district)
+                .province(province)
+                .fullAddress(fullAddress)
+                .latitude(addressRequest.getLatitude())
+                .longitude(addressRequest.getLongitude())
+                .isVerified(addressRequest.getIsVerified() != null ? addressRequest.getIsVerified() : false)
+                .build();
+
+        // Save and return
+        Address savedAddress = addressRepository.save(address);
+        log.info("Address created successfully with id: {}", savedAddress.getAddressId());
+        return savedAddress;
     }
 }

@@ -2,6 +2,7 @@ package com.smartrent.dto.request;
 
 import com.smartrent.infra.repository.entity.Listing;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -57,9 +58,10 @@ public class VipListingCreationRequest {
     @Schema(description = "Price unit", example = "MONTH", allowableValues = {"MONTH", "DAY", "YEAR"})
     String priceUnit;
 
-    @NotNull(message = "Address ID is required")
-    @Schema(description = "Address ID", example = "1", required = true)
-    Long addressId;
+    @Valid
+    @NotNull(message = "Address information is required")
+    @Schema(description = "Address information for creating new address with this listing", required = true)
+    AddressCreationRequest address;
 
     @Schema(description = "Area in square meters", example = "75.5")
     Float area;

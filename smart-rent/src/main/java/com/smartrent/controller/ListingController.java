@@ -35,7 +35,28 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/v1/listings")
-@Tag(name = "Listings", description = "CRUD operations for property listings")
+@Tag(
+    name = "Property Listings",
+    description = """
+        Complete property listing management with VIP tiers, quota system, and transactional address creation.
+
+        **Listing Types:**
+        - NORMAL: Standard listings (90,000 VND/30 days)
+        - SILVER: Enhanced visibility (600,000 VND/30 days or quota)
+        - GOLD: Premium visibility (1,200,000 VND/30 days or quota)
+        - DIAMOND: Maximum visibility + shadow NORMAL listing (1,800,000 VND/30 days or quota)
+
+        **Payment Model:**
+        - Pay-per-post: Direct payment via VNPay
+        - Membership quota: Free posts from membership package
+
+        **Features:**
+        - Transactional address creation (no orphaned data)
+        - Location-based pricing analytics
+        - Admin verification workflow
+        - Quota management
+        """
+)
 @RequiredArgsConstructor
 public class ListingController {
 
@@ -43,7 +64,29 @@ public class ListingController {
     private final QuotaService quotaService;
 
     @Operation(
-        summary = "Create a new listing",
+        summary = "Create a new listing with transactional address",
+        description = """
+            Creates a new property listing with automatic address creation in a single transaction.
+
+            **Transactional Address Creation:**
+            - Address is created first within the same transaction
+            - If listing creation fails, address is automatically rolled back
+            - No orphaned address data
+            - Full address text is auto-generated if not provided
+
+            **Required Fields:**
+            - title, description, userId
+            - listingType (RENT/SALE)
+            - productType (APARTMENT/HOUSE/STUDIO/etc.)
+            - price, priceUnit (MONTH/DAY/YEAR)
+            - address object with provinceId, districtId, wardId, streetId
+
+            **Optional Fields:**
+            - area, bedrooms, bathrooms
+            - direction, furnishing, propertyType
+            - amenityIds (array of amenity IDs)
+            - address.latitude, address.longitude
+            """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(
@@ -51,6 +94,7 @@ public class ListingController {
                 schema = @Schema(implementation = ListingCreationRequest.class),
                 examples = @ExampleObject(
                     name = "Create Listing Example",
+                    summary = "Tạo listing mới với address (transactional)",
                     value = """
                         {
                           "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
@@ -64,9 +108,17 @@ public class ListingController {
                           "vipType": "NORMAL",
                           "categoryId": 10,
                           "productType": "APARTMENT",
-                          "price": 1200.00,
+                          "price": 12000000,
                           "priceUnit": "MONTH",
-                          "addressId": 501,
+                          "address": {
+                            "streetNumber": "123",
+                            "streetId": 1,
+                            "wardId": 1,
+                            "districtId": 1,
+                            "provinceId": 1,
+                            "latitude": 21.0285,
+                            "longitude": 105.8542
+                          },
                           "area": 78.5,
                           "bedrooms": 2,
                           "bathrooms": 1,
@@ -538,46 +590,102 @@ public class ListingController {
                 schema = @Schema(implementation = VipListingCreationRequest.class),
                 examples = {
                     @ExampleObject(
-                        name = "VIP with Quota",
+                        name = "SILVER with Quota",
+                        summary = "SILVER listing sử dụng quota từ membership",
                         value = """
                             {
-                              "title": "Căn hộ cao cấp tại Quận 1",
-                              "description": "Căn hộ 2 phòng ngủ đẹp",
+                              "title": "Căn hộ cao cấp tại Quận Ba Đình",
+                              "description": "Căn hộ 2 phòng ngủ đẹp, đầy đủ nội thất",
                               "listingType": "RENT",
-                              "vipType": "VIP",
+                              "vipType": "SILVER",
                               "categoryId": 1,
                               "productType": "APARTMENT",
                               "price": 15000000,
                               "priceUnit": "MONTH",
-                              "addressId": 123,
+                              "address": {
+                                "streetNumber": "45A",
+                                "streetId": 10,
+                                "wardId": 1,
+                                "districtId": 1,
+                                "provinceId": 1,
+                                "latitude": 21.0285,
+                                "longitude": 105.8542
+                              },
                               "area": 80.5,
                               "bedrooms": 2,
                               "bathrooms": 2,
+                              "direction": "SOUTH",
+                              "furnishing": "FULLY_FURNISHED",
                               "useMembershipQuota": true,
                               "durationDays": 30
                             }
                             """
                     ),
                     @ExampleObject(
-                        name = "Premium with Payment",
+                        name = "GOLD with Payment",
+                        summary = "GOLD listing với thanh toán VNPay",
                         value = """
                             {
-                              "title": "Biệt thự Premium tại Quận 2",
-                              "description": "Biệt thự 4 phòng ngủ tuyệt đẹp",
+                              "title": "Biệt thự GOLD tại Quận 2",
+                              "description": "Biệt thự 3 phòng ngủ sang trọng",
                               "listingType": "RENT",
-                              "vipType": "PREMIUM",
+                              "vipType": "GOLD",
                               "categoryId": 1,
                               "productType": "HOUSE",
-                              "price": 50000000,
+                              "price": 35000000,
                               "priceUnit": "MONTH",
-                              "addressId": 456,
-                              "area": 250.0,
-                              "bedrooms": 4,
+                              "address": {
+                                "streetNumber": "120",
+                                "streetId": 50,
+                                "wardId": 20,
+                                "districtId": 10,
+                                "provinceId": 79,
+                                "latitude": 10.7769,
+                                "longitude": 106.7009
+                              },
+                              "area": 200.0,
+                              "bedrooms": 3,
                               "bathrooms": 3,
+                              "direction": "EAST",
+                              "furnishing": "FULLY_FURNISHED",
                               "useMembershipQuota": false,
                               "durationDays": 30,
                               "paymentProvider": "VNPAY",
                               "returnUrl": "http://localhost:3000/payment/result"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "DIAMOND with Shadow",
+                        summary = "DIAMOND listing (tự động tạo shadow NORMAL listing)",
+                        value = """
+                            {
+                              "title": "Penthouse DIAMOND Landmark 81",
+                              "description": "Penthouse cao cấp nhất với view toàn thành phố",
+                              "listingType": "RENT",
+                              "vipType": "DIAMOND",
+                              "categoryId": 1,
+                              "productType": "PENTHOUSE",
+                              "price": 100000000,
+                              "priceUnit": "MONTH",
+                              "address": {
+                                "streetNumber": "720A",
+                                "streetId": 100,
+                                "wardId": 50,
+                                "districtId": 20,
+                                "provinceId": 79,
+                                "latitude": 10.7941,
+                                "longitude": 106.7218
+                              },
+                              "area": 500.0,
+                              "bedrooms": 5,
+                              "bathrooms": 5,
+                              "direction": "NORTHEAST",
+                              "furnishing": "LUXURY_FURNISHED",
+                              "propertyType": "PENTHOUSE",
+                              "roomCapacity": 10,
+                              "useMembershipQuota": true,
+                              "durationDays": 30
                             }
                             """
                     )

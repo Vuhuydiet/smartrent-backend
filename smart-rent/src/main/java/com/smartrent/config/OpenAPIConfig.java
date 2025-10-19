@@ -119,6 +119,21 @@ public class OpenAPIConfig {
                 "- View saved listings via `/v1/saved-listings/my-saved`\n" +
                 "- Check if listing is saved via `/v1/saved-listings/check/{listingId}`\n\n" +
 
+                "## Address Management (Vietnamese Administrative Structure)\n" +
+                "SmartRent uses Vietnam's 3-tier administrative hierarchy (63 provinces):\n" +
+                "- **Province Level** (Tỉnh/Thành phố): 63 units total\n" +
+                "  - 5 centrally-governed cities: Hà Nội, HCM, Đà Nẵng, Hải Phòng, Cần Thơ\n" +
+                "  - 58 provinces\n" +
+                "- **District Level** (Quận/Huyện/Thị xã): ~700 units\n" +
+                "  - Quận (Urban district), Huyện (Rural district), Thị xã (Town)\n" +
+                "- **Ward Level** (Phường/Xã/Thị trấn): ~11,000 units\n" +
+                "  - Phường (Ward), Xã (Commune), Thị trấn (Township)\n" +
+                "- **Cascading Selection**: Province → District → Ward for address forms\n" +
+                "- **Search Capability**: Search across all administrative levels\n" +
+                "- **Unified Response**: All endpoints return AddressUnitDTO format\n" +
+                "- Browse addresses via `/v1/addresses/provinces`, `/v1/addresses/provinces/{id}/districts`, etc.\n" +
+                "- Search addresses via `/v1/addresses/provinces/search?q={query}`\n\n" +
+
                 "## Circuit Breaker & Resilience\n" +
                 "The API implements circuit breaker patterns for email services to ensure reliability:\n" +
                 "- Automatic retry on transient failures\n" +
@@ -234,6 +249,76 @@ public class OpenAPIConfig {
                                 .addProperty("responseCode", new Schema<>().type("string"))
                                 .addProperty("reason", new Schema<>().type("string"))
                         )
+                )
+                .addSchemas("AddressUnitDTO", new Schema<>()
+                        .type("object")
+                        .description("Vietnamese administrative unit (Province, District, or Ward)")
+                        .addProperty("id", new Schema<>().type("integer").format("int64").example(1).description("Unique ID"))
+                        .addProperty("name", new Schema<>().type("string").example("Thành phố Hà Nội").description("Administrative unit name"))
+                        .addProperty("code", new Schema<>().type("string").example("01").description("Administrative code"))
+                        .addProperty("type", new Schema<>().type("string").example("CITY").description("Type: CITY, PROVINCE, DISTRICT, WARD, COMMUNE, TOWNSHIP"))
+                        .addProperty("level", new Schema<>().type("string").example("PROVINCE").description("Level: PROVINCE, DISTRICT, WARD"))
+                        .addProperty("isActive", new Schema<>().type("boolean").example(true).description("Whether unit is active"))
+                        .addProperty("provinceId", new Schema<>().type("integer").format("int64").nullable(true).description("Parent province ID (for districts/wards)"))
+                        .addProperty("provinceName", new Schema<>().type("string").nullable(true).description("Parent province name"))
+                        .addProperty("districtId", new Schema<>().type("integer").format("int64").nullable(true).description("Parent district ID (for wards)"))
+                        .addProperty("districtName", new Schema<>().type("string").nullable(true).description("Parent district name"))
+                        .addProperty("fullAddressText", new Schema<>().type("string").example("Phường Phúc Xá, Quận Ba Đình, Thành phố Hà Nội").description("Complete hierarchical address"))
+                        .addProperty("isMerged", new Schema<>().type("boolean").nullable(true).description("Whether province is merged (province level only)"))
+                        .addProperty("originalName", new Schema<>().type("string").nullable(true).description("Original name before administrative changes"))
+                )
+                .addSchemas("AddressCreationRequest", new Schema<>()
+                        .type("object")
+                        .description("Address creation request for new listing")
+                        .addProperty("streetNumber", new Schema<>().type("string").example("123").description("Street number (optional)"))
+                        .addProperty("streetId", new Schema<>().type("integer").format("int64").example(1).description("Street ID (required)"))
+                        .addProperty("wardId", new Schema<>().type("integer").format("int64").example(1).description("Ward ID (required)"))
+                        .addProperty("districtId", new Schema<>().type("integer").format("int64").example(1).description("District ID (required)"))
+                        .addProperty("provinceId", new Schema<>().type("integer").format("int64").example(1).description("Province ID (required)"))
+                        .addProperty("fullAddress", new Schema<>().type("string").nullable(true).description("Full address text (auto-generated if not provided)"))
+                        .addProperty("latitude", new Schema<>().type("number").format("decimal").nullable(true).description("Latitude coordinate"))
+                        .addProperty("longitude", new Schema<>().type("number").format("decimal").nullable(true).description("Longitude coordinate"))
+                        .addProperty("isVerified", new Schema<>().type("boolean").nullable(true).description("Whether address is verified"))
+                )
+                .addSchemas("ListingCreationRequest", new Schema<>()
+                        .type("object")
+                        .description("Request to create a new listing with transactional address creation")
+                        .addProperty("title", new Schema<>().type("string").example("Căn hộ 2 phòng ngủ đẹp").description("Listing title"))
+                        .addProperty("description", new Schema<>().type("string").description("Detailed description"))
+                        .addProperty("userId", new Schema<>().type("string").description("User ID (owner)"))
+                        .addProperty("listingType", new Schema<>().type("string").example("RENT").description("RENT or SALE"))
+                        .addProperty("vipType", new Schema<>().type("string").example("NORMAL").description("NORMAL, SILVER, GOLD, DIAMOND"))
+                        .addProperty("productType", new Schema<>().type("string").example("APARTMENT").description("Property type"))
+                        .addProperty("price", new Schema<>().type("number").format("decimal").example(12000000).description("Price"))
+                        .addProperty("priceUnit", new Schema<>().type("string").example("MONTH").description("MONTH, DAY, YEAR"))
+                        .addProperty("address", new Schema<>().$ref("#/components/schemas/AddressCreationRequest"))
+                        .addProperty("area", new Schema<>().type("number").format("float").example(78.5).description("Area in sqm"))
+                        .addProperty("bedrooms", new Schema<>().type("integer").example(2).description("Number of bedrooms"))
+                        .addProperty("bathrooms", new Schema<>().type("integer").example(1).description("Number of bathrooms"))
+                        .addProperty("amenityIds", new Schema<>().type("array").description("Array of amenity IDs"))
+                )
+                .addSchemas("ListingResponse", new Schema<>()
+                        .type("object")
+                        .description("Listing response with full details and location pricing")
+                        .addProperty("listingId", new Schema<>().type("integer").format("int64").description("Listing ID"))
+                        .addProperty("title", new Schema<>().type("string").description("Listing title"))
+                        .addProperty("description", new Schema<>().type("string").description("Description"))
+                        .addProperty("price", new Schema<>().type("number").format("decimal").description("Price"))
+                        .addProperty("priceUnit", new Schema<>().type("string").description("Price unit"))
+                        .addProperty("vipType", new Schema<>().type("string").description("VIP tier"))
+                        .addProperty("addressId", new Schema<>().type("integer").format("int64").description("Address ID"))
+                        .addProperty("area", new Schema<>().type("number").format("float").description("Area"))
+                        .addProperty("bedrooms", new Schema<>().type("integer").description("Bedrooms"))
+                        .addProperty("bathrooms", new Schema<>().type("integer").description("Bathrooms"))
+                        .addProperty("amenities", new Schema<>().type("array").description("Array of amenity objects"))
+                        .addProperty("locationPricing", new Schema<>().type("object").description("Location-based pricing analytics"))
+                        .addProperty("createdAt", new Schema<>().type("string").format("date-time").description("Creation timestamp"))
+                )
+                .addSchemas("ListingCreationResponse", new Schema<>()
+                        .type("object")
+                        .description("Response after creating a listing")
+                        .addProperty("listingId", new Schema<>().type("integer").format("int64").description("Created listing ID"))
+                        .addProperty("status", new Schema<>().type("string").example("CREATED").description("Creation status"))
                 );
     }
 

@@ -1,5 +1,6 @@
 package com.smartrent.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -57,8 +58,9 @@ public class ListingCreationRequest {
     @NotBlank
     String priceUnit;
 
-    @NotNull
-    Long addressId;
+    @Valid
+    @NotNull(message = "Address information is required")
+    AddressCreationRequest address;
 
     @DecimalMin(value = "0.0", inclusive = false)
     Float area;
