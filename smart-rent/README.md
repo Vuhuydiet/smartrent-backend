@@ -210,7 +210,9 @@ Admins (M) ←→ (M) Roles
 
 ### JWT Token Flow
 
-1. **Authentication**: POST `/v1/auth` or `/v1/auth/admin`
+1. **Authentication**:
+   - Email/Password: POST `/v1/auth` or `/v1/auth/admin`
+   - Google OAuth: POST `/v1/auth/outbound/google` (auto-creates users)
 2. **Token Usage**: Include `Authorization: Bearer <token>` header
 3. **Token Refresh**: POST `/v1/auth/refresh` with refresh token
 4. **Token Validation**: POST `/v1/auth/introspect`
@@ -280,7 +282,8 @@ Access comprehensive API documentation at: http://localhost:8080/swagger-ui.html
 ### Key Endpoints
 
 #### Authentication
-- `POST /v1/auth` - User authentication
+- `POST /v1/auth` - User authentication (email/password)
+- `POST /v1/auth/outbound/google` - Google OAuth authentication
 - `POST /v1/auth/admin` - Admin authentication
 - `POST /v1/auth/refresh` - Token refresh
 - `POST /v1/auth/logout` - User logout

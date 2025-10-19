@@ -160,6 +160,8 @@ The API uses **JWT (JSON Web Token)** for authentication.
 
 ### Authentication Flow
 
+#### Option 1: Email/Password Authentication
+
 1. **User Registration**:
    - `POST /v1/users` - Create account
    - `POST /v1/verification/code?email={email}` - Send verification code
@@ -168,6 +170,17 @@ The API uses **JWT (JSON Web Token)** for authentication.
 2. **User Login**:
    - `POST /v1/auth` - Login with email/password
    - Receive `accessToken` and `refreshToken`
+
+#### Option 2: Google OAuth Authentication
+
+1. **Google Login**:
+   - Redirect user to Google OAuth consent screen
+   - Receive authorization code from Google callback
+   - `POST /v1/auth/outbound/google` - Send authorization code
+   - Receive `accessToken` and `refreshToken`
+   - **Note**: New users are automatically created; no email verification required
+
+#### Using the API
 
 3. **Using Protected Endpoints**:
    - Add header: `Authorization: Bearer {accessToken}`
@@ -181,7 +194,7 @@ The API uses **JWT (JSON Web Token)** for authentication.
 
 ### Admin Authentication
 
-Similar flow but using `/v1/auth/admin/**` endpoints.
+Similar flow but using `/v1/auth/admin/**` endpoints (email/password only).
 
 ---
 

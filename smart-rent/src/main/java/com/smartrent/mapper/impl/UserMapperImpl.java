@@ -1,5 +1,6 @@
 package com.smartrent.mapper.impl;
 
+import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.GetUserResponse;
 import com.smartrent.dto.response.UserCreationResponse;
@@ -15,6 +16,20 @@ public class UserMapperImpl implements UserMapper {
     return User.builder()
         .email(userCreationRequest.getEmail())
         .password(userCreationRequest.getPassword())
+        .firstName(userCreationRequest.getFirstName())
+        .lastName(userCreationRequest.getLastName())
+        .idDocument(userCreationRequest.getIdDocument())
+        .taxNumber(userCreationRequest.getTaxNumber())
+        .phoneCode(userCreationRequest.getPhoneCode())
+        .phoneNumber(userCreationRequest.getPhoneNumber())
+        .build();
+  }
+
+  @Override
+  public User mapFromInternalUserCreationRequestToUserEntity(
+      InternalUserCreationRequest userCreationRequest) {
+    return User.builder()
+        .email(userCreationRequest.getEmail())
         .firstName(userCreationRequest.getFirstName())
         .lastName(userCreationRequest.getLastName())
         .idDocument(userCreationRequest.getIdDocument())

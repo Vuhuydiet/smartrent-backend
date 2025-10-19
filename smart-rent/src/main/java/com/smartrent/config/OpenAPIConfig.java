@@ -65,14 +65,24 @@ public class OpenAPIConfig {
         return baseDescription + "\n\n" +
                 "## Authentication\n" +
                 "This API uses JWT (JSON Web Token) for authentication. To access protected endpoints:\n" +
-                "1. **User Authentication**: Use `/v1/auth` endpoint to authenticate users\n" +
-                "2. **Admin Authentication**: Use `/v1/auth/admin` endpoint to authenticate administrators\n" +
-                "3. **Include Token**: Add the access token in the Authorization header: `Bearer <access_token>`\n" +
-                "4. **Token Refresh**: Use the refresh token to obtain new access tokens when they expire\n" +
-                "5. **Token Validation**: Use `/v1/auth/introspect` to validate token status\n\n" +
+                "1. **User Authentication**: Use `/v1/auth` endpoint to authenticate users with email/password\n" +
+                "2. **Google OAuth Login**: Use `/v1/auth/outbound/google` endpoint to authenticate with Google\n" +
+                "3. **Admin Authentication**: Use `/v1/auth/admin` endpoint to authenticate administrators\n" +
+                "4. **Include Token**: Add the access token in the Authorization header: `Bearer <access_token>`\n" +
+                "5. **Token Refresh**: Use the refresh token to obtain new access tokens when they expire\n" +
+                "6. **Token Validation**: Use `/v1/auth/introspect` to validate token status\n\n" +
+
+                "## OAuth Authentication (Google Login)\n" +
+                "SmartRent supports Google OAuth for seamless user authentication:\n" +
+                "1. Redirect user to Google OAuth consent screen\n" +
+                "2. Receive authorization code from Google callback\n" +
+                "3. Send code to `/v1/auth/outbound/google` endpoint\n" +
+                "4. Receive JWT access and refresh tokens\n" +
+                "5. **Auto-Registration**: New users are automatically created if they don't exist\n" +
+                "6. **No Email Verification Required**: OAuth users are pre-verified by Google\n\n" +
 
                 "## Email Verification\n" +
-                "User accounts require email verification before full activation:\n" +
+                "User accounts created with email/password require email verification before full activation:\n" +
                 "1. Create user account via `/v1/users`\n" +
                 "2. Send verification code via `/v1/verification/code`\n" +
                 "3. Verify email using `/v1/verification` with the received code\n\n" +

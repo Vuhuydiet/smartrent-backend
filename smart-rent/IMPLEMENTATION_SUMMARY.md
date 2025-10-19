@@ -63,7 +63,7 @@ This document summarizes the implementation of the comprehensive membership and 
 
 ### 7. Scheduled Jobs (0% Complete)
 - ⏳ Membership expiration job
-- ⏳ Scheduled boost executor job
+- ⏳ Scheduled push executor job
 - ⏳ Benefit expiration job
 
 ### 8. Validators (0% Complete)
@@ -145,7 +145,7 @@ This document summarizes the implementation of the comprehensive membership and 
 ### ✅ Shadow Listing System
 - Automatic creation for Premium
 - Content synchronization
-- Free boost propagation
+- Free push propagation
 - Double visibility
 
 ## 🔄 Business Logic Implemented
@@ -273,7 +273,7 @@ smart-rent/
 
 3. **Create Scheduled Jobs**
    - Membership expiration
-   - Scheduled boost executor
+   - Scheduled push executor
    - Benefit expiration
 
 ### Medium Priority

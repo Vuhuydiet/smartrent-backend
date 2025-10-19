@@ -590,7 +590,7 @@ Từ Membership (1,400,000):
 - 5 VIP Vàng × 2.7M = 13,447,500
 - 1 VIP KC × 6.8M = 6,846,000
 - 1 NORMAL shadow = 66,000
-- 20 Boost × 40k = 800,000
+- 20 Push × 40k = 800,000
 Subtotal: 22,382,000 VND
 
 Từ Per-post (2,729,500):

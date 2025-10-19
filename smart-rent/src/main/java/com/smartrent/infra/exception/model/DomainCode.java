@@ -35,6 +35,8 @@ public enum DomainCode {
   INVALID_EMAIL_PASSWORD("5002", HttpStatus.UNAUTHORIZED, "Invalid email or password"),
   INVALID_TOKEN("5003", HttpStatus.UNAUTHORIZED, "Invalid token"),
   USER_NOT_VERIFIED("5004", HttpStatus.UNAUTHORIZED, "User not verified"),
+  INVALID_OAUTH_CODE("5005", HttpStatus.UNAUTHORIZED, "Invalid or expired OAuth authorization code"),
+  OAUTH_AUTHENTICATION_FAILED("5006", HttpStatus.UNAUTHORIZED, "OAuth authentication failed"),
   //    Forbidden	Client	6xxx (Unauthorized error)
   UNAUTHORIZED("6001", HttpStatus.FORBIDDEN, "Don't have permission"),
   //    Payment Error 7xxx

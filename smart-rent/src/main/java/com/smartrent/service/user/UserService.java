@@ -1,5 +1,6 @@
 package com.smartrent.service.user;
 
+import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.GetUserResponse;
 import com.smartrent.dto.response.UserCreationResponse;
@@ -10,5 +11,5 @@ public interface UserService {
 
   GetUserResponse getUserById(String id);
 
-  User internalCreateUser(UserCreationRequest request);
+  User internalCreateUser(InternalUserCreationRequest request);
 }
