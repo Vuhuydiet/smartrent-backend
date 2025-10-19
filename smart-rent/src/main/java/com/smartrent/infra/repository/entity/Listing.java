@@ -1,21 +1,7 @@
 package com.smartrent.infra.repository.entity;
 
 import com.smartrent.enums.PostSource;
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.JoinTable;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -128,8 +114,9 @@ public class Listing {
     PriceUnit priceUnit = PriceUnit.MONTH;
 
     // Location Information - Reference to Address table
-    @Column(name = "address_id", nullable = false)
-    Long addressId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "address_id", nullable = false)
+    Address address;
 
     // Property Specifications
     @Column(name = "area")

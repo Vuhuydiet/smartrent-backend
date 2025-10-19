@@ -11,6 +11,7 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Getter
@@ -82,7 +83,11 @@ public class ListingResponse {
 
     Integer roomCapacity;
 
-    Set<Long> amenityIds;
+    @Schema(description = "List of amenities associated with this listing")
+    List<AmenityResponse> amenities;
+
+    @Schema(description = "Location-based pricing information for this listing and similar listings in the same area")
+    LocationPricingResponse locationPricing;
 
     LocalDateTime createdAt;
 

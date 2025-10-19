@@ -19,6 +19,10 @@ public interface DistrictRepository extends JpaRepository<District, Long> {
     // Find by code and province
     Optional<District> findByCodeAndProvinceProvinceIdAndIsActiveTrue(String code, Long provinceId);
 
+    Optional<District> findByCodeAndProvince_ProvinceId(String code, Long provinceId);
+
+    Optional<District> findByCode(String code);
+
     // Search districts by name within a province (contains search)
     List<District> findByNameContainingIgnoreCaseAndProvinceProvinceIdAndIsActiveTrueOrderByName(String searchTerm, Long provinceId);
 
@@ -27,4 +31,9 @@ public interface DistrictRepository extends JpaRepository<District, Long> {
 
     // Get all active districts
     List<District> findByIsActiveTrueOrderByName();
+
+    List<District> findByIsActiveTrue();
+
+    // Get districts by province (including active check)
+    List<District> findByProvince_ProvinceIdAndIsActiveTrue(Long provinceId);
 }

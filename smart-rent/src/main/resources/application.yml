@@ -93,6 +93,7 @@ spring:
       - "auth.refreshToken"
       - "auth.otp"
       - "auth.invalidatedTokens"
+      - "locationCache"
     type: "${CACHE_TYPE:redis}"
     redis:
       timeToLive: 1d
@@ -100,6 +101,7 @@ spring:
         "[user.details]": 1m
         "[auth.otp]": 5m
         "[auth.invalidatedTokens]": 24h
+        "[locationCache]": 24h
 
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"
@@ -200,6 +202,14 @@ open:
       secretKey: ${S3_SECRET_KEY}
       bucketName: ${S3_BUCKET}
       publicUrl: ${S3_PUBLIC_URL}
+      maxFileSizeMB: ${S3_MAX_FILE_SIZE_MB:10}
+      allowedImageTypes:
+        - image/jpeg
+        - image/png
+        - image/webp
+      allowedVideoTypes:
+        - video/mp4
+        - video/quicktime
 
 # VNPay Payment Gateway Configuration
 vnpay:

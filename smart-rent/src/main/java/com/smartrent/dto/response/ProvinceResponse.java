@@ -27,4 +27,9 @@ public class ProvinceResponse {
     // For merged provinces
     Long parentProvinceId;
     String originalName;
+
+    // External API integration fields
+    String externalId;        // ID from external API (tinhthanhpho.com)
+    String fullName;          // Full administrative name
+    String codeName;          // Code name for URL-friendly format
 }

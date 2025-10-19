@@ -80,7 +80,7 @@ public class Address {
     @Column(name = "is_verified", nullable = false)
     Boolean isVerified = false;
 
-    @OneToMany(mappedBy = "addressId", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "address", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<Listing> listings;
 
     @CreationTimestamp

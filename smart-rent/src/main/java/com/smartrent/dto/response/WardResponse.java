@@ -24,4 +24,10 @@ public class WardResponse {
     Long provinceId;
     String provinceName;
     boolean isActive;
+
+    // External API integration fields
+    String externalId;           // ID from external API (tinhthanhpho.com)
+    String districtExternalId;   // External district ID
+    String fullName;             // Full administrative name
+    String codeName;             // Code name for URL-friendly format
 }
