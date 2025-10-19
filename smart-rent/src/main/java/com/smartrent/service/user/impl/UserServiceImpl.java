@@ -1,6 +1,7 @@
 package com.smartrent.service.user.impl;
 
 import com.smartrent.config.Constants;
+import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.GetUserResponse;
 import com.smartrent.dto.response.UserCreationResponse;
@@ -99,15 +100,14 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  public User internalCreateUser(UserCreationRequest request) {
+  public User internalCreateUser(InternalUserCreationRequest request) {
 
     if (userRepository.existsByEmail(request.getEmail())) {
       throw new EmailExistingException();
     }
 
-    User user = userMapper.mapFromUserCreationRequestToUserEntity(request);
+    User user = userMapper.mapFromInternalUserCreationRequestToUserEntity(request);
 
-    user.setPassword(passwordEncoder.encode(user.getPassword()));
     user.setVerified(true);
 
     userRepository.saveAndFlush(user);
