@@ -119,6 +119,7 @@ application:
         - "/v1/payments/vnpay/callback"
         - "/v1/listings/**"
         - "/v1/addresses/**"
+        - "/v1/new-addresses/**"
         - "/v1/memberships/packages"
         - "/v1/memberships/packages/**"
         - "/v1/vip-tiers/**"
@@ -175,6 +176,8 @@ feign:
           url: "https://www.googleapis.com"
       vnpay:
         url: "${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}"
+      tinhthanhpho:
+        url: "${TINHTHANHPHO_API_URL:https://tinhthanhpho.com/api/v1}"
 
 springdoc:
   api-docs:
