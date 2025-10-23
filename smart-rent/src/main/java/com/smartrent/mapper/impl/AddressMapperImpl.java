@@ -120,4 +120,103 @@ public class AddressMapperImpl implements AddressMapper {
                 .originalName(province.getOriginalName())
                 .build();
     }
+
+    // ==================== NEW 2025 STRUCTURE MAPPINGS ====================
+
+    @Override
+    public NewProvinceResponse toNewProvinceResponse(Province province) {
+        if (province == null) {
+            return null;
+        }
+
+        return NewProvinceResponse.builder()
+                .provinceId(province.getProvinceId())
+                .code(province.getCode())
+                .name(province.getName())
+                .type(mapProvinceTypeToVietnamese(province.getType()))
+                .build();
+    }
+
+    @Override
+    public NewWardResponse toNewWardResponse(Ward ward) {
+        if (ward == null) {
+            return null;
+        }
+
+        return NewWardResponse.builder()
+                .wardId(ward.getWardId())
+                .code(ward.getCode())
+                .name(ward.getName())
+                .type(mapWardTypeToVietnamese(ward.getType()))
+                .provinceCode(ward.getProvince() != null ? ward.getProvince().getCode() : null)
+                .build();
+    }
+
+    @Override
+    public NewFullAddressResponse toNewFullAddressResponse(Province province, Ward ward) {
+        return NewFullAddressResponse.builder()
+                .province(toNewProvinceResponse(province))
+                .ward(ward != null ? toNewWardResponse(ward) : null)
+                .build();
+    }
+
+    @Override
+    public NewAddressSearchResponse toNewAddressSearchResponse(Ward ward) {
+        if (ward == null) {
+            return null;
+        }
+
+        Province province = ward.getProvince();
+        String fullAddress = ward.getName();
+        if (province != null) {
+            fullAddress = ward.getName() + ", " + province.getName();
+        }
+
+        return NewAddressSearchResponse.builder()
+                .code(ward.getCode())
+                .name(ward.getName())
+                .type(mapWardTypeToVietnamese(ward.getType()))
+                .provinceCode(province != null ? province.getCode() : null)
+                .provinceName(province != null ? province.getName() : null)
+                .fullAddress(fullAddress)
+                .build();
+    }
+
+    @Override
+    public NewAddressSearchResponse toNewAddressSearchResponseFromProvince(Province province) {
+        if (province == null) {
+            return null;
+        }
+
+        return NewAddressSearchResponse.builder()
+                .code(province.getCode())
+                .name(province.getName())
+                .type(mapProvinceTypeToVietnamese(province.getType()))
+                .provinceCode(province.getCode())
+                .provinceName(province.getName())
+                .fullAddress(province.getName())
+                .build();
+    }
+
+    // Helper methods for Vietnamese type mapping
+    private String mapProvinceTypeToVietnamese(Province.ProvinceType type) {
+        if (type == null) {
+            return null;
+        }
+        return switch (type) {
+            case CITY -> "Thành phố";
+            case PROVINCE -> "Tỉnh";
+        };
+    }
+
+    private String mapWardTypeToVietnamese(Ward.WardType type) {
+        if (type == null) {
+            return null;
+        }
+        return switch (type) {
+            case WARD -> "Phường";
+            case COMMUNE -> "Xã";
+            case TOWNSHIP -> "Thị trấn";
+        };
+    }
 }
