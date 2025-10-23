@@ -1308,6 +1308,333 @@ public class AddressController {
 
     // ==================== HEALTH CHECK ====================
 
+    // ==================== NEW ADDRESS STRUCTURE ENDPOINTS (After 1/7/2025) ====================
+
+    @GetMapping("/new-provinces")
+    @Operation(
+        summary = "Get all provinces (34 provinces - new structure)",
+        description = """
+            Returns all provinces in Vietnam's new administrative structure (after 1/7/2025).
+
+            **Returns**: 34 provinces including:
+            - Merged provinces from the old 63-province structure
+            - New administrative boundaries
+
+            **Query Parameters**:
+            - keyword: Search by province name or code
+            - page: Page number (default: 1)
+            - limit: Items per page (default: 20, max: 100)
+
+            **Use Cases**:
+            - Populate province dropdown in address forms
+            - Display complete list of new provinces
+            - First step in cascading address selection
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved provinces",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = PaginatedResponse.class),
+                    examples = @ExampleObject(
+                        name = "New Province List Example",
+                        summary = "Danh sách 34 tỉnh/thành phố mới",
+                        value = """
+                            {
+                              "success": true,
+                              "message": "Success",
+                              "data": [
+                                {
+                                  "province_id": 13,
+                                  "code": "01",
+                                  "name": "Hà Nội",
+                                  "type": "Thành phố"
+                                },
+                                {
+                                  "province_id": 15,
+                                  "code": "79",
+                                  "name": "Hồ Chí Minh",
+                                  "type": "Thành phố"
+                                }
+                              ],
+                              "metadata": {
+                                "total": 34,
+                                "page": 1,
+                                "limit": 20
+                              }
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ResponseEntity<PaginatedResponse<List<NewProvinceResponse>>> getNewProvinces(
+            @Parameter(description = "Search keyword", example = "Hà Nội")
+            @RequestParam(required = false) String keyword,
+
+            @Parameter(description = "Page number", example = "1")
+            @RequestParam(required = false) Integer page,
+
+            @Parameter(description = "Items per page (max 100)", example = "20")
+            @RequestParam(required = false) Integer limit) {
+
+        log.info("GET /v1/addresses/new-provinces - keyword: {}, page: {}, limit: {}",
+                keyword, page, limit);
+
+        PaginatedResponse<List<NewProvinceResponse>> response =
+                newAddressService.getNewProvinces(keyword, page, limit);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/new-provinces/{provinceCode}/wards")
+    @Operation(
+        summary = "Get wards by province code (new structure)",
+        description = """
+            Returns all wards belonging to a specific province in the new structure.
+            In the new structure, wards are directly under provinces without districts.
+
+            **Vietnamese Ward Types**:
+            - **Phường** (Ward) - Urban administrative unit
+            - **Xã** (Commune) - Rural administrative unit
+            - **Thị trấn** (Township) - Small town unit
+
+            **Query Parameters**:
+            - keyword: Search by ward name or code
+            - page: Page number (default: 1)
+            - limit: Items per page (default: 20, max: 100)
+
+            **Use Cases**:
+            - Populate ward dropdown after province selection
+            - Second step in simplified cascading address selection
+            - Display all wards in a province
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved wards",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = PaginatedResponse.class),
+                    examples = @ExampleObject(
+                        name = "Hanoi Wards Example",
+                        summary = "Danh sách phường/xã của Hà Nội (cấu trúc mới)",
+                        value = """
+                            {
+                              "success": true,
+                              "message": "Success",
+                              "data": [
+                                {
+                                  "ward_id": 105,
+                                  "code": "09877",
+                                  "name": "An Khánh",
+                                  "type": "Xã",
+                                  "province_code": "01"
+                                },
+                                {
+                                  "ward_id": 3,
+                                  "code": "00004",
+                                  "name": "Ba Đình",
+                                  "type": "Phường",
+                                  "province_code": "01"
+                                }
+                              ],
+                              "metadata": {
+                                "total": 126,
+                                "page": 1,
+                                "limit": 20
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Invalid province code"
+            )
+        }
+    )
+    public ResponseEntity<PaginatedResponse<List<NewWardResponse>>> getWardsByNewProvince(
+            @Parameter(description = "Province code", example = "01", required = true)
+            @PathVariable String provinceCode,
+
+            @Parameter(description = "Search keyword", example = "Ba Đình")
+            @RequestParam(required = false) String keyword,
+
+            @Parameter(description = "Page number", example = "1")
+            @RequestParam(required = false) Integer page,
+
+            @Parameter(description = "Items per page (max 100)", example = "20")
+            @RequestParam(required = false) Integer limit) {
+
+        log.info("GET /v1/addresses/new-provinces/{}/wards - keyword: {}, page: {}, limit: {}",
+                provinceCode, keyword, page, limit);
+
+        PaginatedResponse<List<NewWardResponse>> response =
+                newAddressService.getWardsByNewProvince(provinceCode, keyword, page, limit);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/new-full-address")
+    @Operation(
+        summary = "Get full address information (new structure)",
+        description = """
+            Returns complete address information for the new structure.
+            Resolves province and ward details based on provided codes.
+
+            **Query Parameters**:
+            - provinceCode: Province code (required)
+            - wardCode: Ward code (optional)
+
+            **Use Cases**:
+            - Resolve full address from codes
+            - Validate address codes
+            - Display complete address information
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved full address",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Full Address Example",
+                        summary = "Thông tin địa chỉ đầy đủ",
+                        value = """
+                            {
+                              "data": {
+                                "province": {
+                                  "province_id": 13,
+                                  "code": "01",
+                                  "name": "Hà Nội",
+                                  "type": "Thành phố"
+                                },
+                                "ward": {
+                                  "ward_id": 3,
+                                  "code": "00004",
+                                  "name": "Ba Đình",
+                                  "type": "Phường",
+                                  "province_code": "01"
+                                }
+                              },
+                              "message": "Successfully retrieved full address"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Invalid parameters"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Address not found"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<NewFullAddressResponse>> getNewFullAddress(
+            @Parameter(description = "Province code", example = "01", required = true)
+            @RequestParam String provinceCode,
+
+            @Parameter(description = "Ward code", example = "00004")
+            @RequestParam(required = false) String wardCode) {
+
+        log.info("GET /v1/addresses/new-full-address - provinceCode: {}, wardCode: {}",
+                provinceCode, wardCode);
+
+        NewFullAddressResponse addressResponse =
+                newAddressService.getNewFullAddress(provinceCode, wardCode);
+
+        return ResponseEntity.ok(ApiResponse.<NewFullAddressResponse>builder()
+                .data(addressResponse)
+                .message("Successfully retrieved full address")
+                .build());
+    }
+
+    @GetMapping("/search-new-address")
+    @Operation(
+        summary = "Search addresses (new structure)",
+        description = """
+            Search for provinces and wards in the new administrative structure.
+            Performs a full-text search across all administrative units.
+
+            **Query Parameters**:
+            - keyword: Search keyword (required)
+            - page: Page number (default: 1)
+            - limit: Items per page (default: 20, max: 100)
+
+            **Use Cases**:
+            - Auto-complete address fields
+            - Search across provinces and wards
+            - Find addresses by partial names
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully performed search",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = PaginatedResponse.class),
+                    examples = @ExampleObject(
+                        name = "Search Results Example",
+                        summary = "Kết quả tìm kiếm địa chỉ",
+                        value = """
+                            {
+                              "success": true,
+                              "message": "Success",
+                              "data": [
+                                {
+                                  "code": "01",
+                                  "name": "Hà Nội",
+                                  "type": "Thành phố",
+                                  "province_code": "01",
+                                  "province_name": "Hà Nội",
+                                  "full_address": "Hà Nội"
+                                }
+                              ],
+                              "metadata": {
+                                "total": 1,
+                                "page": 1,
+                                "limit": 20
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Invalid parameters"
+            )
+        }
+    )
+    public ResponseEntity<PaginatedResponse<List<NewAddressSearchResponse>>> searchNewAddress(
+            @Parameter(description = "Search keyword", example = "Hà Nội", required = true)
+            @RequestParam String keyword,
+
+            @Parameter(description = "Page number", example = "1")
+            @RequestParam(required = false) Integer page,
+
+            @Parameter(description = "Items per page (max 100)", example = "20")
+            @RequestParam(required = false) Integer limit) {
+
+        log.info("GET /v1/addresses/search-new-address - keyword: {}, page: {}, limit: {}",
+                keyword, page, limit);
+
+        PaginatedResponse<List<NewAddressSearchResponse>> response =
+                newAddressService.searchNewAddress(keyword, page, limit);
+
+        return ResponseEntity.ok(response);
+    }
+
+    // ==================== HEALTH CHECK ====================
+
     @GetMapping("/health")
     @Operation(
         summary = "API health check",
