@@ -10,7 +10,13 @@ import com.smartrent.dto.response.PaymentHistoryResponse;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.enums.TransactionStatus;
+import com.smartrent.enums.TransactionType;
+import com.smartrent.infra.repository.entity.Transaction;
+import com.smartrent.service.listing.ListingService;
+import com.smartrent.service.membership.MembershipService;
 import com.smartrent.service.payment.PaymentService;
+import com.smartrent.service.push.PushService;
+import com.smartrent.service.transaction.TransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -42,6 +48,10 @@ import java.util.Map;
 public class PaymentController {
 
     PaymentService paymentService;
+    TransactionService transactionService;
+    MembershipService membershipService;
+    ListingService listingService;
+    PushService pushService;
 
     // Generic Payment Endpoints (Provider-agnostic)
 
@@ -93,6 +103,11 @@ public class PaymentController {
                     .build();
             PaymentCallbackResponse response = paymentService.processCallback(callbackRequest, httpRequest);
 
+            // If payment was successful, trigger business logic completion
+            if (response.getSuccess() && response.getTransactionRef() != null) {
+                triggerBusinessLogicCompletion(response.getTransactionRef());
+            }
+
             // Redirect to frontend with payment result
             String redirectUrl = buildRedirectUrl(response);
             httpResponse.sendRedirect(redirectUrl);
@@ -118,6 +133,17 @@ public class PaymentController {
                     .params(params)
                     .build();
             PaymentCallbackResponse response = paymentService.processIPN(ipnRequest, httpRequest);
+
+            // If payment was successful, trigger business logic completion
+            if (response.getSignatureValid() && response.getSuccess() && response.getTransactionRef() != null) {
+                try {
+                    triggerBusinessLogicCompletion(response.getTransactionRef());
+                } catch (Exception e) {
+                    log.error("Error triggering business logic completion for transaction: {}",
+                            response.getTransactionRef(), e);
+                    // Don't fail the IPN response - transaction is already updated
+                }
+            }
 
             if (response.getSignatureValid() && response.getSuccess()) {
                 return ResponseEntity.ok("RspCode=00&Message=OK");
@@ -281,6 +307,41 @@ public class PaymentController {
         }
     }
 
+    @GetMapping("/transactions/{txnRef}")
+    @Operation(summary = "Query transaction", description = "Query transaction status and details by transaction reference")
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Transaction found"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Transaction not found"
+            )
+    })
+    public ApiResponse<PaymentCallbackResponse> queryTransaction(
+            @Parameter(description = "Transaction reference") @PathVariable String txnRef) {
+
+        log.info("Querying transaction: {}", txnRef);
+
+        try {
+            PaymentCallbackResponse response = paymentService.queryTransaction(txnRef);
+
+            return ApiResponse.<PaymentCallbackResponse>builder()
+                    .code("200000")
+                    .message("Transaction queried successfully")
+                    .data(response)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Error querying transaction: {}", txnRef, e);
+            return ApiResponse.<PaymentCallbackResponse>builder()
+                    .code("404000")
+                    .message("Transaction not found: " + e.getMessage())
+                    .build();
+        }
+    }
+
     @GetMapping("/exists/{transactionRef}")
     @Operation(summary = "Check transaction existence", description = "Check if transaction reference exists")
     public ApiResponse<Boolean> checkTransactionExists(
@@ -306,6 +367,56 @@ public class PaymentController {
     }
 
     // Private helper methods
+
+    /**
+     * Trigger business logic completion based on transaction type
+     * Called after successful payment callback/IPN
+     */
+    private void triggerBusinessLogicCompletion(String transactionRef) {
+        log.info("Triggering business logic completion for transaction: {}", transactionRef);
+
+        try {
+            // Get transaction to determine type
+            Transaction transaction = transactionService.getTransaction(transactionRef);
+
+            if (transaction == null) {
+                log.warn("Transaction not found: {}", transactionRef);
+                return;
+            }
+
+            // Check if already processed
+            if (transaction.getStatus() != TransactionStatus.COMPLETED) {
+                log.warn("Transaction not completed, skipping business logic: {}", transactionRef);
+                return;
+            }
+
+            // Trigger appropriate business logic based on transaction type
+            TransactionType type = transaction.getTransactionType();
+            log.info("Processing transaction type: {} for transaction: {}", type, transactionRef);
+
+            switch (type) {
+                case MEMBERSHIP_PURCHASE -> {
+                    log.info("Completing membership purchase for transaction: {}", transactionRef);
+                    membershipService.completeMembershipPurchase(transactionRef);
+                }
+                case POST_FEE -> {
+                    log.info("Completing VIP listing creation for transaction: {}", transactionRef);
+                    listingService.completeVipListingCreation(transactionRef);
+                }
+                case PUSH_FEE -> {
+                    log.info("Completing push after payment for transaction: {}", transactionRef);
+                    pushService.completePushAfterPayment(transactionRef);
+                }
+                default -> log.warn("Unknown transaction type: {} for transaction: {}", type, transactionRef);
+            }
+
+            log.info("Business logic completion triggered successfully for transaction: {}", transactionRef);
+
+        } catch (Exception e) {
+            log.error("Error triggering business logic completion for transaction: {}", transactionRef, e);
+            throw new RuntimeException("Failed to trigger business logic completion", e);
+        }
+    }
 
     private String buildRedirectUrl(PaymentCallbackResponse response) {
         // Build redirect URL based on payment result
