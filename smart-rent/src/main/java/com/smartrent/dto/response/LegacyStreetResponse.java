@@ -21,4 +21,6 @@ public class LegacyStreetResponse {
     String provinceName;
     Integer districtId;
     String districtName;
+    Integer wardId;
+    String wardName;
 }

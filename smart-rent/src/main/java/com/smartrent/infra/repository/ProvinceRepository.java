@@ -8,66 +8,21 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ProvinceRepository extends JpaRepository<Province, Long> {
+public interface ProvinceRepository extends JpaRepository<Province, String> {
 
-    // ==================== LEGACY STRUCTURE QUERIES ====================
-
-    // Get all active provinces (parent provinces only for dropdown)
-    List<Province> findByParentProvinceIsNullAndIsActiveTrueOrderByName();
-
-    // Get all provinces including merged ones
-    List<Province> findByIsActiveTrueOrderByName();
-
-    // Find by name (including merged provinces)
-    List<Province> findByNameOrOriginalNameAndIsActiveTrue(String name, String originalName);
-
-    // Find by code
-    Optional<Province> findByCodeAndIsActiveTrue(String code);
-
+    // Find province by code
     Optional<Province> findByCode(String code);
 
-    // Get merged provinces for a parent
-    List<Province> findByParentProvinceProvinceIdAndIsActiveTrueOrderByName(Long parentId);
+    // Search provinces by keyword (name, nameEn, or code)
+    @Query("SELECT p FROM Province p WHERE " +
+            "LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(p.nameEn) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(p.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "ORDER BY p.name")
+    Page<Province> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
-    // Search provinces by name (for autocomplete)
-    List<Province> findByNameContainingIgnoreCaseOrOriginalNameContainingIgnoreCaseAndIsActiveTrueOrderByName(
-            String nameSearchTerm, String originalNameSearchTerm);
-
-    // Get all active provinces (simplified)
-    List<Province> findByIsActiveTrue();
-
-    // ==================== NEW 2025 STRUCTURE QUERIES ====================
-
-    /**
-     * Get all parent provinces (34 provinces in new structure) with pagination
-     */
-    @Query("SELECT p FROM provinces p WHERE p.parentProvince IS NULL AND p.isActive = true ORDER BY p.name")
-    Page<Province> findNewProvinces(Pageable pageable);
-
-    /**
-     * Search parent provinces by keyword (name or code) with pagination
-     */
-    @Query("SELECT p FROM provinces p WHERE p.parentProvince IS NULL AND p.isActive = true " +
-           "AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-           "OR LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
-           "ORDER BY p.name")
-    Page<Province> searchNewProvinces(@Param("keyword") String keyword, Pageable pageable);
-
-    /**
-     * Count parent provinces
-     */
-    @Query("SELECT COUNT(p) FROM provinces p WHERE p.parentProvince IS NULL AND p.isActive = true")
-    long countNewProvinces();
-
-    /**
-     * Count parent provinces by keyword
-     */
-    @Query("SELECT COUNT(p) FROM provinces p WHERE p.parentProvince IS NULL AND p.isActive = true " +
-           "AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-           "OR LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    long countNewProvincesByKeyword(@Param("keyword") String keyword);
 }

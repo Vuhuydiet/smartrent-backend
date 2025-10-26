@@ -3791,7 +3791,7 @@ INSERT INTO `project` (`id`, `_name`, `name_en`, `_province_id`, `_district_id`,
 
 INSERT INTO `province` (`id`, `_name`, `name_en`, `_code`) VALUES
 (1, 'Hồ Chí Minh', 'Ho Chi Minh City', 'SG'),
-(2, 'Hà Nội', 'Hà Nọi', 'HN'),
+(2, 'Hà Nội', 'Ha Noi', 'HN'),
 (3, 'Đà Nẵng', 'Da Nang', 'DDN'),
 (4, 'Bình Dương', 'Binh Duong', 'BD'),
 (5, 'Đồng Nai', 'Dong Nai', 'DNA'),
@@ -46828,35 +46828,45 @@ INSERT INTO `ward` (`id`, `_name`, `name_en`, `_prefix`, `_province_id`, `_distr
 -- Indexes for table `district`
 --
 ALTER TABLE `district`
-  ADD PRIMARY KEY (`id`),
   ADD KEY `_province_id` (`_province_id`);
 
 --
 -- Indexes for table `project`
 --
 ALTER TABLE `project`
-  ADD PRIMARY KEY (`id`),
   ADD KEY `_province_id` (`_province_id`,`_district_id`);
 
 --
 -- Indexes for table `province`
 --
-ALTER TABLE `province`
-  ADD PRIMARY KEY (`id`);
+-- PRIMARY KEY already defined in V21
 
 --
 -- Indexes for table `street`
 --
 ALTER TABLE `street`
-  ADD PRIMARY KEY (`id`),
   ADD KEY `_province_id` (`_province_id`,`_district_id`);
 
 --
 -- Indexes for table `ward`
 --
 ALTER TABLE `ward`
-  ADD PRIMARY KEY (`id`),
   ADD KEY `_province_id` (`_province_id`,`_district_id`);
+
+--
+-- Drop foreign key constraints from V21 mapping tables before modifying columns
+--
+ALTER TABLE `district_ward_mapping`
+  DROP FOREIGN KEY `fk_district_ward_mapping_district`;
+
+ALTER TABLE `province_mapping`
+  DROP FOREIGN KEY `fk_province_mapping_legacy`;
+
+ALTER TABLE `ward_mapping`
+  DROP FOREIGN KEY `fk_ward_mapping_legacy`;
+
+ALTER TABLE `street_mapping`
+  DROP FOREIGN KEY `fk_street_mapping_legacy`;
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -46891,5 +46901,24 @@ ALTER TABLE `street`
 --
 ALTER TABLE `ward`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11284;
+
+--
+-- Recreate foreign key constraints from V21 mapping tables
+--
+ALTER TABLE `district_ward_mapping`
+  ADD CONSTRAINT `fk_district_ward_mapping_district`
+    FOREIGN KEY (`district_legacy_id`) REFERENCES `district`(`id`);
+
+ALTER TABLE `province_mapping`
+  ADD CONSTRAINT `fk_province_mapping_legacy`
+    FOREIGN KEY (`province_legacy_id`) REFERENCES `province`(`id`);
+
+ALTER TABLE `ward_mapping`
+  ADD CONSTRAINT `fk_ward_mapping_legacy`
+    FOREIGN KEY (`ward_legacy_id`) REFERENCES `ward`(`id`);
+
+ALTER TABLE `street_mapping`
+  ADD CONSTRAINT `fk_street_mapping_legacy`
+    FOREIGN KEY (`street_legacy_id`) REFERENCES `street`(`id`);
 COMMIT;
 

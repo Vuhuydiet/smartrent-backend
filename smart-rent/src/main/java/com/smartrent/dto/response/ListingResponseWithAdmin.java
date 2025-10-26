@@ -68,7 +68,7 @@ public class ListingResponseWithAdmin {
 
     String priceUnit;
 
-    Long addressId;
+    Integer addressId;
 
     Float area;
 

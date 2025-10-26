@@ -11,34 +11,27 @@ public interface AddressService {
     // Province operations
     List<LegacyProvinceResponse> getAllProvinces();
     List<LegacyProvinceResponse> getParentProvinces(); // For dropdown
-    LegacyProvinceResponse getProvinceById(Integer provinceId);
+    LegacyProvinceResponse getProvinceById(Long provinceId);
     List<LegacyProvinceResponse> searchProvinces(String searchTerm);
 
     // District operations
-    List<LegacyDistrictResponse> getDistrictsByProvinceId(Integer provinceId);
-    LegacyDistrictResponse getDistrictById(Integer districtId);
-    List<LegacyDistrictResponse> searchDistricts(String searchTerm, Integer provinceId);
+    List<LegacyDistrictResponse> getDistrictsByProvinceId(Long provinceId);
+    LegacyDistrictResponse getDistrictById(Long districtId);
+    List<LegacyDistrictResponse> searchDistricts(String searchTerm, Long provinceId);
 
     // Ward operations
-    List<LegacyWardResponse> getWardsByDistrictId(Integer districtId);
-    LegacyWardResponse getWardById(Integer wardId);
-    List<LegacyWardResponse> searchWards(String searchTerm, Integer districtId);
+    List<LegacyWardResponse> getWardsByDistrictId(Long districtId);
+    LegacyWardResponse getWardById(Long wardId);
+    List<LegacyWardResponse> searchWards(String searchTerm, Long districtId);
 
     // Street operations
-    List<LegacyStreetResponse> getStreetsByProvinceId(Integer provinceId);
-    List<LegacyStreetResponse> getStreetsByDistrictId(Integer districtId);
-    LegacyStreetResponse getStreetById(Integer streetId);
-    List<LegacyStreetResponse> searchStreets(String searchTerm, Integer provinceId, Integer districtId);
-
-    // Project operations
-    List<LegacyProjectResponse> getProjectsByProvinceId(Integer provinceId);
-    List<LegacyProjectResponse> getProjectsByDistrictId(Integer districtId);
-    LegacyProjectResponse getProjectById(Integer projectId);
-    List<LegacyProjectResponse> searchProjects(String searchTerm, Integer provinceId, Integer districtId);
+    List<LegacyStreetResponse> getStreetsByWardId(Long wardId);
+    LegacyStreetResponse getStreetById(Long streetId);
+    List<LegacyStreetResponse> searchStreets(String searchTerm, Long wardId);
 
     // Address operations
-    List<AddressResponse> getAddressesByStreetId(Integer streetId);
-    AddressResponse getAddressById(Integer addressId);
+    List<AddressResponse> getAddressesByStreetId(Long streetId);
+    AddressResponse getAddressById(Long addressId);
     List<AddressResponse> searchAddresses(String searchTerm);
     List<AddressResponse> getNearbyAddresses(BigDecimal latitude, BigDecimal longitude, Double radiusKm);
     AddressResponse createAddress(AddressCreationRequest request);

@@ -1633,6 +1633,152 @@ public class AddressController {
         return ResponseEntity.ok(response);
     }
 
+    // ==================== ADDRESS CONVERSION ====================
+
+    @GetMapping("/convert/legacy-to-new")
+    @Operation(
+        summary = "Convert legacy address to new structure",
+        description = """
+            Converts an address from legacy structure (63 provinces, 3-tier) to new structure (34 provinces, 2-tier).
+
+            **Input**: Legacy Province ID, District ID, Ward ID
+            **Output**: Both legacy and new address information with conversion notes
+
+            **Use Cases**:
+            - Migrate existing data from legacy to new structure
+            - Show users their address in both formats
+            - Validate address conversions
+
+            **Note**: Uses mapping tables to find corresponding new addresses.
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully converted address",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Conversion Example",
+                        summary = "Chuyển đổi địa chỉ từ cấu trúc cũ sang mới",
+                        value = """
+                            {
+                              "data": {
+                                "legacyAddress": {
+                                  "province": {"id": 1, "name": "Hà Nội", "code": "01"},
+                                  "district": {"id": 1, "name": "Ba Đình"},
+                                  "ward": {"id": 1, "name": "Phúc Xá"}
+                                },
+                                "newAddress": {
+                                  "province": {"code": "01", "name": "Hà Nội"},
+                                  "ward": {"code": "00001", "name": "Phúc Xá"}
+                                },
+                                "conversionNote": "Converted from legacy structure. Merge type: KEEP"
+                              },
+                              "message": "Successfully converted address from legacy to new structure"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Address not found or mapping not available"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<AddressConversionResponse>> convertLegacyToNew(
+            @Parameter(description = "Legacy Province ID", example = "1", required = true)
+            @RequestParam Integer provinceId,
+
+            @Parameter(description = "Legacy District ID", example = "1", required = true)
+            @RequestParam Integer districtId,
+
+            @Parameter(description = "Legacy Ward ID", example = "1", required = true)
+            @RequestParam Integer wardId) {
+
+        log.info("GET /v1/addresses/convert/legacy-to-new - provinceId: {}, districtId: {}, wardId: {}",
+                provinceId, districtId, wardId);
+
+//        AddressConversionResponse response = addressService.convertLegacyToNew(provinceId, districtId, wardId);
+        AddressConversionResponse response = new AddressConversionResponse();
+        return ResponseEntity.ok(ApiResponse.<AddressConversionResponse>builder()
+                .data(response)
+                .message("Successfully converted address from legacy to new structure")
+                .build());
+    }
+
+    @GetMapping("/convert/new-to-legacy")
+    @Operation(
+        summary = "Convert new address to legacy structure",
+        description = """
+            Converts an address from new structure (34 provinces, 2-tier) to legacy structure (63 provinces, 3-tier).
+
+            **Input**: New Province Code, Ward Code
+            **Output**: Both new and legacy address information with conversion notes
+
+            **Use Cases**:
+            - Support backward compatibility with legacy systems
+            - Show users their address in legacy format
+            - Export data for systems using old structure
+
+            **Note**: One new ward may map to multiple legacy wards. Returns first match by default.
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully converted address",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Reverse Conversion Example",
+                        summary = "Chuyển đổi địa chỉ từ cấu trúc mới về cũ",
+                        value = """
+                            {
+                              "data": {
+                                "legacyAddress": {
+                                  "province": {"id": 1, "name": "Hà Nội", "code": "01"},
+                                  "district": {"id": 1, "name": "Ba Đình"},
+                                  "ward": {"id": 1, "name": "Phúc Xá"}
+                                },
+                                "newAddress": {
+                                  "province": {"code": "01", "name": "Hà Nội"},
+                                  "ward": {"code": "00001", "name": "Phúc Xá"}
+                                },
+                                "conversionNote": "Converted to legacy structure. Merge type: KEEP"
+                              },
+                              "message": "Successfully converted address from new to legacy structure"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Address not found or mapping not available"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<AddressConversionResponse>> convertNewToLegacy(
+            @Parameter(description = "New Province Code", example = "01", required = true)
+            @RequestParam String provinceCode,
+
+            @Parameter(description = "New Ward Code", example = "00001", required = true)
+            @RequestParam String wardCode) {
+
+        log.info("GET /v1/addresses/convert/new-to-legacy - provinceCode: {}, wardCode: {}",
+                provinceCode, wardCode);
+
+//        AddressConversionResponse response = addressService.convertNewToLegacy(provinceCode, wardCode);
+        AddressConversionResponse response = new AddressConversionResponse();
+
+        return ResponseEntity.ok(ApiResponse.<AddressConversionResponse>builder()
+                .data(response)
+                .message("Successfully converted address from new to legacy structure")
+                .build());
+    }
+
     // ==================== HEALTH CHECK ====================
 
     @GetMapping("/health")

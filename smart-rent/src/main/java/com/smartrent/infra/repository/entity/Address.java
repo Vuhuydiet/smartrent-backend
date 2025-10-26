@@ -1,8 +1,25 @@
 package com.smartrent.infra.repository.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -10,15 +27,19 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Address entity - stores formatted address strings for both old and new structures
- * Matches database schema from V7 migration
- */
 @Entity(name = "addresses")
-@Table(name = "addresses")
+@Table(name = "addresses",
+        indexes = {
+                @Index(name = "idx_street_id", columnList = "street_id"),
+                @Index(name = "idx_ward_id", columnList = "ward_id"),
+                @Index(name = "idx_district_id", columnList = "district_id"),
+                @Index(name = "idx_province_id", columnList = "province_id"),
+                @Index(name = "idx_coordinates", columnList = "latitude, longitude"),
+                @Index(name = "idx_is_verified", columnList = "is_verified")
+        })
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -26,28 +47,39 @@ public class Address {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "address_id")
-    Long addressId;
+    Integer addressId;
 
-    /**
-     * Formatted full address for old structure (63 provinces, 3-tier)
-     * Example: "123 Đường Nguyễn Trãi, Phường Phúc Xá, Quận Ba Đình, Thành phố Hà Nội"
-     */
+    @Column(name = "street_number", length = 20)
+    String streetNumber;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "street_id", nullable = false)
+    Street street;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ward_id", nullable = false)
+    LegacyWard ward;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "district_id", nullable = false)
+    District district;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "province_id", nullable = false)
+    LegacyProvince province;
+
     @Column(name = "full_address", columnDefinition = "TEXT")
     String fullAddress;
-
-    /**
-     * Formatted full address for new structure (34 provinces, 2-tier)
-     * Example: "123 Đường Nguyễn Trãi, Phường Ba Đình, Thành phố Hà Nội"
-     */
-    @Column(name = "full_newaddress", columnDefinition = "TEXT")
-    String fullNewAddress;
 
     @Column(name = "latitude", precision = 10, scale = 8)
     BigDecimal latitude;
 
     @Column(name = "longitude", precision = 11, scale = 8)
     BigDecimal longitude;
+
+    @Builder.Default
+    @Column(name = "is_verified", nullable = false)
+    Boolean isVerified = false;
 
     @OneToMany(mappedBy = "address", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<Listing> listings;
@@ -60,20 +92,16 @@ public class Address {
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
 
-    /**
-     * Get the appropriate address display based on which format is available
-     */
-    public String getDisplayAddress() {
-        if (fullNewAddress != null && !fullNewAddress.isEmpty()) {
-            return fullNewAddress;
+    // Helper method to get full address display
+    public String getFullAddressDisplay() {
+        StringBuilder sb = new StringBuilder();
+        if (streetNumber != null) {
+            sb.append(streetNumber).append(" ");
         }
-        return fullAddress;
-    }
-
-    /**
-     * Check if this address uses the new structure
-     */
-    public boolean isNewStructure() {
-        return fullNewAddress != null && !fullNewAddress.isEmpty();
+        sb.append(street.getName()).append(", ");
+        sb.append(ward.getName()).append(", ");
+        sb.append(district.getName()).append(", ");
+        sb.append(province.getName());
+        return sb.toString();
     }
 }
