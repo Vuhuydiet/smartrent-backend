@@ -14,121 +14,6 @@ CREATE TABLE categories (
     INDEX idx_is_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Create Provinces table with self-referencing for merged provinces
-CREATE TABLE provinces (
-    province_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    code VARCHAR(10),
-    type ENUM('PROVINCE', 'CITY') NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    effective_from DATE,
-    effective_to DATE,
-    parent_province_id BIGINT,
-    is_merged BOOLEAN NOT NULL DEFAULT FALSE,
-    merged_date DATE,
-    original_name VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    UNIQUE KEY unique_province_code (code),
-    INDEX idx_name (name),
-    INDEX idx_is_active (is_active),
-    INDEX idx_effective_period (effective_from, effective_to),
-    INDEX idx_parent_province (parent_province_id),
-    INDEX idx_is_merged (is_merged),
-
-    CONSTRAINT fk_provinces_parent FOREIGN KEY (parent_province_id) REFERENCES provinces(province_id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Create Districts table
-CREATE TABLE districts (
-    district_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    code VARCHAR(10),
-    type ENUM('DISTRICT', 'TOWN', 'CITY') NOT NULL,
-    province_id BIGINT NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    effective_from DATE,
-    effective_to DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    UNIQUE KEY unique_province_district_code (province_id, code),
-    INDEX idx_province_id (province_id),
-    INDEX idx_name (name),
-    INDEX idx_is_active (is_active),
-    INDEX idx_effective_period (effective_from, effective_to),
-
-    CONSTRAINT fk_districts_province FOREIGN KEY (province_id) REFERENCES provinces(province_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Create Wards table
-CREATE TABLE wards (
-    ward_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    code VARCHAR(10),
-    type ENUM('WARD', 'COMMUNE', 'TOWNSHIP') NOT NULL,
-    district_id BIGINT NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    effective_from DATE,
-    effective_to DATE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    UNIQUE KEY unique_district_ward_code (district_id, code),
-    INDEX idx_district_id (district_id),
-    INDEX idx_name (name),
-    INDEX idx_is_active (is_active),
-    INDEX idx_effective_period (effective_from, effective_to),
-
-    CONSTRAINT fk_wards_district FOREIGN KEY (district_id) REFERENCES districts(district_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Create Streets table
-CREATE TABLE streets (
-    street_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(200) NOT NULL,
-    ward_id BIGINT NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    INDEX idx_ward_id (ward_id),
-    INDEX idx_name (name),
-    INDEX idx_is_active (is_active),
-
-    CONSTRAINT fk_streets_ward FOREIGN KEY (ward_id) REFERENCES wards(ward_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Create Addresses table
-CREATE TABLE addresses (
-    address_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    street_number VARCHAR(20),
-    street_id BIGINT NOT NULL,
-    ward_id BIGINT NOT NULL,
-    district_id BIGINT NOT NULL,
-    province_id BIGINT NOT NULL,
-    full_address TEXT,
-    latitude DECIMAL(10, 8),
-    longitude DECIMAL(11, 8),
-    is_verified BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    INDEX idx_street_id (street_id),
-    INDEX idx_ward_id (ward_id),
-    INDEX idx_district_id (district_id),
-    INDEX idx_province_id (province_id),
-    INDEX idx_coordinates (latitude, longitude),
-    INDEX idx_is_verified (is_verified),
-
-    CONSTRAINT fk_addresses_street FOREIGN KEY (street_id) REFERENCES streets(street_id) ON DELETE CASCADE,
-    CONSTRAINT fk_addresses_ward FOREIGN KEY (ward_id) REFERENCES wards(ward_id) ON DELETE CASCADE,
-    CONSTRAINT fk_addresses_district FOREIGN KEY (district_id) REFERENCES districts(district_id) ON DELETE CASCADE,
-    CONSTRAINT fk_addresses_province FOREIGN KEY (province_id) REFERENCES provinces(province_id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Create Amenities table
 CREATE TABLE amenities (
     amenity_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -142,6 +27,17 @@ CREATE TABLE amenities (
     INDEX idx_name (name),
     INDEX idx_category (category),
     INDEX idx_is_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Create Addresses table (basic version, will be enhanced in V23)
+CREATE TABLE addresses (
+    address_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    full_address TEXT,
+    full_newaddress TEXT,
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Listings table

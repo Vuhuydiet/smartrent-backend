@@ -144,11 +144,8 @@ public class Listing {
     Integer roomCapacity;
 
     // Relationships
-    @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    List<Image> images;
-
-    @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    List<Video> videos;
+    @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    List<Media> media;
 
     @ManyToMany
     @JoinTable(
