@@ -7,35 +7,31 @@ import lombok.experimental.FieldDefaults;
 import java.util.List;
 
 /**
- * Legacy district structure (before July 1, 2025)
+ * Legacy province structure (before July 1, 2025)
  * Uses integer ID as primary key
  */
 @Entity
-@Table(name = "district")
+@Table(name = "province")
 @Getter
 @Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class District {
+public class LegacyProvince {
 
     @Id
     Integer id;
 
-    @Column(name = "_name", length = 100)
+    @Column(name = "_name", length = 50)
     String name;
 
     @Column(name = "name_en", length = 100)
     String nameEn;
 
-    @Column(name = "_prefix", length = 20)
-    String prefix;
+    @Column(name = "_code", length = 20)
+    String code;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "_province_id")
-    LegacyProvince province;
-
-    @OneToMany(mappedBy = "district", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    List<LegacyWard> wards;
+    @OneToMany(mappedBy = "province", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<District> districts;
 }

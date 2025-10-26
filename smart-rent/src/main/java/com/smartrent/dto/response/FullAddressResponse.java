@@ -4,7 +4,8 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 /**
- * Full address response with complete administrative hierarchy
+ * Full address response with complete administrative hierarchy (legacy structure)
+ * 3-tier structure: Province → District → Ward
  */
 @Getter
 @Setter
@@ -14,44 +15,8 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class FullAddressResponse {
 
-    ProvinceInfo province;
-    DistrictInfo district;
-    WardInfo ward;
-    String fullAddressText;
-
-    @Getter
-    @Setter
-    @Builder
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class ProvinceInfo {
-        String code;
-        String name;
-        String type;
-    }
-
-    @Getter
-    @Setter
-    @Builder
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class DistrictInfo {
-        String code;
-        String name;
-        String type;
-    }
-
-    @Getter
-    @Setter
-    @Builder
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class WardInfo {
-        String code;
-        String name;
-        String type;
-    }
+    LegacyProvinceResponse province;
+    LegacyDistrictResponse district;
+    LegacyWardResponse ward;
+    LegacyStreetResponse street;
 }

@@ -38,7 +38,7 @@ CREATE TABLE administrative_units (
 -- =====================================================================
 
 CREATE TABLE `district` (
-  `id` int NOT NULL,
+  `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `_prefix` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE `district` (
 
 
 CREATE TABLE `project` (
-  `id` int NOT NULL,
+  `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `_province_id` int DEFAULT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE `project` (
 
 
 CREATE TABLE `province` (
-  `id` int NOT NULL,
+  `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `_code` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL
@@ -67,7 +67,7 @@ CREATE TABLE `province` (
 
 
 CREATE TABLE `street` (
-  `id` int NOT NULL,
+  `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `_prefix` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -77,7 +77,7 @@ CREATE TABLE `street` (
 
 
 CREATE TABLE `ward` (
-  `id` int NOT NULL,
+  `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `_prefix` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -139,14 +139,14 @@ CREATE TABLE province_mapping (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT fk_province_mapping_legacy
-    FOREIGN KEY (province_legacy_id) REFERENCES provinces(id),
+    FOREIGN KEY (province_legacy_id) REFERENCES province(id),
   CONSTRAINT fk_province_mapping_new
     FOREIGN KEY (province_new_code) REFERENCES provinces(code),
 
   UNIQUE KEY uq_province_mapping (province_legacy_id, province_new_code),
   INDEX idx_province_mapping_legacy_id (province_legacy_id),
   INDEX idx_province_mapping_new_code (province_new_code)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- District to Ward Mapping
 CREATE TABLE district_ward_mapping (
@@ -157,14 +157,14 @@ CREATE TABLE district_ward_mapping (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT fk_district_ward_mapping_district
-    FOREIGN KEY (district_legacy_id) REFERENCES districts(id),
+    FOREIGN KEY (district_legacy_id) REFERENCES district(id),
   CONSTRAINT fk_district_ward_mapping_ward
     FOREIGN KEY (ward_new_code) REFERENCES wards(code),
 
   UNIQUE KEY uq_district_ward_mapping (district_legacy_id, ward_new_code),
   INDEX idx_district_ward_mapping_district_id (district_legacy_id),
   INDEX idx_district_ward_mapping_ward_code (ward_new_code)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Ward Mapping
 CREATE TABLE ward_mapping (
@@ -176,14 +176,14 @@ CREATE TABLE ward_mapping (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
   CONSTRAINT fk_ward_mapping_legacy
-    FOREIGN KEY (ward_legacy_id) REFERENCES wards(id),
+    FOREIGN KEY (ward_legacy_id) REFERENCES ward(id),
   CONSTRAINT fk_ward_mapping_new
     FOREIGN KEY (ward_new_code) REFERENCES wards(code),
 
   UNIQUE KEY uq_ward_mapping (ward_legacy_id, ward_new_code),
   INDEX idx_ward_mapping_legacy_id (ward_legacy_id),
   INDEX idx_ward_mapping_new_code (ward_new_code)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Street Mapping
 CREATE TABLE street_mapping (
@@ -204,4 +204,4 @@ CREATE TABLE street_mapping (
   INDEX idx_street_mapping_legacy_id (street_legacy_id),
   INDEX idx_street_mapping_province_code (province_new_code),
   INDEX idx_street_mapping_ward_code (ward_new_code)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

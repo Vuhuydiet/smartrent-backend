@@ -36,14 +36,14 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
      */
     @Query("""
         SELECT l FROM listings l
-        WHERE l.address.ward.wardId = :wardId
+        WHERE l.address.ward.id = :wardId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
         ORDER BY l.price ASC
     """)
     List<Listing> findByWardIdAndProductTypeAndPriceUnit(
-        @Param("wardId") Long wardId,
+        @Param("wardId") Integer wardId,
         @Param("productType") Listing.ProductType productType,
         @Param("priceUnit") Listing.PriceUnit priceUnit,
         Pageable pageable
@@ -54,14 +54,14 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
      */
     @Query("""
         SELECT l FROM listings l
-        WHERE l.address.district.districtId = :districtId
+        WHERE l.address.district.id = :districtId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
         ORDER BY l.price ASC
     """)
     List<Listing> findByDistrictIdAndProductTypeAndPriceUnit(
-        @Param("districtId") Long districtId,
+        @Param("districtId") Integer districtId,
         @Param("productType") Listing.ProductType productType,
         @Param("priceUnit") Listing.PriceUnit priceUnit,
         Pageable pageable
@@ -72,14 +72,14 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
      */
     @Query("""
         SELECT l FROM listings l
-        WHERE l.address.province.provinceId = :provinceId
+        WHERE l.address.province.id = :provinceId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
         ORDER BY l.price ASC
     """)
     List<Listing> findByProvinceIdAndProductTypeAndPriceUnit(
-        @Param("provinceId") Long provinceId,
+        @Param("provinceId") Integer provinceId,
         @Param("productType") Listing.ProductType productType,
         @Param("priceUnit") Listing.PriceUnit priceUnit,
         Pageable pageable
@@ -97,13 +97,13 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
             AVG(l.area),
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
-        WHERE l.address.ward.wardId = :wardId
+        WHERE l.address.ward.id = :wardId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
     """)
     Object[] getPricingStatisticsByWard(
-        @Param("wardId") Long wardId,
+        @Param("wardId") Integer wardId,
         @Param("productType") Listing.ProductType productType,
         @Param("priceUnit") Listing.PriceUnit priceUnit
     );
@@ -120,13 +120,13 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
             AVG(l.area),
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
-        WHERE l.address.district.districtId = :districtId
+        WHERE l.address.district.id = :districtId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
     """)
     Object[] getPricingStatisticsByDistrict(
-        @Param("districtId") Long districtId,
+        @Param("districtId") Integer districtId,
         @Param("productType") Listing.ProductType productType,
         @Param("priceUnit") Listing.PriceUnit priceUnit
     );
@@ -143,13 +143,13 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
             AVG(l.area),
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
-        WHERE l.address.province.provinceId = :provinceId
+        WHERE l.address.province.id = :provinceId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
     """)
     Object[] getPricingStatisticsByProvince(
-        @Param("provinceId") Long provinceId,
+        @Param("provinceId") Integer provinceId,
         @Param("productType") Listing.ProductType productType,
         @Param("priceUnit") Listing.PriceUnit priceUnit
     );

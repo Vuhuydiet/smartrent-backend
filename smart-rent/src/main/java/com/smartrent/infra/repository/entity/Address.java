@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -38,7 +39,7 @@ import java.util.List;
         })
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -46,7 +47,7 @@ public class Address {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long addressId;
+    Integer addressId;
 
     @Column(name = "street_number", length = 20)
     String streetNumber;
@@ -57,7 +58,7 @@ public class Address {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ward_id", nullable = false)
-    Ward ward;
+    LegacyWard ward;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "district_id", nullable = false)
@@ -65,7 +66,7 @@ public class Address {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "province_id", nullable = false)
-    Province province;
+    LegacyProvince province;
 
     @Column(name = "full_address", columnDefinition = "TEXT")
     String fullAddress;
@@ -100,7 +101,7 @@ public class Address {
         sb.append(street.getName()).append(", ");
         sb.append(ward.getName()).append(", ");
         sb.append(district.getName()).append(", ");
-        sb.append(province.getDisplayName()); // Use display name for merged provinces
+        sb.append(province.getName());
         return sb.toString();
     }
 }

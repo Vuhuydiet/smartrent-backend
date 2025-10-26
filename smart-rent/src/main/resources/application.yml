@@ -118,6 +118,7 @@ application:
         - "/actuator/**"
         - "/v1/payments/vnpay/callback"
         - "/v1/listings/**"
+        - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
         - "/v1/new-addresses/**"
         - "/v1/memberships/packages"

@@ -19,7 +19,7 @@ INSERT INTO administrative_units(id,full_name,full_name_en,short_name,short_name
 -- ----------------------------------
 
 -- DATA for provinces --
-INSERT INTO provinces(id,code,name,name_en,full_name,full_name_en,code_name,administrative_unit_id) VALUES
+INSERT INTO provinces(code,name,name_en,full_name,full_name_en,code_name,administrative_unit_id) VALUES
 ('01','Hà Nội','Ha Noi','Thành phố Hà Nội','Ha Noi City','ha_noi',1),
 ('04','Cao Bằng','Cao Bang','Tỉnh Cao Bằng','Cao Bang Province','cao_bang',2),
 ('08','Tuyên Quang','Tuyen Quang','Tỉnh Tuyên Quang','Tuyen Quang Province','tuyen_quang',2),

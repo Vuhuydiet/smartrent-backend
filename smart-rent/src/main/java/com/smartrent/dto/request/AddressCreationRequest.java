@@ -23,18 +23,18 @@ public class AddressCreationRequest {
     String streetNumber;
 
     @NotNull(message = "Street ID is required")
-    Long streetId;
+    Integer streetId;
 
     @NotNull(message = "Ward ID is required")
-    Long wardId;
+    Integer wardId;
 
 
     @NotNull(message = "District ID is required")
-    Long districtId;
+    Integer districtId;
 
 
     @NotNull(message = "Province ID is required")
-    Long provinceId;
+    Integer provinceId;
 
     String fullAddress;
 

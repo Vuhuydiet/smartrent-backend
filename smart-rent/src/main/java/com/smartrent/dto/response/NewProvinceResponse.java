@@ -21,10 +21,21 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class NewProvinceResponse {
 
-    @JsonProperty("province_id")
-    Long provinceId;
-
     String code;
     String name;
-    String type;
+
+    @JsonProperty("name_en")
+    String nameEn;
+
+    @JsonProperty("full_name")
+    String fullName;
+
+    @JsonProperty("full_name_en")
+    String fullNameEn;
+
+    @JsonProperty("code_name")
+    String codeName;
+
+    @JsonProperty("administrative_unit_type")
+    String administrativeUnitType;
 }
