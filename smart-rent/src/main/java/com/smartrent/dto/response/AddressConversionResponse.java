@@ -3,10 +3,9 @@ package com.smartrent.dto.response;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.time.LocalDate;
-
 /**
- * Response for address conversion from old to new administrative structure
+ * Response for address conversion from legacy to new administrative structure
+ * Shows both the original legacy address and the converted new address
  */
 @Getter
 @Setter
@@ -16,57 +15,18 @@ import java.time.LocalDate;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AddressConversionResponse {
 
-    // Original address
-    OldAddress oldAddress;
+    /**
+     * Original legacy address (Province → District → Ward)
+     */
+    FullAddressResponse legacyAddress;
 
-    // Converted address
-    NewAddress newAddress;
+    /**
+     * Converted new address (Province → Ward, no district)
+     */
+    NewFullAddressResponse newAddress;
 
-    // Conversion metadata
-    ConversionInfo conversionInfo;
-
-    @Getter
-    @Setter
-    @Builder
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class OldAddress {
-        String provinceCode;
-        String provinceName;
-        String districtCode;
-        String districtName;
-        String wardCode;
-        String wardName;
-        String fullAddress;
-    }
-
-    @Getter
-    @Setter
-    @Builder
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class NewAddress {
-        String provinceCode;
-        String provinceName;
-        String districtCode;
-        String districtName;
-        String wardCode;
-        String wardName;
-        String fullAddress;
-    }
-
-    @Getter
-    @Setter
-    @Builder
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    public static class ConversionInfo {
-        Boolean wasConverted;
-        String conversionType; // NONE, PROVINCE_MERGE, WARD_MERGE, DISTRICT_MERGE
-        LocalDate effectiveDate;
-        String notes;
-    }
+    /**
+     * Notes about the conversion process and merge type
+     */
+    String conversionNote;
 }

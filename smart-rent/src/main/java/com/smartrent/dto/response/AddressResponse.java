@@ -17,15 +17,15 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class AddressResponse {
-    Long addressId;
+    Integer addressId;
     String streetNumber;
-    Long streetId;
+    Integer streetId;
     String streetName;
-    Long wardId;
+    Integer wardId;
     String wardName;
-    Long districtId;
+    Integer districtId;
     String districtName;
-    Long provinceId;
+    Integer provinceId;
     String provinceName;
     String fullAddress;
     BigDecimal latitude;

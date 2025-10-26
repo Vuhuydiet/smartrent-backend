@@ -9,5 +9,5 @@ public interface LocationPricingService {
      * @param listing The listing to get pricing information for
      * @return LocationPricingResponse containing statistics and similar listings
      */
-    LocationPricingResponse getLocationPricing(Listing listing, Long wardId, Long districtId, Long provinceId);
+    LocationPricingResponse getLocationPricing(Listing listing, Integer wardId, Integer districtId, Integer provinceId);
 }

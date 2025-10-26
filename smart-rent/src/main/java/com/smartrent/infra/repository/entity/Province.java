@@ -1,45 +1,16 @@
 package com.smartrent.infra.repository.entity;
 
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
-@Entity(name = "provinces")
+@Entity
 @Table(name = "provinces",
         indexes = {
-                @Index(name = "idx_name", columnList = "name"),
-                @Index(name = "idx_is_active", columnList = "is_active"),
-                @Index(name = "idx_effective_period", columnList = "effective_from, effective_to"),
-                @Index(name = "idx_parent_province", columnList = "parent_province_id"),
-                @Index(name = "idx_is_merged", columnList = "is_merged")
-        },
-        uniqueConstraints = {
-                @UniqueConstraint(name = "unique_province_code", columnNames = {"code"})
+                @Index(name = "idx_provinces_unit", columnList = "administrative_unit_id"),
+                @Index(name = "idx_provinces_name", columnList = "name")
         })
 @Getter
 @Setter
@@ -50,77 +21,28 @@ import java.util.List;
 public class Province {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long provinceId;
-
-    @Column(nullable = false, length = 100)
-    String name;
-
-    @Column(length = 10)
+    @Column(length = 20)
     String code;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    ProvinceType type;
+    String name;
 
-    @Builder.Default
-    @Column(name = "is_active", nullable = false)
-    Boolean isActive = true;
+    @Column(name = "name_en")
+    String nameEn;
 
-    @Column(name = "effective_from")
-    LocalDate effectiveFrom;
+    @Column(name = "full_name", nullable = false)
+    String fullName;
 
-    @Column(name = "effective_to")
-    LocalDate effectiveTo;
+    @Column(name = "full_name_en")
+    String fullNameEn;
 
-    // Self-referencing relationship for merged provinces
+    @Column(name = "code_name")
+    String codeName;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_province_id")
-    Province parentProvince;
+    @JoinColumn(name = "administrative_unit_id")
+    AdministrativeUnit administrativeUnit;
 
-    @OneToMany(mappedBy = "parentProvince", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    List<Province> mergedProvinces;
-
-    @Builder.Default
-    @Column(name = "is_merged", nullable = false)
-    Boolean isMerged = false;
-
-    @Column(name = "merged_date")
-    LocalDate mergedDate;
-
-    @Column(name = "original_name", length = 100)
-    String originalName; // Store original name before merger
-
-    // Relationships with other entities
     @OneToMany(mappedBy = "province", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    List<District> districts;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    LocalDateTime updatedAt;
-
-    public enum ProvinceType {
-        PROVINCE, CITY
-    }
-
-    // Helper methods for merged province logic
-    public boolean isParentProvince() {
-        return mergedProvinces != null && !mergedProvinces.isEmpty();
-    }
-
-    public boolean isMergedProvince() {
-        return parentProvince != null;
-    }
-
-    public String getDisplayName() {
-        return isMergedProvince() ? parentProvince.getName() : name;
-    }
-
-    public List<Province> getAllMergedProvinces() {
-        return isParentProvince() ? mergedProvinces : List.of();
-    }
+    List<Ward> wards;
 }

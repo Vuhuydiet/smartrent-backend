@@ -3,25 +3,28 @@ package com.smartrent.infra.repository.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.SuperBuilder;
+
+import java.util.List;
 
 /**
- * Legacy street structure (before July 1, 2025)
+ * Legacy ward structure (before July 1, 2025)
  * Uses integer ID as primary key
  */
 @Entity
-@Table(name = "street")
+@Table(name = "ward")
 @Getter
 @Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class Street {
+public class LegacyWard {
 
     @Id
     Integer id;
 
-    @Column(name = "_name", length = 100)
+    @Column(name = "_name", length = 50, nullable = false)
     String name;
 
     @Column(name = "name_en", length = 100)
@@ -38,7 +41,6 @@ public class Street {
     @JoinColumn(name = "_district_id")
     District district;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "_ward_id")
-    LegacyWard ward;
+    @OneToMany(mappedBy = "ward", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<Street> streets;
 }

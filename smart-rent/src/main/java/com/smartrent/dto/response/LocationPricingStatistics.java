@@ -26,7 +26,7 @@ public class LocationPricingStatistics {
     String locationType;
 
     @Schema(description = "Location ID (ward ID, district ID, province ID, or project ID)")
-    Long locationId;
+    Integer locationId;
 
     @Schema(description = "Location name", example = "Phường Bến Nghé")
     String locationName;

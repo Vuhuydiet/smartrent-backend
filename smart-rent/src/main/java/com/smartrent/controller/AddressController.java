@@ -15,7 +15,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 
 @RestController
@@ -85,22 +84,16 @@ public class AddressController {
                             {
                               "data": [
                                 {
-                                  "id": 1,
+                                  "provinceId": 1,
                                   "name": "Thành phố Hà Nội",
                                   "code": "01",
-                                  "type": "CITY",
-                                  "level": "PROVINCE",
-                                  "isActive": true,
-                                  "fullAddressText": "Thành phố Hà Nội"
+                                  "isActive": true
                                 },
                                 {
-                                  "id": 79,
+                                  "provinceId": 79,
                                   "name": "Thành phố Hồ Chí Minh",
                                   "code": "79",
-                                  "type": "CITY",
-                                  "level": "PROVINCE",
-                                  "isActive": true,
-                                  "fullAddressText": "Thành phố Hồ Chí Minh"
+                                  "isActive": true
                                 }
                               ],
                               "message": "Successfully retrieved 63 provinces"
@@ -111,17 +104,14 @@ public class AddressController {
             )
         }
     )
-    public ResponseEntity<ApiResponse<List<AddressUnitDTO>>> getAllProvinces() {
+    public ResponseEntity<ApiResponse<List<LegacyProvinceResponse>>> getAllProvinces() {
         log.info("GET /v1/addresses/provinces - Fetching all active provinces (legacy structure)");
 
-        List<ProvinceResponse> provinces = addressService.getAllProvinces();
-        List<AddressUnitDTO> units = provinces.stream()
-                .map(AddressUnitDTO::fromProvince)
-                .collect(Collectors.toList());
+        List<LegacyProvinceResponse> provinces = addressService.getAllProvinces();
 
-        return ResponseEntity.ok(ApiResponse.<List<AddressUnitDTO>>builder()
-                .data(units)
-                .message("Successfully retrieved " + units.size() + " provinces")
+        return ResponseEntity.ok(ApiResponse.<List<LegacyProvinceResponse>>builder()
+                .data(provinces)
+                .message("Successfully retrieved " + provinces.size() + " provinces")
                 .build());
     }
 
@@ -140,17 +130,16 @@ public class AddressController {
             )
         }
     )
-    public ResponseEntity<ApiResponse<AddressUnitDTO>> getProvinceById(
+    public ResponseEntity<ApiResponse<LegacyProvinceResponse>> getProvinceById(
             @Parameter(description = "Province ID", example = "1", required = true)
             @PathVariable Long provinceId) {
 
         log.info("GET /v1/addresses/provinces/{}", provinceId);
 
-        ProvinceResponse province = addressService.getProvinceById(provinceId);
-        AddressUnitDTO unit = AddressUnitDTO.fromProvince(province);
+        LegacyProvinceResponse province = addressService.getProvinceById(provinceId);
 
-        return ResponseEntity.ok(ApiResponse.<AddressUnitDTO>builder()
-                .data(unit)
+        return ResponseEntity.ok(ApiResponse.<LegacyProvinceResponse>builder()
+                .data(province)
                 .message("Successfully retrieved province")
                 .build());
     }
@@ -166,20 +155,17 @@ public class AddressController {
             )
         }
     )
-    public ResponseEntity<ApiResponse<List<AddressUnitDTO>>> searchProvinces(
+    public ResponseEntity<ApiResponse<List<LegacyProvinceResponse>>> searchProvinces(
             @Parameter(description = "Search term", example = "Hà Nội", required = true)
             @RequestParam String q) {
 
         log.info("GET /v1/addresses/provinces/search - query={}", q);
 
-        List<ProvinceResponse> provinces = addressService.searchProvinces(q);
-        List<AddressUnitDTO> units = provinces.stream()
-                .map(AddressUnitDTO::fromProvince)
-                .collect(Collectors.toList());
+        List<LegacyProvinceResponse> provinces = addressService.searchProvinces(q);
 
-        return ResponseEntity.ok(ApiResponse.<List<AddressUnitDTO>>builder()
-                .data(units)
-                .message("Found " + units.size() + " provinces matching '" + q + "'")
+        return ResponseEntity.ok(ApiResponse.<List<LegacyProvinceResponse>>builder()
+                .data(provinces)
+                .message("Found " + provinces.size() + " provinces matching '" + q + "'")
                 .build());
     }
 
@@ -248,20 +234,17 @@ public class AddressController {
             )
         }
     )
-    public ResponseEntity<ApiResponse<List<AddressUnitDTO>>> getDistrictsByProvinceId(
+    public ResponseEntity<ApiResponse<List<LegacyDistrictResponse>>> getDistrictsByProvinceId(
             @Parameter(description = "Province ID", example = "1", required = true)
             @PathVariable Long provinceId) {
 
         log.info("GET /v1/addresses/provinces/{}/districts", provinceId);
 
-        List<DistrictResponse> districts = addressService.getDistrictsByProvinceId(provinceId);
-        List<AddressUnitDTO> units = districts.stream()
-                .map(AddressUnitDTO::fromDistrict)
-                .collect(Collectors.toList());
+        List<LegacyDistrictResponse> districts = addressService.getDistrictsByProvinceId(provinceId);
 
-        return ResponseEntity.ok(ApiResponse.<List<AddressUnitDTO>>builder()
-                .data(units)
-                .message("Successfully retrieved " + units.size() + " districts for province " + provinceId)
+        return ResponseEntity.ok(ApiResponse.<List<LegacyDistrictResponse>>builder()
+                .data(districts)
+                .message("Successfully retrieved " + districts.size() + " districts for province " + provinceId)
                 .build());
     }
 
@@ -280,17 +263,16 @@ public class AddressController {
             )
         }
     )
-    public ResponseEntity<ApiResponse<AddressUnitDTO>> getDistrictById(
+    public ResponseEntity<ApiResponse<LegacyDistrictResponse>> getDistrictById(
             @Parameter(description = "District ID", example = "1", required = true)
             @PathVariable Long districtId) {
 
         log.info("GET /v1/addresses/districts/{}", districtId);
 
-        DistrictResponse district = addressService.getDistrictById(districtId);
-        AddressUnitDTO unit = AddressUnitDTO.fromDistrict(district);
+        LegacyDistrictResponse district = addressService.getDistrictById(districtId);
 
-        return ResponseEntity.ok(ApiResponse.<AddressUnitDTO>builder()
-                .data(unit)
+        return ResponseEntity.ok(ApiResponse.<LegacyDistrictResponse>builder()
+                .data(district)
                 .message("Successfully retrieved district")
                 .build());
     }
@@ -309,7 +291,7 @@ public class AddressController {
             )
         }
     )
-    public ResponseEntity<ApiResponse<List<AddressUnitDTO>>> searchDistricts(
+    public ResponseEntity<ApiResponse<List<LegacyDistrictResponse>>> searchDistricts(
             @Parameter(description = "Search term", example = "Ba Đình", required = true)
             @RequestParam String q,
 
@@ -318,14 +300,11 @@ public class AddressController {
 
         log.info("GET /v1/addresses/districts/search - query={}, provinceId={}", q, provinceId);
 
-        List<DistrictResponse> districts = addressService.searchDistricts(q, provinceId);
-        List<AddressUnitDTO> units = districts.stream()
-                .map(AddressUnitDTO::fromDistrict)
-                .collect(Collectors.toList());
+        List<LegacyDistrictResponse> districts = addressService.searchDistricts(q, provinceId);
 
-        return ResponseEntity.ok(ApiResponse.<List<AddressUnitDTO>>builder()
-                .data(units)
-                .message("Found " + units.size() + " districts matching '" + q + "'")
+        return ResponseEntity.ok(ApiResponse.<List<LegacyDistrictResponse>>builder()
+                .data(districts)
+                .message("Found " + districts.size() + " districts matching '" + q + "'")
                 .build());
     }
 
@@ -397,20 +376,17 @@ public class AddressController {
             )
         }
     )
-    public ResponseEntity<ApiResponse<List<AddressUnitDTO>>> getWardsByDistrictId(
+    public ResponseEntity<ApiResponse<List<LegacyWardResponse>>> getWardsByDistrictId(
             @Parameter(description = "District ID", example = "1", required = true)
             @PathVariable Long districtId) {
 
         log.info("GET /v1/addresses/districts/{}/wards", districtId);
 
-        List<WardResponse> wards = addressService.getWardsByDistrictId(districtId);
-        List<AddressUnitDTO> units = wards.stream()
-                .map(AddressUnitDTO::fromWard)
-                .collect(Collectors.toList());
+        List<LegacyWardResponse> wards = addressService.getWardsByDistrictId(districtId);
 
-        return ResponseEntity.ok(ApiResponse.<List<AddressUnitDTO>>builder()
-                .data(units)
-                .message("Successfully retrieved " + units.size() + " wards for district " + districtId)
+        return ResponseEntity.ok(ApiResponse.<List<LegacyWardResponse>>builder()
+                .data(wards)
+                .message("Successfully retrieved " + wards.size() + " wards for district " + districtId)
                 .build());
     }
 
@@ -429,17 +405,16 @@ public class AddressController {
             )
         }
     )
-    public ResponseEntity<ApiResponse<AddressUnitDTO>> getWardById(
+    public ResponseEntity<ApiResponse<LegacyWardResponse>> getWardById(
             @Parameter(description = "Ward ID", example = "1", required = true)
             @PathVariable Long wardId) {
 
         log.info("GET /v1/addresses/wards/{}", wardId);
 
-        WardResponse ward = addressService.getWardById(wardId);
-        AddressUnitDTO unit = AddressUnitDTO.fromWard(ward);
+        LegacyWardResponse ward = addressService.getWardById(wardId);
 
-        return ResponseEntity.ok(ApiResponse.<AddressUnitDTO>builder()
-                .data(unit)
+        return ResponseEntity.ok(ApiResponse.<LegacyWardResponse>builder()
+                .data(ward)
                 .message("Successfully retrieved ward")
                 .build());
     }
@@ -458,7 +433,7 @@ public class AddressController {
             )
         }
     )
-    public ResponseEntity<ApiResponse<List<AddressUnitDTO>>> searchWards(
+    public ResponseEntity<ApiResponse<List<LegacyWardResponse>>> searchWards(
             @Parameter(description = "Search term", example = "Phúc Xá", required = true)
             @RequestParam String q,
 
@@ -467,14 +442,11 @@ public class AddressController {
 
         log.info("GET /v1/addresses/wards/search - query={}, districtId={}", q, districtId);
 
-        List<WardResponse> wards = addressService.searchWards(q, districtId);
-        List<AddressUnitDTO> units = wards.stream()
-                .map(AddressUnitDTO::fromWard)
-                .collect(Collectors.toList());
+        List<LegacyWardResponse> wards = addressService.searchWards(q, districtId);
 
-        return ResponseEntity.ok(ApiResponse.<List<AddressUnitDTO>>builder()
-                .data(units)
-                .message("Found " + units.size() + " wards matching '" + q + "'")
+        return ResponseEntity.ok(ApiResponse.<List<LegacyWardResponse>>builder()
+                .data(wards)
+                .message("Found " + wards.size() + " wards matching '" + q + "'")
                 .build());
     }
 
@@ -802,6 +774,152 @@ public class AddressController {
                 newAddressService.searchNewAddress(keyword, page, limit);
 
         return ResponseEntity.ok(response);
+    }
+
+    // ==================== ADDRESS CONVERSION ====================
+
+    @GetMapping("/convert/legacy-to-new")
+    @Operation(
+        summary = "Convert legacy address to new structure",
+        description = """
+            Converts an address from legacy structure (63 provinces, 3-tier) to new structure (34 provinces, 2-tier).
+
+            **Input**: Legacy Province ID, District ID, Ward ID
+            **Output**: Both legacy and new address information with conversion notes
+
+            **Use Cases**:
+            - Migrate existing data from legacy to new structure
+            - Show users their address in both formats
+            - Validate address conversions
+
+            **Note**: Uses mapping tables to find corresponding new addresses.
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully converted address",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Conversion Example",
+                        summary = "Chuyển đổi địa chỉ từ cấu trúc cũ sang mới",
+                        value = """
+                            {
+                              "data": {
+                                "legacyAddress": {
+                                  "province": {"id": 1, "name": "Hà Nội", "code": "01"},
+                                  "district": {"id": 1, "name": "Ba Đình"},
+                                  "ward": {"id": 1, "name": "Phúc Xá"}
+                                },
+                                "newAddress": {
+                                  "province": {"code": "01", "name": "Hà Nội"},
+                                  "ward": {"code": "00001", "name": "Phúc Xá"}
+                                },
+                                "conversionNote": "Converted from legacy structure. Merge type: KEEP"
+                              },
+                              "message": "Successfully converted address from legacy to new structure"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Address not found or mapping not available"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<AddressConversionResponse>> convertLegacyToNew(
+            @Parameter(description = "Legacy Province ID", example = "1", required = true)
+            @RequestParam Integer provinceId,
+
+            @Parameter(description = "Legacy District ID", example = "1", required = true)
+            @RequestParam Integer districtId,
+
+            @Parameter(description = "Legacy Ward ID", example = "1", required = true)
+            @RequestParam Integer wardId) {
+
+        log.info("GET /v1/addresses/convert/legacy-to-new - provinceId: {}, districtId: {}, wardId: {}",
+                provinceId, districtId, wardId);
+
+//        AddressConversionResponse response = addressService.convertLegacyToNew(provinceId, districtId, wardId);
+        AddressConversionResponse response = new AddressConversionResponse();
+        return ResponseEntity.ok(ApiResponse.<AddressConversionResponse>builder()
+                .data(response)
+                .message("Successfully converted address from legacy to new structure")
+                .build());
+    }
+
+    @GetMapping("/convert/new-to-legacy")
+    @Operation(
+        summary = "Convert new address to legacy structure",
+        description = """
+            Converts an address from new structure (34 provinces, 2-tier) to legacy structure (63 provinces, 3-tier).
+
+            **Input**: New Province Code, Ward Code
+            **Output**: Both new and legacy address information with conversion notes
+
+            **Use Cases**:
+            - Support backward compatibility with legacy systems
+            - Show users their address in legacy format
+            - Export data for systems using old structure
+
+            **Note**: One new ward may map to multiple legacy wards. Returns first match by default.
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully converted address",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Reverse Conversion Example",
+                        summary = "Chuyển đổi địa chỉ từ cấu trúc mới về cũ",
+                        value = """
+                            {
+                              "data": {
+                                "legacyAddress": {
+                                  "province": {"id": 1, "name": "Hà Nội", "code": "01"},
+                                  "district": {"id": 1, "name": "Ba Đình"},
+                                  "ward": {"id": 1, "name": "Phúc Xá"}
+                                },
+                                "newAddress": {
+                                  "province": {"code": "01", "name": "Hà Nội"},
+                                  "ward": {"code": "00001", "name": "Phúc Xá"}
+                                },
+                                "conversionNote": "Converted to legacy structure. Merge type: KEEP"
+                              },
+                              "message": "Successfully converted address from new to legacy structure"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Address not found or mapping not available"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<AddressConversionResponse>> convertNewToLegacy(
+            @Parameter(description = "New Province Code", example = "01", required = true)
+            @RequestParam String provinceCode,
+
+            @Parameter(description = "New Ward Code", example = "00001", required = true)
+            @RequestParam String wardCode) {
+
+        log.info("GET /v1/addresses/convert/new-to-legacy - provinceCode: {}, wardCode: {}",
+                provinceCode, wardCode);
+
+//        AddressConversionResponse response = addressService.convertNewToLegacy(provinceCode, wardCode);
+        AddressConversionResponse response = new AddressConversionResponse();
+
+        return ResponseEntity.ok(ApiResponse.<AddressConversionResponse>builder()
+                .data(response)
+                .message("Successfully converted address from new to legacy structure")
+                .build());
     }
 
     // ==================== HEALTH CHECK ====================

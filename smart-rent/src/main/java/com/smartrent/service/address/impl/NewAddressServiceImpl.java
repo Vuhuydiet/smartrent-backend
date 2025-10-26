@@ -1,4 +1,4 @@
-package com.smartrent.service.address;
+package com.smartrent.service.address.impl;
 
 import com.smartrent.dto.response.NewAddressSearchResponse;
 import com.smartrent.dto.response.NewFullAddressResponse;
@@ -12,6 +12,7 @@ import com.smartrent.infra.repository.WardRepository;
 import com.smartrent.infra.repository.entity.Province;
 import com.smartrent.infra.repository.entity.Ward;
 import com.smartrent.mapper.AddressMapper;
+import com.smartrent.service.address.NewAddressService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -56,14 +57,11 @@ public class NewAddressServiceImpl implements NewAddressService {
 
             Pageable pageable = PageRequest.of(validPage - 1, validLimit);
             Page<Province> provincePage;
-            long totalCount;
 
             if (keyword != null && !keyword.trim().isEmpty()) {
-                provincePage = provinceRepository.searchNewProvinces(keyword.trim(), pageable);
-                totalCount = provinceRepository.countNewProvincesByKeyword(keyword.trim());
+                provincePage = provinceRepository.searchByKeyword(keyword.trim(), pageable);
             } else {
-                provincePage = provinceRepository.findNewProvinces(pageable);
-                totalCount = provinceRepository.countNewProvinces();
+                provincePage = provinceRepository.findAll(pageable);
             }
 
             List<NewProvinceResponse> provinceResponses = provincePage.getContent().stream()
@@ -73,7 +71,7 @@ public class NewAddressServiceImpl implements NewAddressService {
             log.info("Successfully fetched {} new provinces from database", provinceResponses.size());
 
             PaginatedResponse.Metadata metadata = PaginatedResponse.Metadata.builder()
-                    .total((int) totalCount)
+                    .total((int) provincePage.getTotalElements())
                     .page(validPage)
                     .limit(validLimit)
                     .build();
@@ -109,7 +107,7 @@ public class NewAddressServiceImpl implements NewAddressService {
 
         try {
             // Verify province exists
-            Province province = provinceRepository.findByCodeAndIsActiveTrue(provinceCode)
+            Province province = provinceRepository.findByCode(provinceCode)
                     .orElseThrow(() -> new AppException(DomainCode.ADDRESS_NOT_FOUND,
                             "Province not found with code: " + provinceCode));
 
@@ -118,14 +116,11 @@ public class NewAddressServiceImpl implements NewAddressService {
 
             Pageable pageable = PageRequest.of(validPage - 1, validLimit);
             Page<Ward> wardPage;
-            long totalCount;
 
             if (keyword != null && !keyword.trim().isEmpty()) {
-                wardPage = wardRepository.searchWardsByNewProvinceCode(provinceCode, keyword.trim(), pageable);
-                totalCount = wardRepository.countWardsByNewProvinceCodeAndKeyword(provinceCode, keyword.trim());
+                wardPage = wardRepository.searchByProvinceAndKeyword(provinceCode, keyword.trim(), pageable);
             } else {
-                wardPage = wardRepository.findWardsByNewProvinceCode(provinceCode, pageable);
-                totalCount = wardRepository.countWardsByNewProvinceCode(provinceCode);
+                wardPage = wardRepository.findByProvinceCode(provinceCode, pageable);
             }
 
             List<NewWardResponse> wardResponses = wardPage.getContent().stream()
@@ -136,7 +131,7 @@ public class NewAddressServiceImpl implements NewAddressService {
                     wardResponses.size(), provinceCode);
 
             PaginatedResponse.Metadata metadata = PaginatedResponse.Metadata.builder()
-                    .total((int) totalCount)
+                    .total((int) wardPage.getTotalElements())
                     .page(validPage)
                     .limit(validLimit)
                     .build();
@@ -169,16 +164,16 @@ public class NewAddressServiceImpl implements NewAddressService {
 
         try {
             // Fetch province
-            Province province = provinceRepository.findByCodeAndIsActiveTrue(provinceCode)
+            Province province = provinceRepository.findByCode(provinceCode)
                     .orElseThrow(() -> new AppException(DomainCode.ADDRESS_NOT_FOUND,
                             "Province not found with code: " + provinceCode));
 
             // Fetch ward if wardCode is provided
             Ward ward = null;
             if (wardCode != null && !wardCode.trim().isEmpty()) {
-                ward = wardRepository.findNewWardByCodeAndProvinceCode(wardCode, provinceCode)
+                ward = wardRepository.findByCode(wardCode)
                         .orElseThrow(() -> new AppException(DomainCode.ADDRESS_NOT_FOUND,
-                                "Ward not found with code: " + wardCode + " in province: " + provinceCode));
+                                "Ward not found with code: " + wardCode));
             }
 
             log.info("Successfully fetched full address for province {} and ward {} from database",
@@ -215,14 +210,11 @@ public class NewAddressServiceImpl implements NewAddressService {
 
             Pageable pageable = PageRequest.of(validPage - 1, validLimit);
 
-            // Search wards (which includes province information)
-            Page<Ward> wardPage = wardRepository.searchNewAddresses(keyword.trim(), pageable);
+            // Search provinces by keyword
+            Page<Province> provincePage = provinceRepository.searchByKeyword(keyword.trim(), pageable);
 
-            // Also search provinces
-            Page<Province> provincePage = provinceRepository.searchNewProvinces(
-                    keyword.trim(),
-                    PageRequest.of(0, validLimit)
-            );
+            // Search wards by keyword (includes province information)
+            Page<Ward> wardPage = wardRepository.searchByKeyword(keyword.trim(), pageable);
 
             // Combine results - provinces first, then wards
             List<NewAddressSearchResponse> searchResults = new ArrayList<>();
@@ -237,7 +229,7 @@ public class NewAddressServiceImpl implements NewAddressService {
                     .map(addressMapper::toNewAddressSearchResponse)
                     .collect(Collectors.toList()));
 
-            // Limit combined results
+            // Limit combined results to the requested page size
             if (searchResults.size() > validLimit) {
                 searchResults = searchResults.subList(0, validLimit);
             }
