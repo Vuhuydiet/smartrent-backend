@@ -7,6 +7,7 @@ import com.smartrent.service.membership.MembershipService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -80,10 +81,103 @@ public class MembershipController {
                 .build();
     }
 
+    @PostMapping("/initiate-purchase")
+    @Operation(
+        summary = "Initiate membership purchase",
+        description = "Initiate membership package purchase and receive VNPay payment URL. After successful payment, membership will be activated with all benefits.",
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Payment URL generated successfully",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = PaymentResponse.class),
+                    examples = @ExampleObject(
+                        name = "Success Response",
+                        value = """
+                            {
+                              "code": "200000",
+                              "message": "Success",
+                              "data": {
+                                "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?...",
+                                "transactionRef": "abc123-def456-ghi789",
+                                "amount": 299000,
+                                "provider": "VNPAY"
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Invalid request - Missing required field (membershipId is required) or invalid payment provider",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Validation Error",
+                        value = """
+                            {
+                              "code": "400000",
+                              "message": "Membership package ID is required"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Membership package not found or user not found",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Not Found Error",
+                        value = """
+                            {
+                              "code": "404000",
+                              "message": "Membership package not found: 999"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "422",
+                description = "Membership package is not active",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Inactive Package Error",
+                        value = """
+                            {
+                              "code": "422000",
+                              "message": "Membership package is not active"
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    public ApiResponse<PaymentResponse> initiateMembershipPurchase(
+            @RequestBody @Valid MembershipPurchaseRequest request) {
+        // Extract user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
+        log.info("User {} initiating membership purchase for package {}", userId, request.getMembershipId());
+        PaymentResponse response = membershipService.initiateMembershipPurchase(userId, request);
+        return ApiResponse.<PaymentResponse>builder()
+                .data(response)
+                .build();
+    }
+
     @PostMapping("/purchase")
     @Operation(
-        summary = "Purchase a membership package",
-        description = "Purchase a membership package and receive all benefits immediately",
+        summary = "Purchase a membership package (Deprecated)",
+        description = "Direct purchase of membership package. This endpoint is deprecated. Use /initiate-purchase instead for payment flow.",
+        deprecated = true,
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
@@ -100,13 +194,14 @@ public class MembershipController {
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    @Deprecated
     public ApiResponse<UserMembershipResponse> purchaseMembership(
             @RequestBody @Valid MembershipPurchaseRequest request) {
         // Extract user ID from JWT token
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userId = authentication.getName();
 
-        log.info("User {} purchasing membership package {}", userId, request.getMembershipId());
+        log.info("User {} purchasing membership package {} (deprecated endpoint)", userId, request.getMembershipId());
         UserMembershipResponse response = membershipService.purchaseMembership(userId, request);
         return ApiResponse.<UserMembershipResponse>builder()
                 .data(response)
