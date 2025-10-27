@@ -30,9 +30,6 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
     // Find by full address text search
     List<Address> findByFullAddressContainingIgnoreCaseOrderByFullAddress(String searchTerm);
 
-    // Get verified addresses only
-    List<Address> findByIsVerifiedTrueOrderByFullAddress();
-
 ////    // Find exact address match
 //    Optional<Address> findByStreetNumberAndStreetStreetIdAndWardWardIdAndDistrictDistrictIdAndProvinceProvinceId(
 //            Street street, Ward ward, District district, Province province);
