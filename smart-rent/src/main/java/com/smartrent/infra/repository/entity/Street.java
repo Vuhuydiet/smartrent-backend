@@ -30,15 +30,9 @@ public class Street {
     @Column(name = "_prefix", length = 20)
     String prefix;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "_province_id")
-    LegacyProvince province;
+    @Column(name = "_province_id")
+    Integer provinceId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "_district_id")
-    District district;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "_ward_id")
-    LegacyWard ward;
+    @Column(name = "_district_id")
+    Integer districtId;
 }

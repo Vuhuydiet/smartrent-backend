@@ -18,7 +18,9 @@ public interface StreetRepository extends JpaRepository<Street, Integer> {
 
     List<Street> findByDistrictId(Integer districtId);
 
-    List<Street> findByWardId(Integer wardId);
+    @Query("SELECT s FROM Street s WHERE s.provinceId = :provinceId AND s.districtId = :districtId")
+    List<Street> findByProvinceIdAndDistrictId(@Param("provinceId") Integer provinceId,
+                                                 @Param("districtId") Integer districtId);
 
     @Query("SELECT s FROM Street s WHERE " +
             "LOWER(s.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

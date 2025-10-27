@@ -25,26 +25,14 @@ public class AddressMapperImpl implements AddressMapper {
             return null;
         }
 
-        Street street = address.getStreet();
-        LegacyWard ward = address.getWard();
-        District district = address.getDistrict();
-        LegacyProvince province = address.getProvince();
-
         return AddressResponse.builder()
                 .addressId(address.getAddressId())
-                .streetNumber(address.getStreetNumber())
-                .streetId(street != null ? street.getId() : null)
-                .streetName(street != null ? street.getName() : null)
-                .wardId(ward != null ? ward.getId() : null)
-                .wardName(ward != null ? ward.getName() : null)
-                .districtId(district != null ? district.getId() : null)
-                .districtName(district != null ? district.getName() : null)
-                .provinceId(province != null ? province.getId() : null)
-                .provinceName(province != null ? province.getName() : null)
                 .fullAddress(address.getFullAddress())
+                .fullNewAddress(address.getFullNewAddress())
+                .displayAddress(address.getDisplayAddress())
                 .latitude(address.getLatitude())
                 .longitude(address.getLongitude())
-                .isVerified(address.getIsVerified())
+                // Note: Metadata fields should be populated from AddressMetadata if needed
                 .build();
     }
 
@@ -109,12 +97,10 @@ public class AddressMapperImpl implements AddressMapper {
                 .name(street.getName())
                 .nameEn(street.getNameEn())
                 .prefix(street.getPrefix())
-                .provinceId(street.getProvince() != null ? street.getProvince().getId() : null)
-                .provinceName(street.getProvince() != null ? street.getProvince().getName() : null)
-                .districtId(street.getDistrict() != null ? street.getDistrict().getId() : null)
-                .districtName(street.getDistrict() != null ? street.getDistrict().getName() : null)
-                .wardId(street.getWard() != null ? street.getWard().getId() : null)
-                .wardName(street.getWard() != null ? street.getWard().getName() : null)
+                .provinceId(street.getProvinceId())
+                .provinceName(null) // Will be populated in service layer
+                .districtId(street.getDistrictId())
+                .districtName(null) // Will be populated in service layer
                 .build();
     }
 

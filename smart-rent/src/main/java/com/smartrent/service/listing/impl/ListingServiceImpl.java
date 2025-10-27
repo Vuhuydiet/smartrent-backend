@@ -14,6 +14,7 @@ import com.smartrent.enums.PostSource;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AddressRepository;
+import com.smartrent.infra.repository.AddressMetadataRepository;
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
@@ -25,6 +26,7 @@ import com.smartrent.service.pricing.LocationPricingService;
 import com.smartrent.service.quota.QuotaService;
 import com.smartrent.service.payment.PaymentService;
 import com.smartrent.service.transaction.TransactionService;
+import com.smartrent.service.address.AddressCreationService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -48,6 +50,7 @@ public class ListingServiceImpl implements ListingService {
     ListingRepository listingRepository;
     MediaRepository mediaRepository;
     AddressRepository addressRepository;
+    AddressMetadataRepository addressMetadataRepository;
     AdminRepository adminRepository;
     ListingMapper listingMapper;
     LocationPricingService locationPricingService;
@@ -55,11 +58,7 @@ public class ListingServiceImpl implements ListingService {
     TransactionService transactionService;
     TransactionRepository transactionRepository;
     PaymentService paymentService;
-
-    com.smartrent.infra.repository.StreetRepository streetRepository;
-    com.smartrent.infra.repository.LegacyWardRepository wardRepository;
-    com.smartrent.infra.repository.LegacyDistrictRepository districtRepository;
-    com.smartrent.infra.repository.LegacyProvinceRepository provinceRepository;
+    AddressCreationService addressCreationService;
 
     @Override
     @Transactional
@@ -280,13 +279,23 @@ public class ListingServiceImpl implements ListingService {
         // Add location pricing if address is available
         Address address = listing.getAddress();
         if (address != null) {
-            Integer wardId = address.getWard() != null ? address.getWard().getId() : null;
-            Integer districtId = address.getDistrict() != null ? address.getDistrict().getId() : null;
-            Integer provinceId = address.getProvince() != null ? address.getProvince().getId() : null;
-
-            response.setLocationPricing(
-                    locationPricingService.getLocationPricing(listing, wardId, districtId, provinceId)
-            );
+            // Get address metadata to retrieve location IDs
+            addressMetadataRepository.findByAddress_AddressId(address.getAddressId())
+                    .ifPresent(metadata -> {
+                        // Use old structure for pricing if available
+                        if (metadata.getAddressType() == AddressMetadata.AddressType.OLD) {
+                            response.setLocationPricing(
+                                    locationPricingService.getLocationPricing(
+                                            listing,
+                                            metadata.getWardId(),
+                                            metadata.getDistrictId(),
+                                            metadata.getProvinceId()
+                                    )
+                            );
+                        }
+                        // For new structure, location pricing may not be applicable
+                        // as it uses a different province/ward system
+                    });
         }
 
         return response;
@@ -378,62 +387,17 @@ public class ListingServiceImpl implements ListingService {
 
     /**
      * Helper method to create an Address from AddressCreationRequest.
+     * Delegates to AddressCreationService which handles both old and new address structures.
      * This ensures that address creation is part of the same transaction as listing creation,
      * preventing orphaned data.
      *
      * @param addressRequest the address creation request
      * @return the created and persisted Address entity
-     * @throws RuntimeException if any required entity (street, ward, district, province) is not found
+     * @throws IllegalArgumentException if validation fails
      */
     private Address createAddress(com.smartrent.dto.request.AddressCreationRequest addressRequest) {
-        log.info("Creating address for listing - Province: {}, District: {}, Ward: {}, Street: {}",
-                addressRequest.getProvinceId(), addressRequest.getDistrictId(),
-                addressRequest.getWardId(), addressRequest.getStreetId());
-
-        // Fetch required entities
-        var street = streetRepository.findById(addressRequest.getStreetId())
-                .orElseThrow(() -> new RuntimeException("Street not found with id: " + addressRequest.getStreetId()));
-
-        var ward = wardRepository.findById(addressRequest.getWardId())
-                .orElseThrow(() -> new RuntimeException("Ward not found with id: " + addressRequest.getWardId()));
-
-        var district = districtRepository.findById(addressRequest.getDistrictId())
-                .orElseThrow(() -> new RuntimeException("District not found with id: " + addressRequest.getDistrictId()));
-
-        var province = provinceRepository.findById(addressRequest.getProvinceId())
-                .orElseThrow(() -> new RuntimeException("Province not found with id: " + addressRequest.getProvinceId()));
-
-        // Build full address if not provided
-        String fullAddress = addressRequest.getFullAddress();
-        if (fullAddress == null || fullAddress.isBlank()) {
-            StringBuilder sb = new StringBuilder();
-            if (addressRequest.getStreetNumber() != null && !addressRequest.getStreetNumber().isBlank()) {
-                sb.append(addressRequest.getStreetNumber()).append(" ");
-            }
-            sb.append(street.getName()).append(", ");
-            sb.append(ward.getName()).append(", ");
-            sb.append(district.getName()).append(", ");
-            sb.append(province.getName());
-            fullAddress = sb.toString();
-        }
-
-        // Create address entity
-        Address address = Address.builder()
-                .streetNumber(addressRequest.getStreetNumber())
-                .street(street)
-                .ward(ward)
-                .district(district)
-                .province(province)
-                .fullAddress(fullAddress)
-                .latitude(addressRequest.getLatitude())
-                .longitude(addressRequest.getLongitude())
-                .isVerified(addressRequest.getIsVerified() != null ? addressRequest.getIsVerified() : false)
-                .build();
-
-        // Save and return
-        Address savedAddress = addressRepository.save(address);
-        log.info("Address created successfully with id: {}", savedAddress.getAddressId());
-        return savedAddress;
+        log.info("Creating address for listing - Type: {}", addressRequest.getAddressType());
+        return addressCreationService.createAddress(addressRequest);
     }
 
     /**
