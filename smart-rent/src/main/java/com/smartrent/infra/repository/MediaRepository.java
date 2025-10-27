@@ -51,6 +51,16 @@ public interface MediaRepository extends JpaRepository<Media, Long> {
     List<Media> findExpiredPendingUploads(@Param("expiryTime") LocalDateTime expiryTime);
 
     /**
+     * Find orphan media (ACTIVE media without listing after expiry time)
+     * These are media that were uploaded but never attached to a listing
+     */
+    @Query("SELECT m FROM media m WHERE m.status = 'ACTIVE' " +
+           "AND m.listing IS NULL " +
+           "AND m.sourceType = 'UPLOAD' " +
+           "AND m.createdAt < :expiryTime")
+    List<Media> findOrphanActiveMedia(@Param("expiryTime") LocalDateTime expiryTime);
+
+    /**
      * Find media by storage key
      */
     Optional<Media> findByStorageKey(String storageKey);

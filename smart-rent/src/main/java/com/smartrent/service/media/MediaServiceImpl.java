@@ -20,7 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -111,6 +113,117 @@ public class MediaServiceImpl implements MediaService {
                 .message("Upload URL generated. Please upload the file to the provided URL within "
                         + (presignedUrl.getExpiresIn() / 60) + " minutes.")
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public MediaResponse uploadMedia(
+            MultipartFile file,
+            String mediaType,
+            Long listingId,
+            String title,
+            String description,
+            String altText,
+            Boolean isPrimary,
+            Integer sortOrder,
+            Long userId) {
+
+        String userIdStr = String.valueOf(userId);
+        log.info("Starting direct upload for user: {}, filename: {}, type: {}",
+                userIdStr, file.getOriginalFilename(), mediaType);
+
+        // Validate user exists
+        User user = userRepository.findById(userIdStr)
+                .orElseThrow(() -> new AppException(DomainCode.USER_NOT_FOUND, "User not found"));
+
+        // Validate file is not empty
+        if (file.isEmpty()) {
+            throw new AppException(DomainCode.BAD_REQUEST_ERROR, "File is empty");
+        }
+
+        // Validate file size
+        if (!storageService.isValidFileSize(file.getSize())) {
+            throw new AppException(DomainCode.INVALID_FILE_TYPE,
+                    String.format("File size exceeds maximum allowed: %d MB", file.getSize() / (1024 * 1024)));
+        }
+
+        // Determine if image or video
+        boolean isImage = "IMAGE".equalsIgnoreCase(mediaType);
+        Media.MediaType mediaTypeEnum = isImage ? Media.MediaType.IMAGE : Media.MediaType.VIDEO;
+
+        // Validate content type
+        String contentType = file.getContentType();
+        if (contentType == null || !storageService.isValidContentType(contentType, isImage)) {
+            throw new AppException(DomainCode.INVALID_FILE_TYPE,
+                    String.format("Invalid content type: %s for media type: %s", contentType, mediaType));
+        }
+
+        // Validate listing if provided
+        Listing listing = null;
+        if (listingId != null) {
+            listing = listingRepository.findById(listingId)
+                    .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
+
+            // Validate user owns the listing
+            if (!listing.getUserId().equals(userIdStr)) {
+                throw new AppException(DomainCode.UNAUTHORIZED,
+                        "You don't have permission to add media to this listing");
+            }
+        }
+
+        // Generate storage key
+        String storageKey = storageService.generateStorageKey(userId, file.getOriginalFilename());
+
+        try {
+            // Upload file directly to R2/S3
+            log.info("Uploading file to cloud storage: {}", storageKey);
+            storageService.uploadFile(
+                    storageKey,
+                    file.getInputStream(),
+                    contentType,
+                    file.getSize()
+            );
+            log.info("File uploaded successfully to cloud storage: {}", storageKey);
+
+            // Generate public URL
+            String publicUrl = storageService.getPublicUrl(storageKey);
+
+            // Create media entity in ACTIVE status (already uploaded)
+            Media media = Media.builder()
+                    .userId(userIdStr)
+                    .listing(listing)
+                    .mediaType(mediaTypeEnum)
+                    .sourceType(Media.MediaSourceType.UPLOAD)
+                    .status(Media.MediaStatus.ACTIVE)
+                    .storageKey(storageKey)
+                    .url(publicUrl)
+                    .originalFilename(file.getOriginalFilename())
+                    .mimeType(contentType)
+                    .fileSize(file.getSize())
+                    .title(title)
+                    .description(description)
+                    .altText(altText)
+                    .isPrimary(isPrimary != null && isPrimary)
+                    .sortOrder(sortOrder != null ? sortOrder : 0)
+                    .uploadConfirmed(true)
+                    .confirmedAt(LocalDateTime.now())
+                    .build();
+
+            media = mediaRepository.save(media);
+
+            log.info("Media saved successfully with ID: {}", media.getMediaId());
+
+            return mediaMapper.toResponse(media);
+
+        } catch (IOException e) {
+            log.error("Failed to read file content: {}", file.getOriginalFilename(), e);
+            throw new AppException(DomainCode.FILE_READ_ERROR,
+                    e.getMessage());
+        } catch (RuntimeException e) {
+            log.error("Failed to upload file to cloud storage: {}", storageKey, e);
+            throw new AppException(DomainCode.FILE_UPLOAD_ERROR,
+                    e.getMessage());
+        }
     }
 
     @Override
@@ -347,6 +460,49 @@ public class MediaServiceImpl implements MediaService {
         }
 
         log.info("Cleanup completed. Processed {} expired uploads", expiredMedia.size());
+    }
+
+    /**
+     * Cleanup orphan media (ACTIVE media without listing after 24 hours)
+     * This handles cases where user uploaded media but never created a listing
+     * Runs every 6 hours
+     */
+    @Transactional
+    @Scheduled(cron = "0 0 */6 * * *") // Run every 6 hours
+    public void cleanupOrphanMedia() {
+        log.info("Starting cleanup of orphan media (ACTIVE media without listing)");
+
+        // Find ACTIVE media without listing, older than 24 hours
+        LocalDateTime expiryTime = LocalDateTime.now().minusHours(24);
+        List<Media> orphanMedia = mediaRepository.findOrphanActiveMedia(expiryTime);
+
+        if (orphanMedia.isEmpty()) {
+            log.info("No orphan media found");
+            return;
+        }
+
+        log.info("Found {} orphan media items", orphanMedia.size());
+
+        for (Media media : orphanMedia) {
+            try {
+                // Delete from storage if exists
+                if (media.isUploaded() && media.getStorageKey() != null) {
+                    storageService.deleteObject(media.getStorageKey());
+                    log.info("Deleted orphan media file from storage: {}", media.getStorageKey());
+                }
+
+                // Mark as deleted
+                media.setStatus(Media.MediaStatus.DELETED);
+                mediaRepository.save(media);
+
+                log.info("Cleaned up orphan media: {} (created at: {}, user: {})",
+                        media.getMediaId(), media.getCreatedAt(), media.getUserId());
+            } catch (Exception e) {
+                log.error("Failed to cleanup orphan media: {}", media.getMediaId(), e);
+            }
+        }
+
+        log.info("Orphan media cleanup completed. Processed {} items", orphanMedia.size());
     }
 
     // Helper methods

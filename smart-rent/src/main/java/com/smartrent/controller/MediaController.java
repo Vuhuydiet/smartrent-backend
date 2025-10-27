@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -26,17 +27,26 @@ import java.util.List;
 @Tag(
         name = "Media API",
         description = """
-                Secure media upload/download with pre-signed URLs (Cloudflare R2)
+                Secure media upload/download with Cloudflare R2 storage
 
-                **Upload Flow:**
+                **Two Upload Methods:**
+
+                **Method 1: Client-Side Upload (Pre-signed URL)**
                 1. POST /upload-url - Get pre-signed upload URL
-                2. PUT to presigned URL - Upload file directly to R2 (frontend)
+                2. PUT to presigned URL - Client uploads directly to R2
                 3. POST /{mediaId}/confirm - Confirm upload completion
+                *Best for: Large files, reduced server load*
+
+                **Method 2: Backend Upload (Direct)**
+                1. POST /upload - Upload file via backend to R2
+                *Best for: Simple flow, file processing, smaller files*
 
                 **Features:**
-                - Pre-signed URLs for secure upload/download
+                - Multiple upload strategies (client-side/backend)
+                - Pre-signed URLs for secure operations
                 - Support for images and videos
                 - YouTube/TikTok embed support
+                - File validation (type, size)
                 - Ownership validation
                 - Automatic cleanup of expired uploads
                 """
@@ -78,6 +88,77 @@ public class MediaController {
                 .data(response)
                 .message("Upload URL generated successfully. Please upload file within " +
                         (response.getExpiresIn() / 60) + " minutes.")
+                .build());
+    }
+
+    @PostMapping("/upload")
+    @Operation(
+            summary = "Upload media directly from backend to cloud",
+            description = """
+                    Complete upload flow in a single request (backend uploads to R2).
+
+                    **Process:**
+                    1. Backend receives file via multipart/form-data
+                    2. Backend validates file (type, size, ownership)
+                    3. Backend uploads directly to R2 storage
+                    4. Backend saves media record as ACTIVE
+                    5. Returns media response with public URL
+
+                    **Use this when:**
+                    - Simple upload flow preferred
+                    - File processing needed before upload
+                    - Centralized upload logic required
+
+                    **Alternative:** Use /upload-url for client-side direct upload (more efficient for large files)
+
+                    **Parameters:**
+                    - file: The media file (required)
+                    - mediaType: IMAGE or VIDEO (required)
+                    - listingId: Associate with listing (optional)
+                    - title, description, altText: Metadata (optional)
+                    - isPrimary: Set as primary media (default: false)
+                    - sortOrder: Display order (default: 0)
+                    """
+    )
+    public ResponseEntity<ApiResponse<MediaResponse>> uploadMedia(
+            @Parameter(description = "Media file to upload", required = true)
+            @RequestParam("file") MultipartFile file,
+
+            @Parameter(description = "Type of media: IMAGE or VIDEO", required = true)
+            @RequestParam("mediaType") String mediaType,
+
+            @Parameter(description = "Listing ID to associate with")
+            @RequestParam(value = "listingId", required = false) Long listingId,
+
+            @Parameter(description = "Media title")
+            @RequestParam(value = "title", required = false) String title,
+
+            @Parameter(description = "Media description")
+            @RequestParam(value = "description", required = false) String description,
+
+            @Parameter(description = "Alt text for accessibility")
+            @RequestParam(value = "altText", required = false) String altText,
+
+            @Parameter(description = "Set as primary media")
+            @RequestParam(value = "isPrimary", required = false, defaultValue = "false") Boolean isPrimary,
+
+            @Parameter(description = "Display order")
+            @RequestParam(value = "sortOrder", required = false, defaultValue = "0") Integer sortOrder,
+
+            Authentication authentication) {
+
+        Long userId = extractUserId(authentication);
+        log.info("POST /v1/media/upload - user: {}, filename: {}, type: {}",
+                userId, file.getOriginalFilename(), mediaType);
+
+        MediaResponse response = mediaService.uploadMedia(
+                file, mediaType, listingId, title, description,
+                altText, isPrimary, sortOrder, userId
+        );
+
+        return ResponseEntity.ok(ApiResponse.<MediaResponse>builder()
+                .data(response)
+                .message("Media uploaded successfully. File is now active and accessible.")
                 .build());
     }
 

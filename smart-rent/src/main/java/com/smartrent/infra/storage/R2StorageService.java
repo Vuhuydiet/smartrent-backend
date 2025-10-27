@@ -10,9 +10,11 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -124,6 +126,74 @@ public class R2StorageService {
         } catch (Exception e) {
             log.error("Failed to generate download URL for key: {}", key, e);
             throw new RuntimeException("Failed to generate download URL", e);
+        }
+    }
+
+    /**
+     * Upload file directly from backend to R2/S3
+     * Use this when the backend receives the file and needs to upload it to cloud storage
+     *
+     * @param key Storage key (path in bucket)
+     * @param fileData Byte array of file content
+     * @param contentType MIME type of the file
+     * @param fileSize Size of the file in bytes
+     * @return PutObjectResponse with upload metadata
+     */
+    public PutObjectResponse uploadFile(String key, byte[] fileData, String contentType, long fileSize) {
+        try {
+            PutObjectRequest putRequest = PutObjectRequest.builder()
+                    .bucket(config.getBucketName())
+                    .key(key)
+                    .contentType(contentType)
+                    .contentLength(fileSize)
+                    .build();
+
+            PutObjectResponse response = s3Client.putObject(
+                    putRequest,
+                    RequestBody.fromBytes(fileData)
+            );
+
+            log.info("Successfully uploaded file to storage: {}, size: {} bytes, ETag: {}",
+                    key, fileSize, response.eTag());
+
+            return response;
+        } catch (Exception e) {
+            log.error("Failed to upload file to storage: {}", key, e);
+            throw new RuntimeException("Failed to upload file to cloud storage", e);
+        }
+    }
+
+    /**
+     * Upload file directly from backend using InputStream
+     * More memory-efficient for large files
+     *
+     * @param key Storage key (path in bucket)
+     * @param inputStream InputStream of file content
+     * @param contentType MIME type of the file
+     * @param fileSize Size of the file in bytes
+     * @return PutObjectResponse with upload metadata
+     */
+    public PutObjectResponse uploadFile(String key, java.io.InputStream inputStream, String contentType, long fileSize) {
+        try {
+            PutObjectRequest putRequest = PutObjectRequest.builder()
+                    .bucket(config.getBucketName())
+                    .key(key)
+                    .contentType(contentType)
+                    .contentLength(fileSize)
+                    .build();
+
+            PutObjectResponse response = s3Client.putObject(
+                    putRequest,
+                    RequestBody.fromInputStream(inputStream, fileSize)
+            );
+
+            log.info("Successfully uploaded file to storage: {}, size: {} bytes, ETag: {}",
+                    key, fileSize, response.eTag());
+
+            return response;
+        } catch (Exception e) {
+            log.error("Failed to upload file to storage: {}", key, e);
+            throw new RuntimeException("Failed to upload file to cloud storage", e);
         }
     }
 

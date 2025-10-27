@@ -11,10 +11,13 @@ import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.PostSource;
+import com.smartrent.infra.exception.AppException;
+import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AddressRepository;
 import com.smartrent.infra.repository.AddressMetadataRepository;
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingRepository;
+import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.ListingMapper;
@@ -45,6 +48,7 @@ import java.util.stream.Collectors;
 public class ListingServiceImpl implements ListingService {
 
     ListingRepository listingRepository;
+    MediaRepository mediaRepository;
     AddressRepository addressRepository;
     AddressMetadataRepository addressMetadataRepository;
     AdminRepository adminRepository;
@@ -72,6 +76,12 @@ public class ListingServiceImpl implements ListingService {
         Listing saved = listingRepository.save(listing);
         log.info("Listing created successfully with id: {} and address id: {}",
                 saved.getListingId(), address.getAddressId());
+
+        // Link media to listing if provided (within same transaction)
+        if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
+            linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
+            log.info("Linked {} media items to listing {}", request.getMediaIds().size(), saved.getListingId());
+        }
 
         return listingMapper.toCreationResponse(saved);
     }
@@ -118,6 +128,12 @@ public class ListingServiceImpl implements ListingService {
                 // TODO: Implement auto-verification check
 
                 Listing saved = listingRepository.save(listing);
+
+                // Link media to listing if provided (within same transaction)
+                if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
+                    linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
+                    log.info("Linked {} media items to VIP listing {}", request.getMediaIds().size(), saved.getListingId());
+                }
 
                 // If Diamond, create shadow NORMAL listing
                 if ("DIAMOND".equalsIgnoreCase(request.getVipType())) {
@@ -382,5 +398,60 @@ public class ListingServiceImpl implements ListingService {
     private Address createAddress(com.smartrent.dto.request.AddressCreationRequest addressRequest) {
         log.info("Creating address for listing - Type: {}", addressRequest.getAddressType());
         return addressCreationService.createAddress(addressRequest);
+    }
+
+    /**
+     * Helper method to link existing media to a listing.
+     * Ensures data integrity by validating:
+     * - Media exists and is ACTIVE
+     * - Media belongs to the same user (ownership validation)
+     * - Media is not already linked to another listing
+     *
+     * This operation is part of the listing creation transaction,
+     * ensuring atomicity and consistency.
+     *
+     * @param listing the listing to attach media to
+     * @param mediaIds set of media IDs to link
+     * @param userId user ID for ownership validation
+     * @throws AppException if validation fails
+     */
+    private void linkMediaToListing(Listing listing, Set<Long> mediaIds, String userId) {
+        log.info("Linking {} media items to listing {} for user {}",
+                mediaIds.size(), listing.getListingId(), userId);
+
+        for (Long mediaId : mediaIds) {
+            // Fetch media
+            Media media = mediaRepository.findById(mediaId)
+                    .orElseThrow(() -> new AppException(DomainCode.ADDRESS_NOT_FOUND,
+                            "Media not found with ID: " + mediaId));
+
+            // Validate ownership
+            if (!media.getUserId().equals(userId)) {
+                throw new AppException(DomainCode.UNAUTHORIZED,
+                        "Media " + mediaId + " does not belong to user " + userId);
+            }
+
+            // Validate media status
+            if (media.getStatus() != Media.MediaStatus.ACTIVE) {
+                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                        "Media " + mediaId + " is not active (status: " + media.getStatus() + ")");
+            }
+
+            // Validate media is not already linked to another listing
+            if (media.getListing() != null) {
+                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                        "Media " + mediaId + " is already linked to listing " +
+                        media.getListing().getListingId());
+            }
+
+            // Link media to listing
+            media.setListing(listing);
+            mediaRepository.save(media);
+
+            log.debug("Media {} successfully linked to listing {}", mediaId, listing.getListingId());
+        }
+
+        log.info("Successfully linked all {} media items to listing {}",
+                mediaIds.size(), listing.getListingId());
     }
 }

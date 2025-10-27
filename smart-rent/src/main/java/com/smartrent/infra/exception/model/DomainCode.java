@@ -59,6 +59,8 @@ public enum DomainCode {
   USER_NOT_AUTHENTICATED("7009", HttpStatus.UNAUTHORIZED, "User not authenticated for payment"),
   //    File Storage Error 8xxx
   INVALID_FILE_TYPE("8001", HttpStatus.BAD_REQUEST, "Invalid file type: %s"),
+  FILE_UPLOAD_ERROR("8002", HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload file: %s"),
+  FILE_READ_ERROR("8003", HttpStatus.BAD_REQUEST, "Failed to read file: %s"),
   //    External Service Error 9xxx
   EXTERNAL_SERVICE_ERROR("9001", HttpStatus.SERVICE_UNAVAILABLE, "External service error"),
   TOO_MANY_REQUESTS("9002", HttpStatus.TOO_MANY_REQUESTS, "Too many requests to external service"),
