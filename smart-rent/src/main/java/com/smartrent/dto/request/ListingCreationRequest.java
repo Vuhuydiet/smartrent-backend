@@ -81,4 +81,11 @@ public class ListingCreationRequest {
     Integer roomCapacity;
 
     Set<Long> amenityIds;
+
+    /**
+     * List of media IDs to attach to this listing
+     * Media must be already uploaded and belong to the same user
+     * Optional: If not provided, listing will be created without media
+     */
+    Set<Long> mediaIds;
 }

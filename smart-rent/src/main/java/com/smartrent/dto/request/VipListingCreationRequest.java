@@ -88,6 +88,12 @@ public class VipListingCreationRequest {
     Set<Long> amenityIds;
 
     @Schema(
+        description = "Set of media IDs to attach to this listing (media must be already uploaded and belong to the same user)",
+        example = "[1, 2, 3]"
+    )
+    Set<Long> mediaIds;
+
+    @Schema(
         description = "Whether to use membership quota (true) or direct payment (false)",
         example = "true"
     )

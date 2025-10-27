@@ -34,6 +34,10 @@ public enum DomainCode {
   PROVINCE_NOT_FOUND("4006", HttpStatus.NOT_FOUND, "Province not found"),
   DISTRICT_NOT_FOUND("4007", HttpStatus.NOT_FOUND, "District not found"),
   WARD_NOT_FOUND("4008", HttpStatus.NOT_FOUND, "Ward not found"),
+  RESOURCE_NOT_FOUND("4009", HttpStatus.NOT_FOUND, "Resource not found: %s"),
+  STREET_NOT_FOUND("4010", HttpStatus.NOT_FOUND, "Street not found"),
+  PROVINCE_MAPPING_NOT_FOUND("4011", HttpStatus.NOT_FOUND, "Province mapping not found"),
+  WARD_MAPPING_NOT_FOUND("4012", HttpStatus.NOT_FOUND, "Ward mapping not found"),
   //    Unauthorized	Client	5xxx (Unauthenticated error)
   UNAUTHENTICATED("5001", HttpStatus.UNAUTHORIZED, "Unauthenticated"),
   INVALID_EMAIL_PASSWORD("5002", HttpStatus.UNAUTHORIZED, "Invalid email or password"),
@@ -55,6 +59,8 @@ public enum DomainCode {
   USER_NOT_AUTHENTICATED("7009", HttpStatus.UNAUTHORIZED, "User not authenticated for payment"),
   //    File Storage Error 8xxx
   INVALID_FILE_TYPE("8001", HttpStatus.BAD_REQUEST, "Invalid file type: %s"),
+  FILE_UPLOAD_ERROR("8002", HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload file: %s"),
+  FILE_READ_ERROR("8003", HttpStatus.BAD_REQUEST, "Failed to read file: %s"),
   //    External Service Error 9xxx
   EXTERNAL_SERVICE_ERROR("9001", HttpStatus.SERVICE_UNAVAILABLE, "External service error"),
   TOO_MANY_REQUESTS("9002", HttpStatus.TOO_MANY_REQUESTS, "Too many requests to external service"),

@@ -1,6 +1,6 @@
 package com.smartrent.infra.repository;
 
-import com.smartrent.infra.repository.entity.Address;
+import com.smartrent.infra.repository.entity.*;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +14,7 @@ import java.util.Optional;
 public interface AddressRepository extends JpaRepository<Address, Long> {
 
     // Get addresses by street
-    List<Address> findByStreetStreetIdOrderByStreetNumber(Long streetId);
+//    List<Address> findByStreetStreetIdOrderByStreetNumber(Street street);
 
     // Search addresses by coordinates (nearby addresses)
     @Query("SELECT a FROM addresses a WHERE " +
@@ -30,10 +30,7 @@ public interface AddressRepository extends JpaRepository<Address, Long> {
     // Find by full address text search
     List<Address> findByFullAddressContainingIgnoreCaseOrderByFullAddress(String searchTerm);
 
-    // Get verified addresses only
-    List<Address> findByIsVerifiedTrueOrderByFullAddress();
-
-    // Find exact address match
-    Optional<Address> findByStreetNumberAndStreetStreetIdAndWardWardIdAndDistrictDistrictIdAndProvinceProvinceId(
-            String streetNumber, Long streetId, Long wardId, Long districtId, Long provinceId);
+////    // Find exact address match
+//    Optional<Address> findByStreetNumberAndStreetStreetIdAndWardWardIdAndDistrictDistrictIdAndProvinceProvinceId(
+//            Street street, Ward ward, District district, Province province);
 }

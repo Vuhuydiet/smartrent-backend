@@ -129,6 +129,21 @@ public class OpenAPIConfig {
                 "- View saved listings via `/v1/saved-listings/my-saved`\n" +
                 "- Check if listing is saved via `/v1/saved-listings/check/{listingId}`\n\n" +
 
+                "## Media Management (Cloudflare R2 Storage)\n" +
+                "SmartRent uses Cloudflare R2 for secure, scalable media storage with pre-signed URLs:\n" +
+                "- **Upload Flow (3 steps)**:\n" +
+                "  1. POST `/v1/media/upload-url` - Generate pre-signed upload URL\n" +
+                "  2. PUT to pre-signed URL - Upload file directly to R2 (frontend)\n" +
+                "  3. POST `/v1/media/{mediaId}/confirm` - Confirm upload completion\n" +
+                "- **Supported Media**: Images (JPEG, PNG, WebP), Videos (MP4, QuickTime)\n" +
+                "- **File Limits**: Max 100MB per file\n" +
+                "- **External Media**: YouTube and TikTok video embeds\n" +
+                "- **Security**: Pre-signed URLs expire in 30 minutes (upload) / 60 minutes (download)\n" +
+                "- **Features**: Automatic thumbnail generation, sort ordering, primary media selection\n" +
+                "- Download media via `/v1/media/{mediaId}/download-url`\n" +
+                "- View listing media via `/v1/media/listing/{listingId}`\n" +
+                "- Manage user media via `/v1/media/my-media`\n\n" +
+
                 "## Address Management (Vietnamese Administrative Structure)\n" +
                 "SmartRent uses Vietnam's 3-tier administrative hierarchy (63 provinces):\n" +
                 "- **Province Level** (Tỉnh/Thành phố): 63 units total\n" +
@@ -329,6 +344,117 @@ public class OpenAPIConfig {
                         .description("Response after creating a listing")
                         .addProperty("listingId", new Schema<>().type("integer").format("int64").description("Created listing ID"))
                         .addProperty("status", new Schema<>().type("string").example("CREATED").description("Creation status"))
+                )
+                // Media Management Schemas
+                .addSchemas("GenerateUploadUrlRequest", new Schema<>()
+                        .type("object")
+                        .description("Request to generate pre-signed upload URL for media")
+                        .addProperty("mediaType", new Schema<>().type("string").example("IMAGE")
+                                .description("Media type: IMAGE or VIDEO")
+                                ._enum(List.of("IMAGE", "VIDEO")))
+                        .addProperty("filename", new Schema<>().type("string").example("photo.jpg")
+                                .description("Original filename (max 255 chars)"))
+                        .addProperty("contentType", new Schema<>().type("string").example("image/jpeg")
+                                .description("MIME type: image/jpeg, image/png, image/webp, video/mp4, video/quicktime"))
+                        .addProperty("fileSize", new Schema<>().type("integer").format("int64").example(2048576)
+                                .description("File size in bytes (max 100MB = 104857600 bytes)"))
+                        .addProperty("listingId", new Schema<>().type("integer").format("int64").nullable(true)
+                                .description("Optional listing ID to associate media with"))
+                        .addProperty("title", new Schema<>().type("string").nullable(true)
+                                .description("Media title (max 255 chars)"))
+                        .addProperty("description", new Schema<>().type("string").nullable(true)
+                                .description("Media description (max 1000 chars)"))
+                        .addProperty("altText", new Schema<>().type("string").nullable(true)
+                                .description("Alt text for accessibility (max 255 chars)"))
+                        .addProperty("isPrimary", new Schema<>().type("boolean").example(false)
+                                .description("Whether this is the primary media for the listing"))
+                        .addProperty("sortOrder", new Schema<>().type("integer").example(0)
+                                .description("Display order (lower numbers first)"))
+                )
+                .addSchemas("GenerateUploadUrlResponse", new Schema<>()
+                        .type("object")
+                        .description("Response with pre-signed upload URL")
+                        .addProperty("mediaId", new Schema<>().type("integer").format("int64").example(123)
+                                .description("Media ID for confirmation"))
+                        .addProperty("uploadUrl", new Schema<>().type("string")
+                                .description("Pre-signed URL for direct upload to R2"))
+                        .addProperty("expiresIn", new Schema<>().type("integer").example(1800)
+                                .description("URL expiration time in seconds (default: 1800 = 30 minutes)"))
+                        .addProperty("storageKey", new Schema<>().type("string")
+                                .description("Storage key/path in R2 bucket"))
+                        .addProperty("message", new Schema<>().type("string")
+                                .description("Additional instructions or information"))
+                )
+                .addSchemas("ConfirmUploadRequest", new Schema<>()
+                        .type("object")
+                        .description("Request to confirm upload completion")
+                        .addProperty("checksum", new Schema<>().type("string").nullable(true)
+                                .description("Optional file checksum for verification"))
+                        .addProperty("contentType", new Schema<>().type("string").nullable(true)
+                                .description("Actual content type after upload"))
+                )
+                .addSchemas("MediaResponse", new Schema<>()
+                        .type("object")
+                        .description("Media information response")
+                        .addProperty("mediaId", new Schema<>().type("integer").format("int64").example(123)
+                                .description("Media ID"))
+                        .addProperty("listingId", new Schema<>().type("integer").format("int64").nullable(true)
+                                .description("Associated listing ID"))
+                        .addProperty("userId", new Schema<>().type("string")
+                                .description("Owner user ID"))
+                        .addProperty("mediaType", new Schema<>().type("string").example("IMAGE")
+                                .description("Media type: IMAGE or VIDEO"))
+                        .addProperty("sourceType", new Schema<>().type("string").example("UPLOADED")
+                                .description("Source type: UPLOADED or EXTERNAL"))
+                        .addProperty("status", new Schema<>().type("string").example("ACTIVE")
+                                .description("Status: PENDING, ACTIVE, DELETED"))
+                        .addProperty("url", new Schema<>().type("string")
+                                .description("Public URL or download URL"))
+                        .addProperty("thumbnailUrl", new Schema<>().type("string").nullable(true)
+                                .description("Thumbnail URL for videos/large images"))
+                        .addProperty("title", new Schema<>().type("string").nullable(true)
+                                .description("Media title"))
+                        .addProperty("description", new Schema<>().type("string").nullable(true)
+                                .description("Media description"))
+                        .addProperty("altText", new Schema<>().type("string").nullable(true)
+                                .description("Alt text for accessibility"))
+                        .addProperty("isPrimary", new Schema<>().type("boolean").example(false)
+                                .description("Whether this is the primary media"))
+                        .addProperty("sortOrder", new Schema<>().type("integer").example(0)
+                                .description("Display order"))
+                        .addProperty("fileSize", new Schema<>().type("integer").format("int64").nullable(true)
+                                .description("File size in bytes"))
+                        .addProperty("mimeType", new Schema<>().type("string").nullable(true)
+                                .description("MIME type"))
+                        .addProperty("originalFilename", new Schema<>().type("string").nullable(true)
+                                .description("Original filename"))
+                        .addProperty("durationSeconds", new Schema<>().type("integer").nullable(true)
+                                .description("Video duration in seconds"))
+                        .addProperty("uploadConfirmed", new Schema<>().type("boolean").example(true)
+                                .description("Whether upload has been confirmed"))
+                        .addProperty("createdAt", new Schema<>().type("string").format("date-time")
+                                .description("Creation timestamp"))
+                        .addProperty("updatedAt", new Schema<>().type("string").format("date-time")
+                                .description("Last update timestamp"))
+                )
+                .addSchemas("SaveExternalMediaRequest", new Schema<>()
+                        .type("object")
+                        .description("Request to save external media (YouTube/TikTok)")
+                        .addProperty("url", new Schema<>().type("string")
+                                .example("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+                                .description("YouTube or TikTok video URL (max 1000 chars)"))
+                        .addProperty("listingId", new Schema<>().type("integer").format("int64").nullable(true)
+                                .description("Optional listing ID to associate media with"))
+                        .addProperty("title", new Schema<>().type("string").nullable(true)
+                                .description("Media title (max 255 chars)"))
+                        .addProperty("description", new Schema<>().type("string").nullable(true)
+                                .description("Media description (max 1000 chars)"))
+                        .addProperty("altText", new Schema<>().type("string").nullable(true)
+                                .description("Alt text for accessibility (max 255 chars)"))
+                        .addProperty("isPrimary", new Schema<>().type("boolean").example(false)
+                                .description("Whether this is the primary media for the listing"))
+                        .addProperty("sortOrder", new Schema<>().type("integer").example(0)
+                                .description("Display order (lower numbers first)"))
                 );
     }
 
@@ -395,10 +521,10 @@ public class OpenAPIConfig {
     @Bean
     public GroupedOpenApi uploadApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
             return GroupedOpenApi.builder()
-                            .group("file-upload")
-                            .displayName("File Upload")
+                            .group("media-management")
+                            .displayName("Media Management (R2 Storage)")
                             .packagesToScan(packageToScan)
-                            .pathsToMatch("/v1/upload/**")
+                            .pathsToMatch("/v1/media/**")
                             .build();
     }
 

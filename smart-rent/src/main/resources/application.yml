@@ -118,7 +118,9 @@ application:
         - "/actuator/**"
         - "/v1/payments/vnpay/callback"
         - "/v1/listings/**"
+        - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
+        - "/v1/new-addresses/**"
         - "/v1/memberships/packages"
         - "/v1/memberships/packages/**"
         - "/v1/vip-tiers/**"
@@ -127,6 +129,9 @@ application:
         - "/v1/auth/**"
         - "/v1/users"
         - "/v1/admins"
+        - "/v1/verification/**"
+        - "/v1/listings"
+        - "/v1/listings/**"
         - "/v1/payments/vnpay/ipn"
   authentication:
     jwt:
@@ -175,6 +180,8 @@ feign:
           url: "https://www.googleapis.com"
       vnpay:
         url: "${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}"
+      tinhthanhpho:
+        url: "${TINHTHANHPHO_API_URL:https://tinhthanhpho.com/api/v1}"
 
 springdoc:
   api-docs:
@@ -197,12 +204,14 @@ open:
   storage:
     s3:
       endpoint: ${S3_ENDPOINT}
-      region: ${S3_REGION}
+      region: ${S3_REGION:auto}
       accessKey: ${S3_ACCESS_KEY}
       secretKey: ${S3_SECRET_KEY}
       bucketName: ${S3_BUCKET}
       publicUrl: ${S3_PUBLIC_URL}
-      maxFileSizeMB: ${S3_MAX_FILE_SIZE_MB:10}
+      maxFileSizeMB: ${S3_MAX_FILE_SIZE_MB:100}
+      uploadUrlTtlMinutes: ${S3_UPLOAD_URL_TTL_MINUTES:30}
+      downloadUrlTtlMinutes: ${S3_DOWNLOAD_URL_TTL_MINUTES:60}
       allowedImageTypes:
         - image/jpeg
         - image/png

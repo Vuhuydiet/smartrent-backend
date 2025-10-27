@@ -30,7 +30,7 @@ public class LocationPricingServiceImpl implements LocationPricingService {
 
     @Override
     @Transactional(readOnly = true)
-    public LocationPricingResponse getLocationPricing(Listing listing, Long wardId, Long districtId, Long provinceId) {
+    public LocationPricingResponse getLocationPricing(Listing listing, Integer wardId, Integer districtId, Integer provinceId) {
         log.info("Generating location pricing for listing {} in ward {}, district {}, province {}",
                 listing.getListingId(), wardId, districtId, provinceId);
 
@@ -80,7 +80,7 @@ public class LocationPricingServiceImpl implements LocationPricingService {
         return responseBuilder.build();
     }
 
-    private LocationPricingStatistics getPricingStatistics(Long locationId, String locationType,
+    private LocationPricingStatistics getPricingStatistics(Integer locationId, String locationType,
                                                            Listing.ProductType productType, Listing.PriceUnit priceUnit) {
         try {
             Object[] stats = switch (locationType) {
@@ -129,7 +129,7 @@ public class LocationPricingServiceImpl implements LocationPricingService {
         }
     }
 
-    private List<ListingPricingInfo> getSimilarListings(Long locationId, String locationType,
+    private List<ListingPricingInfo> getSimilarListings(Integer locationId, String locationType,
                                                         Listing.ProductType productType, Listing.PriceUnit priceUnit,
                                                         Long excludeListingId) {
         try {
@@ -203,7 +203,7 @@ public class LocationPricingServiceImpl implements LocationPricingService {
         return percentage.doubleValue();
     }
 
-    private String getLocationName(Long locationId, String locationType) {
+    private String getLocationName(Integer locationId, String locationType) {
         // This is a simplified version - you would fetch actual names from the database
         return locationType + " " + locationId;
     }

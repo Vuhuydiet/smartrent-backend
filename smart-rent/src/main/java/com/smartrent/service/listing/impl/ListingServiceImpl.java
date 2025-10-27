@@ -11,20 +11,22 @@ import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.PostSource;
+import com.smartrent.infra.exception.AppException;
+import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AddressRepository;
+import com.smartrent.infra.repository.AddressMetadataRepository;
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingRepository;
+import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.TransactionRepository;
-import com.smartrent.infra.repository.entity.Address;
-import com.smartrent.infra.repository.entity.Admin;
-import com.smartrent.infra.repository.entity.Listing;
-import com.smartrent.infra.repository.entity.Transaction;
+import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.pricing.LocationPricingService;
 import com.smartrent.service.quota.QuotaService;
 import com.smartrent.service.payment.PaymentService;
 import com.smartrent.service.transaction.TransactionService;
+import com.smartrent.service.address.AddressCreationService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -46,7 +48,9 @@ import java.util.stream.Collectors;
 public class ListingServiceImpl implements ListingService {
 
     ListingRepository listingRepository;
+    MediaRepository mediaRepository;
     AddressRepository addressRepository;
+    AddressMetadataRepository addressMetadataRepository;
     AdminRepository adminRepository;
     ListingMapper listingMapper;
     LocationPricingService locationPricingService;
@@ -54,11 +58,7 @@ public class ListingServiceImpl implements ListingService {
     TransactionService transactionService;
     TransactionRepository transactionRepository;
     PaymentService paymentService;
-
-    com.smartrent.infra.repository.StreetRepository streetRepository;
-    com.smartrent.infra.repository.WardRepository wardRepository;
-    com.smartrent.infra.repository.DistrictRepository districtRepository;
-    com.smartrent.infra.repository.ProvinceRepository provinceRepository;
+    AddressCreationService addressCreationService;
 
     @Override
     @Transactional
@@ -76,6 +76,12 @@ public class ListingServiceImpl implements ListingService {
         Listing saved = listingRepository.save(listing);
         log.info("Listing created successfully with id: {} and address id: {}",
                 saved.getListingId(), address.getAddressId());
+
+        // Link media to listing if provided (within same transaction)
+        if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
+            linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
+            log.info("Linked {} media items to listing {}", request.getMediaIds().size(), saved.getListingId());
+        }
 
         return listingMapper.toCreationResponse(saved);
     }
@@ -122,6 +128,12 @@ public class ListingServiceImpl implements ListingService {
                 // TODO: Implement auto-verification check
 
                 Listing saved = listingRepository.save(listing);
+
+                // Link media to listing if provided (within same transaction)
+                if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
+                    linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
+                    log.info("Linked {} media items to VIP listing {}", request.getMediaIds().size(), saved.getListingId());
+                }
 
                 // If Diamond, create shadow NORMAL listing
                 if ("DIAMOND".equalsIgnoreCase(request.getVipType())) {
@@ -267,13 +279,23 @@ public class ListingServiceImpl implements ListingService {
         // Add location pricing if address is available
         Address address = listing.getAddress();
         if (address != null) {
-            Long wardId = address.getWard() != null ? address.getWard().getWardId() : null;
-            Long districtId = address.getDistrict() != null ? address.getDistrict().getDistrictId() : null;
-            Long provinceId = address.getProvince() != null ? address.getProvince().getProvinceId() : null;
-
-            response.setLocationPricing(
-                    locationPricingService.getLocationPricing(listing, wardId, districtId, provinceId)
-            );
+            // Get address metadata to retrieve location IDs
+            addressMetadataRepository.findByAddress_AddressId(address.getAddressId())
+                    .ifPresent(metadata -> {
+                        // Use old structure for pricing if available
+                        if (metadata.getAddressType() == AddressMetadata.AddressType.OLD) {
+                            response.setLocationPricing(
+                                    locationPricingService.getLocationPricing(
+                                            listing,
+                                            metadata.getWardId(),
+                                            metadata.getDistrictId(),
+                                            metadata.getProvinceId()
+                                    )
+                            );
+                        }
+                        // For new structure, location pricing may not be applicable
+                        // as it uses a different province/ward system
+                    });
         }
 
         return response;
@@ -365,61 +387,71 @@ public class ListingServiceImpl implements ListingService {
 
     /**
      * Helper method to create an Address from AddressCreationRequest.
+     * Delegates to AddressCreationService which handles both old and new address structures.
      * This ensures that address creation is part of the same transaction as listing creation,
      * preventing orphaned data.
      *
      * @param addressRequest the address creation request
      * @return the created and persisted Address entity
-     * @throws RuntimeException if any required entity (street, ward, district, province) is not found
+     * @throws IllegalArgumentException if validation fails
      */
     private Address createAddress(com.smartrent.dto.request.AddressCreationRequest addressRequest) {
-        log.info("Creating address for listing - Province: {}, District: {}, Ward: {}, Street: {}",
-                addressRequest.getProvinceId(), addressRequest.getDistrictId(),
-                addressRequest.getWardId(), addressRequest.getStreetId());
+        log.info("Creating address for listing - Type: {}", addressRequest.getAddressType());
+        return addressCreationService.createAddress(addressRequest);
+    }
 
-        // Fetch required entities
-        var street = streetRepository.findById(addressRequest.getStreetId())
-                .orElseThrow(() -> new RuntimeException("Street not found with id: " + addressRequest.getStreetId()));
+    /**
+     * Helper method to link existing media to a listing.
+     * Ensures data integrity by validating:
+     * - Media exists and is ACTIVE
+     * - Media belongs to the same user (ownership validation)
+     * - Media is not already linked to another listing
+     *
+     * This operation is part of the listing creation transaction,
+     * ensuring atomicity and consistency.
+     *
+     * @param listing the listing to attach media to
+     * @param mediaIds set of media IDs to link
+     * @param userId user ID for ownership validation
+     * @throws AppException if validation fails
+     */
+    private void linkMediaToListing(Listing listing, Set<Long> mediaIds, String userId) {
+        log.info("Linking {} media items to listing {} for user {}",
+                mediaIds.size(), listing.getListingId(), userId);
 
-        var ward = wardRepository.findById(addressRequest.getWardId())
-                .orElseThrow(() -> new RuntimeException("Ward not found with id: " + addressRequest.getWardId()));
+        for (Long mediaId : mediaIds) {
+            // Fetch media
+            Media media = mediaRepository.findById(mediaId)
+                    .orElseThrow(() -> new AppException(DomainCode.ADDRESS_NOT_FOUND,
+                            "Media not found with ID: " + mediaId));
 
-        var district = districtRepository.findById(addressRequest.getDistrictId())
-                .orElseThrow(() -> new RuntimeException("District not found with id: " + addressRequest.getDistrictId()));
-
-        var province = provinceRepository.findById(addressRequest.getProvinceId())
-                .orElseThrow(() -> new RuntimeException("Province not found with id: " + addressRequest.getProvinceId()));
-
-        // Build full address if not provided
-        String fullAddress = addressRequest.getFullAddress();
-        if (fullAddress == null || fullAddress.isBlank()) {
-            StringBuilder sb = new StringBuilder();
-            if (addressRequest.getStreetNumber() != null && !addressRequest.getStreetNumber().isBlank()) {
-                sb.append(addressRequest.getStreetNumber()).append(" ");
+            // Validate ownership
+            if (!media.getUserId().equals(userId)) {
+                throw new AppException(DomainCode.UNAUTHORIZED,
+                        "Media " + mediaId + " does not belong to user " + userId);
             }
-            sb.append(street.getName()).append(", ");
-            sb.append(ward.getName()).append(", ");
-            sb.append(district.getName()).append(", ");
-            sb.append(province.getName());
-            fullAddress = sb.toString();
+
+            // Validate media status
+            if (media.getStatus() != Media.MediaStatus.ACTIVE) {
+                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                        "Media " + mediaId + " is not active (status: " + media.getStatus() + ")");
+            }
+
+            // Validate media is not already linked to another listing
+            if (media.getListing() != null) {
+                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                        "Media " + mediaId + " is already linked to listing " +
+                        media.getListing().getListingId());
+            }
+
+            // Link media to listing
+            media.setListing(listing);
+            mediaRepository.save(media);
+
+            log.debug("Media {} successfully linked to listing {}", mediaId, listing.getListingId());
         }
 
-        // Create address entity
-        Address address = Address.builder()
-                .streetNumber(addressRequest.getStreetNumber())
-                .street(street)
-                .ward(ward)
-                .district(district)
-                .province(province)
-                .fullAddress(fullAddress)
-                .latitude(addressRequest.getLatitude())
-                .longitude(addressRequest.getLongitude())
-                .isVerified(addressRequest.getIsVerified() != null ? addressRequest.getIsVerified() : false)
-                .build();
-
-        // Save and return
-        Address savedAddress = addressRepository.save(address);
-        log.info("Address created successfully with id: {}", savedAddress.getAddressId());
-        return savedAddress;
+        log.info("Successfully linked all {} media items to listing {}",
+                mediaIds.size(), listing.getListingId());
     }
 }

@@ -8,10 +8,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Component;
 
+/**
+ * Implementation of AddressMapper
+ * Handles mapping for both legacy and new address structures
+ */
 @Component
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AddressMapperImpl implements AddressMapper {
+
+    // ==================== ADDRESS ENTITY MAPPING ====================
 
     @Override
     public AddressResponse toResponse(Address address) {
@@ -21,103 +27,174 @@ public class AddressMapperImpl implements AddressMapper {
 
         return AddressResponse.builder()
                 .addressId(address.getAddressId())
-                .streetNumber(address.getStreetNumber())
-                .streetId(address.getStreet() != null ? address.getStreet().getStreetId() : null)
-                .streetName(address.getStreet() != null ? address.getStreet().getName() : null)
-                .wardId(address.getWard() != null ? address.getWard().getWardId() : null)
-                .wardName(address.getWard() != null ? address.getWard().getName() : null)
-                .districtId(address.getDistrict() != null ? address.getDistrict().getDistrictId() : null)
-                .districtName(address.getDistrict() != null ? address.getDistrict().getName() : null)
-                .provinceId(address.getProvince() != null ? address.getProvince().getProvinceId() : null)
-                .provinceName(address.getProvince() != null ? address.getProvince().getDisplayName() : null)
                 .fullAddress(address.getFullAddress())
+                .fullNewAddress(address.getFullNewAddress())
+                .displayAddress(address.getDisplayAddress())
                 .latitude(address.getLatitude())
                 .longitude(address.getLongitude())
-                .isVerified(address.getIsVerified())
+                // Note: Metadata fields should be populated from AddressMetadata if needed
                 .build();
     }
 
-    @Override
-    public StreetResponse toResponse(Street street) {
-        if (street == null) {
-            return null;
-        }
-
-        return StreetResponse.builder()
-                .streetId(street.getStreetId())
-                .name(street.getName())
-                .wardId(street.getWard() != null ? street.getWard().getWardId() : null)
-                .wardName(street.getWard() != null ? street.getWard().getName() : null)
-                .districtId(street.getWard() != null && street.getWard().getDistrict() != null ?
-                           street.getWard().getDistrict().getDistrictId() : null)
-                .districtName(street.getWard() != null && street.getWard().getDistrict() != null ?
-                             street.getWard().getDistrict().getName() : null)
-                .provinceId(street.getWard() != null && street.getWard().getDistrict() != null &&
-                           street.getWard().getDistrict().getProvince() != null ?
-                           street.getWard().getDistrict().getProvince().getProvinceId() : null)
-                .provinceName(street.getWard() != null && street.getWard().getDistrict() != null &&
-                             street.getWard().getDistrict().getProvince() != null ?
-                             street.getWard().getDistrict().getProvince().getDisplayName() : null)
-                .isActive(street.getIsActive())
-                .build();
-    }
+    // ==================== LEGACY STRUCTURE MAPPINGS ====================
 
     @Override
-    public WardResponse toResponse(Ward ward) {
-        if (ward == null) {
-            return null;
-        }
-
-        return WardResponse.builder()
-                .wardId(ward.getWardId())
-                .name(ward.getName())
-                .code(ward.getCode())
-                .type(ward.getType() != null ? ward.getType().name() : null)
-                .districtId(ward.getDistrict() != null ? ward.getDistrict().getDistrictId() : null)
-                .districtName(ward.getDistrict() != null ? ward.getDistrict().getName() : null)
-                .provinceId(ward.getDistrict() != null && ward.getDistrict().getProvince() != null ?
-                           ward.getDistrict().getProvince().getProvinceId() : null)
-                .provinceName(ward.getDistrict() != null && ward.getDistrict().getProvince() != null ?
-                             ward.getDistrict().getProvince().getDisplayName() : null)
-                .isActive(ward.getIsActive())
-                .build();
-    }
-
-    @Override
-    public DistrictResponse toResponse(District district) {
-        if (district == null) {
-            return null;
-        }
-
-        return DistrictResponse.builder()
-                .districtId(district.getDistrictId())
-                .name(district.getName())
-                .code(district.getCode())
-                .type(district.getType() != null ? district.getType().name() : null)
-                .provinceId(district.getProvince() != null ? district.getProvince().getProvinceId() : null)
-                .provinceName(district.getProvince() != null ? district.getProvince().getDisplayName() : null)
-                .isActive(district.getIsActive() != null ? district.getIsActive() : false)
-                .build();
-    }
-
-    @Override
-    public ProvinceResponse toResponse(Province province) {
+    public LegacyProvinceResponse toLegacyProvinceResponse(LegacyProvince province) {
         if (province == null) {
             return null;
         }
 
-        return ProvinceResponse.builder()
-                .provinceId(province.getProvinceId())
+        return LegacyProvinceResponse.builder()
+                .id(province.getId())
                 .name(province.getName())
+                .nameEn(province.getNameEn())
                 .code(province.getCode())
-                .type(province.getType() != null ? province.getType().name() : null)
-                .displayName(province.getDisplayName())
-                .isActive(province.getIsActive() != null ? province.getIsActive() : false)
-                .isMerged(province.getIsMerged() != null ? province.getIsMerged() : false)
-                .isParentProvince(province.isParentProvince())
-                .parentProvinceId(province.getParentProvince() != null ?
-                                 province.getParentProvince().getProvinceId() : null)
-                .originalName(province.getOriginalName())
+                .build();
+    }
+
+    @Override
+    public LegacyDistrictResponse toLegacyDistrictResponse(District district) {
+        if (district == null) {
+            return null;
+        }
+
+        return LegacyDistrictResponse.builder()
+                .id(district.getId())
+                .name(district.getName())
+                .nameEn(district.getNameEn())
+                .prefix(district.getPrefix())
+                .provinceId(district.getProvince() != null ? district.getProvince().getId() : null)
+                .provinceName(district.getProvince() != null ? district.getProvince().getName() : null)
+                .build();
+    }
+
+    @Override
+    public LegacyWardResponse toLegacyWardResponse(LegacyWard ward) {
+        if (ward == null) {
+            return null;
+        }
+
+        return LegacyWardResponse.builder()
+                .id(ward.getId())
+                .name(ward.getName())
+                .nameEn(ward.getNameEn())
+                .prefix(ward.getPrefix())
+                .provinceId(ward.getProvince() != null ? ward.getProvince().getId() : null)
+                .provinceName(ward.getProvince() != null ? ward.getProvince().getName() : null)
+                .districtId(ward.getDistrict() != null ? ward.getDistrict().getId() : null)
+                .districtName(ward.getDistrict() != null ? ward.getDistrict().getName() : null)
+                .build();
+    }
+
+    @Override
+    public LegacyStreetResponse toLegacyStreetResponse(Street street) {
+        if (street == null) {
+            return null;
+        }
+
+        return LegacyStreetResponse.builder()
+                .id(street.getId())
+                .name(street.getName())
+                .nameEn(street.getNameEn())
+                .prefix(street.getPrefix())
+                .provinceId(street.getProvinceId())
+                .provinceName(null) // Will be populated in service layer
+                .districtId(street.getDistrictId())
+                .districtName(null) // Will be populated in service layer
+                .build();
+    }
+
+    // ==================== NEW STRUCTURE MAPPINGS ====================
+
+    @Override
+    public NewProvinceResponse toNewProvinceResponse(Province province) {
+        if (province == null) {
+            return null;
+        }
+
+        return NewProvinceResponse.builder()
+                .code(province.getCode())
+                .name(province.getName())
+                .nameEn(province.getNameEn())
+                .fullName(province.getFullName())
+                .fullNameEn(province.getFullNameEn())
+                .codeName(province.getCodeName())
+                .administrativeUnitType(province.getAdministrativeUnit() != null ?
+                        province.getAdministrativeUnit().getFullName() : null)
+                .build();
+    }
+
+    @Override
+    public NewWardResponse toNewWardResponse(Ward ward) {
+        if (ward == null) {
+            return null;
+        }
+
+        Province province = ward.getProvince();
+
+        return NewWardResponse.builder()
+                .code(ward.getCode())
+                .name(ward.getName())
+                .nameEn(ward.getNameEn())
+                .fullName(ward.getFullName())
+                .fullNameEn(ward.getFullNameEn())
+                .codeName(ward.getCodeName())
+                .provinceCode(province != null ? province.getCode() : null)
+                .provinceName(province != null ? province.getName() : null)
+                .administrativeUnitType(ward.getAdministrativeUnit() != null ?
+                        ward.getAdministrativeUnit().getFullName() : null)
+                .build();
+    }
+
+    @Override
+    public NewFullAddressResponse toNewFullAddressResponse(Province province, Ward ward) {
+        return NewFullAddressResponse.builder()
+                .province(toNewProvinceResponse(province))
+                .ward(ward != null ? toNewWardResponse(ward) : null)
+                .build();
+    }
+
+    @Override
+    public NewAddressSearchResponse toNewAddressSearchResponse(Ward ward) {
+        if (ward == null) {
+            return null;
+        }
+
+        Province province = ward.getProvince();
+        String fullAddress = ward.getName();
+        if (province != null) {
+            fullAddress = ward.getName() + ", " + province.getName();
+        }
+
+        String type = ward.getAdministrativeUnit() != null ?
+                ward.getAdministrativeUnit().getFullName() : "Ward";
+
+        return NewAddressSearchResponse.builder()
+                .code(ward.getCode())
+                .name(ward.getName())
+                .type(type)
+                .provinceCode(province != null ? province.getCode() : null)
+                .provinceName(province != null ? province.getName() : null)
+                .fullAddress(fullAddress)
+                .build();
+    }
+
+    @Override
+    public NewAddressSearchResponse toNewAddressSearchResponseFromProvince(Province province) {
+        if (province == null) {
+            return null;
+        }
+
+        String type = province.getAdministrativeUnit() != null ?
+                province.getAdministrativeUnit().getFullName() : "Province";
+
+        return NewAddressSearchResponse.builder()
+                .code(province.getCode())
+                .name(province.getName())
+                .type(type)
+                .provinceCode(province.getCode())
+                .provinceName(province.getName())
+                .fullAddress(province.getName())
                 .build();
     }
 }

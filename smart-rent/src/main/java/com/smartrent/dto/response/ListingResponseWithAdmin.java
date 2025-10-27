@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import software.amazon.awssdk.services.s3.endpoints.internal.Value;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
