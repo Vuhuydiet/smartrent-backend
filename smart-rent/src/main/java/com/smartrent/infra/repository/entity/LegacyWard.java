@@ -3,9 +3,6 @@ package com.smartrent.infra.repository.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.SuperBuilder;
-
-import java.util.List;
 
 /**
  * Legacy ward structure (before July 1, 2025)
@@ -40,7 +37,4 @@ public class LegacyWard {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "_district_id")
     District district;
-
-    @OneToMany(mappedBy = "ward", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    List<Street> streets;
 }

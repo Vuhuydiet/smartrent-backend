@@ -132,7 +132,7 @@ public class AddressController {
     )
     public ResponseEntity<ApiResponse<LegacyProvinceResponse>> getProvinceById(
             @Parameter(description = "Province ID", example = "1", required = true)
-            @PathVariable Long provinceId) {
+            @PathVariable Integer provinceId) {
 
         log.info("GET /v1/addresses/provinces/{}", provinceId);
 
@@ -236,7 +236,7 @@ public class AddressController {
     )
     public ResponseEntity<ApiResponse<List<LegacyDistrictResponse>>> getDistrictsByProvinceId(
             @Parameter(description = "Province ID", example = "1", required = true)
-            @PathVariable Long provinceId) {
+            @PathVariable Integer provinceId) {
 
         log.info("GET /v1/addresses/provinces/{}/districts", provinceId);
 
@@ -265,7 +265,7 @@ public class AddressController {
     )
     public ResponseEntity<ApiResponse<LegacyDistrictResponse>> getDistrictById(
             @Parameter(description = "District ID", example = "1", required = true)
-            @PathVariable Long districtId) {
+            @PathVariable Integer districtId) {
 
         log.info("GET /v1/addresses/districts/{}", districtId);
 
@@ -296,7 +296,7 @@ public class AddressController {
             @RequestParam String q,
 
             @Parameter(description = "Province ID to filter by (optional)", example = "1")
-            @RequestParam(required = false) Long provinceId) {
+            @RequestParam(required = false) Integer provinceId) {
 
         log.info("GET /v1/addresses/districts/search - query={}, provinceId={}", q, provinceId);
 
@@ -378,7 +378,7 @@ public class AddressController {
     )
     public ResponseEntity<ApiResponse<List<LegacyWardResponse>>> getWardsByDistrictId(
             @Parameter(description = "District ID", example = "1", required = true)
-            @PathVariable Long districtId) {
+            @PathVariable Integer districtId) {
 
         log.info("GET /v1/addresses/districts/{}/wards", districtId);
 
@@ -407,7 +407,7 @@ public class AddressController {
     )
     public ResponseEntity<ApiResponse<LegacyWardResponse>> getWardById(
             @Parameter(description = "Ward ID", example = "1", required = true)
-            @PathVariable Long wardId) {
+            @PathVariable Integer wardId) {
 
         log.info("GET /v1/addresses/wards/{}", wardId);
 
@@ -438,7 +438,7 @@ public class AddressController {
             @RequestParam String q,
 
             @Parameter(description = "District ID to filter by (optional)", example = "1")
-            @RequestParam(required = false) Long districtId) {
+            @RequestParam(required = false) Integer districtId) {
 
         log.info("GET /v1/addresses/wards/search - query={}, districtId={}", q, districtId);
 
@@ -447,6 +447,390 @@ public class AddressController {
         return ResponseEntity.ok(ApiResponse.<List<LegacyWardResponse>>builder()
                 .data(wards)
                 .message("Found " + wards.size() + " wards matching '" + q + "'")
+                .build());
+    }
+
+    @GetMapping("/provinces/{provinceId}/streets")
+    @Operation(
+        summary = "Get streets by province ID",
+        description = """
+            Returns all streets belonging to a specific province.
+
+            **Vietnamese Street Types**:
+            - **Đường** (Street/Road) - Main street
+            - **Phố** (Street) - Street in urban areas
+            - **Ngõ** (Alley) - Small street/alley
+            - **Ngách** (Lane) - Very small lane
+
+            **Use Cases**:
+            - Populate street dropdown for a province
+            - Display all streets in a province
+            - Support cascading address selection
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved streets",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Province Streets Example",
+                        summary = "Danh sách đường/phố của một tỉnh",
+                        value = """
+                            {
+                              "data": [
+                                {
+                                  "id": 1,
+                                  "name": "Nguyễn Trãi",
+                                  "nameEn": "Nguyen Trai",
+                                  "prefix": "Đường",
+                                  "provinceId": 1,
+                                  "provinceName": "Thành phố Hà Nội",
+                                  "districtId": 1,
+                                  "districtName": "Quận Ba Đình"
+                                }
+                              ],
+                              "message": "Successfully retrieved 500 streets for province 1"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Province not found"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<List<LegacyStreetResponse>>> getStreetsByProvinceId(
+            @Parameter(description = "Province ID", example = "1", required = true)
+            @PathVariable Integer provinceId) {
+
+        log.info("GET /v1/addresses/provinces/{}/streets", provinceId);
+
+        List<LegacyStreetResponse> streets = addressService.getStreetsByProvinceId(provinceId);
+
+        return ResponseEntity.ok(ApiResponse.<List<LegacyStreetResponse>>builder()
+                .data(streets)
+                .message("Successfully retrieved " + streets.size() + " streets for province " + provinceId)
+                .build());
+    }
+
+    @GetMapping("/districts/{districtId}/streets")
+    @Operation(
+        summary = "Get streets by district ID",
+        description = """
+            Returns all streets belonging to a specific district.
+
+            **Vietnamese Street Types**:
+            - **Đường** (Street/Road) - Main street
+            - **Phố** (Street) - Street in urban areas
+            - **Ngõ** (Alley) - Small street/alley
+            - **Ngách** (Lane) - Very small lane
+
+            **Use Cases**:
+            - Populate street dropdown after district selection
+            - Display all streets in a district
+            - Support cascading address selection
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved streets",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "District Streets Example",
+                        summary = "Danh sách đường/phố của một quận/huyện",
+                        value = """
+                            {
+                              "data": [
+                                {
+                                  "id": 1,
+                                  "name": "Nguyễn Trãi",
+                                  "nameEn": "Nguyen Trai",
+                                  "prefix": "Đường",
+                                  "provinceId": 1,
+                                  "provinceName": "Thành phố Hà Nội",
+                                  "districtId": 1,
+                                  "districtName": "Quận Ba Đình"
+                                }
+                              ],
+                              "message": "Successfully retrieved 50 streets for district 1"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "District not found"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<List<LegacyStreetResponse>>> getStreetsByDistrictId(
+            @Parameter(description = "District ID", example = "1", required = true)
+            @PathVariable Integer districtId) {
+
+        log.info("GET /v1/addresses/districts/{}/streets", districtId);
+
+        List<LegacyStreetResponse> streets = addressService.getStreetsByDistrictId(districtId);
+
+        return ResponseEntity.ok(ApiResponse.<List<LegacyStreetResponse>>builder()
+                .data(streets)
+                .message("Successfully retrieved " + streets.size() + " streets for district " + districtId)
+                .build());
+    }
+
+    @GetMapping("/streets/{streetId}")
+    @Operation(
+        summary = "Get street by ID",
+        description = "Get detailed information about a specific street by its ID.",
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Street found"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Street not found"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<LegacyStreetResponse>> getStreetById(
+            @Parameter(description = "Street ID", example = "1", required = true)
+            @PathVariable Integer streetId) {
+
+        log.info("GET /v1/addresses/streets/{}", streetId);
+
+        LegacyStreetResponse street = addressService.getStreetById(streetId);
+
+        return ResponseEntity.ok(ApiResponse.<LegacyStreetResponse>builder()
+                .data(street)
+                .message("Successfully retrieved street")
+                .build());
+    }
+
+    @GetMapping("/streets/search")
+    @Operation(
+        summary = "Search streets by name",
+        description = """
+            Search for streets by name (case-insensitive partial match).
+            Optionally filter by province and/or district.
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Search results"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<List<LegacyStreetResponse>>> searchStreets(
+            @Parameter(description = "Search term", example = "Nguyễn Trãi", required = true)
+            @RequestParam String q,
+
+            @Parameter(description = "Province ID to filter by (optional)", example = "1")
+            @RequestParam(required = false) Integer provinceId,
+
+            @Parameter(description = "District ID to filter by (optional)", example = "1")
+            @RequestParam(required = false) Integer districtId) {
+
+        log.info("GET /v1/addresses/streets/search - query={}, provinceId={}, districtId={}", q, provinceId, districtId);
+
+        List<LegacyStreetResponse> streets = addressService.searchStreets(q, provinceId, districtId);
+
+        return ResponseEntity.ok(ApiResponse.<List<LegacyStreetResponse>>builder()
+                .data(streets)
+                .message("Found " + streets.size() + " streets matching '" + q + "'")
+                .build());
+    }
+
+    @GetMapping("/provinces/{provinceId}/projects")
+    @Operation(
+        summary = "Get projects by province ID",
+        description = """
+            Returns all projects/locations belonging to a specific province.
+
+            **Use Cases**:
+            - Display available projects in a province
+            - Filter listings by project location
+            - Populate project dropdown after province selection
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved projects",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Province Projects Example",
+                        summary = "Danh sách dự án/khu vực trong tỉnh",
+                        value = """
+                            {
+                              "data": [
+                                {
+                                  "id": 1,
+                                  "name": "Vinhomes Grand Park",
+                                  "nameEn": "Vinhomes Grand Park",
+                                  "provinceId": 79,
+                                  "provinceName": "Thành phố Hồ Chí Minh",
+                                  "districtId": 769,
+                                  "districtName": "Quận 9",
+                                  "latitude": 10.8455,
+                                  "longitude": 106.8564
+                                }
+                              ],
+                              "message": "Successfully retrieved 15 projects for province 79"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Province not found"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<List<LegacyProjectResponse>>> getProjectsByProvinceId(
+            @Parameter(description = "Province ID", example = "79", required = true)
+            @PathVariable Integer provinceId) {
+
+        log.info("GET /v1/addresses/provinces/{}/projects", provinceId);
+
+        List<LegacyProjectResponse> projects = addressService.getProjectsByProvinceId(provinceId);
+
+        return ResponseEntity.ok(ApiResponse.<List<LegacyProjectResponse>>builder()
+                .data(projects)
+                .message("Successfully retrieved " + projects.size() + " projects for province " + provinceId)
+                .build());
+    }
+
+    @GetMapping("/districts/{districtId}/projects")
+    @Operation(
+        summary = "Get projects by district ID",
+        description = """
+            Returns all projects/locations belonging to a specific district.
+
+            **Use Cases**:
+            - Display available projects in a district
+            - Filter listings by project location
+            - Populate project dropdown after district selection
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved projects",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "District Projects Example",
+                        summary = "Danh sách dự án/khu vực trong quận/huyện",
+                        value = """
+                            {
+                              "data": [
+                                {
+                                  "id": 1,
+                                  "name": "Vinhomes Grand Park",
+                                  "nameEn": "Vinhomes Grand Park",
+                                  "provinceId": 79,
+                                  "provinceName": "Thành phố Hồ Chí Minh",
+                                  "districtId": 769,
+                                  "districtName": "Quận 9",
+                                  "latitude": 10.8455,
+                                  "longitude": 106.8564
+                                }
+                              ],
+                              "message": "Successfully retrieved 5 projects for district 769"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "District not found"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<List<LegacyProjectResponse>>> getProjectsByDistrictId(
+            @Parameter(description = "District ID", example = "769", required = true)
+            @PathVariable Integer districtId) {
+
+        log.info("GET /v1/addresses/districts/{}/projects", districtId);
+
+        List<LegacyProjectResponse> projects = addressService.getProjectsByDistrictId(districtId);
+
+        return ResponseEntity.ok(ApiResponse.<List<LegacyProjectResponse>>builder()
+                .data(projects)
+                .message("Successfully retrieved " + projects.size() + " projects for district " + districtId)
+                .build());
+    }
+
+    @GetMapping("/projects/{projectId}")
+    @Operation(
+        summary = "Get project by ID",
+        description = "Get detailed information about a specific project by its ID.",
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Project found"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Project not found"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<LegacyProjectResponse>> getProjectById(
+            @Parameter(description = "Project ID", example = "1", required = true)
+            @PathVariable Integer projectId) {
+
+        log.info("GET /v1/addresses/projects/{}", projectId);
+
+        LegacyProjectResponse project = addressService.getProjectById(projectId);
+
+        return ResponseEntity.ok(ApiResponse.<LegacyProjectResponse>builder()
+                .data(project)
+                .message("Successfully retrieved project")
+                .build());
+    }
+
+    @GetMapping("/projects/search")
+    @Operation(
+        summary = "Search projects by name",
+        description = """
+            Search for projects by name (case-insensitive partial match).
+            Optionally filter by province and/or district.
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Search results"
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<List<LegacyProjectResponse>>> searchProjects(
+            @Parameter(description = "Search term", example = "Vinhomes", required = true)
+            @RequestParam String q,
+
+            @Parameter(description = "Province ID to filter by (optional)", example = "79")
+            @RequestParam(required = false) Integer provinceId,
+
+            @Parameter(description = "District ID to filter by (optional)", example = "769")
+            @RequestParam(required = false) Integer districtId) {
+
+        log.info("GET /v1/addresses/projects/search - query={}, provinceId={}, districtId={}", q, provinceId, districtId);
+
+        List<LegacyProjectResponse> projects = addressService.searchProjects(q, provinceId, districtId);
+
+        return ResponseEntity.ok(ApiResponse.<List<LegacyProjectResponse>>builder()
+                .data(projects)
+                .message("Found " + projects.size() + " projects matching '" + q + "'")
                 .build());
     }
 

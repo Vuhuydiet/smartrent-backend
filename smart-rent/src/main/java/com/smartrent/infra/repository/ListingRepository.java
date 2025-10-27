@@ -36,7 +36,9 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
      */
     @Query("""
         SELECT l FROM listings l
-        WHERE l.address.ward.id = :wardId
+        JOIN l.address a
+        JOIN AddressMetadata am ON am.address.addressId = a.addressId
+        WHERE am.wardId = :wardId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -54,7 +56,9 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
      */
     @Query("""
         SELECT l FROM listings l
-        WHERE l.address.district.id = :districtId
+        JOIN l.address a
+        JOIN AddressMetadata am ON am.address.addressId = a.addressId
+        WHERE am.districtId = :districtId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -72,7 +76,9 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
      */
     @Query("""
         SELECT l FROM listings l
-        WHERE l.address.province.id = :provinceId
+        JOIN l.address a
+        JOIN AddressMetadata am ON am.address.addressId = a.addressId
+        WHERE am.provinceId = :provinceId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -97,7 +103,9 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
             AVG(l.area),
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
-        WHERE l.address.ward.id = :wardId
+        JOIN l.address a
+        JOIN AddressMetadata am ON am.address.addressId = a.addressId
+        WHERE am.wardId = :wardId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -120,7 +128,9 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
             AVG(l.area),
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
-        WHERE l.address.district.id = :districtId
+        JOIN l.address a
+        JOIN AddressMetadata am ON am.address.addressId = a.addressId
+        WHERE am.districtId = :districtId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -143,7 +153,9 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
             AVG(l.area),
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
-        WHERE l.address.province.id = :provinceId
+        JOIN l.address a
+        JOIN AddressMetadata am ON am.address.addressId = a.addressId
+        WHERE am.provinceId = :provinceId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
