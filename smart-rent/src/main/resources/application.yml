@@ -125,6 +125,7 @@ application:
         - "/v1/memberships/packages/**"
         - "/v1/vip-tiers/**"
         - "/v1/push-details/**"
+        - "/v1/housing-predictor/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
@@ -133,6 +134,7 @@ application:
         - "/v1/listings"
         - "/v1/listings/**"
         - "/v1/payments/vnpay/ipn"
+        - "/v1/housing-predictor/**"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
@@ -156,17 +158,20 @@ application:
     base-wait-duration: 2000 # milliseconds
     exponential-multiplier: 2.0
     jitter-percentage: 0.25
-    min-wait-duration: 1000 # milliseconds
-  circuit-breaker:
-    failure-rate-threshold: 60 # percentage
-    wait-duration-in-open-state: 120 # seconds
-    sliding-window-size: 20
-    minimum-number-of-calls: 10
-    permitted-calls-in-half-open: 5
-    timeout-duration: 15 # seconds
+  housing-predictor:
+    mock:
+      enabled: false  # Set to false to use real AI service
+    ai-service:
+      base-url: "${AI_SERVICE_BASE_URL:http://localhost:8000}"
+
+# Feign configuration
 feign:
   client:
     config:
+      smartrent-ai:
+        url: "${AI_SERVICE_BASE_URL:http://localhost:8000}"
+        connect-timeout: 5000
+        read-timeout: 30000
       brevo:
         url: "https://api.brevo.com"
       google:
@@ -182,6 +187,14 @@ feign:
         url: "${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}"
       tinhthanhpho:
         url: "${TINHTHANHPHO_API_URL:https://tinhthanhpho.com/api/v1}"
+    min-wait-duration: 1000 # milliseconds
+  circuit-breaker:
+    failure-rate-threshold: 60 # percentage
+    wait-duration-in-open-state: 120 # seconds
+    sliding-window-size: 20
+    minimum-number-of-calls: 10
+    permitted-calls-in-half-open: 5
+    timeout-duration: 15 # seconds
 
 springdoc:
   api-docs:
