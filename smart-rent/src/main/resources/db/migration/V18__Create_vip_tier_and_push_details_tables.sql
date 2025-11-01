@@ -7,19 +7,19 @@
 -- =====================================================
 -- 1. VIP TIER DETAILS TABLE
 -- =====================================================
-CREATE TABLE vip_tier_details (
+CREATE TABLE IF NOT EXISTS vip_tier_details (
     tier_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     tier_code VARCHAR(20) NOT NULL UNIQUE COMMENT 'NORMAL, SILVER, GOLD, DIAMOND',
     tier_name VARCHAR(100) NOT NULL COMMENT 'Display name in Vietnamese',
     tier_name_en VARCHAR(100) NOT NULL COMMENT 'Display name in English',
     tier_level INT NOT NULL COMMENT 'Priority level: 1=NORMAL, 2=SILVER, 3=GOLD, 4=DIAMOND',
-    
+
     -- Pricing
     price_per_day DECIMAL(15, 0) NOT NULL COMMENT 'Base price per day in VND',
     price_10_days DECIMAL(15, 0) NOT NULL COMMENT 'Total price for 10 days',
     price_15_days DECIMAL(15, 0) NOT NULL COMMENT 'Total price for 15 days (11% discount)',
     price_30_days DECIMAL(15, 0) NOT NULL COMMENT 'Total price for 30 days (18.5% discount)',
-    
+
     -- Features
     max_images INT NOT NULL DEFAULT 5 COMMENT 'Maximum number of images allowed',
     max_videos INT NOT NULL DEFAULT 1 COMMENT 'Maximum number of videos allowed',
@@ -30,19 +30,19 @@ CREATE TABLE vip_tier_details (
     no_ads BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'No advertisement banners',
     priority_display BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Priority in search results',
     has_shadow_listing BOOLEAN NOT NULL DEFAULT FALSE COMMENT 'Creates shadow normal listing (Diamond only)',
-    
+
     -- Description
     description TEXT COMMENT 'Tier description and features',
     features JSON COMMENT 'JSON array of feature descriptions',
-    
+
     -- Status
     is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Whether tier is currently available',
     display_order INT NOT NULL DEFAULT 0 COMMENT 'Display order in UI',
-    
+
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+
     INDEX idx_tier_code (tier_code),
     INDEX idx_tier_level (tier_level),
     INDEX idx_is_active (is_active)
@@ -52,30 +52,30 @@ COMMENT='VIP tier details with pricing and features';
 -- =====================================================
 -- 2. PUSH DETAILS TABLE
 -- =====================================================
-CREATE TABLE push_details (
+CREATE TABLE IF NOT EXISTS push_details (
     push_detail_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     detail_code VARCHAR(20) NOT NULL UNIQUE COMMENT 'SINGLE_PUSH, PUSH_PACKAGE_3, etc.',
     detail_name VARCHAR(100) NOT NULL COMMENT 'Display name',
     detail_name_en VARCHAR(100) NOT NULL COMMENT 'Display name in English',
-    
+
     -- Pricing
     price_per_push DECIMAL(15, 0) NOT NULL COMMENT 'Price per single push in VND',
     quantity INT NOT NULL DEFAULT 1 COMMENT 'Number of pushes in package',
     total_price DECIMAL(15, 0) NOT NULL COMMENT 'Total price for package',
     discount_percentage DECIMAL(5, 2) DEFAULT 0.00 COMMENT 'Discount percentage if package',
-    
+
     -- Description
     description TEXT COMMENT 'Push package description',
     features JSON COMMENT 'JSON array of feature descriptions',
-    
+
     -- Status
     is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Whether package is currently available',
     display_order INT NOT NULL DEFAULT 0 COMMENT 'Display order in UI',
-    
+
     -- Timestamps
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
+
     INDEX idx_detail_code (detail_code),
     INDEX idx_is_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

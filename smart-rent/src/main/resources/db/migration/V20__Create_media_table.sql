@@ -1,5 +1,5 @@
 -- Create media table for secure file management with pre-signed URLs
-CREATE TABLE media (
+CREATE TABLE IF NOT EXISTS media (
     media_id BIGINT AUTO_INCREMENT PRIMARY KEY,
     listing_id BIGINT,
     user_id VARCHAR(36) NOT NULL,

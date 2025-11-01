@@ -11,7 +11,7 @@
 -- =====================================================================
 -- CREATE administrative_regions TABLE
 -- =====================================================================
-CREATE TABLE administrative_regions (
+CREATE TABLE IF NOT EXISTS administrative_regions (
     id INTEGER NOT NULL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     name_en VARCHAR(255) NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE administrative_regions (
 -- =====================================================================
 -- CREATE administrative_units TABLE
 -- =====================================================================
-CREATE TABLE administrative_units (
+CREATE TABLE IF NOT EXISTS administrative_units (
     id INTEGER NOT NULL PRIMARY KEY,
     full_name VARCHAR(255) NULL,
     full_name_en VARCHAR(255) NULL,
@@ -37,7 +37,7 @@ CREATE TABLE administrative_units (
 -- CREATE provinces TABLE (for V22 data import)
 -- =====================================================================
 
-CREATE TABLE `district` (
+CREATE TABLE IF NOT EXISTS `district` (
   `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -46,7 +46,7 @@ CREATE TABLE `district` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-CREATE TABLE `project` (
+CREATE TABLE IF NOT EXISTS `project` (
   `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE `project` (
 
 
 
-CREATE TABLE `province` (
+CREATE TABLE IF NOT EXISTS `province` (
   `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE `province` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-CREATE TABLE `street` (
+CREATE TABLE IF NOT EXISTS `street` (
   `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -76,7 +76,7 @@ CREATE TABLE `street` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
-CREATE TABLE `ward` (
+CREATE TABLE IF NOT EXISTS `ward` (
   `id` int NOT NULL PRIMARY KEY,
   `_name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `name_en` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE `ward` (
 -- =====================================================================
 -- CREATE provinces TABLE (for V23 data import)
 -- =====================================================================
-CREATE TABLE provinces (
+CREATE TABLE IF NOT EXISTS provinces (
     code VARCHAR(20) NOT NULL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     name_en VARCHAR(255) NULL,
@@ -99,17 +99,14 @@ CREATE TABLE provinces (
     administrative_unit_id INTEGER NULL,
 
     INDEX idx_provinces_unit (administrative_unit_id),
-    INDEX idx_provinces_name (name),
-
-    CONSTRAINT fk_provinces_admin_unit FOREIGN KEY (administrative_unit_id)
-        REFERENCES administrative_units(id) ON DELETE SET NULL
+    INDEX idx_provinces_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- =====================================================================
 -- CREATE wards TABLE (for V23 data import)
 -- =====================================================================
-CREATE TABLE wards (
+CREATE TABLE IF NOT EXISTS wards (
     code VARCHAR(20) NOT NULL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     name_en VARCHAR(255) NULL,
@@ -121,17 +118,12 @@ CREATE TABLE wards (
 
     INDEX idx_wards_province (province_code),
     INDEX idx_wards_unit (administrative_unit_id),
-    INDEX idx_wards_name (name),
-
-    CONSTRAINT fk_wards_admin_unit FOREIGN KEY (administrative_unit_id)
-        REFERENCES administrative_units(id) ON DELETE SET NULL,
-    CONSTRAINT fk_wards_province FOREIGN KEY (province_code)
-        REFERENCES provinces(code) ON DELETE SET NULL
+    INDEX idx_wards_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- Province Mapping
-CREATE TABLE province_mapping (
+CREATE TABLE IF NOT EXISTS province_mapping (
   id INTEGER PRIMARY KEY AUTO_INCREMENT,
   province_legacy_id INTEGER NOT NULL,
   province_new_code VARCHAR(20) NOT NULL,
@@ -149,7 +141,7 @@ CREATE TABLE province_mapping (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- District to Ward Mapping
-CREATE TABLE district_ward_mapping (
+CREATE TABLE IF NOT EXISTS district_ward_mapping (
   id INTEGER PRIMARY KEY AUTO_INCREMENT,
   district_legacy_id INTEGER NOT NULL,
   ward_new_code VARCHAR(20) NOT NULL,
@@ -167,7 +159,7 @@ CREATE TABLE district_ward_mapping (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Ward Mapping
-CREATE TABLE ward_mapping (
+CREATE TABLE IF NOT EXISTS ward_mapping (
   id INTEGER PRIMARY KEY AUTO_INCREMENT,
   ward_legacy_id INTEGER NOT NULL,
   ward_new_code VARCHAR(20) NOT NULL,
@@ -186,7 +178,7 @@ CREATE TABLE ward_mapping (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Street Mapping
-CREATE TABLE street_mapping (
+CREATE TABLE IF NOT EXISTS street_mapping (
   id INTEGER PRIMARY KEY AUTO_INCREMENT,
   street_legacy_id INTEGER NOT NULL,
   province_new_code VARCHAR(20) NOT NULL,
@@ -205,3 +197,31 @@ CREATE TABLE street_mapping (
   INDEX idx_street_mapping_province_code (province_new_code),
   INDEX idx_street_mapping_ward_code (ward_new_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- =====================================================================
+-- ADD FOREIGN KEY CONSTRAINTS
+-- =====================================================================
+
+-- provinces foreign key
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'provinces' AND CONSTRAINT_NAME = 'fk_provinces_admin_unit');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE provinces ADD CONSTRAINT fk_provinces_admin_unit FOREIGN KEY (administrative_unit_id) REFERENCES administrative_units(id) ON DELETE SET NULL',
+    'SELECT ''Constraint fk_provinces_admin_unit already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- wards foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'wards' AND CONSTRAINT_NAME = 'fk_wards_admin_unit');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE wards ADD CONSTRAINT fk_wards_admin_unit FOREIGN KEY (administrative_unit_id) REFERENCES administrative_units(id) ON DELETE SET NULL',
+    'SELECT ''Constraint fk_wards_admin_unit already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'wards' AND CONSTRAINT_NAME = 'fk_wards_province');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE wards ADD CONSTRAINT fk_wards_province FOREIGN KEY (province_code) REFERENCES provinces(code) ON DELETE SET NULL',
+    'SELECT ''Constraint fk_wards_province already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

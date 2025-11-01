@@ -43,6 +43,7 @@ application:
         - "/v1/memberships/packages/**"
         - "/v1/vip-tiers/**"
         - "/v1/push-details/**"
+        - "/v1/users/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
