@@ -1,7 +1,7 @@
 -- Create address_metadata table for structured address querying
 -- This allows filtering listings by province, district, ward, etc.
 
-CREATE TABLE address_metadata (
+CREATE TABLE IF NOT EXISTS address_metadata (
     metadata_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     address_id BIGINT NOT NULL UNIQUE,
     address_type ENUM('OLD', 'NEW') NOT NULL,

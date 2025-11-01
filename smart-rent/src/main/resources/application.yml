@@ -1,5 +1,13 @@
 server:
   port: 8080
+  error:
+    # Disable Spring Boot's default error page to ensure @ControllerAdvice handles all exceptions
+    whitelabel:
+      enabled: false
+    # Don't include exception details in error responses
+    include-exception: false
+    include-stacktrace: never
+    include-message: always
 
 # Logging Configuration
 logging:
@@ -108,6 +116,7 @@ application:
   authorize-ignored:
     methods:
       get:
+        - "/error"
         - "/swagger-ui/**"
         - "/swagger-ui.html"
         - "/v3/api-docs/**"

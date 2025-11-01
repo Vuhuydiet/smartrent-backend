@@ -1,5 +1,5 @@
 -- Create Categories table
-CREATE TABLE categories (
+CREATE TABLE IF NOT EXISTS categories (
     category_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     slug VARCHAR(120) UNIQUE,
@@ -14,7 +14,7 @@ CREATE TABLE categories (
     INDEX idx_is_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE amenities (
+CREATE TABLE IF NOT EXISTS amenities (
     amenity_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     icon VARCHAR(50),
@@ -30,7 +30,7 @@ CREATE TABLE amenities (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Addresses table (basic version, will be enhanced in V23)
-CREATE TABLE addresses (
+CREATE TABLE IF NOT EXISTS addresses (
     address_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     full_address TEXT,
     full_newaddress TEXT,
@@ -41,7 +41,7 @@ CREATE TABLE addresses (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Listings table
-CREATE TABLE listings (
+CREATE TABLE IF NOT EXISTS listings (
     listing_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(200) NOT NULL,
     description LONGTEXT,
@@ -74,15 +74,11 @@ CREATE TABLE listings (
     INDEX idx_price_type (price, listing_type),
     INDEX idx_status (verified, expired, vip_type),
     INDEX idx_expiry_date (expiry_date),
-    INDEX idx_post_date (post_date),
-
-    CONSTRAINT fk_listings_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_listings_category FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE,
-    CONSTRAINT fk_listings_address FOREIGN KEY (address_id) REFERENCES addresses(address_id) ON DELETE CASCADE
+    INDEX idx_post_date (post_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Pricing Histories table
-CREATE TABLE pricing_histories (
+CREATE TABLE IF NOT EXISTS pricing_histories (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     listing_id BIGINT NOT NULL,
     old_price DECIMAL(15, 0),
@@ -100,13 +96,11 @@ CREATE TABLE pricing_histories (
     INDEX idx_listing_id (listing_id),
     INDEX idx_listing_date (listing_id, changed_at),
     INDEX idx_changed_at (changed_at),
-    INDEX idx_is_current (is_current),
-
-    CONSTRAINT fk_pricing_histories_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE
+    INDEX idx_is_current (is_current)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Images table
-CREATE TABLE images (
+CREATE TABLE IF NOT EXISTS images (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     listing_id BIGINT NOT NULL,
     url VARCHAR(500) NOT NULL,
@@ -120,13 +114,11 @@ CREATE TABLE images (
 
     INDEX idx_listing_id (listing_id),
     INDEX idx_listing_sort (listing_id, sort_order),
-    INDEX idx_is_primary (is_primary),
-
-    CONSTRAINT fk_images_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE
+    INDEX idx_is_primary (is_primary)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Videos table
-CREATE TABLE videos (
+CREATE TABLE IF NOT EXISTS videos (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     listing_id BIGINT NOT NULL,
     url VARCHAR(500) NOT NULL,
@@ -141,25 +133,20 @@ CREATE TABLE videos (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     INDEX idx_listing_id (listing_id),
-    INDEX idx_listing_sort (listing_id, sort_order),
-
-    CONSTRAINT fk_videos_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE
+    INDEX idx_listing_sort (listing_id, sort_order)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Listing Amenities junction table
-CREATE TABLE listing_amenities (
+CREATE TABLE IF NOT EXISTS listing_amenities (
     listing_id BIGINT NOT NULL,
     amenity_id BIGINT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    PRIMARY KEY (listing_id, amenity_id),
-
-    CONSTRAINT fk_listing_amenities_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
-    CONSTRAINT fk_listing_amenities_amenity FOREIGN KEY (amenity_id) REFERENCES amenities(amenity_id) ON DELETE CASCADE
+    PRIMARY KEY (listing_id, amenity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Favorites table
-CREATE TABLE favorites (
+CREATE TABLE IF NOT EXISTS favorites (
     user_id VARCHAR(36) NOT NULL,
     listing_id BIGINT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -167,14 +154,11 @@ CREATE TABLE favorites (
     PRIMARY KEY (user_id, listing_id),
 
     INDEX idx_user_id (user_id),
-    INDEX idx_listing_id (listing_id),
-
-    CONSTRAINT fk_favorites_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_favorites_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE
+    INDEX idx_listing_id (listing_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create Views table
-CREATE TABLE views (
+CREATE TABLE IF NOT EXISTS views (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     listing_id BIGINT NOT NULL,
     user_id VARCHAR(36),
@@ -188,10 +172,7 @@ CREATE TABLE views (
     INDEX idx_listing_id (listing_id),
     INDEX idx_listing_time (listing_id, viewed_at),
     INDEX idx_user_id (user_id),
-    INDEX idx_ip_time (ip_address, viewed_at),
-
-    CONSTRAINT fk_views_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
-    CONSTRAINT fk_views_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL
+    INDEX idx_ip_time (ip_address, viewed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert default categories
@@ -242,3 +223,96 @@ INSERT INTO amenities (name, icon, category, is_active) VALUES
     ('Gần bệnh viện', 'hospital', 'TRANSPORT', TRUE),
     ('Gần trường học', 'school', 'TRANSPORT', TRUE),
     ('Gần chợ/siêu thị', 'market', 'TRANSPORT', TRUE);
+
+
+-- Add foreign key constraints only if they don't exist
+-- Listings table foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND CONSTRAINT_NAME = 'fk_listings_user');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE listings ADD CONSTRAINT fk_listings_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_listings_user already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND CONSTRAINT_NAME = 'fk_listings_category');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE listings ADD CONSTRAINT fk_listings_category FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_listings_category already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND CONSTRAINT_NAME = 'fk_listings_address');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE listings ADD CONSTRAINT fk_listings_address FOREIGN KEY (address_id) REFERENCES addresses(address_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_listings_address already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Pricing histories foreign key
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'pricing_histories' AND CONSTRAINT_NAME = 'fk_pricing_histories_listing');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE pricing_histories ADD CONSTRAINT fk_pricing_histories_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_pricing_histories_listing already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Images foreign key
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'images' AND CONSTRAINT_NAME = 'fk_images_listing');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE images ADD CONSTRAINT fk_images_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_images_listing already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Videos foreign key
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'videos' AND CONSTRAINT_NAME = 'fk_videos_listing');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE videos ADD CONSTRAINT fk_videos_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_videos_listing already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Listing amenities foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'listing_amenities' AND CONSTRAINT_NAME = 'fk_listing_amenities_listing');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE listing_amenities ADD CONSTRAINT fk_listing_amenities_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_listing_amenities_listing already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'listing_amenities' AND CONSTRAINT_NAME = 'fk_listing_amenities_amenity');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE listing_amenities ADD CONSTRAINT fk_listing_amenities_amenity FOREIGN KEY (amenity_id) REFERENCES amenities(amenity_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_listing_amenities_amenity already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Favorites foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'favorites' AND CONSTRAINT_NAME = 'fk_favorites_user');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE favorites ADD CONSTRAINT fk_favorites_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_favorites_user already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'favorites' AND CONSTRAINT_NAME = 'fk_favorites_listing');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE favorites ADD CONSTRAINT fk_favorites_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_favorites_listing already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Views foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'views' AND CONSTRAINT_NAME = 'fk_views_listing');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE views ADD CONSTRAINT fk_views_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_views_listing already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'views' AND CONSTRAINT_NAME = 'fk_views_user');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE views ADD CONSTRAINT fk_views_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL',
+    'SELECT ''Constraint fk_views_user already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

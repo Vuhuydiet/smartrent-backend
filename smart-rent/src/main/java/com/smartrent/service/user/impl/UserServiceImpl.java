@@ -4,7 +4,10 @@ import com.smartrent.config.Constants;
 import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.GetUserResponse;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.UserCreationResponse;
+import com.smartrent.exception.InvalidPageException;
+import com.smartrent.exception.InvalidPageSizeException;
 import com.smartrent.infra.exception.DocumentExistingException;
 import com.smartrent.infra.exception.EmailExistingException;
 import com.smartrent.infra.exception.PhoneExistingException;
@@ -19,11 +22,16 @@ import com.smartrent.service.email.VerificationEmailService;
 import com.smartrent.service.user.UserService;
 import com.smartrent.utility.MaskingUtil;
 import jakarta.transaction.Transactional;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.utils.StringUtils;
@@ -97,6 +105,34 @@ public class UserServiceImpl implements UserService {
         MaskingUtil.maskEmail(user.getEmail()));
 
     return userMapper.mapFromUserEntityToGetUserResponse(user);
+  }
+
+  @Override
+  @Cacheable(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#page + #size")
+  public PageResponse<GetUserResponse> getUsers(int page, int size) {
+    // Validate pagination parameters
+    if (page < 1) {
+      throw new InvalidPageException();
+    }
+    if (size <= 0) {
+      throw new InvalidPageSizeException();
+    }
+
+    Pageable pageable = PageRequest.of(page-1, size);
+
+    Page<User> users = userRepository.findAll(pageable);
+
+    List<GetUserResponse> userResponses = users.getContent().stream()
+        .map(userMapper::mapFromUserEntityToGetUserResponse)
+        .toList();
+
+    return PageResponse.<GetUserResponse>builder()
+        .page(page)
+        .size(size)
+        .totalElements(users.getTotalElements())
+        .totalPages(users.getTotalPages())
+        .data(userResponses)
+        .build();
   }
 
   @Override

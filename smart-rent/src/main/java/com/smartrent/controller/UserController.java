@@ -1,13 +1,12 @@
 package com.smartrent.controller;
 
-import com.smartrent.config.Constants;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.GetUserResponse;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.UserCreationResponse;
 import com.smartrent.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,8 +22,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -211,6 +210,112 @@ public class UserController {
     GetUserResponse getUserResponse = userService.getUserById(userId);
     return ApiResponse.<GetUserResponse>builder()
         .data(getUserResponse)
+        .build();
+  }
+
+  @GetMapping("/list")
+  @Operation(
+      summary = "Get paginated list of users",
+      description = "Retrieves a paginated list of all users in the system. This endpoint requires authentication and is typically used for administrative purposes.",
+      security = @SecurityRequirement(name = "Bearer Authentication")
+  )
+  @ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "200",
+          description = "Users retrieved successfully",
+          content = @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = ApiResponse.class),
+              examples = @ExampleObject(
+                  name = "Success Response",
+                  value = """
+                      {
+                        "code": "999999",
+                        "message": null,
+                        "data": {
+                          "page": 0,
+                          "size": 10,
+                          "totalElements": 25,
+                          "totalPages": 3,
+                          "data": [
+                            {
+                              "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                              "phoneCode": "+1",
+                              "phoneNumber": "1234567890",
+                              "email": "john.doe@example.com",
+                              "firstName": "John",
+                              "lastName": "Doe",
+                              "idDocument": "ID123456789",
+                              "taxNumber": "TAX987654321"
+                            },
+                            {
+                              "userId": "user-223e4567-e89b-12d3-a456-426614174001",
+                              "phoneCode": "+1",
+                              "phoneNumber": "0987654321",
+                              "email": "jane.smith@example.com",
+                              "firstName": "Jane",
+                              "lastName": "Smith",
+                              "idDocument": "ID987654321",
+                              "taxNumber": "TAX123456789"
+                            }
+                          ]
+                        }
+                      }
+                      """
+              )
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "401",
+          description = "Unauthorized - Invalid or missing authentication token",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  name = "Unauthorized Error",
+                  value = """
+                      {
+                        "code": "401001",
+                        "message": "UNAUTHORIZED",
+                        "data": null
+                      }
+                      """
+              )
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "403",
+          description = "Forbidden - Insufficient permissions",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  name = "Forbidden Error",
+                  value = """
+                      {
+                        "code": "403001",
+                        "message": "FORBIDDEN",
+                        "data": null
+                      }
+                      """
+              )
+          )
+      )
+  })
+  public ApiResponse<PageResponse<GetUserResponse>> getUsers(
+      @io.swagger.v3.oas.annotations.Parameter(
+          description = "Page number (0-indexed)",
+          example = "0",
+          required = true
+      )
+      @RequestParam("page") int page,
+      @io.swagger.v3.oas.annotations.Parameter(
+          description = "Number of items per page",
+          example = "10",
+          required = true
+      )
+      @RequestParam("size") int size) {
+    PageResponse<GetUserResponse> pageResponse = userService.getUsers(page, size);
+    return ApiResponse.<PageResponse<GetUserResponse>>builder()
+        .data(pageResponse)
         .build();
   }
 }

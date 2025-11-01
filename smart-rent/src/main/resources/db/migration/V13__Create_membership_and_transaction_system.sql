@@ -7,7 +7,7 @@
 -- =====================================================
 -- 1. MEMBERSHIP PACKAGES TABLE
 -- =====================================================
-CREATE TABLE membership_packages (
+CREATE TABLE IF NOT EXISTS membership_packages (
     membership_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     package_code VARCHAR(50) NOT NULL UNIQUE,
     package_name VARCHAR(100) NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE membership_packages (
 -- =====================================================
 -- 2. MEMBERSHIP PACKAGE BENEFITS TABLE
 -- =====================================================
-CREATE TABLE membership_package_benefits (
+CREATE TABLE IF NOT EXISTS membership_package_benefits (
     benefit_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     membership_id BIGINT NOT NULL,
     benefit_type ENUM('VIP_POSTS', 'PREMIUM_POSTS', 'BOOST_QUOTA', 'AUTO_VERIFY', 'TRUSTED_BADGE') NOT NULL,
@@ -37,7 +37,6 @@ CREATE TABLE membership_package_benefits (
     quantity_per_month INT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_mpb_membership FOREIGN KEY (membership_id) REFERENCES membership_packages(membership_id) ON DELETE CASCADE,
     INDEX idx_membership_id (membership_id),
     INDEX idx_benefit_type (benefit_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -45,7 +44,7 @@ CREATE TABLE membership_package_benefits (
 -- =====================================================
 -- 3. USER MEMBERSHIPS TABLE
 -- =====================================================
-CREATE TABLE user_memberships (
+CREATE TABLE IF NOT EXISTS user_memberships (
     user_membership_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     membership_id BIGINT NOT NULL,
@@ -57,8 +56,6 @@ CREATE TABLE user_memberships (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_um_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_um_membership FOREIGN KEY (membership_id) REFERENCES membership_packages(membership_id),
     INDEX idx_user_id (user_id),
     INDEX idx_status (status),
     INDEX idx_end_date (end_date),
@@ -68,7 +65,7 @@ CREATE TABLE user_memberships (
 -- =====================================================
 -- 4. USER MEMBERSHIP BENEFITS TABLE
 -- =====================================================
-CREATE TABLE user_membership_benefits (
+CREATE TABLE IF NOT EXISTS user_membership_benefits (
     user_benefit_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_membership_id BIGINT NOT NULL,
     benefit_id BIGINT NOT NULL,
@@ -82,9 +79,6 @@ CREATE TABLE user_membership_benefits (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_umb_user_membership FOREIGN KEY (user_membership_id) REFERENCES user_memberships(user_membership_id) ON DELETE CASCADE,
-    CONSTRAINT fk_umb_benefit FOREIGN KEY (benefit_id) REFERENCES membership_package_benefits(benefit_id),
-    CONSTRAINT fk_umb_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_benefit_type (benefit_type),
     INDEX idx_status (status),
@@ -96,7 +90,7 @@ CREATE TABLE user_membership_benefits (
 -- =====================================================
 -- 5. TRANSACTIONS TABLE
 -- =====================================================
-CREATE TABLE transactions (
+CREATE TABLE IF NOT EXISTS transactions (
     transaction_id VARCHAR(36) NOT NULL PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     transaction_type ENUM('MEMBERSHIP_PURCHASE', 'POST_FEE', 'BOOST_FEE', 'WALLET_TOPUP', 'REFUND') NOT NULL,
@@ -112,7 +106,6 @@ CREATE TABLE transactions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_transaction_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_transaction_type (transaction_type),
     INDEX idx_status (status),
@@ -124,7 +117,7 @@ CREATE TABLE transactions (
 -- =====================================================
 -- 6. PUSH SCHEDULE TABLE
 -- =====================================================
-CREATE TABLE push_schedule (
+CREATE TABLE IF NOT EXISTS push_schedule (
     schedule_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
     listing_id BIGINT NOT NULL,
@@ -138,9 +131,6 @@ CREATE TABLE push_schedule (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_ps_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ps_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ps_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id) ON DELETE SET NULL,
     INDEX idx_listing_id (listing_id),
     INDEX idx_status (status),
     INDEX idx_scheduled_time (scheduled_time)
@@ -149,7 +139,7 @@ CREATE TABLE push_schedule (
 -- =====================================================
 -- 7. PUSH HISTORY TABLE
 -- =====================================================
-CREATE TABLE push_history (
+CREATE TABLE IF NOT EXISTS push_history (
     push_id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     listing_id BIGINT NOT NULL,
     push_source ENUM('MEMBERSHIP_QUOTA', 'DIRECT_PURCHASE', 'SCHEDULED', 'ADMIN', 'DIRECT_PAYMENT') NOT NULL,
@@ -160,10 +150,6 @@ CREATE TABLE push_history (
     message VARCHAR(500),
     pushed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_ph_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ph_benefit FOREIGN KEY (user_benefit_id) REFERENCES user_membership_benefits(user_benefit_id) ON DELETE SET NULL,
-    CONSTRAINT fk_ph_schedule FOREIGN KEY (schedule_id) REFERENCES push_schedule(schedule_id) ON DELETE SET NULL,
-    CONSTRAINT fk_ph_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id) ON DELETE SET NULL,
     INDEX idx_listing_id (listing_id),
     INDEX idx_pushed_at (pushed_at),
     INDEX idx_listing_pushed (listing_id, pushed_at)
@@ -172,14 +158,51 @@ CREATE TABLE push_history (
 -- =====================================================
 -- 8. UPDATE LISTINGS TABLE - Add shadow listing support
 -- =====================================================
-ALTER TABLE listings
-ADD COLUMN is_shadow BOOLEAN NOT NULL DEFAULT FALSE AFTER vip_type,
-ADD COLUMN parent_listing_id BIGINT AFTER is_shadow,
-ADD COLUMN pushed_at TIMESTAMP AFTER post_date,
-ADD INDEX idx_parent_listing (parent_listing_id),
-ADD INDEX idx_is_shadow (is_shadow),
-ADD INDEX idx_pushed_at (pushed_at),
-ADD CONSTRAINT fk_listing_parent FOREIGN KEY (parent_listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE;
+-- Add is_shadow column if it doesn't exist
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND COLUMN_NAME = 'is_shadow');
+SET @sql = IF(@column_exists = 0,
+    'ALTER TABLE listings ADD COLUMN is_shadow BOOLEAN NOT NULL DEFAULT FALSE AFTER vip_type',
+    'SELECT ''Column is_shadow already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Add parent_listing_id column if it doesn't exist
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND COLUMN_NAME = 'parent_listing_id');
+SET @sql = IF(@column_exists = 0,
+    'ALTER TABLE listings ADD COLUMN parent_listing_id BIGINT AFTER is_shadow',
+    'SELECT ''Column parent_listing_id already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Add pushed_at column if it doesn't exist
+SET @column_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND COLUMN_NAME = 'pushed_at');
+SET @sql = IF(@column_exists = 0,
+    'ALTER TABLE listings ADD COLUMN pushed_at TIMESTAMP AFTER post_date',
+    'SELECT ''Column pushed_at already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Add indexes if they don't exist
+SET @index_exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND INDEX_NAME = 'idx_parent_listing');
+SET @sql = IF(@index_exists = 0,
+    'ALTER TABLE listings ADD INDEX idx_parent_listing (parent_listing_id)',
+    'SELECT ''Index idx_parent_listing already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @index_exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND INDEX_NAME = 'idx_is_shadow');
+SET @sql = IF(@index_exists = 0,
+    'ALTER TABLE listings ADD INDEX idx_is_shadow (is_shadow)',
+    'SELECT ''Index idx_is_shadow already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @index_exists = (SELECT COUNT(*) FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND INDEX_NAME = 'idx_pushed_at');
+SET @sql = IF(@index_exists = 0,
+    'ALTER TABLE listings ADD INDEX idx_pushed_at (pushed_at)',
+    'SELECT ''Index idx_pushed_at already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- =====================================================
 -- 9. INSERT DEFAULT MEMBERSHIP PACKAGES
@@ -211,6 +234,122 @@ INSERT INTO membership_package_benefits (membership_id, benefit_type, benefit_na
 (3, 'BOOST_QUOTA', '40 lượt đẩy tin miễn phí', 40),
 (3, 'AUTO_VERIFY', 'Duyệt tin ngay lập tức', 1),
 (3, 'TRUSTED_BADGE', 'Badge đối tác tin cậy', 1);
+
+-- =====================================================
+-- ADD FOREIGN KEY CONSTRAINTS
+-- =====================================================
+
+-- membership_package_benefits foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'membership_package_benefits' AND CONSTRAINT_NAME = 'fk_mpb_membership');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE membership_package_benefits ADD CONSTRAINT fk_mpb_membership FOREIGN KEY (membership_id) REFERENCES membership_packages(membership_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_mpb_membership already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- user_memberships foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'user_memberships' AND CONSTRAINT_NAME = 'fk_um_user');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE user_memberships ADD CONSTRAINT fk_um_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_um_user already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'user_memberships' AND CONSTRAINT_NAME = 'fk_um_membership');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE user_memberships ADD CONSTRAINT fk_um_membership FOREIGN KEY (membership_id) REFERENCES membership_packages(membership_id)',
+    'SELECT ''Constraint fk_um_membership already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- user_membership_benefits foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'user_membership_benefits' AND CONSTRAINT_NAME = 'fk_umb_user_membership');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE user_membership_benefits ADD CONSTRAINT fk_umb_user_membership FOREIGN KEY (user_membership_id) REFERENCES user_memberships(user_membership_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_umb_user_membership already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'user_membership_benefits' AND CONSTRAINT_NAME = 'fk_umb_benefit');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE user_membership_benefits ADD CONSTRAINT fk_umb_benefit FOREIGN KEY (benefit_id) REFERENCES membership_package_benefits(benefit_id)',
+    'SELECT ''Constraint fk_umb_benefit already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'user_membership_benefits' AND CONSTRAINT_NAME = 'fk_umb_user');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE user_membership_benefits ADD CONSTRAINT fk_umb_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_umb_user already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- transactions foreign key
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'transactions' AND CONSTRAINT_NAME = 'fk_transaction_user');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE transactions ADD CONSTRAINT fk_transaction_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_transaction_user already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- push_schedule foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'push_schedule' AND CONSTRAINT_NAME = 'fk_ps_user');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE push_schedule ADD CONSTRAINT fk_ps_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_ps_user already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'push_schedule' AND CONSTRAINT_NAME = 'fk_ps_listing');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE push_schedule ADD CONSTRAINT fk_ps_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_ps_listing already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'push_schedule' AND CONSTRAINT_NAME = 'fk_ps_transaction');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE push_schedule ADD CONSTRAINT fk_ps_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id) ON DELETE SET NULL',
+    'SELECT ''Constraint fk_ps_transaction already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- push_history foreign keys
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'push_history' AND CONSTRAINT_NAME = 'fk_ph_listing');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE push_history ADD CONSTRAINT fk_ph_listing FOREIGN KEY (listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_ph_listing already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'push_history' AND CONSTRAINT_NAME = 'fk_ph_benefit');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE push_history ADD CONSTRAINT fk_ph_benefit FOREIGN KEY (user_benefit_id) REFERENCES user_membership_benefits(user_benefit_id) ON DELETE SET NULL',
+    'SELECT ''Constraint fk_ph_benefit already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'push_history' AND CONSTRAINT_NAME = 'fk_ph_schedule');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE push_history ADD CONSTRAINT fk_ph_schedule FOREIGN KEY (schedule_id) REFERENCES push_schedule(schedule_id) ON DELETE SET NULL',
+    'SELECT ''Constraint fk_ph_schedule already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'push_history' AND CONSTRAINT_NAME = 'fk_ph_transaction');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE push_history ADD CONSTRAINT fk_ph_transaction FOREIGN KEY (transaction_id) REFERENCES transactions(transaction_id) ON DELETE SET NULL',
+    'SELECT ''Constraint fk_ph_transaction already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- listings parent foreign key
+SET @constraint_exists = (SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'listings' AND CONSTRAINT_NAME = 'fk_listing_parent');
+SET @sql = IF(@constraint_exists = 0,
+    'ALTER TABLE listings ADD CONSTRAINT fk_listing_parent FOREIGN KEY (parent_listing_id) REFERENCES listings(listing_id) ON DELETE CASCADE',
+    'SELECT ''Constraint fk_listing_parent already exists'' AS message');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- =====================================================
 -- END OF MIGRATION V13
