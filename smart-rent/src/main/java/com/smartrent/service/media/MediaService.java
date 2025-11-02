@@ -14,7 +14,7 @@ public interface MediaService {
     /**
      * Generate pre-signed upload URL (Step 1 of upload flow)
      */
-    GenerateUploadUrlResponse generateUploadUrl(GenerateUploadUrlRequest request, Long userId);
+    GenerateUploadUrlResponse generateUploadUrl(GenerateUploadUrlRequest request, String userId);
 
     /**
      * Upload file directly from backend to cloud storage
@@ -28,7 +28,7 @@ public interface MediaService {
      * @param altText Optional alt text for images
      * @param isPrimary Whether this is the primary media
      * @param sortOrder Display order
-     * @param userId User ID performing the upload
+     * @param userId User ID (UUID String) performing the upload
      * @return MediaResponse with media details and public URL
      */
     MediaResponse uploadMedia(
@@ -40,28 +40,28 @@ public interface MediaService {
             String altText,
             Boolean isPrimary,
             Integer sortOrder,
-            Long userId
+            String userId
     );
 
     /**
      * Confirm upload completion (Step 2 of upload flow)
      */
-    MediaResponse confirmUpload(Long mediaId, ConfirmUploadRequest request, Long userId);
+    MediaResponse confirmUpload(Long mediaId, ConfirmUploadRequest request, String userId);
 
     /**
      * Generate pre-signed download URL
      */
-    String generateDownloadUrl(Long mediaId, Long userId);
+    String generateDownloadUrl(Long mediaId, String userId);
 
     /**
      * Delete media (soft delete with storage cleanup)
      */
-    void deleteMedia(Long mediaId, Long userId);
+    void deleteMedia(Long mediaId, String userId);
 
     /**
      * Save external media (YouTube/TikTok)
      */
-    MediaResponse saveExternalMedia(SaveExternalMediaRequest request, Long userId);
+    MediaResponse saveExternalMedia(SaveExternalMediaRequest request, String userId);
 
     /**
      * Get all media for a listing
@@ -71,7 +71,7 @@ public interface MediaService {
     /**
      * Get all media for a user
      */
-    List<MediaResponse> getUserMedia(Long userId);
+    List<MediaResponse> getUserMedia(String userId);
 
     /**
      * Get media by ID

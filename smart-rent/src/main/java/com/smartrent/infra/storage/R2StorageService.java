@@ -217,12 +217,15 @@ public class R2StorageService {
 
     /**
      * Generate storage key for media
+     * @param userId User ID (UUID string)
+     * @param filename Original filename
+     * @return Storage key in format: media/{userId}/{uuid}_{sanitized_filename}
      */
-    public String generateStorageKey(Long userId, String filename) {
+    public String generateStorageKey(String userId, String filename) {
         // Sanitize filename: keep only alphanumeric, dots, underscores, and hyphens
         String sanitized = filename.replaceAll("[^a-zA-Z0-9._-]", "_");
         String uuid = UUID.randomUUID().toString();
-        return String.format("media/%d/%s_%s", userId, uuid, sanitized);
+        return String.format("media/%s/%s_%s", userId, uuid, sanitized);
     }
 
     /**
