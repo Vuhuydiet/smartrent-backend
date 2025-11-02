@@ -22,6 +22,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
+import java.util.List;
+
 @Slf4j
 @Configuration
 @EnableWebSecurity
@@ -84,10 +86,19 @@ public class SecurityConfig {
   public CorsFilter corsFilter(@Value("${application.client-url}") String clientUrl) {
     CorsConfiguration config = new CorsConfiguration();
 
-    config.addAllowedOrigin(clientUrl);
-    config.addAllowedHeader("*");
-    config.addAllowedMethod("*");
+    config.setAllowedOrigins(List.of(clientUrl));
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
     config.setAllowCredentials(true);
+    config.setExposedHeaders(List.of(
+        "Content-Disposition",
+        "X-Suggested-Filename",
+        "Content-Length",
+        "Content-Type"
+    ));
+
+    // Cache preflight for 2 hours to reduce OPTIONS requests
+    config.setMaxAge(7200L);
 
     UrlBasedCorsConfigurationSource urlBasedCorsConfigurationSource = new UrlBasedCorsConfigurationSource();
     urlBasedCorsConfigurationSource.registerCorsConfiguration("/**", config);
