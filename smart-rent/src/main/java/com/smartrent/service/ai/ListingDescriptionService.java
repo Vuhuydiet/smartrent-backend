@@ -2,10 +2,13 @@ package com.smartrent.service.ai;
 
 import com.smartrent.dto.request.ListingDescriptionRequest;
 import com.smartrent.infra.connector.SmartRentAiConnector;
-import com.smartrent.infra.connector.model.ChatRequestModel;
-import com.smartrent.infra.connector.model.ChatResponseModel;
+import com.smartrent.dto.response.ListingDescriptionResponse;
+import com.smartrent.infra.connector.model.CompletionRequestModel;
+import com.smartrent.infra.connector.model.CompletionResponseModel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.time.OffsetDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -14,9 +17,9 @@ public class ListingDescriptionService {
   private final SmartRentAiConnector aiConnector;
 
   /**
-   * Build a simple prompt from listing fields and call AI service.
+   * Build a simple prompt from listing fields and call the AI completion endpoint.
    */
-  public ChatResponseModel generateDescription(ListingDescriptionRequest req) {
+  public ListingDescriptionResponse generateDescription(ListingDescriptionRequest req) {
     StringBuilder prompt = new StringBuilder();
 
     prompt.append("Generate a short, attractive listing description in Vietnamese.");
@@ -56,12 +59,19 @@ public class ListingDescriptionService {
       prompt.append(" Keep the description under ").append(req.getMaxWords()).append(" words.");
     }
 
-    ChatRequestModel chatReq = ChatRequestModel.builder()
-        .message(prompt.toString())
+    // Build completion request
+    CompletionRequestModel completionReq = CompletionRequestModel.builder()
+        .prompt(prompt.toString())
         .build();
 
-    // call external AI service via Feign
-    ChatResponseModel aiResp = aiConnector.generateChat(chatReq);
-    return aiResp;
+    // call external AI completion endpoint via Feign
+    CompletionResponseModel completionResp = aiConnector.generateCompletion(completionReq);
+
+  // Build and return the API response DTO (do not expose connector DTOs)
+  ListingDescriptionResponse resp = ListingDescriptionResponse.builder()
+    .generatedDescription(completionResp != null ? completionResp.getText() : null)
+    .build();
+
+  return resp;
   }
 }

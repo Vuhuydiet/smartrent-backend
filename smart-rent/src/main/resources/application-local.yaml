@@ -49,6 +49,7 @@ application:
         - "/v1/users"
         - "/v1/admins"
         - "/v1/payments/vnpay/ipn"
+        - "v1/ai/listing-description"
 
 # Enable debug logging for authentication
 logging:
@@ -56,3 +57,9 @@ logging:
     com.smartrent.config.security: DEBUG
     com.smartrent.service.authentication: DEBUG
     org.springframework.security: DEBUG
+
+feign:
+  client:
+    config:
+      smartrent-ai:
+        url: http://localhost:8000

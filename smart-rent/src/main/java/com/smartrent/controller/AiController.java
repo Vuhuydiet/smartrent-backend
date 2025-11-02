@@ -3,7 +3,6 @@ package com.smartrent.controller;
 import com.smartrent.dto.request.ListingDescriptionRequest;
 import com.smartrent.dto.response.ListingDescriptionResponse;
 import com.smartrent.dto.response.ApiResponse;
-import com.smartrent.infra.connector.model.ChatResponseModel;
 import com.smartrent.service.ai.ListingDescriptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -39,16 +38,33 @@ public class AiController {
                   value = "{ \"title\": \"Căn hộ 2PN view sông\", \"addressText\": \"123 Đường Láng, Hà Nội\", \"bedrooms\": 2, \"bathrooms\": 1, \"area\": 78.5, \"price\": 12000000, \"priceUnit\": \"MONTH\", \"furnishing\": \"SEMI_FURNISHED\", \"propertyType\": \"APARTMENT\", \"tone\": \"friendly\", \"maxWords\": 40 }"
               )
           )
-      )
+      ),
+      responses = {
+          @io.swagger.v3.oas.annotations.responses.ApiResponse(
+              responseCode = "200",
+              description = "Successful response",
+              content = @Content(
+                  mediaType = "application/json",
+                  schema = @Schema(implementation = ListingDescriptionResponse.class),
+                  examples = @ExampleObject(
+                      name = "Success",
+                      value = "{ \"code\": \"999999\", \"message\": \"Operation completed successfully\", \"data\": { \"generatedDescription\": \"Căn hộ đẹp, 2 phòng ngủ, view sông...\" } }"
+                  )
+              )
+          ),
+          @io.swagger.v3.oas.annotations.responses.ApiResponse(
+              responseCode = "400",
+              description = "Invalid request"
+          ),
+          @io.swagger.v3.oas.annotations.responses.ApiResponse(
+              responseCode = "500",
+              description = "Internal server error"
+          )
+      }
   )
-  public ApiResponse<ListingDescriptionResponse> generateDescription(@Valid @RequestBody ListingDescriptionRequest request) {
-    ChatResponseModel aiResp = descriptionService.generateDescription(request);
+    public ApiResponse<ListingDescriptionResponse> generateDescription(@Valid @RequestBody ListingDescriptionRequest request) {
+        ListingDescriptionResponse resp = descriptionService.generateDescription(request);
 
-    ListingDescriptionResponse resp = ListingDescriptionResponse.builder()
-        .generatedDescription(aiResp != null ? aiResp.getMessage() : null)
-        .conversationId(aiResp != null ? aiResp.getConversationId() : null)
-        .build();
-
-    return ApiResponse.<ListingDescriptionResponse>builder().data(resp).build();
-  }
+        return ApiResponse.<ListingDescriptionResponse>builder().data(resp).build();
+    }
 }

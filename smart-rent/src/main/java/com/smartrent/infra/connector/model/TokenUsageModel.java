@@ -1,6 +1,5 @@
-package com.smartrent.dto.response;
+package com.smartrent.infra.connector.model;
 
-import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,8 +14,8 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Schema(description = "AI generated listing description")
-public class ListingDescriptionResponse {
-    @Schema(description = "Generated human readable description")
-    String generatedDescription;
+public class TokenUsageModel {
+  Integer promptTokens;
+  Integer completionTokens;
+  Integer totalTokens;
 }
