@@ -56,3 +56,9 @@ logging:
     com.smartrent.config.security: DEBUG
     com.smartrent.service.authentication: DEBUG
     org.springframework.security: DEBUG
+
+feign:
+  client:
+    config:
+      smartrent-ai:
+        url: http://localhost:8000
