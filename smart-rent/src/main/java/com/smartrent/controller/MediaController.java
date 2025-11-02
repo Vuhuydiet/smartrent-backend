@@ -79,7 +79,7 @@ public class MediaController {
             @Valid @RequestBody GenerateUploadUrlRequest request,
             Authentication authentication) {
 
-        Long userId = extractUserId(authentication);
+        String userId = extractUserId(authentication);
         log.info("POST /v1/media/upload-url - user: {}, type: {}", userId, request.getMediaType());
 
         GenerateUploadUrlResponse response = mediaService.generateUploadUrl(request, userId);
@@ -147,7 +147,7 @@ public class MediaController {
 
             Authentication authentication) {
 
-        Long userId = extractUserId(authentication);
+        String userId = extractUserId(authentication);
         log.info("POST /v1/media/upload - user: {}, filename: {}, type: {}",
                 userId, file.getOriginalFilename(), mediaType);
 
@@ -183,7 +183,7 @@ public class MediaController {
             @Valid @RequestBody ConfirmUploadRequest request,
             Authentication authentication) {
 
-        Long userId = extractUserId(authentication);
+        String userId = extractUserId(authentication);
         log.info("POST /v1/media/{}/confirm - user: {}", mediaId, userId);
 
         MediaResponse response = mediaService.confirmUpload(mediaId, request, userId);
@@ -214,7 +214,7 @@ public class MediaController {
             @PathVariable Long mediaId,
             Authentication authentication) {
 
-        Long userId = extractUserId(authentication);
+        String userId = extractUserId(authentication);
         log.info("GET /v1/media/{}/download-url - user: {}", mediaId, userId);
 
         String downloadUrl = mediaService.generateDownloadUrl(mediaId, userId);
@@ -244,7 +244,7 @@ public class MediaController {
             @PathVariable Long mediaId,
             Authentication authentication) {
 
-        Long userId = extractUserId(authentication);
+        String userId = extractUserId(authentication);
         log.info("DELETE /v1/media/{} - user: {}", mediaId, userId);
 
         mediaService.deleteMedia(mediaId, userId);
@@ -274,7 +274,7 @@ public class MediaController {
             @Valid @RequestBody SaveExternalMediaRequest request,
             Authentication authentication) {
 
-        Long userId = extractUserId(authentication);
+        String userId = extractUserId(authentication);
         log.info("POST /v1/media/external - user: {}, URL: {}", userId, request.getUrl());
 
         MediaResponse response = mediaService.saveExternalMedia(request, userId);
@@ -325,7 +325,7 @@ public class MediaController {
     public ResponseEntity<ApiResponse<List<MediaResponse>>> getMyMedia(
             Authentication authentication) {
 
-        Long userId = extractUserId(authentication);
+        String userId = extractUserId(authentication);
         log.info("GET /v1/media/my-media - user: {}", userId);
 
         List<MediaResponse> media = mediaService.getUserMedia(userId);
@@ -357,8 +357,9 @@ public class MediaController {
 
     /**
      * Extract user ID from authentication
+     * User ID is stored as UUID String in the database and JWT token
      */
-    private Long extractUserId(Authentication authentication) {
+    private String extractUserId(Authentication authentication) {
         if (authentication == null) {
             authentication = SecurityContextHolder.getContext().getAuthentication();
         }
@@ -367,10 +368,7 @@ public class MediaController {
             throw new IllegalStateException("User is not authenticated");
         }
 
-        try {
-            return Long.parseLong(authentication.getName());
-        } catch (NumberFormatException e) {
-            throw new IllegalStateException("Invalid user ID format in authentication", e);
-        }
+        // Return the UUID string directly from JWT subject claim
+        return authentication.getName();
     }
 }
