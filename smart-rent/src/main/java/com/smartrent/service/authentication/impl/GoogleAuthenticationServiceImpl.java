@@ -25,6 +25,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -33,6 +34,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE,makeFinal = true)
 public class GoogleAuthenticationServiceImpl implements OutboundAuthenticationService {
+
+  final static String DEFAULT_FIRST_NAME = "Anonymous";
+  final static String DEFAULT_LAST_NAME = "User";
 
   @NonFinal
   @Value("${feign.client.config.google.auth.client_id}")
@@ -102,8 +106,8 @@ public class GoogleAuthenticationServiceImpl implements OutboundAuthenticationSe
             log.info("Creating new user account for Google OAuth user: {}", userInfo.getEmail());
             return userService.internalCreateUser(InternalUserCreationRequest.builder()
                 .email(userInfo.getEmail())
-                .firstName(userInfo.getFamilyName())
-                .lastName(userInfo.getGivenName())
+                .firstName(StringUtils.isEmpty(userInfo.getFamilyName()) ? DEFAULT_FIRST_NAME : userInfo.getFamilyName())
+                .lastName(StringUtils.isEmpty(userInfo.getGivenName()) ? DEFAULT_LAST_NAME : userInfo.getGivenName())
                 .build());
           });
 
