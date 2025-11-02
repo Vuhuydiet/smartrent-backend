@@ -302,8 +302,8 @@ public class UserController {
   })
   public ApiResponse<PageResponse<GetUserResponse>> getUsers(
       @io.swagger.v3.oas.annotations.Parameter(
-          description = "Page number (1-indexed)",
-          example = "1",
+          description = "Page number (0-indexed)",
+          example = "0",
           required = true
       )
       @RequestParam("page") int page,

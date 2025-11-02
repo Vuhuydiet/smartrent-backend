@@ -174,6 +174,7 @@ public class ListingServiceImpl implements ListingService {
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(amount)
+                .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("Post " + request.getVipType() + " listing: " + request.getTitle())
                 .returnUrl(request.getReturnUrl())
                 .build();

@@ -60,6 +60,9 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
 
             log.info("VNPay payment created successfully. Transaction ref: {}", transaction.getTransactionId());
 
+            // Use current time for createdAt and expiresAt since @CreationTimestamp may not be populated yet
+            java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
             return PaymentResponse.builder()
                     .provider(getProviderType())
                     .transactionRef(transaction.getTransactionId())
@@ -67,8 +70,8 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                     .amount(transaction.getAmount())
                     .currency("VND") // Default currency
                     .orderInfo(request.getOrderInfo())
-                    .createdAt(transaction.getCreatedAt())
-                    .expiresAt(transaction.getCreatedAt().plusMinutes(15)) // VNPay default expiry
+                    .createdAt(now)
+                    .expiresAt(now.plusMinutes(15)) // VNPay default expiry
                     .build();
 
         } catch (Exception e) {

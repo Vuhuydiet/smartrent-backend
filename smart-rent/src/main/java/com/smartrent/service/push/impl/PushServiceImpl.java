@@ -117,6 +117,7 @@ public class PushServiceImpl implements PushService {
                 .provider(PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(PricingConstants.PUSH_PER_TIME)
+                .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("Push listing #" + request.getListingId())
                 .returnUrl(request.getReturnUrl())
                 .build();

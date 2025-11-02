@@ -69,6 +69,15 @@ public final class PricingConstants {
     public static final BigDecimal PUSH_PER_TIME = new BigDecimal("40000");
 
     // =====================================================
+    // CURRENCY
+    // =====================================================
+
+    /**
+     * Default currency for all transactions: VND (Vietnamese Dong)
+     */
+    public static final String DEFAULT_CURRENCY = "VND";
+
+    // =====================================================
     // STANDARD PRICES (30 days with 18.5% discount)
     // =====================================================
 

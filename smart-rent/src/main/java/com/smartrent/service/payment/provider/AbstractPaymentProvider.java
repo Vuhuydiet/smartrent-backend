@@ -41,7 +41,15 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
         StringBuilder additionalInfo = new StringBuilder();
         additionalInfo.append("Order: ").append(request.getOrderInfo());
         additionalInfo.append(" | IP: ").append(ipAddress);
-        additionalInfo.append(" | UserAgent: ").append(httpRequest.getHeader("User-Agent"));
+
+        // Handle null httpRequest gracefully (when called from service layer)
+        if (httpRequest != null) {
+            String userAgent = httpRequest.getHeader("User-Agent");
+            if (userAgent != null) {
+                additionalInfo.append(" | UserAgent: ").append(userAgent);
+            }
+        }
+
         if (request.getReturnUrl() != null) {
             additionalInfo.append(" | ReturnURL: ").append(request.getReturnUrl());
         }
@@ -139,8 +147,12 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
 
     /**
      * Get client IP address
+     * Returns "UNKNOWN" if request is null (when called from service layer)
      */
     protected String getClientIpAddress(HttpServletRequest request) {
+        if (request == null) {
+            return "UNKNOWN";
+        }
         return PaymentUtil.getClientIpAddress(
                 request.getHeader("X-Forwarded-For"),
                 request.getHeader("X-Real-IP"),
@@ -201,9 +213,7 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
             throw PaymentValidationException.invalidCurrency(request.getCurrency());
         }
 
-        if (request.getListingId() == null) {
-            throw new PaymentValidationException("Listing ID cannot be null");
-        }
+        // Note: listingId is optional - not all payments are for listings (e.g., membership purchases)
     }
 
     /**

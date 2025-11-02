@@ -1,5 +1,6 @@
 package com.smartrent.service.membership.impl;
 
+import com.smartrent.constants.PricingConstants;
 import com.smartrent.dto.request.MembershipPurchaseRequest;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.response.*;
@@ -140,6 +141,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(membershipPackage.getSalePrice())
+                .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("Membership: " + membershipPackage.getPackageName())
                 .returnUrl(request.getReturnUrl())
                 .build();
