@@ -20,6 +20,8 @@ public enum DomainCode {
   VERIFY_CODE_EXPIRED("2006", HttpStatus.BAD_REQUEST, "Verify code expired"),
   INCORRECT_PASSWORD("2007", HttpStatus.BAD_REQUEST, "Incorrect password"),
   PASSWORD_SAME("2008", HttpStatus.BAD_REQUEST, "The same password"),
+  INVALID_PAGE("2009", HttpStatus.BAD_REQUEST, "Invalid page"),
+  INVALID_PAGE_SIZE("2010", HttpStatus.BAD_REQUEST, "Invalid page size"),
   //    Existing Error 3xxx
   EMAIL_EXISTING("3001", HttpStatus.CONFLICT, "Email already exists"),
   PHONE_EXISTING("3002", HttpStatus.CONFLICT, "Phone already exists"),

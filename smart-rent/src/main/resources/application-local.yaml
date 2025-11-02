@@ -43,6 +43,7 @@ application:
         - "/v1/memberships/packages/**"
         - "/v1/vip-tiers/**"
         - "/v1/push-details/**"
+        - "/v1/users/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
@@ -55,3 +56,9 @@ logging:
     com.smartrent.config.security: DEBUG
     com.smartrent.service.authentication: DEBUG
     org.springframework.security: DEBUG
+
+feign:
+  client:
+    config:
+      smartrent-ai:
+        url: http://localhost:8000

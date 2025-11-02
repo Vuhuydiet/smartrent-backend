@@ -83,6 +83,16 @@ public class GlobalExceptionHandler {
             .build());
   }
 
+  @ExceptionHandler(IllegalArgumentException.class)
+  public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException exception) {
+    DomainCode domainCode = DomainCode.BAD_REQUEST_ERROR;
+    return ResponseEntity.badRequest()
+        .body(ApiResponse.<Void>builder()
+            .code(domainCode.getValue())
+            .message(exception.getMessage())
+            .build());
+  }
+
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValidException(MethodArgumentNotValidException exception) {
     DomainCode domainCode = DomainCode.INVALID_KEY;

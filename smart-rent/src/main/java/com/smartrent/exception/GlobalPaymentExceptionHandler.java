@@ -105,32 +105,5 @@ public class GlobalPaymentExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
     }
 
-    /**
-     * Handle generic payment exceptions
-     */
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> handleGenericException(RuntimeException ex) {
-        // Only handle if it's payment-related (contains "payment", "transaction", "vnpay" in message)
-        String message = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
-        
-        if (message.contains("payment") || message.contains("transaction") || message.contains("vnpay")) {
-            log.error("Payment error: {}", ex.getMessage(), ex);
-
-            Map<String, Object> errorDetails = new HashMap<>();
-            errorDetails.put("message", ex.getMessage());
-            errorDetails.put("type", ex.getClass().getSimpleName());
-
-            ApiResponse<Map<String, Object>> response = ApiResponse.<Map<String, Object>>builder()
-                    .code("PAYMENT_999")
-                    .message("PAYMENT_ERROR")
-                    .data(errorDetails)
-                    .build();
-
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-
-        // Re-throw if not payment-related
-        throw ex;
-    }
 }
 
