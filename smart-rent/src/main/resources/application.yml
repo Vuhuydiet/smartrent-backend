@@ -316,3 +316,12 @@ management:
     export:
       prometheus:
         enabled: true
+
+# Feign Client Configuration
+feign:
+  client:
+    config:
+      smartrent-ai:
+        url: "${AI_SERVICE_BASE_URL:http://localhost:8000}"
+        connectTimeout: 10000
+        readTimeout: 30000
