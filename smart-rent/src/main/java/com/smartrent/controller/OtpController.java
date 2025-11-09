@@ -19,11 +19,11 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * Controller for OTP phone verification operations
- * 
+ *
  * Endpoints:
- * - POST /api/otp/send - Send OTP to phone number
- * - POST /api/otp/verify - Verify OTP code
- * 
+ * - POST /otp/send - Send OTP to phone number
+ * - POST /otp/verify - Verify OTP code
+ *
  * Security notes:
  * - These endpoints are typically public (no authentication required)
  * - Rate limiting is enforced per phone and per IP
@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api/otp")
+@RequestMapping("/otp")
 @RequiredArgsConstructor
 @Tag(name = "OTP", description = "OTP phone verification API")
 public class OtpController {

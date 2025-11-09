@@ -581,7 +581,7 @@ public class OpenAPIConfig {
                             .group("payments")
                             .displayName("VNPay Payments & Transactions")
                             .packagesToScan(packageToScan)
-                            .pathsToMatch("/v1/payments/**", "/api/v1/payments/**")
+                            .pathsToMatch("/v1/payments/**")
                             .build();
     }
 
