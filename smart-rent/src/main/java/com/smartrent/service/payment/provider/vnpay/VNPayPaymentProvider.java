@@ -81,55 +81,6 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
     }
 
     @Override
-    public PaymentCallbackResponse processCallback(Map<String, String> params, HttpServletRequest httpRequest) {
-        String txnRef = params.get("vnp_TxnRef");
-        log.info("Processing VNPay callback for transaction: {}", txnRef);
-
-        try {
-            // Validate signature
-            String secureHash = params.get("vnp_SecureHash");
-            boolean signatureValid = validateSignature(params, secureHash);
-            if (!signatureValid) {
-                log.warn("Invalid signature for transaction: {}", txnRef);
-                return buildCallbackResponse(null, false, "Invalid signature");
-            }
-
-            // Find transaction
-            Optional<Transaction> transactionOpt = findPaymentByTransactionRef(txnRef);
-            if (transactionOpt.isEmpty()) {
-                log.warn("Transaction not found for transaction ref: {}", txnRef);
-                return buildCallbackResponse(null, false, "Transaction not found");
-            }
-
-            Transaction transaction = transactionOpt.get();
-
-            // Update transaction with VNPay response
-            VNPayTransactionStatus status = VNPayTransactionStatus.fromCode(params.get("vnp_ResponseCode"));
-            transaction = updatePaymentWithProviderData(
-                    txnRef,
-                    params.get("vnp_TransactionNo"),
-                    params.get("vnp_CardType"),
-                    params.get("vnp_BankCode"),
-                    params.get("vnp_BankTranNo"),
-                    VNPayStatusConverter.toGenericStatus(status),
-                    params.get("vnp_ResponseCode"),
-                    getResponseMessage(params.get("vnp_ResponseCode"))
-            );
-
-            boolean success = VNPayUtil.isSuccessResponseCode(params.get("vnp_ResponseCode"));
-            String message = success ? "Payment processed successfully" : "Payment failed";
-
-            log.info("VNPay callback processed. Transaction: {}, Status: {}", txnRef, transaction.getStatus());
-
-            return buildCallbackResponse(transaction, signatureValid, message);
-
-        } catch (Exception e) {
-            log.error("Error processing VNPay callback", e);
-            throw new RuntimeException("Failed to process VNPay callback", e);
-        }
-    }
-
-    @Override
     public PaymentCallbackResponse processIPN(Map<String, String> params, HttpServletRequest httpRequest) {
         String txnRef = params.get("vnp_TxnRef");
         log.info("Processing VNPay IPN for transaction: {}", txnRef);
@@ -161,19 +112,27 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         }
 
         Transaction transaction = transactionOpt.get();
-        VNPayTransactionStatus status = VNPayTransactionStatus.fromCode(params.get("vnp_ResponseCode"));
+        String responseCode = params.get("vnp_ResponseCode");
+        VNPayTransactionStatus status = VNPayTransactionStatus.fromCode(responseCode);
+        TransactionStatus genericStatus = VNPayStatusConverter.toGenericStatus(status);
+        
+        log.info("VNPay IPN - txnRef: {}, responseCode: {}, vnpayStatus: {}, genericStatus: {}", 
+                 txnRef, responseCode, status, genericStatus);
+        
         transaction = updatePaymentWithProviderData(
                 txnRef,
                 params.get("vnp_TransactionNo"),
                 params.get("vnp_CardType"),
                 params.get("vnp_BankCode"),
                 params.get("vnp_BankTranNo"),
-                VNPayStatusConverter.toGenericStatus(status),
-                params.get("vnp_ResponseCode"),
-                getResponseMessage(params.get("vnp_ResponseCode"))
+                genericStatus,
+                responseCode,
+                getResponseMessage(responseCode)
         );
 
-        boolean success = VNPayUtil.isSuccessResponseCode(params.get("vnp_ResponseCode"));
+        boolean success = VNPayUtil.isSuccessResponseCode(responseCode);
+        log.info("VNPay IPN processing completed - txnRef: {}, success: {}, finalStatus: {}", 
+                 txnRef, success, transaction.getStatus());
 
         return buildCallbackResponse(transaction, true, success ? "IPN processed successfully" : "Payment failed");
     }

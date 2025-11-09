@@ -29,11 +29,6 @@ public interface PaymentService {
     PaymentResponse createPayment(PaymentRequest request, HttpServletRequest httpRequest);
 
     /**
-     * Process payment callback from any provider
-     */
-    PaymentCallbackResponse processCallback(PaymentCallbackRequest request, HttpServletRequest httpRequest);
-
-    /**
      * Process IPN from any provider
      */
     PaymentCallbackResponse processIPN(PaymentCallbackRequest request, HttpServletRequest httpRequest);

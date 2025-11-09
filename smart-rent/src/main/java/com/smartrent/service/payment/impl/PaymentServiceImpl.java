@@ -60,23 +60,6 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentCallbackResponse processCallback(PaymentCallbackRequest request, HttpServletRequest httpRequest) {
-        String txnRef = extractTransactionRef(request.getParams(), request.getProvider());
-        log.info("Processing callback for provider: {} and transaction: {}", request.getProvider(), txnRef);
-
-        try {
-            com.smartrent.service.payment.provider.PaymentProvider provider =
-                    paymentProviderFactory.getProvider(request.getProvider());
-
-            return provider.processCallback(request.getParams(), httpRequest);
-        } catch (Exception e) {
-            log.error("Error processing callback for provider: {}", request.getProvider(), e);
-            throw new RuntimeException("Failed to process callback", e);
-        }
-    }
-
-    @Override
-    @Transactional
     public PaymentCallbackResponse processIPN(PaymentCallbackRequest request, HttpServletRequest httpRequest) {
         String txnRef = extractTransactionRef(request.getParams(), request.getProvider());
         log.info("Processing IPN for provider: {} and transaction: {}", request.getProvider(), txnRef);
