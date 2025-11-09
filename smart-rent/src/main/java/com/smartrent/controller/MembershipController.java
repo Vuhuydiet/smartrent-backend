@@ -84,7 +84,24 @@ public class MembershipController {
     @PostMapping("/initiate-purchase")
     @Operation(
         summary = "Initiate membership purchase",
-        description = "Initiate membership package purchase and receive VNPay payment URL. After successful payment, membership will be activated with all benefits.",
+        description = "Initiate membership package purchase and receive VNPay payment URL. After successful payment, membership will be activated with all benefits. The return URL is configured on the server side.",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = MembershipPurchaseRequest.class),
+                examples = @ExampleObject(
+                    name = "Purchase Request",
+                    summary = "Request to purchase membership package",
+                    value = """
+                        {
+                          "membershipId": 2,
+                          "paymentProvider": "VNPAY"
+                        }
+                        """
+                )
+            )
+        ),
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",

@@ -171,14 +171,14 @@ public class ListingServiceImpl implements ListingService {
         // For now, we'll need to pass the request data through the callback
         // TODO: Consider storing request data in a temporary table or cache
 
-        // Generate payment URL
+        // Generate payment URL - pass transactionId to reuse existing transaction
         PaymentRequest paymentRequest = PaymentRequest.builder()
+                .transactionId(transactionId) // Reuse the transaction created above
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(amount)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("Post " + request.getVipType() + " listing: " + request.getTitle())
-                .returnUrl(request.getReturnUrl())
                 .build();
 
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);

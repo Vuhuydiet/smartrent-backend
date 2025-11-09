@@ -657,8 +657,7 @@ public class ListingController {
                               "furnishing": "FULLY_FURNISHED",
                               "useMembershipQuota": false,
                               "durationDays": 30,
-                              "paymentProvider": "VNPAY",
-                              "returnUrl": "http://localhost:3000/payment/result"
+                              "paymentProvider": "VNPAY"
                             }
                             """
                     ),

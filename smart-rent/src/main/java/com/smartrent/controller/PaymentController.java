@@ -1,5 +1,6 @@
 package com.smartrent.controller;
 
+import com.smartrent.config.PaymentProperties;
 import com.smartrent.dto.request.PaymentCallbackRequest;
 import com.smartrent.dto.request.PaymentHistoryByStatusRequest;
 import com.smartrent.dto.request.PaymentRefundRequest;
@@ -52,6 +53,7 @@ public class PaymentController {
     MembershipService membershipService;
     ListingService listingService;
     PushService pushService;
+    PaymentProperties paymentProperties;
 
     // Generic Payment Endpoints (Provider-agnostic)
 
@@ -419,9 +421,8 @@ public class PaymentController {
     }
 
     private String buildRedirectUrl(PaymentCallbackResponse response) {
-        // Build redirect URL based on payment result
-        // This should point to your frontend application
-        String baseUrl = "http://localhost:3000/payment/result"; // Configure this
+        // Build redirect URL based on payment result using configured URL
+        String baseUrl = paymentProperties.getRedirectUrl();
 
         StringBuilder url = new StringBuilder(baseUrl);
         url.append("?transactionRef=").append(response.getTransactionRef());
