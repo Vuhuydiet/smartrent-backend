@@ -1,6 +1,5 @@
 package com.smartrent.controller;
 
-import com.smartrent.config.PaymentProperties;
 import com.smartrent.dto.request.PaymentCallbackRequest;
 import com.smartrent.dto.request.PaymentHistoryByStatusRequest;
 import com.smartrent.dto.request.PaymentRefundRequest;
@@ -9,6 +8,7 @@ import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.PaymentCallbackResponse;
 import com.smartrent.dto.response.PaymentHistoryResponse;
 import com.smartrent.dto.response.PaymentResponse;
+import com.smartrent.dto.response.TransactionResponse;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.enums.TransactionStatus;
 import com.smartrent.enums.TransactionType;
@@ -53,72 +53,8 @@ public class PaymentController {
     MembershipService membershipService;
     ListingService listingService;
     PushService pushService;
-    PaymentProperties paymentProperties;
 
     // Generic Payment Endpoints (Provider-agnostic)
-
-    @PostMapping("/create")
-    @Operation(summary = "Create payment", description = "Create a new payment with any supported provider")
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Payment created successfully"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request data"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    public ApiResponse<PaymentResponse> createPayment(
-            @Valid @RequestBody PaymentRequest request,
-            HttpServletRequest httpRequest) {
-
-        log.info("Creating payment for provider: {} with amount: {}", request.getProvider(), request.getAmount());
-
-        try {
-            PaymentResponse response = paymentService.createPayment(request, httpRequest);
-
-            return ApiResponse.<PaymentResponse>builder()
-                    .code("200000")
-                    .message("Payment created successfully")
-                    .data(response)
-                    .build();
-
-        } catch (Exception e) {
-            log.error("Error creating payment", e);
-            return ApiResponse.<PaymentResponse>builder()
-                    .code("500000")
-                    .message("Failed to create payment: " + e.getMessage())
-                    .build();
-        }
-    }
-
-    @GetMapping("/callback/{provider}")
-    @Operation(summary = "Payment callback", description = "Handle payment callback from any provider")
-    public void handlePaymentCallback(
-            @Parameter(description = "Payment provider") @PathVariable PaymentProvider provider,
-            @Parameter(description = "Callback parameters") @RequestParam Map<String, String> params,
-            HttpServletRequest httpRequest,
-            HttpServletResponse httpResponse) throws IOException {
-
-        log.info("Handling callback for provider: {}", provider);
-
-        try {
-            PaymentCallbackRequest callbackRequest = PaymentCallbackRequest.builder()
-                    .provider(provider)
-                    .params(params)
-                    .build();
-            PaymentCallbackResponse response = paymentService.processCallback(callbackRequest, httpRequest);
-
-            // If payment was successful, trigger business logic completion
-            if (response.getSuccess() && response.getTransactionRef() != null) {
-                triggerBusinessLogicCompletion(response.getTransactionRef());
-            }
-
-            // Redirect to frontend with payment result
-            String redirectUrl = buildRedirectUrl(response);
-            httpResponse.sendRedirect(redirectUrl);
-
-        } catch (Exception e) {
-            log.error("Error processing callback for provider: {}", provider, e);
-            httpResponse.sendRedirect("/payment/error?message=" + e.getMessage());
-        }
-    }
 
     @PostMapping("/ipn/{provider}")
     @Operation(summary = "Payment IPN endpoint", description = "Handle Instant Payment Notification from any provider")
@@ -321,15 +257,15 @@ public class PaymentController {
                     description = "Transaction not found"
             )
     })
-    public ApiResponse<PaymentCallbackResponse> queryTransaction(
+    public ApiResponse<TransactionResponse> queryTransaction(
             @Parameter(description = "Transaction reference") @PathVariable String txnRef) {
 
         log.info("Querying transaction: {}", txnRef);
 
         try {
-            PaymentCallbackResponse response = paymentService.queryTransaction(txnRef);
+            TransactionResponse response = transactionService.getTransactionResponse(txnRef);
 
-            return ApiResponse.<PaymentCallbackResponse>builder()
+            return ApiResponse.<TransactionResponse>builder()
                     .code("200000")
                     .message("Transaction queried successfully")
                     .data(response)
@@ -337,7 +273,7 @@ public class PaymentController {
 
         } catch (Exception e) {
             log.error("Error querying transaction: {}", txnRef, e);
-            return ApiResponse.<PaymentCallbackResponse>builder()
+            return ApiResponse.<TransactionResponse>builder()
                     .code("404000")
                     .message("Transaction not found: " + e.getMessage())
                     .build();
@@ -372,7 +308,7 @@ public class PaymentController {
 
     /**
      * Trigger business logic completion based on transaction type
-     * Called after successful payment callback/IPN
+     * Called after successful payment IPN
      */
     private void triggerBusinessLogicCompletion(String transactionRef) {
         log.info("Triggering business logic completion for transaction: {}", transactionRef);
@@ -418,27 +354,6 @@ public class PaymentController {
             log.error("Error triggering business logic completion for transaction: {}", transactionRef, e);
             throw new RuntimeException("Failed to trigger business logic completion", e);
         }
-    }
-
-    private String buildRedirectUrl(PaymentCallbackResponse response) {
-        // Build redirect URL based on payment result using configured URL
-        String baseUrl = paymentProperties.getRedirectUrl();
-
-        StringBuilder url = new StringBuilder(baseUrl);
-        url.append("?transactionRef=").append(response.getTransactionRef());
-        url.append("&success=").append(response.getSuccess());
-        url.append("&status=").append(response.getStatus());
-        url.append("&provider=").append(response.getProvider());
-
-        if (response.getAmount() != null) {
-            url.append("&amount=").append(response.getAmount());
-        }
-
-        if (response.getResponseMessage() != null) {
-            url.append("&message=").append(response.getResponseMessage());
-        }
-
-        return url.toString();
     }
 
 }

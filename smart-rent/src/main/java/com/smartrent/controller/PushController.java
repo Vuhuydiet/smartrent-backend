@@ -35,7 +35,7 @@ public class PushController {
     @PostMapping("/push")
     @Operation(
         summary = "Push a listing",
-        description = "Push a listing to the top of search results. Can use membership quota or direct purchase. The return URL is configured on the server side.",
+        description = "Push a listing to the top of search results. Can use membership quota or direct purchase. If payment is required, the user will be redirected to the configured frontend URL after payment completion. Verify payment status using GET /v1/payments/transactions/{txnRef}.",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(

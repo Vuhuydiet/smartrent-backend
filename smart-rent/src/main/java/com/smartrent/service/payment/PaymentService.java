@@ -8,6 +8,7 @@ import com.smartrent.dto.request.PaymentStatusUpdateRequest;
 import com.smartrent.dto.response.PaymentCallbackResponse;
 import com.smartrent.dto.response.PaymentHistoryResponse;
 import com.smartrent.dto.response.PaymentResponse;
+import com.smartrent.dto.response.TransactionResponse;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.service.payment.provider.PaymentProvider.PaymentFeature;
@@ -77,7 +78,7 @@ public interface PaymentService {
     /**
      * Update payment status
      */
-    Transaction updatePaymentStatus(PaymentStatusUpdateRequest request);
+    TransactionResponse updatePaymentStatus(PaymentStatusUpdateRequest request);
 
     // Provider Management Methods
 
