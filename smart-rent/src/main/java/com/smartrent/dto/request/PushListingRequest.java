@@ -18,6 +18,4 @@ public class PushListingRequest {
     Boolean useMembershipQuota; // true = use quota, false = direct purchase
 
     String paymentProvider; // Only needed if useMembershipQuota = false
-
-    String returnUrl; // URL to return after payment (for VNPay callback)
 }

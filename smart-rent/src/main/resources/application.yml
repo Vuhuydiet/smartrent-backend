@@ -243,6 +243,11 @@ open:
         - video/mp4
         - video/quicktime
 
+# Payment Configuration
+payment:
+  # Frontend redirect URL after payment completion
+  redirect-url: ${PAYMENT_REDIRECT_URL:http://localhost:3000/payment/result}
+
 # VNPay Payment Gateway Configuration
 vnpay:
   tmnCode: ${VNPAY_TMN_CODE:DEMO}

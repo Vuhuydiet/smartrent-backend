@@ -112,14 +112,14 @@ public class PushServiceImpl implements PushService {
                 request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
         );
 
-        // Generate payment URL
+        // Generate payment URL - pass transactionId to reuse existing transaction
         PaymentRequest paymentRequest = PaymentRequest.builder()
+                .transactionId(transactionId) // Reuse the transaction created above
                 .provider(PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(PricingConstants.PUSH_PER_TIME)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("Push listing #" + request.getListingId())
-                .returnUrl(request.getReturnUrl())
                 .build();
 
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
