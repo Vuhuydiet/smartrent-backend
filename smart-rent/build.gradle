@@ -60,6 +60,26 @@ dependencies {
 
     // Environment variables from .env file
     implementation 'io.github.cdimascio:dotenv-java:3.0.0'
+
+    // OTP Phone Verification Dependencies
+    // Google libphonenumber for phone number validation and normalization
+    implementation 'com.googlecode.libphonenumber:libphonenumber:8.13.47'
+
+    // Twilio SDK for SMS fallback (check for latest version before production)
+    implementation 'com.twilio.sdk:twilio:10.6.3'
+
+    // Spring Security Crypto for password hashing (BCrypt/Argon2)
+    implementation 'org.springframework.security:spring-security-crypto'
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.79'
+
+    // HTTP client for Zalo ZNS API calls
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // WireMock for integration testing
+    testImplementation 'org.wiremock:wiremock-standalone:3.9.2'
+
+    // Embedded Redis for testing
+    testImplementation 'it.ozimov:embedded-redis:0.7.3'
 }
 
 tasks.named('test') {

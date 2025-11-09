@@ -19,6 +19,7 @@ import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.TransactionRepository;
+import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
@@ -52,6 +53,7 @@ public class ListingServiceImpl implements ListingService {
     AddressRepository addressRepository;
     AddressMetadataRepository addressMetadataRepository;
     AdminRepository adminRepository;
+    UserRepository userRepository;
     ListingMapper listingMapper;
     LocationPricingService locationPricingService;
     QuotaService quotaService;
@@ -277,6 +279,9 @@ public class ListingServiceImpl implements ListingService {
         // Build basic response
         ListingResponse response = listingMapper.toResponse(listing);
 
+        // Populate owner's Zalo contact information
+        populateOwnerZaloInfo(response, listing.getUserId());
+
         // Add location pricing if address is available
         Address address = listing.getAddress();
         if (address != null) {
@@ -306,7 +311,11 @@ public class ListingServiceImpl implements ListingService {
     @Transactional(readOnly = true)
     public List<ListingResponse> getListingsByIds(Set<Long> ids) {
         return listingRepository.findByIdsWithAmenities(ids).stream()
-                .map(listingMapper::toResponse)
+                .map(listing -> {
+                    ListingResponse response = listingMapper.toResponse(listing);
+                    populateOwnerZaloInfo(response, listing.getUserId());
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -318,7 +327,11 @@ public class ListingServiceImpl implements ListingService {
         Pageable pageable = PageRequest.of(safePage, safeSize);
         Page<Listing> pageResult = listingRepository.findAll(pageable);
         return pageResult.getContent().stream()
-                .map(listingMapper::toResponse)
+                .map(listing -> {
+                    ListingResponse response = listingMapper.toResponse(listing);
+                    populateOwnerZaloInfo(response, listing.getUserId());
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -341,7 +354,9 @@ public class ListingServiceImpl implements ListingService {
         if (request.getRoomCapacity() != null) existing.setRoomCapacity(request.getRoomCapacity());
         // ...add more fields as needed, null-safe
         Listing saved = listingRepository.save(existing);
-        return listingMapper.toResponse(saved);
+        ListingResponse response = listingMapper.toResponse(saved);
+        populateOwnerZaloInfo(response, saved.getUserId());
+        return response;
     }
 
     @Override
@@ -454,5 +469,33 @@ public class ListingServiceImpl implements ListingService {
 
         log.info("Successfully linked all {} media items to listing {}",
                 mediaIds.size(), listing.getListingId());
+    }
+
+    /**
+     * Helper method to populate owner's contact information in ListingResponse
+     * Only sets contactAvailable=true if phone is present AND verified
+     */
+    private void populateOwnerZaloInfo(ListingResponse response, String userId) {
+        if (userId != null) {
+            userRepository.findById(userId).ifPresent(user -> {
+                String contactPhone = user.getContactPhoneNumber();
+                Boolean contactVerified = user.getContactPhoneVerified();
+
+                response.setOwnerContactPhoneNumber(contactPhone);
+                response.setOwnerContactPhoneVerified(contactVerified);
+
+                // Only make contact available if phone exists AND is verified
+                boolean isPhonePresent = contactPhone != null && !contactPhone.isEmpty();
+                boolean isVerified = Boolean.TRUE.equals(contactVerified);
+
+                if (isPhonePresent && isVerified) {
+                    response.setOwnerZaloLink("https://zalo.me/" + contactPhone);
+                    response.setContactAvailable(true);
+                } else {
+                    response.setOwnerZaloLink(null);
+                    response.setContactAvailable(false);
+                }
+            });
+        }
     }
 }
