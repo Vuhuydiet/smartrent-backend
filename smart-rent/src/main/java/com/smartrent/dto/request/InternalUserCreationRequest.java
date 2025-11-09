@@ -79,4 +79,11 @@ public class InternalUserCreationRequest {
       example = "TAX987654321"
   )
   String taxNumber;
+
+  @Pattern(regexp = Constants.VIETNAM_PHONE_PATTERN, message = "INVALID_CONTACT_PHONE")
+  @Schema(
+      description = "Vietnam contact phone number for Zalo or other messaging (optional, format: 09xxxxxxxx, 03xxxxxxxx, 07xxxxxxxx, 08xxxxxxxx, 05xxxxxxxx)",
+      example = "0912345678"
+  )
+  String contactPhoneNumber;
 }

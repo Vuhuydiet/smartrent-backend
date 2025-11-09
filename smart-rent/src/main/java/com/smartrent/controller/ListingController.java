@@ -81,12 +81,16 @@ public class ListingController {
             - listingType (RENT/SALE)
             - productType (APARTMENT/HOUSE/STUDIO/etc.)
             - price, priceUnit (MONTH/DAY/YEAR)
-            - address object with provinceId, districtId, wardId, streetId
+            - address object with:
+              - addressType (OLD or NEW) - REQUIRED
+              - For OLD: provinceId, districtId, wardId
+              - For NEW: newProvinceCode, newWardCode
 
             **Optional Fields:**
             - area, bedrooms, bathrooms
             - direction, furnishing, propertyType
             - amenityIds (array of amenity IDs)
+            - address.streetId, address.streetNumber
             - address.latitude, address.longitude
             """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -113,6 +117,7 @@ public class ListingController {
                           "price": 12000000,
                           "priceUnit": "MONTH",
                           "address": {
+                            "addressType": "OLD",
                             "streetNumber": "123",
                             "streetId": 1,
                             "wardId": 1,

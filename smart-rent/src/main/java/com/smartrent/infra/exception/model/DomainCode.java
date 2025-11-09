@@ -66,7 +66,19 @@ public enum DomainCode {
   //    External Service Error 9xxx
   EXTERNAL_SERVICE_ERROR("9001", HttpStatus.SERVICE_UNAVAILABLE, "External service error"),
   TOO_MANY_REQUESTS("9002", HttpStatus.TOO_MANY_REQUESTS, "Too many requests to external service"),
-  BAD_REQUEST_ERROR("9003", HttpStatus.BAD_REQUEST, "Bad request to external service")
+  BAD_REQUEST_ERROR("9003", HttpStatus.BAD_REQUEST, "Bad request to external service"),
+  //    OTP Error 10xxx
+  OTP_INVALID_PHONE("10001", HttpStatus.BAD_REQUEST, "Invalid phone number format"),
+  OTP_NON_VIETNAM_PHONE("10002", HttpStatus.BAD_REQUEST, "Only Vietnam phone numbers are supported"),
+  OTP_RATE_LIMIT_EXCEEDED("10003", HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded. Please try again later"),
+  OTP_GENERATION_FAILED("10004", HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate OTP"),
+  OTP_SEND_FAILED("10005", HttpStatus.SERVICE_UNAVAILABLE, "Failed to send OTP via all channels"),
+  OTP_NOT_FOUND("10006", HttpStatus.NOT_FOUND, "OTP not found or expired"),
+  OTP_INVALID_CODE("10007", HttpStatus.BAD_REQUEST, "Invalid OTP code"),
+  OTP_VERIFICATION_ATTEMPTS_EXCEEDED("10008", HttpStatus.TOO_MANY_REQUESTS, "Maximum verification attempts exceeded"),
+  OTP_ALREADY_VERIFIED("10009", HttpStatus.BAD_REQUEST, "OTP already verified"),
+  OTP_PROVIDER_ERROR("10010", HttpStatus.SERVICE_UNAVAILABLE, "OTP provider error: %s"),
+  OTP_INVALID_REQUEST_ID("10011", HttpStatus.BAD_REQUEST, "Invalid request ID")
   ;
 
   private final String value;

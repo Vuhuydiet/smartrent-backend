@@ -23,6 +23,8 @@ vnpay:
 # Application-specific configuration for local development
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"
+  admin:
+    contact-phone-number: "${ADMIN_CONTACT_PHONE:0912345678}"
   authorize-ignored:
     methods:
       get:
@@ -44,11 +46,13 @@ application:
         - "/v1/vip-tiers/**"
         - "/v1/push-details/**"
         - "/v1/users/**"
+        - "/v1/support/contact"
       post:
         - "/v1/auth/**"
         - "/v1/users"
         - "/v1/admins"
         - "/api/v1/payments/ipn/**"
+        - "/v1/verification/**"
 
 # Enable debug logging for authentication
 logging:

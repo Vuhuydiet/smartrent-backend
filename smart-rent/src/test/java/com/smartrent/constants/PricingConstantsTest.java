@@ -131,15 +131,15 @@ class PricingConstantsTest {
     @Test
     void testBoostPricing_Single() {
         BigDecimal expected = new BigDecimal("40000");
-        BigDecimal actual = PricingConstants.calculateBoostPrice(1);
-        assertEquals(expected, actual, "Single boost should cost 40,000 VND");
+        BigDecimal actual = PricingConstants.calculatePushPrice(1);
+        assertEquals(expected, actual, "Single push should cost 40,000 VND");
     }
 
     @Test
     void testBoostPricing_Multiple() {
         BigDecimal expected = new BigDecimal("800000"); // 40,000 × 20
-        BigDecimal actual = PricingConstants.calculateBoostPrice(20);
-        assertEquals(expected, actual, "20 boosts should cost 800,000 VND");
+        BigDecimal actual = PricingConstants.calculatePushPrice(20);
+        assertEquals(expected, actual, "20 pushes should cost 800,000 VND");
     }
 
     // =====================================================
