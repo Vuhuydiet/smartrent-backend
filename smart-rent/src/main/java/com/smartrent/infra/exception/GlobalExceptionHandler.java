@@ -9,6 +9,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.nio.file.AccessDeniedException;
 import java.util.HashMap;
@@ -109,6 +110,24 @@ public class GlobalExceptionHandler {
         .body(ApiResponse.<Void>builder()
             .code(domainCode.getValue())
             .message(exception.getMessage())
+            .build());
+  }
+
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceededException(
+      MaxUploadSizeExceededException exception) {
+    DomainCode domainCode = DomainCode.BAD_REQUEST_ERROR;
+
+    // Extract max size from exception message if available
+    long maxSize = exception.getMaxUploadSize();
+    String message = maxSize > 0
+        ? String.format("File size exceeds maximum allowed size of %d MB", maxSize / (1024 * 1024))
+        : "File size exceeds maximum allowed size. Please upload a smaller file.";
+
+    return ResponseEntity.badRequest()
+        .body(ApiResponse.<Void>builder()
+            .code(domainCode.getValue())
+            .message(message)
             .build());
   }
 

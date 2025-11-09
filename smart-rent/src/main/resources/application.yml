@@ -1,5 +1,10 @@
 server:
   port: 8080
+  # Tomcat configuration for large file uploads (videos)
+  tomcat:
+    connection-timeout: 300000  # 5 minutes for video uploads
+    max-http-form-post-size: 110MB
+    max-swallow-size: 110MB
   error:
     # Disable Spring Boot's default error page to ensure @ControllerAdvice handles all exceptions
     whitelabel:
@@ -53,6 +58,13 @@ logging:
 spring:
   application:
     name: smart-rent
+  # Multipart file upload configuration for video/image uploads
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB      # Maximum file size per file
+      max-request-size: 110MB   # Maximum total request size
+      file-size-threshold: 2MB  # Threshold after which files are written to disk
   datasource:
     driverClassName: com.mysql.cj.jdbc.Driver
     url: ${IDENTITY_SERVICE_DB_URL}
@@ -127,7 +139,7 @@ application:
         - "/webjars/**"
         - "/actuator/health"
         - "/actuator/**"
-        - "/v1/payments/vnpay/callback"
+        - "/api/v1/payments/callback/**"
         - "/v1/listings/**"
         - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
@@ -142,7 +154,7 @@ application:
         - "/v1/users"
         - "/v1/admins"
         - "/v1/verification/**"
-        - "/v1/payments/vnpay/ipn"
+        - "/api/v1/payments/ipn/**"
         - "/api/otp/**"
   authentication:
     jwt:

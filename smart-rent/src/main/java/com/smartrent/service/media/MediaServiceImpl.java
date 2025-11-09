@@ -40,12 +40,11 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     @Transactional
-    public GenerateUploadUrlResponse generateUploadUrl(GenerateUploadUrlRequest request, Long userId) {
-        String userIdStr = String.valueOf(userId);
-        log.info("Generating upload URL for user: {}, type: {}", userIdStr, request.getMediaType());
+    public GenerateUploadUrlResponse generateUploadUrl(GenerateUploadUrlRequest request, String userId) {
+        log.info("Generating upload URL for user: {}, type: {}", userId, request.getMediaType());
 
         // Validate user exists
-        User user = userRepository.findById(userIdStr)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(DomainCode.USER_NOT_FOUND, "User not found"));
 
         // Validate content type
@@ -68,7 +67,7 @@ public class MediaServiceImpl implements MediaService {
                     .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
 
             // Validate user owns the listing
-            if (!listing.getUserId().equals(userIdStr)) {
+            if (!listing.getUserId().equals(userId)) {
                 throw new AppException(DomainCode.UNAUTHORIZED,
                         "You don't have permission to add media to this listing");
             }
@@ -79,7 +78,7 @@ public class MediaServiceImpl implements MediaService {
 
         // Create media entity in PENDING status
         Media media = Media.builder()
-                .userId(userIdStr)
+                .userId(userId)
                 .listing(listing)
                 .mediaType(request.getMediaType() == GenerateUploadUrlRequest.MediaType.IMAGE ?
                         Media.MediaType.IMAGE : Media.MediaType.VIDEO)
@@ -126,14 +125,13 @@ public class MediaServiceImpl implements MediaService {
             String altText,
             Boolean isPrimary,
             Integer sortOrder,
-            Long userId) {
+            String userId) {
 
-        String userIdStr = String.valueOf(userId);
         log.info("Starting direct upload for user: {}, filename: {}, type: {}",
-                userIdStr, file.getOriginalFilename(), mediaType);
+                userId, file.getOriginalFilename(), mediaType);
 
         // Validate user exists
-        User user = userRepository.findById(userIdStr)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(DomainCode.USER_NOT_FOUND, "User not found"));
 
         // Validate file is not empty
@@ -165,7 +163,7 @@ public class MediaServiceImpl implements MediaService {
                     .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
 
             // Validate user owns the listing
-            if (!listing.getUserId().equals(userIdStr)) {
+            if (!listing.getUserId().equals(userId)) {
                 throw new AppException(DomainCode.UNAUTHORIZED,
                         "You don't have permission to add media to this listing");
             }
@@ -190,7 +188,7 @@ public class MediaServiceImpl implements MediaService {
 
             // Create media entity in ACTIVE status (already uploaded)
             Media media = Media.builder()
-                    .userId(userIdStr)
+                    .userId(userId)
                     .listing(listing)
                     .mediaType(mediaTypeEnum)
                     .sourceType(Media.MediaSourceType.UPLOAD)
@@ -228,12 +226,11 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     @Transactional
-    public MediaResponse confirmUpload(Long mediaId, ConfirmUploadRequest request, Long userId) {
-        String userIdStr = String.valueOf(userId);
-        log.info("Confirming upload for media ID: {}, user: {}", mediaId, userIdStr);
+    public MediaResponse confirmUpload(Long mediaId, ConfirmUploadRequest request, String userId) {
+        log.info("Confirming upload for media ID: {}, user: {}", mediaId, userId);
 
         // Find media and validate ownership
-        Media media = mediaRepository.findByMediaIdAndUserId(mediaId, userIdStr)
+        Media media = mediaRepository.findByMediaIdAndUserId(mediaId, userId)
                 .orElseThrow(() -> new AppException(DomainCode.UNAUTHORIZED,
                         "Media not found or you don't have permission"));
 
@@ -267,9 +264,8 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     @Transactional(readOnly = true)
-    public String generateDownloadUrl(Long mediaId, Long userId) {
-        String userIdStr = String.valueOf(userId);
-        log.info("Generating download URL for media ID: {}, user: {}", mediaId, userIdStr);
+    public String generateDownloadUrl(Long mediaId, String userId) {
+        log.info("Generating download URL for media ID: {}, user: {}", mediaId, userId);
 
         // Find media
         Media media = mediaRepository.findById(mediaId)
@@ -289,7 +285,7 @@ public class MediaServiceImpl implements MediaService {
 
         // For uploaded media, check permissions
         // Allow owner or if listing is public
-        boolean hasPermission = media.isOwnedBy(userIdStr) ||
+        boolean hasPermission = media.isOwnedBy(userId) ||
                 (media.getListing() != null && isListingPublic(media.getListing()));
 
         if (!hasPermission) {
@@ -308,12 +304,11 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     @Transactional
-    public void deleteMedia(Long mediaId, Long userId) {
-        String userIdStr = String.valueOf(userId);
-        log.info("Deleting media ID: {}, user: {}", mediaId, userIdStr);
+    public void deleteMedia(Long mediaId, String userId) {
+        log.info("Deleting media ID: {}, user: {}", mediaId, userId);
 
         // Find media and validate ownership
-        Media media = mediaRepository.findByMediaIdAndUserId(mediaId, userIdStr)
+        Media media = mediaRepository.findByMediaIdAndUserId(mediaId, userId)
                 .orElseThrow(() -> new AppException(DomainCode.UNAUTHORIZED,
                         "Media not found or you don't have permission"));
 
@@ -337,12 +332,11 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     @Transactional
-    public MediaResponse saveExternalMedia(SaveExternalMediaRequest request, Long userId) {
-        String userIdStr = String.valueOf(userId);
-        log.info("Saving external media for user: {}, URL: {}", userIdStr, request.getUrl());
+    public MediaResponse saveExternalMedia(SaveExternalMediaRequest request, String userId) {
+        log.info("Saving external media for user: {}, URL: {}", userId, request.getUrl());
 
         // Validate user exists
-        User user = userRepository.findById(userIdStr)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(DomainCode.USER_NOT_FOUND, "User not found"));
 
         // Validate listing if provided
@@ -352,7 +346,7 @@ public class MediaServiceImpl implements MediaService {
                     .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
 
             // Validate user owns the listing
-            if (!listing.getUserId().equals(userIdStr)) {
+            if (!listing.getUserId().equals(userId)) {
                 throw new AppException(DomainCode.UNAUTHORIZED,
                         "You don't have permission to add media to this listing");
             }
@@ -363,7 +357,7 @@ public class MediaServiceImpl implements MediaService {
 
         // Create media entity
         Media media = Media.builder()
-                .userId(userIdStr)
+                .userId(userId)
                 .listing(listing)
                 .mediaType(Media.MediaType.VIDEO) // External media are typically videos
                 .sourceType(sourceType)
@@ -401,12 +395,11 @@ public class MediaServiceImpl implements MediaService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<MediaResponse> getUserMedia(Long userId) {
-        String userIdStr = String.valueOf(userId);
-        log.info("Fetching media for user: {}", userIdStr);
+    public List<MediaResponse> getUserMedia(String userId) {
+        log.info("Fetching media for user: {}", userId);
 
         List<Media> mediaList = mediaRepository
-                .findByUserIdAndStatusOrderByCreatedAtDesc(userIdStr, Media.MediaStatus.ACTIVE);
+                .findByUserIdAndStatusOrderByCreatedAtDesc(userId, Media.MediaStatus.ACTIVE);
 
         return mediaList.stream()
                 .map(mediaMapper::toResponse)
