@@ -268,6 +268,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         params.put("vnp_OrderType", vnPayProperties.getOrderType());
         params.put("vnp_Locale", getLanguageFromMetadata(request));
         params.put("vnp_ReturnUrl", request.getReturnUrl() != null ? request.getReturnUrl() : vnPayProperties.getReturnUrl());
+        params.put("vnp_IpnUrl", vnPayProperties.getIpnUrl());
         params.put("vnp_IpAddr", ipAddress);
         params.put("vnp_CreateDate", VNPayUtil.formatCurrentDateTime());
 
