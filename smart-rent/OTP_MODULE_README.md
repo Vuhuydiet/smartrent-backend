@@ -219,7 +219,7 @@ otp:
 
 ### 1. Send OTP
 
-**Endpoint**: `POST /api/otp/send`
+**Endpoint**: `POST /otp/send`
 
 **Request**:
 ```json
@@ -249,7 +249,7 @@ otp:
 
 ### 2. Verify OTP
 
-**Endpoint**: `POST /api/otp/verify`
+**Endpoint**: `POST /otp/verify`
 
 **Request**:
 ```json
@@ -319,12 +319,12 @@ otp:
 
 ```bash
 # Send OTP
-curl -X POST http://localhost:8080/api/otp/send \
+curl -X POST http://localhost:8080/otp/send \
   -H "Content-Type: application/json" \
   -d '{"phone": "0912345678"}'
 
 # Verify OTP
-curl -X POST http://localhost:8080/api/otp/verify \
+curl -X POST http://localhost:8080/otp/verify \
   -H "Content-Type: application/json" \
   -d '{
     "phone": "0912345678",

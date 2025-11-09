@@ -152,19 +152,19 @@ export TWILIO_FROM_NUMBER=+1234567890
 ### 4. Test API
 ```bash
 # Send OTP
-curl -X POST http://localhost:8080/api/otp/send \
+curl -X POST http://localhost:8080/otp/send \
   -H "Content-Type: application/json" \
   -d '{"phone": "0912345678"}'
 
 # Verify OTP
-curl -X POST http://localhost:8080/api/otp/verify \
+curl -X POST http://localhost:8080/otp/verify \
   -H "Content-Type: application/json" \
   -d '{"phone": "0912345678", "code": "123456", "requestId": "your-request-id"}'
 ```
 
 ## 📋 API Endpoints
 
-### POST /api/otp/send
+### POST /otp/send
 Send OTP to Vietnam phone number via Zalo or SMS.
 
 **Request**:
@@ -189,7 +189,7 @@ Send OTP to Vietnam phone number via Zalo or SMS.
 }
 ```
 
-### POST /api/otp/verify
+### POST /otp/verify
 Verify OTP code.
 
 **Request**:

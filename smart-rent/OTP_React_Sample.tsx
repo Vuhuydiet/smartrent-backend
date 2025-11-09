@@ -94,7 +94,7 @@ const OtpVerification: React.FC = () => {
 
     try {
       const response = await axios.post<OtpSendResponse>(
-        `${API_BASE_URL}/api/otp/send`,
+        `${API_BASE_URL}/otp/send`,
         { phone },
         {
           headers: {
@@ -145,7 +145,7 @@ const OtpVerification: React.FC = () => {
 
     try {
       const response = await axios.post<OtpVerifyResponse>(
-        `${API_BASE_URL}/api/otp/verify`,
+        `${API_BASE_URL}/otp/verify`,
         {
           phone,
           code: otpCode,
