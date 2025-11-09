@@ -10,8 +10,8 @@ vnpay:
   hash-secret: "${VNPAY_HASH_SECRET:TESTSECRET}"
   payment-url: "${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}"
   query-url: "${VNPAY_QUERY_URL:sandbox.vnpayment.vn}"
-  return-url: "${VNPAY_RETURN_URL:http://localhost:8080/v1/payments/vnpay/callback}"
-  ipn-url: "${VNPAY_IPN_URL:http://localhost:8080/v1/payments/vnpay/ipn}"
+  return-url: "${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payments/callback/VNPAY}"
+  ipn-url: "${VNPAY_IPN_URL:http://localhost:8080/api/v1/payments/ipn/VNPAY}"
   version: "2.1.0"
   command: "pay"
   order-type: "other"
@@ -34,7 +34,7 @@ application:
         - "/webjars/**"
         - "/actuator/health"
         - "/actuator/**"
-        - "/v1/payments/vnpay/callback"
+        - "/api/v1/payments/callback/**"
         - "/v1/listings/**"
         - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
@@ -48,7 +48,7 @@ application:
         - "/v1/auth/**"
         - "/v1/users"
         - "/v1/admins"
-        - "/v1/payments/vnpay/ipn"
+        - "/api/v1/payments/ipn/**"
 
 # Enable debug logging for authentication
 logging:

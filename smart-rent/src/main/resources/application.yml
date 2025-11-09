@@ -137,7 +137,7 @@ application:
         - "/webjars/**"
         - "/actuator/health"
         - "/actuator/**"
-        - "/v1/payments/vnpay/callback"
+        - "/api/v1/payments/callback/**"
         - "/v1/listings/**"
         - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
@@ -151,7 +151,7 @@ application:
         - "/v1/users"
         - "/v1/admins"
         - "/v1/verification/**"
-        - "/v1/payments/vnpay/ipn"
+        - "/api/v1/payments/ipn/**"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
