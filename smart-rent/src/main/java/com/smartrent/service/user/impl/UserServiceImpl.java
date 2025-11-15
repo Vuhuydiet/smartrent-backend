@@ -2,6 +2,7 @@ package com.smartrent.service.user.impl;
 
 import com.smartrent.config.Constants;
 import com.smartrent.dto.request.InternalUserCreationRequest;
+import com.smartrent.dto.request.UpdateContactPhoneRequest;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.GetUserResponse;
 import com.smartrent.dto.response.PageResponse;
@@ -28,6 +29,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -149,5 +151,26 @@ public class UserServiceImpl implements UserService {
     userRepository.saveAndFlush(user);
 
     return user;
+  }
+
+  @Override
+  @Transactional
+  @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId")
+  public GetUserResponse updateContactPhone(String userId, UpdateContactPhoneRequest request) {
+    log.info("Updating contact phone for user {}", userId);
+
+    User user = userRepository.findById(userId)
+        .orElseThrow(UserNotFoundException::new);
+
+    // Update contact phone number
+    user.setContactPhoneNumber(request.getContactPhoneNumber());
+    // Reset verification status when phone is updated
+    user.setContactPhoneVerified(false);
+
+    userRepository.save(user);
+
+    log.info("Contact phone updated successfully for user {}", userId);
+
+    return userMapper.mapFromUserEntityToGetUserResponse(user);
   }
 }

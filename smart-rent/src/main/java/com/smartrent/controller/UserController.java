@@ -1,5 +1,6 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.request.UpdateContactPhoneRequest;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.GetUserResponse;
@@ -20,6 +21,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -316,6 +318,78 @@ public class UserController {
     PageResponse<GetUserResponse> pageResponse = userService.getUsers(page, size);
     return ApiResponse.<PageResponse<GetUserResponse>>builder()
         .data(pageResponse)
+        .build();
+  }
+
+  @PatchMapping("/contact-phone")
+  @Operation(
+      summary = "Update contact phone number",
+      description = """
+          Updates the authenticated user's contact phone number.
+
+          **Use Case:**
+          - User clicks on phone number in listing detail but hasn't provided contact phone
+          - Frontend prompts user to input their contact phone
+          - This endpoint updates the user's contact phone
+
+          **Behavior:**
+          - Requires authentication (user must be logged in)
+          - Validates Vietnam phone number format
+          - Resets phone verification status to false
+          - Clears user cache
+
+          **Returns:**
+          - Updated user profile with new contact phone
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication"),
+      requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+          description = "Contact phone update request",
+          required = true,
+          content = @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = UpdateContactPhoneRequest.class),
+              examples = @ExampleObject(
+                  name = "Update Contact Phone",
+                  value = """
+                      {
+                        "contactPhoneNumber": "0912345678"
+                      }
+                      """
+              )
+          )
+      )
+  )
+  @ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "200",
+          description = "Contact phone updated successfully",
+          content = @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = ApiResponse.class)
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "400",
+          description = "Invalid phone number format"
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "401",
+          description = "Unauthorized - User not authenticated"
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "404",
+          description = "User not found"
+      )
+  })
+  public ApiResponse<GetUserResponse> updateContactPhone(
+      @Valid @RequestBody UpdateContactPhoneRequest request) {
+    // Extract user ID from JWT token
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String userId = authentication.getName();
+
+    GetUserResponse response = userService.updateContactPhone(userId, request);
+    return ApiResponse.<GetUserResponse>builder()
+        .data(response)
         .build();
   }
 }
