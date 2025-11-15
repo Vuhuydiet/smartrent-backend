@@ -252,6 +252,7 @@ vnpay:
   tmnCode: ${VNPAY_TMN_CODE:DEMO}
   hashSecret: ${VNPAY_HASH_SECRET:DEMOSECRETKEY}
   url: ${VNPAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  query-url: ${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
   returnUrl: ${VNPAY_RETURN_URL:http://localhost:3000/payment/result}
   version: "2.1.0"
   command: "pay"

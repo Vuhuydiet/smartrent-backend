@@ -17,6 +17,12 @@ import lombok.experimental.FieldDefaults;
 public class ListingCreationResponse {
     Long listingId;
     String status; // e.g., "CREATED"
-    // Optionally, add a summary or minimal fields
+
+    // Payment-related fields (for listings requiring payment)
+    Boolean paymentRequired;
+    String transactionId;
+    Long amount;
+    String paymentUrl;
+    String message;
 }
 

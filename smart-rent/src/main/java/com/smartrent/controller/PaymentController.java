@@ -338,8 +338,8 @@ public class PaymentController {
                     membershipService.completeMembershipPurchase(transactionRef);
                 }
                 case POST_FEE -> {
-                    log.info("Completing VIP listing creation for transaction: {}", transactionRef);
-                    listingService.completeVipListingCreation(transactionRef);
+                    log.info("Completing listing creation (NORMAL or VIP) for transaction: {}", transactionRef);
+                    listingService.completeListingCreationAfterPayment(transactionRef);
                 }
                 case PUSH_FEE -> {
                     log.info("Completing push after payment for transaction: {}", transactionRef);
