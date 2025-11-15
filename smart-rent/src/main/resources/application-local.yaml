@@ -45,11 +45,14 @@ application:
         - "/v1/vip-tiers/**"
         - "/v1/push-details/**"
         - "/v1/users/**"
+        - "/v1/housing-predictor/**"
         - "/v1/support/contact"
       post:
         - "/v1/auth/**"
         - "/v1/users"
         - "/v1/admins"
+        - "/v1/payments/vnpay/ipn"
+        - "/v1/housing-predictor/**"
         - "/v1/payments/ipn/**"
         - "/v1/verification/**"
 

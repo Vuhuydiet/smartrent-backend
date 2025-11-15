@@ -192,6 +192,10 @@ feign:
     config:
       brevo:
         url: "https://api.brevo.com"
+      smartrent-ai:
+        url: "${AI_SERVICE_BASE_URL:http://localhost:8000}"
+        connectTimeout: 10000
+        readTimeout: 30000
       google:
         auth:
           url: "https://oauth2.googleapis.com"

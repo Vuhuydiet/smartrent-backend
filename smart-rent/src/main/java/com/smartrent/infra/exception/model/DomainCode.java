@@ -67,6 +67,11 @@ public enum DomainCode {
   EXTERNAL_SERVICE_ERROR("9001", HttpStatus.SERVICE_UNAVAILABLE, "External service error"),
   TOO_MANY_REQUESTS("9002", HttpStatus.TOO_MANY_REQUESTS, "Too many requests to external service"),
   BAD_REQUEST_ERROR("9003", HttpStatus.BAD_REQUEST, "Bad request to external service"),
+  //    AI Service Error 9100-9199
+  AI_SERVICE_ERROR("9101", HttpStatus.INTERNAL_SERVER_ERROR, "AI service internal error"),
+  AI_SERVICE_UNAVAILABLE("9102", HttpStatus.SERVICE_UNAVAILABLE, "AI service is unavailable"),
+  AI_SERVICE_TIMEOUT("9103", HttpStatus.REQUEST_TIMEOUT, "AI service request timeout"),
+  AI_SERVICE_INVALID_RESPONSE("9104", HttpStatus.BAD_GATEWAY, "Invalid response from AI service")
   //    OTP Error 10xxx
   OTP_INVALID_PHONE("10001", HttpStatus.BAD_REQUEST, "Invalid phone number format"),
   OTP_NON_VIETNAM_PHONE("10002", HttpStatus.BAD_REQUEST, "Only Vietnam phone numbers are supported"),
