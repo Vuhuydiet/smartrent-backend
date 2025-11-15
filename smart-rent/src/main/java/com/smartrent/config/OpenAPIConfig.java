@@ -614,4 +614,14 @@ public class OpenAPIConfig {
                             .pathsToMatch("/v1/push-details/**")
                             .build();
     }
+
+    @Bean
+    public GroupedOpenApi phoneClickDetailApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("phone-click-details")
+                            .displayName("Phone Click Detail Tracking")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/phone-click-details/**")
+                            .build();
+    }
 }

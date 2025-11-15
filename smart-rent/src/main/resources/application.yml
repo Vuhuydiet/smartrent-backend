@@ -33,6 +33,7 @@ logging:
     com.smartrent.service.communication: INFO
     com.smartrent.service.content: INFO
     com.smartrent.service.discovery: INFO
+    com.smartrent.service.phoneclickdetail: INFO
     # Framework logging
     org.springframework: WARN
     org.hibernate: WARN

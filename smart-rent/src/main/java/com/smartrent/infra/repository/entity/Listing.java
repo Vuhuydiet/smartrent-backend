@@ -161,6 +161,9 @@ public class Listing {
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<View> views;
 
+    @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    List<PhoneClickDetail> phoneClickDetails;
+
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     List<PricingHistory> pricingHistories;
 
