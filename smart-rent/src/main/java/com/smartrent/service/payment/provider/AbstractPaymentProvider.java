@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+@Slf4j
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PROTECTED, makeFinal = true)
 public abstract class AbstractPaymentProvider implements PaymentProvider {
@@ -28,12 +30,34 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
 
     /**
      * Create a payment record in the database
+     * If transactionId is provided in the request, reuse existing transaction
+     * Otherwise, create a new transaction
      */
     @Transactional
     protected Transaction createPaymentRecord(PaymentRequest request, HttpServletRequest httpRequest) {
         validatePaymentRequest(request);
 
-        String txnRef = generateTransactionRef();
+        // If transactionId is provided, reuse existing transaction
+        if (request.getTransactionId() != null && !request.getTransactionId().isEmpty()) {
+            Optional<Transaction> existingTransaction = paymentRepository.findByTransactionRef(request.getTransactionId());
+            if (existingTransaction.isPresent()) {
+                Transaction transaction = existingTransaction.get();
+                // Update transaction with additional payment info if needed
+                String ipAddress = getClientIpAddress(httpRequest);
+                if (transaction.getIpAddress() == null || transaction.getIpAddress().equals("UNKNOWN")) {
+                    transaction.setIpAddress(ipAddress);
+                }
+                if (transaction.getOrderInfo() == null && request.getOrderInfo() != null) {
+                    transaction.setOrderInfo(request.getOrderInfo());
+                }
+                return paymentRepository.save(transaction);
+            }
+            // If transaction not found, fall through to create new one with the provided ID
+        }
+
+        String txnRef = request.getTransactionId() != null && !request.getTransactionId().isEmpty()
+                ? request.getTransactionId()
+                : generateTransactionRef();
         String ipAddress = getClientIpAddress(httpRequest);
         String userId = getCurrentUserId();
 
@@ -117,14 +141,24 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
                                                      TransactionStatus status,
                                                      String responseCode,
                                                      String responseMessage) {
+        log.info("=== STARTING updatePaymentWithProviderData ===");
+        log.info("Updating payment with provider data - txnRef: {}, status: {}, responseCode: {}", 
+                 transactionRef, status, responseCode);
+        
         Optional<Transaction> transactionOpt = paymentRepository.findByTransactionRef(transactionRef);
         if (transactionOpt.isEmpty()) {
+            log.error("Transaction not found for txnRef: {}", transactionRef);
             throw new PaymentNotFoundException(transactionRef);
         }
 
         Transaction transaction = transactionOpt.get();
+        log.info("Found transaction - txnId: {}, current status: {}, new status: {}", 
+                 transaction.getTransactionId(), transaction.getStatus(), status);
+        
         transaction.setProviderTransactionId(providerTransactionId);
         transaction.setStatus(status);
+        
+        log.info("After setStatus - transaction status is now: {}", transaction.getStatus());
 
         // Append provider-specific data to additional info
         String currentInfo = transaction.getAdditionalInfo() != null ? transaction.getAdditionalInfo() : "";
@@ -135,7 +169,20 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
         providerInfo.append(" | Response: ").append(responseCode).append(" - ").append(responseMessage);
         transaction.setAdditionalInfo(providerInfo.toString());
 
-        return paymentRepository.save(transaction);
+        log.info("Calling paymentRepository.save() for txnId: {}", transaction.getTransactionId());
+        Transaction savedTransaction = paymentRepository.save(transaction);
+        log.info("Transaction saved successfully - txnId: {}, status: {}", 
+                 savedTransaction.getTransactionId(), savedTransaction.getStatus());
+        
+        // Verify the save by reading back from database
+        Optional<Transaction> verifyOpt = paymentRepository.findByTransactionRef(transactionRef);
+        if (verifyOpt.isPresent()) {
+            log.info("VERIFICATION: Re-read transaction from DB - txnId: {}, status: {}", 
+                     verifyOpt.get().getTransactionId(), verifyOpt.get().getStatus());
+        }
+        
+        log.info("=== COMPLETED updatePaymentWithProviderData ===");
+        return savedTransaction;
     }
 
     /**

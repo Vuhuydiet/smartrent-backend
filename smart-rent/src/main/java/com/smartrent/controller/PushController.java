@@ -8,6 +8,7 @@ import com.smartrent.service.push.PushService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -34,7 +35,37 @@ public class PushController {
     @PostMapping("/push")
     @Operation(
         summary = "Push a listing",
-        description = "Push a listing to the top of search results. Can use membership quota or direct purchase.",
+        description = "Push a listing to the top of search results. Can use membership quota or direct purchase. If payment is required, the user will be redirected to the configured frontend URL after payment completion. Verify payment status using GET /v1/payments/transactions/{txnRef}.",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = PushListingRequest.class),
+                examples = {
+                    @ExampleObject(
+                        name = "Push with Quota",
+                        summary = "Push listing using membership quota",
+                        value = """
+                            {
+                              "listingId": 123,
+                              "useMembershipQuota": true
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Push with Payment",
+                        summary = "Push listing with direct payment",
+                        value = """
+                            {
+                              "listingId": 123,
+                              "useMembershipQuota": false,
+                              "paymentProvider": "VNPAY"
+                            }
+                            """
+                    )
+                }
+            )
+        ),
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",

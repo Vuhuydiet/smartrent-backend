@@ -68,4 +68,16 @@ public class GetUserResponse implements Serializable {
       example = "TAX987654321"
   )
   String taxNumber;
+
+  @Schema(
+      description = "Vietnam contact phone number for Zalo or other messaging",
+      example = "0912345678"
+  )
+  String contactPhoneNumber;
+
+  @Schema(
+      description = "Whether the contact phone number has been verified",
+      example = "true"
+  )
+  Boolean contactPhoneVerified;
 }

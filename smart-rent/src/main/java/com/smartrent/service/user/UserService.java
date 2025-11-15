@@ -1,6 +1,7 @@
 package com.smartrent.service.user;
 
 import com.smartrent.dto.request.InternalUserCreationRequest;
+import com.smartrent.dto.request.UpdateContactPhoneRequest;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.GetUserResponse;
 import com.smartrent.dto.response.PageResponse;
@@ -15,4 +16,6 @@ public interface UserService {
   PageResponse<GetUserResponse> getUsers(int page, int size);
 
   User internalCreateUser(InternalUserCreationRequest request);
+
+  GetUserResponse updateContactPhone(String userId, UpdateContactPhoneRequest request);
 }

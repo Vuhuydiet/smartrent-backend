@@ -34,6 +34,18 @@ public class ListingResponse {
     @Schema(description = "User ID of the listing owner", example = "user-123")
     String userId;
 
+    @Schema(description = "Owner's contact phone number for Zalo or other messaging", example = "0912345678")
+    String ownerContactPhoneNumber;
+
+    @Schema(description = "Whether the owner's contact phone number has been verified", example = "true")
+    Boolean ownerContactPhoneVerified;
+
+    @Schema(description = "Direct Zalo link to contact owner", example = "https://zalo.me/0912345678")
+    String ownerZaloLink;
+
+    @Schema(description = "Whether owner has contact available (phone present AND verified)")
+    Boolean contactAvailable;
+
     @Schema(description = "Post date")
     LocalDateTime postDate;
 

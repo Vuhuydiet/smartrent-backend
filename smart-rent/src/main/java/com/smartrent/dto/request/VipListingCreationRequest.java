@@ -108,8 +108,5 @@ public class VipListingCreationRequest {
 
     @Schema(description = "Payment provider (only needed if useMembershipQuota = false)", example = "VNPAY")
     String paymentProvider;
-
-    @Schema(description = "Return URL after payment (for VNPay callback)", example = "https://app.com/payment/callback")
-    String returnUrl;
 }
 

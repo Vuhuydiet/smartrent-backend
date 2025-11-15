@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -136,14 +137,14 @@ public class MembershipServiceImpl implements MembershipService {
                 request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
         );
 
-        // Generate payment URL
+        // Generate payment URL - pass transactionId to reuse existing transaction
         PaymentRequest paymentRequest = PaymentRequest.builder()
+                .transactionId(transactionId) // Reuse the transaction created above
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(membershipPackage.getSalePrice())
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("Membership: " + membershipPackage.getPackageName())
-                .returnUrl(request.getReturnUrl())
                 .build();
 
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
@@ -169,10 +170,47 @@ public class MembershipServiceImpl implements MembershipService {
             throw new RuntimeException("Transaction is not a membership purchase: " + transactionId);
         }
 
+        // Validate referenceId exists
+        if (transaction.getReferenceId() == null || transaction.getReferenceId().isEmpty()) {
+            throw new RuntimeException("Transaction referenceId is null or empty: " + transactionId);
+        }
+
+        // Check if membership already created for this transaction (idempotency)
+        // This prevents duplicate memberships when both callback and IPN are processed
+        Optional<UserMembership> existingMembership = userMembershipRepository.findByUserId(transaction.getUserId())
+                .stream()
+                .filter(um -> um.getCreatedAt().isAfter(transaction.getCreatedAt().minusMinutes(5)))
+                .filter(um -> um.getStatus() == MembershipStatus.ACTIVE)
+                .findFirst();
+
+        if (existingMembership.isPresent()) {
+            log.info("Membership already created for transaction: {}, returning existing membership", transactionId);
+            return mapToUserMembershipResponse(existingMembership.get());
+        }
+
+        // Parse membership ID
+        Long membershipId;
+        try {
+            membershipId = Long.parseLong(transaction.getReferenceId());
+        } catch (NumberFormatException e) {
+            throw new RuntimeException("Invalid membership ID in transaction referenceId: " + transaction.getReferenceId(), e);
+        }
+
         // Get membership package
-        Long membershipId = Long.parseLong(transaction.getReferenceId());
         MembershipPackage membershipPackage = membershipPackageRepository.findById(membershipId)
                 .orElseThrow(() -> new RuntimeException("Membership package not found: " + membershipId));
+
+        // Check if user already has an active membership
+        boolean hasActiveMembership = userMembershipRepository.hasActiveMembership(
+                transaction.getUserId(),
+                LocalDateTime.now()
+        );
+
+        if (hasActiveMembership) {
+            log.warn("User {} already has an active membership, but proceeding with new purchase", transaction.getUserId());
+            // Optionally: expire the old membership or extend it
+            // For now, we'll allow multiple active memberships (they can stack)
+        }
 
         // Calculate dates
         LocalDateTime startDate = LocalDateTime.now();

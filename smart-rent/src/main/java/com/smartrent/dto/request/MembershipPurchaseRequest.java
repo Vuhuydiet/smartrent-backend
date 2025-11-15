@@ -16,7 +16,5 @@ public class MembershipPurchaseRequest {
     Long membershipId;
 
     String paymentProvider; // VNPAY, MOMO, WALLET, etc.
-
-    String returnUrl; // For payment gateway callback
 }
 

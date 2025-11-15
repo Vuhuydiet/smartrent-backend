@@ -81,12 +81,16 @@ public class ListingController {
             - listingType (RENT/SALE)
             - productType (APARTMENT/HOUSE/STUDIO/etc.)
             - price, priceUnit (MONTH/DAY/YEAR)
-            - address object with provinceId, districtId, wardId, streetId
+            - address object with:
+              - addressType (OLD or NEW) - REQUIRED
+              - For OLD: provinceId, districtId, wardId
+              - For NEW: newProvinceCode, newWardCode
 
             **Optional Fields:**
             - area, bedrooms, bathrooms
             - direction, furnishing, propertyType
             - amenityIds (array of amenity IDs)
+            - address.streetId, address.streetNumber
             - address.latitude, address.longitude
             """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -113,6 +117,7 @@ public class ListingController {
                           "price": 12000000,
                           "priceUnit": "MONTH",
                           "address": {
+                            "addressType": "OLD",
                             "streetNumber": "123",
                             "streetId": 1,
                             "wardId": 1,
@@ -581,7 +586,7 @@ public class ListingController {
         description = """
             Creates a VIP or Premium listing with dual payment model:
             1. If useMembershipQuota=true and user has quota: Creates listing immediately using quota
-            2. If useMembershipQuota=false or no quota: Returns VNPay payment URL
+            2. If useMembershipQuota=false or no quota: Returns payment URL. After payment completion, user will be redirected to frontend. Verify payment status using GET /v1/payments/transactions/{txnRef}.
 
             Premium listings automatically create a shadow NORMAL listing for double visibility.
             """,
@@ -652,8 +657,7 @@ public class ListingController {
                               "furnishing": "FULLY_FURNISHED",
                               "useMembershipQuota": false,
                               "durationDays": 30,
-                              "paymentProvider": "VNPAY",
-                              "returnUrl": "http://localhost:3000/payment/result"
+                              "paymentProvider": "VNPAY"
                             }
                             """
                     ),

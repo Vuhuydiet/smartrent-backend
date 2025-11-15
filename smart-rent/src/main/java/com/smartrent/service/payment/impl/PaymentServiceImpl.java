@@ -8,6 +8,7 @@ import com.smartrent.dto.request.PaymentStatusUpdateRequest;
 import com.smartrent.dto.response.PaymentCallbackResponse;
 import com.smartrent.dto.response.PaymentHistoryResponse;
 import com.smartrent.dto.response.PaymentResponse;
+import com.smartrent.dto.response.TransactionResponse;
 import com.smartrent.mapper.PaymentMapper;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.infra.repository.PaymentRepository;
@@ -54,23 +55,6 @@ public class PaymentServiceImpl implements PaymentService {
         } catch (Exception e) {
             log.error("Error creating payment for provider: {}", request.getProvider(), e);
             throw new RuntimeException("Failed to create payment", e);
-        }
-    }
-
-    @Override
-    @Transactional
-    public PaymentCallbackResponse processCallback(PaymentCallbackRequest request, HttpServletRequest httpRequest) {
-        String txnRef = extractTransactionRef(request.getParams(), request.getProvider());
-        log.info("Processing callback for provider: {} and transaction: {}", request.getProvider(), txnRef);
-
-        try {
-            com.smartrent.service.payment.provider.PaymentProvider provider =
-                    paymentProviderFactory.getProvider(request.getProvider());
-
-            return provider.processCallback(request.getParams(), httpRequest);
-        } catch (Exception e) {
-            log.error("Error processing callback for provider: {}", request.getProvider(), e);
-            throw new RuntimeException("Failed to process callback", e);
         }
     }
 
@@ -164,16 +148,31 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public boolean transactionRefExists(String transactionRef) {
-        return paymentRepository.existsByTransactionRef(transactionRef);
+        return paymentRepository.findByTransactionRef(transactionRef).isPresent();
     }
 
     @Override
     @Transactional
-    public Transaction updatePaymentStatus(PaymentStatusUpdateRequest request) {
+    public TransactionResponse updatePaymentStatus(PaymentStatusUpdateRequest request) {
         Transaction transaction = getPaymentByTransactionRef(request.getTransactionRef());
         transaction.setStatus(request.getStatus());
         // updatedAt will be automatically set by @UpdateTimestamp
-        return paymentRepository.save(transaction);
+        Transaction updated = paymentRepository.save(transaction);
+
+        return TransactionResponse.builder()
+                .transactionId(updated.getTransactionId())
+                .userId(updated.getUserId())
+                .transactionType(updated.getTransactionType() != null ? updated.getTransactionType().name() : null)
+                .amount(updated.getAmount())
+                .referenceType(updated.getReferenceType() != null ? updated.getReferenceType().name() : null)
+                .referenceId(updated.getReferenceId())
+                .additionalInfo(updated.getAdditionalInfo())
+                .status(updated.getStatus() != null ? updated.getStatus().name() : null)
+                .paymentProvider(updated.getPaymentProvider() != null ? updated.getPaymentProvider().name() : null)
+                .providerTransactionId(updated.getProviderTransactionId())
+                .createdAt(updated.getCreatedAt())
+                .updatedAt(updated.getUpdatedAt())
+                .build();
     }
 
     // Provider Management Methods

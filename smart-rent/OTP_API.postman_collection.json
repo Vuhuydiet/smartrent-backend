@@ -1,0 +1,341 @@
+{
+  "info": {
+    "name": "SmartRent OTP API",
+    "description": "OTP Phone Verification API for SmartRent - Vietnam users with Zalo ZNS and SMS fallback",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "phone",
+      "value": "0912345678",
+      "type": "string"
+    },
+    {
+      "key": "requestId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Send OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Parse response",
+              "const response = pm.response.json();",
+              "",
+              "// Save requestId for verification",
+              "if (response.data && response.data.requestId) {",
+              "    pm.collectionVariables.set('requestId', response.data.requestId);",
+              "    console.log('Request ID saved:', response.data.requestId);",
+              "}",
+              "",
+              "// Tests",
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has success code', function () {",
+              "    pm.expect(response.code).to.equal('0');",
+              "});",
+              "",
+              "pm.test('Response contains requestId', function () {",
+              "    pm.expect(response.data.requestId).to.be.a('string');",
+              "});",
+              "",
+              "pm.test('Response contains channel', function () {",
+              "    pm.expect(response.data.channel).to.be.oneOf(['zalo', 'sms']);",
+              "});",
+              "",
+              "pm.test('Response contains TTL', function () {",
+              "    pm.expect(response.data.ttlSeconds).to.equal(300);",
+              "});",
+              "",
+              "pm.test('Rate limit headers present', function () {",
+              "    pm.response.to.have.header('X-RateLimit-Remaining-Phone');",
+              "    pm.response.to.have.header('X-RateLimit-Remaining-IP');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{phone}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/otp/send",
+          "host": ["{{baseUrl}}"],
+          "path": ["otp", "send"]
+        },
+        "description": "Send OTP to Vietnam phone number. Attempts Zalo ZNS first, falls back to SMS if Zalo fails."
+      },
+      "response": [
+        {
+          "name": "Success - Zalo",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0912345678\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/otp/send",
+              "host": ["{{baseUrl}}"],
+              "path": ["otp", "send"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "key": "X-RateLimit-Remaining-Phone",
+              "value": "4"
+            },
+            {
+              "key": "X-RateLimit-Remaining-IP",
+              "value": "19"
+            }
+          ],
+          "body": "{\n  \"code\": \"0\",\n  \"message\": \"OTP sent successfully\",\n  \"data\": {\n    \"channel\": \"zalo\",\n    \"requestId\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"ttlSeconds\": 300,\n    \"maskedPhone\": \"+8491***5678\"\n  }\n}"
+        },
+        {
+          "name": "Error - Rate Limit Exceeded",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0912345678\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/otp/send",
+              "host": ["{{baseUrl}}"],
+              "path": ["otp", "send"]
+            }
+          },
+          "status": "Too Many Requests",
+          "code": 429,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"code\": \"10003\",\n  \"message\": \"Rate limit exceeded. Please try again later.\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Send OTP with Preferred Channels",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"preferredChannels\": [\"zalo\", \"sms\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/otp/send",
+          "host": ["{{baseUrl}}"],
+          "path": ["otp", "send"]
+        },
+        "description": "Send OTP with explicit channel preference order"
+      }
+    },
+    {
+      "name": "Verify OTP - Success",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const response = pm.response.json();",
+              "",
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('OTP verified successfully', function () {",
+              "    pm.expect(response.data.verified).to.be.true;",
+              "});",
+              "",
+              "pm.test('Success message present', function () {",
+              "    pm.expect(response.message).to.include('successfully');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"code\": \"123456\",\n  \"requestId\": \"{{requestId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/otp/verify",
+          "host": ["{{baseUrl}}"],
+          "path": ["otp", "verify"]
+        },
+        "description": "Verify OTP code. Replace '123456' with the actual OTP received."
+      },
+      "response": [
+        {
+          "name": "Success",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0912345678\",\n  \"code\": \"123456\",\n  \"requestId\": \"550e8400-e29b-41d4-a716-446655440000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/otp/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["otp", "verify"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"code\": \"0\",\n  \"message\": \"OTP verified successfully\",\n  \"data\": {\n    \"verified\": true,\n    \"message\": \"OTP verified successfully\"\n  }\n}"
+        },
+        {
+          "name": "Failed - Invalid Code",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0912345678\",\n  \"code\": \"000000\",\n  \"requestId\": \"550e8400-e29b-41d4-a716-446655440000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/otp/verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["otp", "verify"]
+            }
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"code\": \"10007\",\n  \"message\": \"Invalid OTP code\",\n  \"data\": {\n    \"verified\": false,\n    \"message\": \"Invalid OTP code\",\n    \"remainingAttempts\": 4\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Verify OTP - Wrong Code",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const response = pm.response.json();",
+              "",
+              "pm.test('Status code is 400', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('OTP verification failed', function () {",
+              "    pm.expect(response.data.verified).to.be.false;",
+              "});",
+              "",
+              "pm.test('Remaining attempts shown', function () {",
+              "    pm.expect(response.data.remainingAttempts).to.be.a('number');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"{{phone}}\",\n  \"code\": \"000000\",\n  \"requestId\": \"{{requestId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/otp/verify",
+          "host": ["{{baseUrl}}"],
+          "path": ["otp", "verify"]
+        },
+        "description": "Test verification with wrong OTP code"
+      }
+    }
+  ]
+}
+

@@ -38,6 +38,9 @@ public class PaymentRequest {
     @Schema(description = "Order information", example = "Payment for listing rental deposit")
     String orderInfo;
 
+    @Schema(description = "Existing transaction ID to use (optional - if provided, will reuse existing transaction instead of creating new one)")
+    String transactionId;
+
     @Schema(description = "Listing ID for the payment", example = "12345")
     Long listingId;
 

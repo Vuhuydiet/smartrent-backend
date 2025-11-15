@@ -22,6 +22,8 @@ public class UserMapperImpl implements UserMapper {
         .taxNumber(userCreationRequest.getTaxNumber())
         .phoneCode(userCreationRequest.getPhoneCode())
         .phoneNumber(userCreationRequest.getPhoneNumber())
+        .contactPhoneNumber(userCreationRequest.getContactPhoneNumber())
+        .contactPhoneVerified(false) // New users start with unverified contact phone
         .build();
   }
 
@@ -36,6 +38,8 @@ public class UserMapperImpl implements UserMapper {
         .taxNumber(userCreationRequest.getTaxNumber())
         .phoneCode(userCreationRequest.getPhoneCode())
         .phoneNumber(userCreationRequest.getPhoneNumber())
+        .contactPhoneNumber(userCreationRequest.getContactPhoneNumber())
+        .contactPhoneVerified(false) // New users start with unverified contact phone
         .build();
   }
 
@@ -50,6 +54,8 @@ public class UserMapperImpl implements UserMapper {
         .taxNumber(user.getTaxNumber())
         .phoneCode(user.getPhoneCode())
         .phoneNumber(user.getPhoneNumber())
+        .contactPhoneNumber(user.getContactPhoneNumber())
+        .contactPhoneVerified(user.getContactPhoneVerified())
         .build();
   }
 
@@ -64,6 +70,8 @@ public class UserMapperImpl implements UserMapper {
         .taxNumber(user.getTaxNumber())
         .phoneCode(user.getPhoneCode())
         .phoneNumber(user.getPhoneNumber())
+        .contactPhoneNumber(user.getContactPhoneNumber())
+        .contactPhoneVerified(user.getContactPhoneVerified())
         .build();
   }
 }

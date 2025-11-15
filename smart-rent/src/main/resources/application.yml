@@ -33,6 +33,7 @@ logging:
     com.smartrent.service.communication: INFO
     com.smartrent.service.content: INFO
     com.smartrent.service.discovery: INFO
+    com.smartrent.service.phoneclickdetail: INFO
     # Framework logging
     org.springframework: WARN
     org.hibernate: WARN
@@ -125,6 +126,8 @@ spring:
 
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"
+  admin:
+    contact-phone-number: "${ADMIN_CONTACT_PHONE:0912345678}"
   authorize-ignored:
     methods:
       get:
@@ -137,7 +140,6 @@ application:
         - "/webjars/**"
         - "/actuator/health"
         - "/actuator/**"
-        - "/v1/payments/vnpay/callback"
         - "/v1/listings/**"
         - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
@@ -146,12 +148,14 @@ application:
         - "/v1/memberships/packages/**"
         - "/v1/vip-tiers/**"
         - "/v1/push-details/**"
+        - "/v1/support/contact"
       post:
         - "/v1/auth/**"
         - "/v1/users"
         - "/v1/admins"
         - "/v1/verification/**"
-        - "/v1/payments/vnpay/ipn"
+        - "/v1/payments/ipn/**"
+        - "/otp/**"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
@@ -248,7 +252,7 @@ vnpay:
   tmnCode: ${VNPAY_TMN_CODE:DEMO}
   hashSecret: ${VNPAY_HASH_SECRET:DEMOSECRETKEY}
   url: ${VNPAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-  returnUrl: ${VNPAY_RETURN_URL:http://localhost:8080/v1/payments/callback}
+  returnUrl: ${VNPAY_RETURN_URL:http://localhost:3000/payment/result}
   version: "2.1.0"
   command: "pay"
   currencyCode: "VND"
@@ -320,3 +324,47 @@ management:
     export:
       prometheus:
         enabled: true
+
+# OTP Phone Verification Configuration
+otp:
+  # OTP code configuration
+  code-length: 6
+  ttl-seconds: 300  # 5 minutes
+  max-verification-attempts: 5
+
+  # Storage configuration
+  store:
+    type: ${OTP_STORE_TYPE:redis}  # redis or memory (memory for testing only)
+
+  # Rate limiting configuration
+  rate-limit:
+    max-sends-per-phone: 5      # Maximum OTP sends per phone in time window
+    max-sends-per-ip: 20         # Maximum OTP sends per IP in time window
+    window-seconds: 3600         # Time window in seconds (1 hour)
+
+  # Provider configurations
+  providers:
+    # Zalo ZNS (primary channel)
+    # IMPORTANT: Requires Zalo Official Account registration and template approval
+    # See: https://developers.zalo.me/docs/zalo-notification-service
+    zalo:
+      enabled: ${ZALO_OTP_ENABLED:false}
+      access-token: ${ZALO_ACCESS_TOKEN:}
+      oa-id: ${ZALO_OA_ID:}
+      template-id: ${ZALO_TEMPLATE_ID:}
+      api-endpoint: ${ZALO_API_ENDPOINT:https://business.openapi.zalo.me/message/template}
+      max-retry-attempts: ${ZALO_MAX_RETRY_ATTEMPTS:3}
+      retry-backoff-seconds: ${ZALO_RETRY_BACKOFF_SECONDS:1}
+      request-timeout-seconds: ${ZALO_REQUEST_TIMEOUT_SECONDS:10}
+      app-name: ${ZALO_APP_NAME:SmartRent}
+      default-expiry-minutes: ${ZALO_DEFAULT_EXPIRY_MINUTES:5}
+
+    # Twilio SMS (fallback channel)
+    # IMPORTANT: SMS sender registration required in Vietnam
+    # Consider using local SMS providers (VIETGUYS, VNPT, FPT, Viettel) for production
+    twilio:
+      enabled: ${TWILIO_OTP_ENABLED:false}
+      account-sid: ${TWILIO_ACCOUNT_SID:}
+      auth-token: ${TWILIO_AUTH_TOKEN:}
+      from-number: ${TWILIO_FROM_NUMBER:}
+      message-template: "${TWILIO_MESSAGE_TEMPLATE:SmartRent - Your verification code is %s. Valid for 5 minutes. Do not share this code.}"

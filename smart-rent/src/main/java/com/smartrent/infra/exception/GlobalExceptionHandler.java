@@ -51,15 +51,34 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(ConstraintViolationException.class)
   public ResponseEntity<ApiResponse<Void>> handleConstraintViolationException(ConstraintViolationException exception) {
     DomainCode domainCode = DomainCode.INVALID_KEY;
+    String errorMessage = domainCode.getMessage();
+
     try {
       ConstraintViolation<?> constraintViolation = exception.getConstraintViolations().stream().findFirst().get();
-      domainCode = DomainCode.valueOf(constraintViolation.getMessage());
-    } catch (IllegalArgumentException ignored) {
+      String violationMessage = constraintViolation.getMessage();
+      String propertyPath = constraintViolation.getPropertyPath().toString();
+      Object invalidValue = constraintViolation.getInvalidValue();
+
+      // Log detailed validation error
+      System.err.println("Validation error - Property: " + propertyPath +
+                        ", Invalid value: " + invalidValue +
+                        ", Message: " + violationMessage);
+
+      // Try to get specific domain code from message
+      try {
+        domainCode = DomainCode.valueOf(violationMessage);
+        errorMessage = domainCode.getMessage();
+      } catch (IllegalArgumentException e) {
+        // If not a domain code, use the validation message
+        errorMessage = propertyPath + ": " + violationMessage;
+      }
+    } catch (Exception e) {
+      System.err.println("Error processing constraint violation: " + e.getMessage());
     }
 
     ApiResponse<Void> apiResponse = new ApiResponse<>();
     apiResponse.setCode(domainCode.getValue());
-    apiResponse.setMessage(domainCode.getMessage());
+    apiResponse.setMessage(errorMessage);
     return ResponseEntity.badRequest().body(apiResponse);
   }
 
@@ -116,23 +135,41 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValidException(MethodArgumentNotValidException exception) {
     DomainCode domainCode = DomainCode.INVALID_KEY;
     Map<String, Object> attributes = null;
+    String errorMessage = domainCode.getMessage();
 
     try {
+      String fieldName = exception.getFieldError().getField();
+      Object rejectedValue = exception.getFieldError().getRejectedValue();
       String errorMsg = exception.getFieldError().getDefaultMessage();
-      domainCode = DomainCode.valueOf(errorMsg);
+
+      // Log detailed validation error
+      System.err.println("Method argument validation error - Field: " + fieldName +
+                        ", Rejected value: " + rejectedValue +
+                        ", Message: " + errorMsg);
+
+      // Try to get specific domain code from message
+      try {
+        domainCode = DomainCode.valueOf(errorMsg);
+        errorMessage = domainCode.getMessage();
+      } catch (IllegalArgumentException e) {
+        // If not a domain code, use the validation message
+        errorMessage = fieldName + ": " + errorMsg;
+      }
 
       ConstraintViolation constraintViolation =
           exception.getAllErrors().stream().findFirst().get().unwrap(ConstraintViolation.class);
 
       attributes = constraintViolation.getConstraintDescriptor().getAttributes();
     } catch (IllegalArgumentException ignored) {
+    } catch (Exception e) {
+      System.err.println("Error processing method argument validation: " + e.getMessage());
     }
 
     ApiResponse<Void> apiResponse = new ApiResponse<>();
 
     apiResponse.setCode(domainCode.getValue());
     apiResponse.setMessage(
-        Objects.isNull(attributes) ? domainCode.getMessage() : mapAttribute(domainCode.getMessage(), attributes));
+        Objects.isNull(attributes) ? errorMessage : mapAttribute(errorMessage, attributes));
 
     return ResponseEntity.badRequest().body(apiResponse);
   }

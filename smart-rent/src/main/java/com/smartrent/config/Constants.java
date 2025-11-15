@@ -50,6 +50,8 @@ public class Constants {
 
   public static final String PASSWORD_PATTERN = "^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*(){}\\[\\]!~`|])(?=.*\\d).*$";
 
+  public static final String VIETNAM_PHONE_PATTERN = "^(09|03|07|08|05)[0-9]{8}$";
+
   public static final int USER_ID_MASKING_INDEX = 6;
 
   public static final int PHONE_MASKING_INDEX = 6;

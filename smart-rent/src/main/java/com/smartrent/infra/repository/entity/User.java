@@ -42,4 +42,10 @@ public class User extends AbstractUser{
   @Column(name = "is_verified")
   boolean isVerified;
 
+  @Column(name = "contact_phone_number")
+  String contactPhoneNumber;
+
+  @Column(name = "contact_phone_verified")
+  Boolean contactPhoneVerified;
+
 }
