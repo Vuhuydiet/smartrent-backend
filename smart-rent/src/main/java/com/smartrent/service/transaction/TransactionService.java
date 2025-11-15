@@ -15,7 +15,7 @@ public interface TransactionService {
 
     /**
      * Create a membership purchase transaction
-     * 
+     *
      * @param userId User ID
      * @param membershipId Membership package ID
      * @param amount Payment amount
@@ -49,7 +49,7 @@ public interface TransactionService {
 
     /**
      * Complete a transaction after successful payment
-     * 
+     *
      * @param transactionId Transaction ID
      * @param providerTransactionId Provider's transaction ID
      * @return Updated transaction response
@@ -58,7 +58,7 @@ public interface TransactionService {
 
     /**
      * Fail a transaction
-     * 
+     *
      * @param transactionId Transaction ID
      * @param reason Failure reason
      * @return Updated transaction response
@@ -72,6 +72,14 @@ public interface TransactionService {
      * @return Transaction entity
      */
     Transaction getTransaction(String transactionId);
+
+    /**
+     * Get transaction response by ID
+     *
+     * @param transactionId Transaction ID
+     * @return Transaction response
+     */
+    TransactionResponse getTransactionResponse(String transactionId);
 
     /**
      * Get transaction history for a user

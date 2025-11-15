@@ -52,7 +52,7 @@ public class TransactionServiceImpl implements TransactionService {
 
         transaction = transactionRepository.save(transaction);
         log.info("Created membership transaction: {}", transaction.getTransactionId());
-        
+
         return transaction.getTransactionId();
     }
 
@@ -149,6 +149,17 @@ public class TransactionServiceImpl implements TransactionService {
 
         return transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new RuntimeException("Transaction not found: " + transactionId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TransactionResponse getTransactionResponse(String transactionId) {
+        log.info("Getting transaction response: {}", transactionId);
+
+        Transaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new RuntimeException("Transaction not found: " + transactionId));
+
+        return mapToResponse(transaction);
     }
 
     @Override

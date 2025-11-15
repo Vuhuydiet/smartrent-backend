@@ -8,6 +8,7 @@ import com.smartrent.dto.request.PaymentStatusUpdateRequest;
 import com.smartrent.dto.response.PaymentCallbackResponse;
 import com.smartrent.dto.response.PaymentHistoryResponse;
 import com.smartrent.dto.response.PaymentResponse;
+import com.smartrent.dto.response.TransactionResponse;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.service.payment.provider.PaymentProvider.PaymentFeature;
@@ -26,11 +27,6 @@ public interface PaymentService {
      * Create payment with specified provider
      */
     PaymentResponse createPayment(PaymentRequest request, HttpServletRequest httpRequest);
-
-    /**
-     * Process payment callback from any provider
-     */
-    PaymentCallbackResponse processCallback(PaymentCallbackRequest request, HttpServletRequest httpRequest);
 
     /**
      * Process IPN from any provider
@@ -77,7 +73,7 @@ public interface PaymentService {
     /**
      * Update payment status
      */
-    Transaction updatePaymentStatus(PaymentStatusUpdateRequest request);
+    TransactionResponse updatePaymentStatus(PaymentStatusUpdateRequest request);
 
     // Provider Management Methods
 
