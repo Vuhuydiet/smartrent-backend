@@ -1227,8 +1227,8 @@ public class AddressController {
         log.info("GET /v1/addresses/convert/legacy-to-new - provinceId: {}, districtId: {}, wardId: {}",
                 provinceId, districtId, wardId);
 
-//        AddressConversionResponse response = addressService.convertLegacyToNew(provinceId, districtId, wardId);
-        AddressConversionResponse response = new AddressConversionResponse();
+        AddressConversionResponse response = addressService.convertLegacyToNew(provinceId, districtId, wardId);
+//        AddressConversionResponse response = new AddressConversionResponse();
         return ResponseEntity.ok(ApiResponse.<AddressConversionResponse>builder()
                 .data(response)
                 .message("Successfully converted address from legacy to new structure")
@@ -1297,8 +1297,8 @@ public class AddressController {
         log.info("GET /v1/addresses/convert/new-to-legacy - provinceCode: {}, wardCode: {}",
                 provinceCode, wardCode);
 
-//        AddressConversionResponse response = addressService.convertNewToLegacy(provinceCode, wardCode);
-        AddressConversionResponse response = new AddressConversionResponse();
+        AddressConversionResponse response = addressService.convertNewToLegacy(provinceCode, wardCode);
+//        AddressConversionResponse response = new AddressConversionResponse();
 
         return ResponseEntity.ok(ApiResponse.<AddressConversionResponse>builder()
                 .data(response)

@@ -22,44 +22,36 @@ import java.util.Set;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ListingCreationRequest {
 
-    @NotBlank
-    @Size(max = 200)
-    String title;
-
-    @NotBlank
-    String description;
-
+    // Essential fields - always required
     @NotNull
     String userId;
 
+    // Fields that can be optional for draft listings
+    @Size(max = 200)
+    String title;
+
+    String description;
+
     LocalDateTime expiryDate;
 
-    @NotBlank
     String listingType;
-
 
     Boolean verified;
     Boolean isVerify;
     Boolean expired;
 
-    @NotBlank
     String vipType;
 
-    @NotNull
     Long categoryId;
 
-    @NotBlank
     String productType;
 
-    @NotNull
     @DecimalMin(value = "0.0", inclusive = false)
     BigDecimal price;
 
-    @NotBlank
     String priceUnit;
 
     @Valid
-    @NotNull(message = "Address information is required")
     AddressCreationRequest address;
 
     @DecimalMin(value = "0.0", inclusive = false)
@@ -83,6 +75,14 @@ public class ListingCreationRequest {
     Set<Long> amenityIds;
 
     /**
+     * Whether this is a draft listing
+     * If true, validation is relaxed to allow incomplete data
+     * Default: false
+     */
+    @Builder.Default
+    Boolean isDraft = false;
+
+    /**
      * List of media IDs to attach to this listing
      * Media must be already uploaded and belong to the same user
      * Optional: If not provided, listing will be created without media
@@ -90,10 +90,11 @@ public class ListingCreationRequest {
     Set<Long> mediaIds;
 
     /**
-     * Duration plan ID for the listing (5d, 7d, 10d, 15d, 30d)
-     * Required for NORMAL listings when creating through payment flow
+     * Duration in days for the listing
+     * Required when creating through payment flow
+     * Must match one of the durations available for the selected VIP tier (e.g., 5, 7, 10, 15, 30)
      */
-    Long durationPlanId;
+    Integer durationDays;
 
     /**
      * Whether to use membership quota (only applicable for VIP listings)

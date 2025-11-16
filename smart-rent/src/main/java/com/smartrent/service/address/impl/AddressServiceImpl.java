@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -34,6 +35,7 @@ public class AddressServiceImpl implements AddressService {
     private final LegacyWardRepository legacyWardRepository;
     private final ProvinceMappingRepository provinceMappingRepository;
     private final WardMappingRepository wardMappingRepository;
+    private final DistrictWardMappingRepository districtWardMappingRepository;
     private final StreetRepository streetRepository;
     private final ProjectRepository projectRepository;
 
@@ -166,9 +168,8 @@ public class AddressServiceImpl implements AddressService {
         ProvinceMapping provinceMapping = provinceMappingRepository.findByLegacyProvinceId(legacyProvinceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Province mapping not found for legacy province id: " + legacyProvinceId));
 
-        // Find ward mapping
-        WardMapping wardMapping = wardMappingRepository.findByLegacyWardId(legacyWardId).stream()
-                .findFirst()
+        // Find ward mapping (use default if legacy ward was split to multiple new wards)
+        WardMapping wardMapping = wardMappingRepository.findDefaultByLegacyWardId(legacyWardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ward mapping not found for legacy ward id: " + legacyWardId));
 
         // Get new address
@@ -192,6 +193,8 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     public AddressConversionResponse convertNewToLegacy(String newProvinceCode, String newWardCode) {
+        log.info("Converting new address to legacy - provinceCode: {}, wardCode: {}", newProvinceCode, newWardCode);
+
         // Get new address
         Province newProvince = newProvinceRepository.findByCode(newProvinceCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Province not found with code: " + newProvinceCode));
@@ -203,34 +206,71 @@ public class AddressServiceImpl implements AddressService {
                 .ward(toNewWardResponse(newWard))
                 .build();
 
-        // Find ward mapping (one new ward may map to multiple legacy wards)
-        List<WardMapping> wardMappings = wardMappingRepository.findByNewWardCode(newWardCode);
-        if (wardMappings.isEmpty()) {
-            throw new ResourceNotFoundException("No legacy ward mapping found for new ward code: " + newWardCode);
+        // Try to find ward-to-ward mapping first (legacy ward -> new ward)
+        // Use default mapping to get the primary legacy ward when multiple wards were merged
+        Optional<WardMapping> defaultMappingOpt = wardMappingRepository.findDefaultByNewWardCode(newWardCode);
+
+        if (defaultMappingOpt.isPresent()) {
+            // Found default ward-to-ward mapping
+            log.info("Found default ward-to-ward mapping for new ward code: {}", newWardCode);
+            WardMapping wardMapping = defaultMappingOpt.get();
+            LegacyWard legacyWard = wardMapping.getLegacyWard();
+            District legacyDistrict = legacyWard.getDistrict();
+            LegacyProvince legacyProvince = legacyWard.getProvince();
+
+            FullAddressResponse legacyAddress = FullAddressResponse.builder()
+                    .province(toLegacyProvinceResponse(legacyProvince))
+                    .district(toLegacyDistrictResponse(legacyDistrict))
+                    .ward(toLegacyWardResponse(legacyWard))
+                    .build();
+
+            // Check if there are multiple legacy wards for this new ward (merged scenario)
+            List<WardMapping> allMappings = wardMappingRepository.findByNewWardCode(newWardCode);
+            String conversionNote = allMappings.size() > 1
+                    ? String.format("Converted to legacy structure (ward-to-ward mapping). Note: This new ward was merged from %d legacy wards. Showing default/primary source. Merge type: %s",
+                            allMappings.size(), wardMapping.getMergeType())
+                    : String.format("Converted to legacy structure (ward-to-ward mapping). Merge type: %s", wardMapping.getMergeType());
+
+            return AddressConversionResponse.builder()
+                    .legacyAddress(legacyAddress)
+                    .newAddress(newAddress)
+                    .conversionNote(conversionNote)
+                    .build();
         }
 
-        // Get the first mapping (or you could return all possible mappings)
-        WardMapping wardMapping = wardMappings.get(0);
-        LegacyWard legacyWard = wardMapping.getLegacyWard();
-        District legacyDistrict = legacyWard.getDistrict();
-        LegacyProvince legacyProvince = legacyWard.getProvince();
+        // If no ward-to-ward mapping, try district-to-ward mapping (legacy district -> new ward)
+        log.info("No ward-to-ward mapping found, checking district-to-ward mapping for new ward code: {}", newWardCode);
+        List<DistrictWardMapping> districtWardMappings = districtWardMappingRepository.findByNewWardCode(newWardCode);
 
-        FullAddressResponse legacyAddress = FullAddressResponse.builder()
-                .province(toLegacyProvinceResponse(legacyProvince))
-                .district(toLegacyDistrictResponse(legacyDistrict))
-                .ward(toLegacyWardResponse(legacyWard))
-                .build();
+        if (!districtWardMappings.isEmpty()) {
+            // Found district-to-ward mapping (the entire legacy district became a new ward)
+            log.info("Found district-to-ward mapping for new ward code: {}", newWardCode);
+            DistrictWardMapping districtWardMapping = districtWardMappings.get(0);
+            District legacyDistrict = districtWardMapping.getLegacyDistrict();
+            LegacyProvince legacyProvince = legacyDistrict.getProvince();
 
-        String conversionNote = wardMappings.size() > 1
-                ? String.format("Converted to legacy structure. Note: This new ward maps to %d legacy wards. Showing first result. Merge type: %s",
-                        wardMappings.size(), wardMapping.getMergeType())
-                : String.format("Converted to legacy structure. Merge type: %s", wardMapping.getMergeType());
+            // Note: Since the entire district became a ward, we don't have a specific legacy ward
+            // We return the district as the main administrative unit
+            FullAddressResponse legacyAddress = FullAddressResponse.builder()
+                    .province(toLegacyProvinceResponse(legacyProvince))
+                    .district(toLegacyDistrictResponse(legacyDistrict))
+                    .ward(null) // No specific ward - the entire district became this new ward
+                    .build();
 
-        return AddressConversionResponse.builder()
-                .legacyAddress(legacyAddress)
-                .newAddress(newAddress)
-                .conversionNote(conversionNote)
-                .build();
+            String conversionNote = districtWardMappings.size() > 1
+                    ? String.format("Converted to legacy structure (district-to-ward mapping). Note: This new ward represents an entire legacy district. %d legacy districts map to this ward. Showing first result.",
+                            districtWardMappings.size())
+                    : "Converted to legacy structure (district-to-ward mapping). This new ward represents an entire legacy district.";
+
+            return AddressConversionResponse.builder()
+                    .legacyAddress(legacyAddress)
+                    .newAddress(newAddress)
+                    .conversionNote(conversionNote)
+                    .build();
+        }
+
+        // No mapping found in either table
+        throw new ResourceNotFoundException("No mapping found for new ward code: " + newWardCode + ". Checked both ward_mapping and district_ward_mapping tables.");
     }
 
     // Mapping methods

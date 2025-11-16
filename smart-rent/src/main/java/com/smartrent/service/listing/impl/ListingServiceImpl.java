@@ -2,15 +2,16 @@ package com.smartrent.service.listing.impl;
 
 import com.smartrent.constants.PricingConstants;
 import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.request.MyListingsFilterRequest;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
-import com.smartrent.dto.response.ListingDurationPlanResponse;
-import com.smartrent.dto.response.PriceCalculationResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.PostSource;
 import com.smartrent.infra.exception.AppException;
@@ -22,8 +23,8 @@ import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.UserRepository;
-import com.smartrent.infra.repository.ListingDurationPlanRepository;
 import com.smartrent.infra.repository.entity.*;
+import com.smartrent.infra.repository.specification.ListingSpecification;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.cache.ListingRequestCacheService;
@@ -39,11 +40,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -67,37 +72,41 @@ public class ListingServiceImpl implements ListingService {
     TransactionRepository transactionRepository;
     PaymentService paymentService;
     AddressCreationService addressCreationService;
-    ListingDurationPlanRepository listingDurationPlanRepository;
     ListingRequestCacheService listingRequestCacheService;
 
     @Override
     @Transactional
     public ListingCreationResponse createListing(ListingCreationRequest request) {
-        log.info("Creating listing with address - User: {}, Title: {}", request.getUserId(), request.getTitle());
+        log.info("Creating listing with address - User: {}, Title: {}, IsDraft: {}",
+                request.getUserId(), request.getTitle(), request.getIsDraft());
 
-        // Check if this is a NORMAL listing with duration plan requiring payment
-        if (request.getDurationPlanId() != null && !Boolean.TRUE.equals(request.getUseMembershipQuota())) {
+        // For draft listings, skip validation and payment flow
+        if (Boolean.TRUE.equals(request.getIsDraft())) {
+            return createDraftListing(request);
+        }
+
+        // Validate required fields for non-draft listings
+        validateNonDraftListing(request);
+
+        // Check if this is a NORMAL listing with duration requiring payment
+        if (request.getDurationDays() != null && !Boolean.TRUE.equals(request.getUseMembershipQuota())) {
             log.info("NORMAL listing requires payment - initiating payment flow");
 
-            // Validate duration plan exists
-            ListingDurationPlan plan = listingDurationPlanRepository.findById(request.getDurationPlanId())
-                    .orElseThrow(() -> new AppException(DomainCode.DURATION_PLAN_NOT_FOUND,
-                            "Duration plan not found: " + request.getDurationPlanId()));
-
-            if (!plan.getIsActive()) {
-                throw new AppException(DomainCode.DURATION_PLAN_NOT_FOUND,
-                        "Duration plan is not active: " + request.getDurationPlanId());
+            // Validate duration days
+            if (request.getDurationDays() <= 0) {
+                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                        "Duration days must be positive: " + request.getDurationDays());
             }
 
             // Calculate price for NORMAL listing
-            java.math.BigDecimal amount = PricingConstants.calculateNormalPostPrice(plan.getDurationDays());
+            java.math.BigDecimal amount = PricingConstants.calculateNormalPostPrice(request.getDurationDays());
 
             // Create PENDING transaction
             String transactionId = transactionService.createPostFeeTransaction(
                     request.getUserId(),
                     amount,
                     "NORMAL",
-                    plan.getDurationDays(),
+                    request.getDurationDays(),
                     request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
             );
 
@@ -112,7 +121,7 @@ public class ListingServiceImpl implements ListingService {
                             request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                     .amount(amount)
                     .currency(PricingConstants.DEFAULT_CURRENCY)
-                    .orderInfo("NORMAL Listing - " + plan.getDurationDays() + " days: " + request.getTitle())
+                    .orderInfo("NORMAL Listing - " + request.getDurationDays() + " days: " + request.getTitle())
                     .build();
 
             PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
@@ -389,8 +398,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional(readOnly = true)
     public List<ListingResponse> getListings(int page, int size) {
-        // Convert 1-based page to 0-based for Spring Data
-        int safePage = Math.max(page - 1, 0);
+        int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100); // cap size to 100
         Pageable pageable = PageRequest.of(safePage, safeSize);
         Page<Listing> pageResult = listingRepository.findAll(pageable);
@@ -568,64 +576,6 @@ public class ListingServiceImpl implements ListingService {
     }
 
     @Override
-    public List<ListingDurationPlanResponse> getAvailableDurationPlans() {
-        log.info("Fetching all available duration plans");
-
-        List<ListingDurationPlan> plans = listingDurationPlanRepository.findAllByIsActiveTrueOrderByDurationDaysAsc();
-
-        return plans.stream()
-                .map(plan -> {
-                    int days = plan.getDurationDays();
-                    BigDecimal discount = PricingConstants.getDiscountForDuration(days);
-
-                    return ListingDurationPlanResponse.builder()
-                            .planId(plan.getPlanId())
-                            .durationDays(days)
-                            .isActive(plan.getIsActive())
-                            .discountPercentage(discount)
-                            .discountDescription(formatDiscountDescription(discount))
-                            .normalPrice(PricingConstants.calculateNormalPostPrice(days))
-                            .silverPrice(PricingConstants.calculateSilverPostPrice(days))
-                            .goldPrice(PricingConstants.calculateGoldPostPrice(days))
-                            .diamondPrice(PricingConstants.calculateDiamondPostPrice(days))
-                            .build();
-                })
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public PriceCalculationResponse calculateListingPrice(String vipType, Integer durationDays) {
-        log.info("Calculating price for vipType: {}, duration: {} days", vipType, durationDays);
-
-        BigDecimal basePricePerDay = switch (vipType.toUpperCase()) {
-            case "NORMAL" -> PricingConstants.NORMAL_POST_PER_DAY;
-            case "SILVER" -> PricingConstants.SILVER_POST_PER_DAY;
-            case "GOLD" -> PricingConstants.GOLD_POST_PER_DAY;
-            case "DIAMOND" -> PricingConstants.DIAMOND_POST_PER_DAY;
-            default -> throw new AppException(DomainCode.BAD_REQUEST_ERROR,
-                    "Invalid VIP type: " + vipType);
-        };
-
-        BigDecimal totalBeforeDiscount = basePricePerDay.multiply(new BigDecimal(durationDays));
-        BigDecimal discountPercentage = PricingConstants.getDiscountForDuration(durationDays);
-        BigDecimal discountAmount = totalBeforeDiscount.multiply(discountPercentage)
-                .setScale(0, RoundingMode.HALF_UP);
-        BigDecimal finalPrice = totalBeforeDiscount.subtract(discountAmount);
-
-        return PriceCalculationResponse.builder()
-                .vipType(vipType.toUpperCase())
-                .durationDays(durationDays)
-                .basePricePerDay(basePricePerDay)
-                .totalBeforeDiscount(totalBeforeDiscount)
-                .discountPercentage(discountPercentage)
-                .discountAmount(discountAmount)
-                .finalPrice(finalPrice)
-                .currency(PricingConstants.DEFAULT_CURRENCY)
-                .savingsDescription(formatSavingsDescription(discountAmount, discountPercentage))
-                .build();
-    }
-
-    @Override
     @Transactional
     public ListingCreationResponse completeListingCreationAfterPayment(String transactionId) {
         log.info("Completing listing creation after payment for transaction: {}", transactionId);
@@ -758,6 +708,102 @@ public class ListingServiceImpl implements ListingService {
         }
     }
 
+    /**
+     * Validate required fields for non-draft listings
+     */
+    private void validateNonDraftListing(ListingCreationRequest request) {
+        List<String> missingFields = new ArrayList<>();
+
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            missingFields.add("title");
+        }
+        if (request.getDescription() == null || request.getDescription().isBlank()) {
+            missingFields.add("description");
+        }
+        if (request.getListingType() == null || request.getListingType().isBlank()) {
+            missingFields.add("listingType");
+        }
+        if (request.getVipType() == null || request.getVipType().isBlank()) {
+            missingFields.add("vipType");
+        }
+        if (request.getCategoryId() == null) {
+            missingFields.add("categoryId");
+        }
+        if (request.getProductType() == null || request.getProductType().isBlank()) {
+            missingFields.add("productType");
+        }
+        if (request.getPrice() == null) {
+            missingFields.add("price");
+        }
+        if (request.getPriceUnit() == null || request.getPriceUnit().isBlank()) {
+            missingFields.add("priceUnit");
+        }
+        if (request.getAddress() == null) {
+            missingFields.add("address");
+        }
+
+        if (!missingFields.isEmpty()) {
+            throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                    "Missing required fields for non-draft listing: " + String.join(", ", missingFields));
+        }
+    }
+
+    /**
+     * Create a draft listing with minimal validation
+     */
+    private ListingCreationResponse createDraftListing(ListingCreationRequest request) {
+        log.info("Creating draft listing for user: {}", request.getUserId());
+
+        // Create listing entity with available data
+        Listing listing = Listing.builder()
+                .userId(request.getUserId())
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .listingType(request.getListingType() != null ?
+                        Listing.ListingType.valueOf(request.getListingType()) : null)
+                .vipType(request.getVipType() != null ?
+                        Listing.VipType.valueOf(request.getVipType()) : Listing.VipType.NORMAL)
+                .categoryId(request.getCategoryId())
+                .productType(request.getProductType() != null ?
+                        Listing.ProductType.valueOf(request.getProductType()) : null)
+                .price(request.getPrice())
+                .priceUnit(request.getPriceUnit() != null ?
+                        Listing.PriceUnit.valueOf(request.getPriceUnit()) : null)
+                .area(request.getArea())
+                .bedrooms(request.getBedrooms())
+                .bathrooms(request.getBathrooms())
+                .direction(request.getDirection() != null ?
+                        Listing.Direction.valueOf(request.getDirection()) : null)
+                .furnishing(request.getFurnishing() != null ?
+                        Listing.Furnishing.valueOf(request.getFurnishing()) : null)
+                .propertyType(request.getPropertyType() != null ?
+                        Listing.PropertyType.valueOf(request.getPropertyType()) : null)
+                .roomCapacity(request.getRoomCapacity())
+                .isDraft(true)
+                .verified(false)
+                .isVerify(false)
+                .expired(false)
+                .build();
+
+        // Create address if provided
+        if (request.getAddress() != null) {
+            Address address = createAddress(request.getAddress());
+            listing.setAddress(address);
+        }
+
+        // Save draft listing
+        Listing saved = listingRepository.save(listing);
+        log.info("Draft listing created successfully with id: {}", saved.getListingId());
+
+        // Link media to listing if provided
+        if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
+            linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
+            log.info("Linked {} media items to draft listing {}", request.getMediaIds().size(), saved.getListingId());
+        }
+
+        return listingMapper.toCreationResponse(saved);
+    }
+
     private String formatDiscountDescription(BigDecimal discount) {
         if (discount.compareTo(BigDecimal.ZERO) == 0) {
             return "No discount";
@@ -775,5 +821,113 @@ public class ListingServiceImpl implements ListingService {
                 amount.toBigInteger(),
                 PricingConstants.DEFAULT_CURRENCY,
                 percentValue);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ListingListResponse searchListings(ListingFilterRequest filter) {
+        boolean isMyListings = filter.getUserId() != null && !filter.getUserId().isEmpty();
+
+        log.info("Unified search - UserId: {}, Category: {}, Province: {}/{}, isDraft: {}, Page: {}, Size: {}",
+                filter.getUserId(), filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCode(),
+                filter.getIsDraft(), filter.getPage(), filter.getSize());
+
+        // Build specification from filter
+        Specification<Listing> spec = ListingSpecification.fromFilterRequest(filter);
+
+        // Create pageable with sorting
+        Sort sort = createSort(filter.getSortBy(), filter.getSortDirection());
+        Pageable pageable = PageRequest.of(
+                Math.max(filter.getPage(), 0),
+                Math.min(Math.max(filter.getSize(), 1), 100),
+                sort
+        );
+
+        // Execute query with count
+        Page<Listing> page = listingRepository.findAll(spec, pageable);
+
+        // Convert to response DTOs
+        List<ListingResponse> listings = page.getContent().stream()
+                .map(listing -> {
+                    ListingResponse response = listingMapper.toResponse(listing);
+                    populateOwnerZaloInfo(response, listing.getUserId());
+                    return response;
+                })
+                .collect(Collectors.toList());
+
+        // Get recommendations (only for public search, not for my listings)
+        List<ListingResponse> recommendations = isMyListings
+                ? Collections.emptyList()
+                : getRecommendations(filter, 5);
+
+        return ListingListResponse.builder()
+                .listings(listings)
+                .totalCount(page.getTotalElements())
+                .currentPage(page.getNumber())
+                .pageSize(page.getSize())
+                .totalPages(page.getTotalPages())
+                .recommendations(recommendations)
+                .filterCriteria(filter)
+                .build();
+    }
+
+    /**
+     * Get recommended listings based on filter criteria
+     * TODO: Implement proper recommendation algorithm using ML or collaborative filtering
+     */
+    private List<ListingResponse> getRecommendations(ListingFilterRequest filter, int limit) {
+        // For now, return recent high-tier listings (GOLD/DIAMOND) as recommendations
+        Specification<Listing> recommendationSpec = (root, query, criteriaBuilder) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+
+            // High-tier listings
+            predicates.add(criteriaBuilder.or(
+                    criteriaBuilder.equal(root.get("vipType"), Listing.VipType.GOLD),
+                    criteriaBuilder.equal(root.get("vipType"), Listing.VipType.DIAMOND)
+            ));
+
+            // Verified and not expired
+            predicates.add(criteriaBuilder.equal(root.get("verified"), true));
+            predicates.add(criteriaBuilder.equal(root.get("expired"), false));
+            predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
+            predicates.add(criteriaBuilder.equal(root.get("isShadow"), false));
+
+            // Same category if provided
+            if (filter.getCategoryId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("categoryId"), filter.getCategoryId()));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+        Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "postDate"));
+        Page<Listing> recommendedListings = listingRepository.findAll(recommendationSpec, pageable);
+
+        return recommendedListings.getContent().stream()
+                .map(listing -> {
+                    ListingResponse response = listingMapper.toResponse(listing);
+                    populateOwnerZaloInfo(response, listing.getUserId());
+                    return response;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Create Sort object from sort field and direction
+     */
+    private Sort createSort(String sortBy, String sortDirection) {
+        String sortField = sortBy != null ? sortBy : "postDate";
+        Sort.Direction direction = "ASC".equalsIgnoreCase(sortDirection)
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+
+        // Map sortBy field to entity field
+        return switch (sortField) {
+            case "price" -> Sort.by(direction, "price");
+            case "area" -> Sort.by(direction, "area");
+            case "createdAt" -> Sort.by(direction, "createdAt");
+            case "updatedAt" -> Sort.by(direction, "updatedAt");
+            default -> Sort.by(direction, "postDate");
+        };
     }
 }

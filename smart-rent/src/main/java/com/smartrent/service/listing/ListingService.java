@@ -1,9 +1,12 @@
 package com.smartrent.service.listing;
 
 import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.request.MyListingsFilterRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
@@ -42,24 +45,19 @@ public interface ListingService {
     ListingResponseWithAdmin getListingByIdWithAdmin(Long id, String adminId);
 
     /**
-     * Get all available duration plans with calculated prices for all tiers
-     * @return List of duration plan responses
-     */
-    List<com.smartrent.dto.response.ListingDurationPlanResponse> getAvailableDurationPlans();
-
-    /**
-     * Calculate listing price based on VIP tier and duration
-     * @param vipType VIP tier (NORMAL, SILVER, GOLD, DIAMOND)
-     * @param durationDays Duration in days
-     * @return Price calculation response
-     */
-    com.smartrent.dto.response.PriceCalculationResponse calculateListingPrice(String vipType, Integer durationDays);
-
-    /**
      * Complete listing creation (both NORMAL and VIP) after successful payment
      * This unified method handles both NORMAL and VIP listings by checking cache
      * @param transactionId Transaction ID
      * @return Listing creation response
      */
     ListingCreationResponse completeListingCreationAfterPayment(String transactionId);
+
+    /**
+     * Unified search API - handles both public search and my listings
+     * @param filter Filter criteria (all fields optional)
+     *               - If userId is null: public search (excludes drafts by default)
+     *               - If userId is provided: user's listings (includes drafts if isDraft filter allows)
+     * @return Paginated listing response with total count and recommendations
+     */
+    ListingListResponse searchListings(ListingFilterRequest filter);
 }
