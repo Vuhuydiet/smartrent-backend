@@ -1,0 +1,407 @@
+package com.smartrent.infra.repository.specification;
+
+import com.smartrent.dto.request.ListingFilterRequest;
+import com.smartrent.dto.request.MyListingsFilterRequest;
+import com.smartrent.infra.repository.entity.Address;
+import com.smartrent.infra.repository.entity.AddressMetadata;
+import com.smartrent.infra.repository.entity.Amenity;
+import com.smartrent.infra.repository.entity.Listing;
+import com.smartrent.infra.repository.entity.Media;
+import com.smartrent.infra.repository.entity.User;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
+import org.springframework.data.jpa.domain.Specification;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * JPA Specifications for dynamic Listing queries
+ * Supports unified filtering for all listing search scenarios
+ */
+public class ListingSpecification {
+
+    /**
+     * Build unified specification from filter request
+     * Handles both public search and my listings in a single specification
+     */
+    public static Specification<Listing> fromFilterRequest(ListingFilterRequest filter) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // ============ USER & OWNERSHIP FILTERS ============
+            // User ID filter - if provided, search listings of specific user (my listings)
+            if (filter.getUserId() != null && !filter.getUserId().isEmpty()) {
+                predicates.add(criteriaBuilder.equal(root.get("userId"), filter.getUserId()));
+            }
+
+            // Draft status filter
+            if (filter.getIsDraft() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("isDraft"), filter.getIsDraft()));
+            } else if (filter.getUserId() == null) {
+                // For public search (userId null), exclude drafts by default
+                predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
+            }
+
+            // Verified filter
+            if (filter.getVerified() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("verified"), filter.getVerified()));
+            }
+
+            // Verification pending filter
+            if (filter.getIsVerify() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("isVerify"), filter.getIsVerify()));
+            }
+
+            // Expired filter
+            if (filter.getExpired() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("expired"), filter.getExpired()));
+            } else if (Boolean.TRUE.equals(filter.getExcludeExpired())) {
+                // Exclude expired by default if not explicitly filtered
+                predicates.add(criteriaBuilder.equal(root.get("expired"), false));
+            }
+
+            // ============ LOCATION FILTERS ============
+            // Category filter
+            if (filter.getCategoryId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("categoryId"), filter.getCategoryId()));
+            }
+
+            // Province/District/Ward filter - supports both old and new address structures
+            if (filter.getProvinceId() != null || filter.getProvinceCode() != null ||
+                filter.getDistrictId() != null || filter.getWardId() != null ||
+                filter.getNewWardCode() != null || filter.getStreetId() != null) {
+
+                Subquery<Long> subquery = query.subquery(Long.class);
+                var metadataRoot = subquery.from(AddressMetadata.class);
+
+                List<Predicate> locationPredicates = new ArrayList<>();
+                locationPredicates.add(criteriaBuilder.equal(
+                    root.get("address").get("addressId"),
+                    metadataRoot.get("address").get("addressId")
+                ));
+
+                // Province filters
+                if (filter.getProvinceId() != null) {
+                    locationPredicates.add(criteriaBuilder.equal(
+                        metadataRoot.get("provinceId"),
+                        filter.getProvinceId()
+                    ));
+                }
+                if (filter.getProvinceCode() != null) {
+                    locationPredicates.add(criteriaBuilder.equal(
+                        metadataRoot.get("newProvinceCode"),
+                        filter.getProvinceCode()
+                    ));
+                }
+
+                // District filter (old structure)
+                if (filter.getDistrictId() != null) {
+                    locationPredicates.add(criteriaBuilder.equal(
+                        metadataRoot.get("districtId"),
+                        filter.getDistrictId()
+                    ));
+                }
+
+                // Ward filters
+                if (filter.getWardId() != null) {
+                    locationPredicates.add(criteriaBuilder.equal(
+                        metadataRoot.get("wardId"),
+                        filter.getWardId()
+                    ));
+                }
+                if (filter.getNewWardCode() != null) {
+                    locationPredicates.add(criteriaBuilder.equal(
+                        metadataRoot.get("newWardCode"),
+                        filter.getNewWardCode()
+                    ));
+                }
+
+                // Street filter
+                if (filter.getStreetId() != null) {
+                    locationPredicates.add(criteriaBuilder.equal(
+                        metadataRoot.get("streetId"),
+                        filter.getStreetId()
+                    ));
+                }
+
+                subquery.select(metadataRoot.get("address").get("addressId"))
+                        .where(criteriaBuilder.and(locationPredicates.toArray(new Predicate[0])));
+
+                predicates.add(criteriaBuilder.in(root.get("address").get("addressId")).value(subquery));
+            }
+
+            // Listing type filter
+            if (filter.getListingType() != null) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("listingType"),
+                    Listing.ListingType.valueOf(filter.getListingType())
+                ));
+            }
+
+            // VIP type filter
+            if (filter.getVipType() != null) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("vipType"),
+                    Listing.VipType.valueOf(filter.getVipType())
+                ));
+            }
+
+            // Product type filter
+            if (filter.getProductType() != null) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("productType"),
+                    Listing.ProductType.valueOf(filter.getProductType())
+                ));
+            }
+
+            // Price range filter
+            if (filter.getMinPrice() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("price"), filter.getMinPrice()));
+            }
+            if (filter.getMaxPrice() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("price"), filter.getMaxPrice()));
+            }
+
+            // Area range filter
+            if (filter.getMinArea() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("area"), filter.getMinArea()));
+            }
+            if (filter.getMaxArea() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("area"), filter.getMaxArea()));
+            }
+
+            // Bedrooms filter - exact or range
+            if (filter.getBedrooms() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("bedrooms"), filter.getBedrooms()));
+            } else {
+                if (filter.getMinBedrooms() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("bedrooms"), filter.getMinBedrooms()));
+                }
+                if (filter.getMaxBedrooms() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("bedrooms"), filter.getMaxBedrooms()));
+                }
+            }
+
+            // Bathrooms filter - exact or range
+            if (filter.getBathrooms() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("bathrooms"), filter.getBathrooms()));
+            } else {
+                if (filter.getMinBathrooms() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("bathrooms"), filter.getMinBathrooms()));
+                }
+                if (filter.getMaxBathrooms() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("bathrooms"), filter.getMaxBathrooms()));
+                }
+            }
+
+            // ============ PROPERTY SPECS FILTERS ============
+            // Furnishing filter
+            if (filter.getFurnishing() != null) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("furnishing"),
+                    Listing.Furnishing.valueOf(filter.getFurnishing())
+                ));
+            }
+
+            // Direction filter
+            if (filter.getDirection() != null) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("direction"),
+                    Listing.Direction.valueOf(filter.getDirection())
+                ));
+            }
+
+            // Property type filter
+            if (filter.getPropertyType() != null) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("propertyType"),
+                    Listing.PropertyType.valueOf(filter.getPropertyType())
+                ));
+            }
+
+            // Room capacity range
+            if (filter.getMinRoomCapacity() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("roomCapacity"), filter.getMinRoomCapacity()));
+            }
+            if (filter.getMaxRoomCapacity() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("roomCapacity"), filter.getMaxRoomCapacity()));
+            }
+
+            // ============ AMENITIES & MEDIA FILTERS ============
+            // Amenities filter
+            if (filter.getAmenityIds() != null && !filter.getAmenityIds().isEmpty()) {
+                if ("ALL".equalsIgnoreCase(filter.getAmenityMatchMode())) {
+                    // Must have ALL specified amenities
+                    for (Long amenityId : filter.getAmenityIds()) {
+                        Subquery<Long> amenitySubquery = query.subquery(Long.class);
+                        var amenityRoot = amenitySubquery.from(Listing.class);
+                        Join<Listing, Amenity> amenityJoin = amenityRoot.join("amenities");
+
+                        amenitySubquery.select(amenityRoot.get("listingId"))
+                                .where(criteriaBuilder.and(
+                                        criteriaBuilder.equal(amenityRoot.get("listingId"), root.get("listingId")),
+                                        criteriaBuilder.equal(amenityJoin.get("amenityId"), amenityId)
+                                ));
+
+                        predicates.add(criteriaBuilder.exists(amenitySubquery));
+                    }
+                } else {
+                    // Must have ANY of the specified amenities (at least one)
+                    Subquery<Long> amenitySubquery = query.subquery(Long.class);
+                    var amenityRoot = amenitySubquery.from(Listing.class);
+                    Join<Listing, Amenity> amenityJoin = amenityRoot.join("amenities");
+
+                    amenitySubquery.select(amenityRoot.get("listingId"))
+                            .where(criteriaBuilder.and(
+                                    criteriaBuilder.equal(amenityRoot.get("listingId"), root.get("listingId")),
+                                    amenityJoin.get("amenityId").in(filter.getAmenityIds())
+                            ));
+
+                    predicates.add(criteriaBuilder.exists(amenitySubquery));
+                }
+            }
+
+            // Has media filter
+            if (Boolean.TRUE.equals(filter.getHasMedia())) {
+                Subquery<Long> mediaSubquery = query.subquery(Long.class);
+                var mediaRoot = mediaSubquery.from(Media.class);
+
+                mediaSubquery.select(mediaRoot.get("listing").get("listingId"))
+                        .where(criteriaBuilder.and(
+                                criteriaBuilder.equal(mediaRoot.get("listing").get("listingId"), root.get("listingId")),
+                                criteriaBuilder.equal(mediaRoot.get("status"), Media.MediaStatus.ACTIVE)
+                        ));
+
+                predicates.add(criteriaBuilder.exists(mediaSubquery));
+            }
+
+            // Min media count filter
+            // Note: This is a simplified implementation. For production, consider using native query or JOIN FETCH with HAVING clause
+            if (filter.getMinMediaCount() != null && filter.getMinMediaCount() > 0) {
+                // Use exists with count in subquery WHERE clause
+                Subquery<Long> mediaCountSubquery = query.subquery(Long.class);
+                var mediaRoot = mediaCountSubquery.from(Media.class);
+
+                mediaCountSubquery.select(criteriaBuilder.count(mediaRoot.get("mediaId")))
+                        .where(criteriaBuilder.and(
+                                criteriaBuilder.equal(mediaRoot.get("listing").get("listingId"), root.get("listingId")),
+                                criteriaBuilder.equal(mediaRoot.get("status"), Media.MediaStatus.ACTIVE)
+                        ))
+                        .groupBy(mediaRoot.get("listing").get("listingId"))
+                        .having(criteriaBuilder.greaterThanOrEqualTo(
+                                criteriaBuilder.count(mediaRoot.get("mediaId")),
+                                filter.getMinMediaCount().longValue()
+                        ));
+
+                predicates.add(root.get("listingId").in(
+                        mediaCountSubquery.getSelection()
+                ));
+            }
+
+            // ============ KEYWORD SEARCH ============
+            if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()) {
+                String searchPattern = "%" + filter.getKeyword().toLowerCase() + "%";
+                Predicate titleMatch = criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("title")),
+                        searchPattern
+                );
+                Predicate descriptionMatch = criteriaBuilder.like(
+                        criteriaBuilder.lower(root.get("description")),
+                        searchPattern
+                );
+                predicates.add(criteriaBuilder.or(titleMatch, descriptionMatch));
+            }
+
+            // ============ CONTACT FILTERS ============
+            // Owner phone verified filter
+            if (Boolean.TRUE.equals(filter.getOwnerPhoneVerified())) {
+                Subquery<String> userSubquery = query.subquery(String.class);
+                var userRoot = userSubquery.from(User.class);
+
+                userSubquery.select(userRoot.get("userId"))
+                        .where(criteriaBuilder.and(
+                                criteriaBuilder.equal(userRoot.get("userId"), root.get("userId")),
+                                criteriaBuilder.equal(userRoot.get("contactPhoneVerified"), true),
+                                criteriaBuilder.isNotNull(userRoot.get("contactPhoneNumber"))
+                        ));
+
+                predicates.add(root.get("userId").in(userSubquery));
+            }
+
+            // ============ TIME FILTERS ============
+            // Posted within days filter
+            if (filter.getPostedWithinDays() != null && filter.getPostedWithinDays() > 0) {
+                LocalDateTime cutoffDate = LocalDateTime.now().minusDays(filter.getPostedWithinDays());
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("postDate"), cutoffDate));
+            }
+
+            // Updated within days filter
+            if (filter.getUpdatedWithinDays() != null && filter.getUpdatedWithinDays() > 0) {
+                LocalDateTime cutoffDate = LocalDateTime.now().minusDays(filter.getUpdatedWithinDays());
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("updatedAt"), cutoffDate));
+            }
+
+            // ============ ALWAYS EXCLUDE SHADOW LISTINGS ============
+            predicates.add(criteriaBuilder.equal(root.get("isShadow"), false));
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    /**
+     * Build specification for "My Listings" with user ID and filters
+     */
+    public static Specification<Listing> fromMyListingsFilter(String userId, MyListingsFilterRequest filter) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // User ID filter (required)
+            predicates.add(criteriaBuilder.equal(root.get("userId"), userId));
+
+            // Verified filter
+            if (filter.getVerified() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("verified"), filter.getVerified()));
+            }
+
+            // Is verify filter
+            if (filter.getIsVerify() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("isVerify"), filter.getIsVerify()));
+            }
+
+            // Expired filter
+            if (filter.getExpired() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("expired"), filter.getExpired()));
+            }
+
+            // Draft filter
+            if (filter.getIsDraft() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("isDraft"), filter.getIsDraft()));
+            }
+
+            // VIP type filter
+            if (filter.getVipType() != null) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("vipType"),
+                    Listing.VipType.valueOf(filter.getVipType())
+                ));
+            }
+
+            // Listing type filter
+            if (filter.getListingType() != null) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("listingType"),
+                    Listing.ListingType.valueOf(filter.getListingType())
+                ));
+            }
+
+            // Exclude shadow listings
+            predicates.add(criteriaBuilder.equal(root.get("isShadow"), false));
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+}
