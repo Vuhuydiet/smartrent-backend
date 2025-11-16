@@ -59,6 +59,9 @@ logging:
 spring:
   application:
     name: smart-rent
+  cloud:
+    compatibility-verifier:
+      enabled: false
   # Multipart file upload configuration for video/image uploads
   servlet:
     multipart:
@@ -248,18 +251,19 @@ open:
         - video/quicktime
 
 # VNPay Payment Gateway Configuration
-vnpay:
-  tmnCode: ${VNPAY_TMN_CODE:DEMO}
-  hashSecret: ${VNPAY_HASH_SECRET:DEMOSECRETKEY}
-  url: ${VNPAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+vnpay:  
+  tmn-code: ${VNPAY_TMN_CODE:DEMO}
+  hash-secret: ${VNPAY_HASH_SECRET:DEMOSECRETKEY}
+  payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
   query-url: ${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
-  returnUrl: ${VNPAY_RETURN_URL:http://localhost:3000/payment/result}
+  return-url: ${VNPAY_RETURN_URL:http://localhost:3000/payment/result}
+  ipn-url: ${VNPAY_IPN_URL:http://localhost:8080/v1/payments/ipn/VNPAY}
   version: "2.1.0"
   command: "pay"
-  currencyCode: "VND"
+  currency-code: "VND"
   locale: "vn"
-  orderType: "other"
-  timeout: 15
+  order-type: "other"
+  timeout-minutes: 15
 
 # Resilience4j Configuration for Circuit Breaker and Retry patterns
 resilience4j:

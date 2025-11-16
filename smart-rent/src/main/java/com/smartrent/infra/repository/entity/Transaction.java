@@ -33,7 +33,7 @@ public class Transaction {
     @Column(name = "transaction_id", length = 36)
     String transactionId;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, length = 36)
     String userId;
 
     @Enumerated(EnumType.STRING)

@@ -74,26 +74,28 @@ public class ListingController {
             1. **Standard Listing (isDraft=false or not provided):**
                - All required fields must be provided
                - Listing is published immediately (subject to verification)
-               - Payment flow initiated if durationPlanId is provided
+               - Payment flow initiated if durationDays is provided
 
             2. **Draft Listing (isDraft=true):**
-               - Only userId is required
+               - User ID is automatically extracted from authentication token
                - All other fields are optional
                - Listing saved as draft (not visible in public search)
                - Useful for saving incomplete listings when user loses connection
                - Can be completed and published later via update API
 
-            **Payment Flow (for NORMAL listings):**
-            1. Call GET /v1/vip-tiers to get VIP tier information including available durations and prices
-            2. User selects vipType (NORMAL, SILVER, GOLD, DIAMOND) and durationDays from available options
-            3. Submit this request with durationDays - system will initiate payment if required
+            **Payment Flow:**
+            1. Call GET /v1/vip-tiers/{tierCode} to get VIP tier information including available durations and prices
+            2. User selects vipType (NORMAL, SILVER, GOLD, DIAMOND) and durationDays from available options (10, 15, 30)
+            3. Submit this request with durationDays - system calculates price based on VIP tier and duration
             4. Complete payment via returned paymentUrl
             5. Listing is created after successful payment
 
-            **Available Duration Options (check VIP tier API for exact prices):**
-            - 5 days, 7 days, 10 days (no discount)
-            - 15 days (11% discount)
-            - 30 days (18.5% discount)
+            **Duration Options (with discounts):**
+            - 10 days (no discount)
+            - 15 days (with discount based on VIP tier)
+            - 30 days (with discount based on VIP tier)
+
+            Each VIP tier has its own pricing: Check GET /v1/vip-tiers/{tierCode} for exact prices (price10Days, price15Days, price30Days)
 
             **Transactional Address Creation:**
             - Address is created first within the same transaction
@@ -102,7 +104,7 @@ public class ListingController {
             - Full address text is auto-generated if not provided
 
             **Required Fields for Standard Listing:**
-            - title, description, userId
+            - title, description
             - listingType (RENT/SALE/SHARE)
             - vipType (NORMAL/SILVER/GOLD/DIAMOND)
             - categoryId
@@ -122,8 +124,8 @@ public class ListingController {
             - mediaIds (array of uploaded media IDs)
             - address.streetId, address.streetNumber
             - address.latitude, address.longitude
-            - durationPlanId (for payment flow)
-            - useMembershipQuota (for VIP listings)
+            - durationDays (Integer: 10, 15, or 30 for payment flow)
+            - useMembershipQuota (for VIP listings with existing quota)
             - paymentProvider (VNPAY, etc.)
             """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -139,7 +141,6 @@ public class ListingController {
                             {
                               "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
                               "description": "Căn hộ rộng rãi 2 phòng ngủ có ban công và tầm nhìn thành phố.",
-                              "userId": "user-123e4567-e89b-12d3-a456-426614174000",
                               "listingType": "RENT",
                               "vipType": "NORMAL",
                               "categoryId": 1,
@@ -174,7 +175,6 @@ public class ListingController {
                         summary = "Save incomplete listing as draft (for auto-save/connection loss)",
                         value = """
                             {
-                              "userId": "user-123e4567-e89b-12d3-a456-426614174000",
                               "title": "Căn hộ 2 phòng ngủ",
                               "description": "Căn hộ đang cập nhật thông tin...",
                               "listingType": "RENT",
@@ -186,12 +186,11 @@ public class ListingController {
                     ),
                     @ExampleObject(
                         name = "Listing with Payment (NORMAL tier)",
-                        summary = "Create NORMAL listing with duration plan (requires payment)",
+                        summary = "Create NORMAL listing with duration (requires payment)",
                         value = """
                             {
                               "title": "Phòng trọ sinh viên giá rẻ",
                               "description": "Phòng trọ tiện nghi, gần trường đại học",
-                              "userId": "user-123e4567-e89b-12d3-a456-426614174000",
                               "listingType": "RENT",
                               "vipType": "NORMAL",
                               "categoryId": 1,
@@ -210,7 +209,7 @@ public class ListingController {
                               "bedrooms": 1,
                               "bathrooms": 1,
                               "roomCapacity": 2,
-                              "durationPlanId": 1,
+                              "durationDays": 30,
                               "paymentProvider": "VNPAY"
                             }
                             """
@@ -242,7 +241,7 @@ public class ListingController {
                         ),
                         @ExampleObject(
                             name = "Payment Required (NORMAL tier)",
-                            summary = "Payment URL returned for NORMAL listing with duration plan",
+                            summary = "Payment URL returned for listing with duration",
                             value = """
                                 {
                                   "code": "999999",
@@ -281,6 +280,8 @@ public class ListingController {
     )
     @PostMapping
     public ApiResponse<ListingCreationResponse> createListing(@Valid @RequestBody ListingCreationRequest request) {
+        String userId = extractUserId();
+        request.setUserId(userId);
         ListingCreationResponse response = listingService.createListing(request);
         return ApiResponse.<ListingCreationResponse>builder().data(response).build();
     }
@@ -1516,70 +1517,15 @@ public class ListingController {
         return ApiResponse.<ListingResponseWithAdmin>builder().data(response).build();
     }
 
-    @GetMapping("/duration-plans")
-    @Operation(
-        summary = "Get all available duration plans",
-        description = """
-            Retrieves all active listing duration plans with calculated prices for all VIP tiers.
-
-            **Available Plans:**
-            - 5 days (no discount)
-            - 7 days (no discount)
-            - 10 days (no discount)
-            - 15 days (11% discount)
-            - 30 days (18.5% discount)
-
-            **Response includes:**
-            - Plan ID and duration in days
-            - Discount percentage and description
-            - Calculated prices for NORMAL, SILVER, GOLD, DIAMOND tiers
-
-            Use the planId when creating listings through payment flow.
-            """
-    )
-    public ApiResponse<List<com.smartrent.dto.response.ListingDurationPlanResponse>> getDurationPlans() {
-        List<com.smartrent.dto.response.ListingDurationPlanResponse> plans =
-            listingService.getAvailableDurationPlans();
-        return ApiResponse.<List<com.smartrent.dto.response.ListingDurationPlanResponse>>builder()
-            .code("200000")
-            .message("Duration plans retrieved successfully")
-            .data(plans)
-            .build();
-    }
-
-    @GetMapping("/calculate-price")
-    @Operation(
-        summary = "Calculate listing price based on tier and duration",
-        description = """
-            Calculates the total price for a listing based on VIP tier and duration.
-
-            **Parameters:**
-            - vipType: NORMAL, SILVER, GOLD, or DIAMOND
-            - durationDays: Duration in days (5, 7, 10, 15, or 30)
-
-            **Response includes:**
-            - Base price per day for the tier
-            - Total before discount
-            - Discount percentage and amount
-            - Final price after discount
-            - Savings description
-
-            Use this endpoint to show price preview to users before creating listing.
-            """
-    )
-    public ApiResponse<com.smartrent.dto.response.PriceCalculationResponse> calculatePrice(
-            @Parameter(description = "VIP tier (NORMAL, SILVER, GOLD, DIAMOND)", example = "SILVER")
-            @RequestParam String vipType,
-            @Parameter(description = "Duration in days", example = "30")
-            @RequestParam Integer durationDays) {
-
-        com.smartrent.dto.response.PriceCalculationResponse calculation =
-            listingService.calculateListingPrice(vipType, durationDays);
-
-        return ApiResponse.<com.smartrent.dto.response.PriceCalculationResponse>builder()
-            .code("200000")
-            .message("Price calculated successfully")
-            .data(calculation)
-            .build();
+    /**
+     * Extract user ID from authentication token
+     * @return User ID from JWT subject claim
+     */
+    private String extractUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null) {
+            throw new IllegalStateException("User is not authenticated");
+        }
+        return authentication.getName();
     }
 }

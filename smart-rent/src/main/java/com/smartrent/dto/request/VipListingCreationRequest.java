@@ -100,20 +100,12 @@ public class VipListingCreationRequest {
     Boolean useMembershipQuota;
 
     @Schema(
-        description = "Duration in days (10, 15, or 30). Longer durations get discounts: 15 days (11% off), 30 days (18.5% off). DEPRECATED: Use durationPlanId instead",
+        description = "Duration in days (10, 15, or 30). Price calculated based on VIP tier and duration",
         example = "30",
-        allowableValues = {"10", "15", "30"},
-        deprecated = true
+        allowableValues = {"10", "15", "30"}
     )
     Integer durationDays;
-
-    @Schema(
-        description = "Duration plan ID (alternative to durationDays). Plans: 5d, 7d, 10d, 15d, 30d with automatic discount calculation",
-        example = "5"
-    )
-    Long durationPlanId;
 
     @Schema(description = "Payment provider (only needed if useMembershipQuota = false)", example = "VNPAY")
     String paymentProvider;
 }
-

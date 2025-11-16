@@ -51,14 +51,15 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             // Build VNPay parameters
             Map<String, String> vnpParams = buildVNPayParams(transaction, request, ipAddress);
 
-            // Generate secure hash
+            // Generate secure hash (do NOT add it to vnpParams)
             String secureHash = VNPayUtil.generateSecureHash(vnpParams, vnPayProperties.getHashSecret());
-            vnpParams.put("vnp_SecureHash", secureHash);
 
-            // Build payment URL
-            String paymentUrl = vnPayProperties.getPaymentUrl() + "?" + VNPayUtil.buildQueryString(vnpParams);
+            // Build payment URL with query string + secure hash at the end
+            String queryString = VNPayUtil.buildQueryString(vnpParams);
+            String paymentUrl = vnPayProperties.getPaymentUrl() + "?" + queryString + "&vnp_SecureHash=" + secureHash;
 
-            log.info("VNPay payment created successfully. Transaction ref: {}", transaction.getTransactionId());
+            log.info("VNPay payment created successfully. Transaction ref: {}, IP: {}", transaction.getTransactionId(), ipAddress);
+            log.debug("VNPay query string for hash: {}", queryString);
 
             // Use current time for createdAt and expiresAt since @CreationTimestamp may not be populated yet
             java.time.LocalDateTime now = java.time.LocalDateTime.now();
@@ -115,10 +116,10 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         String responseCode = params.get("vnp_ResponseCode");
         VNPayTransactionStatus status = VNPayTransactionStatus.fromCode(responseCode);
         TransactionStatus genericStatus = VNPayStatusConverter.toGenericStatus(status);
-        
-        log.info("VNPay IPN - txnRef: {}, responseCode: {}, vnpayStatus: {}, genericStatus: {}", 
+
+        log.info("VNPay IPN - txnRef: {}, responseCode: {}, vnpayStatus: {}, genericStatus: {}",
                  txnRef, responseCode, status, genericStatus);
-        
+
         transaction = updatePaymentWithProviderData(
                 txnRef,
                 params.get("vnp_TransactionNo"),
@@ -131,7 +132,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         );
 
         boolean success = VNPayUtil.isSuccessResponseCode(responseCode);
-        log.info("VNPay IPN processing completed - txnRef: {}, success: {}, finalStatus: {}", 
+        log.info("VNPay IPN processing completed - txnRef: {}, success: {}, finalStatus: {}",
                  txnRef, success, transaction.getStatus());
 
         return buildCallbackResponse(transaction, true, success ? "IPN processed successfully" : "Payment failed");

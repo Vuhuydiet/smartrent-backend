@@ -47,7 +47,7 @@ public class Listing {
     @Column(name = "description", columnDefinition = "LONGTEXT")
     String description;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, length = 36)
     String userId;
 
     @Column(name = "post_date")

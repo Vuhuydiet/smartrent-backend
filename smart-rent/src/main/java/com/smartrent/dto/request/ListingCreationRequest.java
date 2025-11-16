@@ -22,8 +22,10 @@ import java.util.Set;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ListingCreationRequest {
 
-    // Essential fields - always required
-    @NotNull
+    /**
+     * User ID - automatically populated from authentication token
+     * DO NOT include this field in the request body
+     */
     String userId;
 
     // Fields that can be optional for draft listings
@@ -90,10 +92,11 @@ public class ListingCreationRequest {
     Set<Long> mediaIds;
 
     /**
-     * Duration plan ID for the listing (5d, 7d, 10d, 15d, 30d)
+     * Duration in days for the listing (e.g., 10, 15, 30)
      * Required for NORMAL listings when creating through payment flow
+     * The price will be calculated based on the VIP tier and duration
      */
-    Long durationPlanId;
+    Integer durationDays;
 
     /**
      * Whether to use membership quota (only applicable for VIP listings)
