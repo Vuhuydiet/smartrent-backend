@@ -2,10 +2,13 @@ package com.smartrent.service.listing.impl;
 
 import com.smartrent.constants.PricingConstants;
 import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.request.MyListingsFilterRequest;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
@@ -24,6 +27,7 @@ import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.ListingDurationPlanRepository;
 import com.smartrent.infra.repository.entity.*;
+import com.smartrent.infra.repository.specification.ListingSpecification;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.cache.ListingRequestCacheService;
@@ -39,11 +43,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -73,7 +81,16 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public ListingCreationResponse createListing(ListingCreationRequest request) {
-        log.info("Creating listing with address - User: {}, Title: {}", request.getUserId(), request.getTitle());
+        log.info("Creating listing with address - User: {}, Title: {}, IsDraft: {}",
+                request.getUserId(), request.getTitle(), request.getIsDraft());
+
+        // For draft listings, skip validation and payment flow
+        if (Boolean.TRUE.equals(request.getIsDraft())) {
+            return createDraftListing(request);
+        }
+
+        // Validate required fields for non-draft listings
+        validateNonDraftListing(request);
 
         // Check if this is a NORMAL listing with duration plan requiring payment
         if (request.getDurationPlanId() != null && !Boolean.TRUE.equals(request.getUseMembershipQuota())) {
@@ -758,6 +775,102 @@ public class ListingServiceImpl implements ListingService {
         }
     }
 
+    /**
+     * Validate required fields for non-draft listings
+     */
+    private void validateNonDraftListing(ListingCreationRequest request) {
+        List<String> missingFields = new ArrayList<>();
+
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            missingFields.add("title");
+        }
+        if (request.getDescription() == null || request.getDescription().isBlank()) {
+            missingFields.add("description");
+        }
+        if (request.getListingType() == null || request.getListingType().isBlank()) {
+            missingFields.add("listingType");
+        }
+        if (request.getVipType() == null || request.getVipType().isBlank()) {
+            missingFields.add("vipType");
+        }
+        if (request.getCategoryId() == null) {
+            missingFields.add("categoryId");
+        }
+        if (request.getProductType() == null || request.getProductType().isBlank()) {
+            missingFields.add("productType");
+        }
+        if (request.getPrice() == null) {
+            missingFields.add("price");
+        }
+        if (request.getPriceUnit() == null || request.getPriceUnit().isBlank()) {
+            missingFields.add("priceUnit");
+        }
+        if (request.getAddress() == null) {
+            missingFields.add("address");
+        }
+
+        if (!missingFields.isEmpty()) {
+            throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                    "Missing required fields for non-draft listing: " + String.join(", ", missingFields));
+        }
+    }
+
+    /**
+     * Create a draft listing with minimal validation
+     */
+    private ListingCreationResponse createDraftListing(ListingCreationRequest request) {
+        log.info("Creating draft listing for user: {}", request.getUserId());
+
+        // Create listing entity with available data
+        Listing listing = Listing.builder()
+                .userId(request.getUserId())
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .listingType(request.getListingType() != null ?
+                        Listing.ListingType.valueOf(request.getListingType()) : null)
+                .vipType(request.getVipType() != null ?
+                        Listing.VipType.valueOf(request.getVipType()) : Listing.VipType.NORMAL)
+                .categoryId(request.getCategoryId())
+                .productType(request.getProductType() != null ?
+                        Listing.ProductType.valueOf(request.getProductType()) : null)
+                .price(request.getPrice())
+                .priceUnit(request.getPriceUnit() != null ?
+                        Listing.PriceUnit.valueOf(request.getPriceUnit()) : null)
+                .area(request.getArea())
+                .bedrooms(request.getBedrooms())
+                .bathrooms(request.getBathrooms())
+                .direction(request.getDirection() != null ?
+                        Listing.Direction.valueOf(request.getDirection()) : null)
+                .furnishing(request.getFurnishing() != null ?
+                        Listing.Furnishing.valueOf(request.getFurnishing()) : null)
+                .propertyType(request.getPropertyType() != null ?
+                        Listing.PropertyType.valueOf(request.getPropertyType()) : null)
+                .roomCapacity(request.getRoomCapacity())
+                .isDraft(true)
+                .verified(false)
+                .isVerify(false)
+                .expired(false)
+                .build();
+
+        // Create address if provided
+        if (request.getAddress() != null) {
+            Address address = createAddress(request.getAddress());
+            listing.setAddress(address);
+        }
+
+        // Save draft listing
+        Listing saved = listingRepository.save(listing);
+        log.info("Draft listing created successfully with id: {}", saved.getListingId());
+
+        // Link media to listing if provided
+        if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
+            linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
+            log.info("Linked {} media items to draft listing {}", request.getMediaIds().size(), saved.getListingId());
+        }
+
+        return listingMapper.toCreationResponse(saved);
+    }
+
     private String formatDiscountDescription(BigDecimal discount) {
         if (discount.compareTo(BigDecimal.ZERO) == 0) {
             return "No discount";
@@ -775,5 +888,113 @@ public class ListingServiceImpl implements ListingService {
                 amount.toBigInteger(),
                 PricingConstants.DEFAULT_CURRENCY,
                 percentValue);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ListingListResponse searchListings(ListingFilterRequest filter) {
+        boolean isMyListings = filter.getUserId() != null && !filter.getUserId().isEmpty();
+
+        log.info("Unified search - UserId: {}, Category: {}, Province: {}/{}, isDraft: {}, Page: {}, Size: {}",
+                filter.getUserId(), filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCode(),
+                filter.getIsDraft(), filter.getPage(), filter.getSize());
+
+        // Build specification from filter
+        Specification<Listing> spec = ListingSpecification.fromFilterRequest(filter);
+
+        // Create pageable with sorting
+        Sort sort = createSort(filter.getSortBy(), filter.getSortDirection());
+        Pageable pageable = PageRequest.of(
+                Math.max(filter.getPage(), 0),
+                Math.min(Math.max(filter.getSize(), 1), 100),
+                sort
+        );
+
+        // Execute query with count
+        Page<Listing> page = listingRepository.findAll(spec, pageable);
+
+        // Convert to response DTOs
+        List<ListingResponse> listings = page.getContent().stream()
+                .map(listing -> {
+                    ListingResponse response = listingMapper.toResponse(listing);
+                    populateOwnerZaloInfo(response, listing.getUserId());
+                    return response;
+                })
+                .collect(Collectors.toList());
+
+        // Get recommendations (only for public search, not for my listings)
+        List<ListingResponse> recommendations = isMyListings
+                ? Collections.emptyList()
+                : getRecommendations(filter, 5);
+
+        return ListingListResponse.builder()
+                .listings(listings)
+                .totalCount(page.getTotalElements())
+                .currentPage(page.getNumber())
+                .pageSize(page.getSize())
+                .totalPages(page.getTotalPages())
+                .recommendations(recommendations)
+                .filterCriteria(filter)
+                .build();
+    }
+
+    /**
+     * Get recommended listings based on filter criteria
+     * TODO: Implement proper recommendation algorithm using ML or collaborative filtering
+     */
+    private List<ListingResponse> getRecommendations(ListingFilterRequest filter, int limit) {
+        // For now, return recent high-tier listings (GOLD/DIAMOND) as recommendations
+        Specification<Listing> recommendationSpec = (root, query, criteriaBuilder) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+
+            // High-tier listings
+            predicates.add(criteriaBuilder.or(
+                    criteriaBuilder.equal(root.get("vipType"), Listing.VipType.GOLD),
+                    criteriaBuilder.equal(root.get("vipType"), Listing.VipType.DIAMOND)
+            ));
+
+            // Verified and not expired
+            predicates.add(criteriaBuilder.equal(root.get("verified"), true));
+            predicates.add(criteriaBuilder.equal(root.get("expired"), false));
+            predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
+            predicates.add(criteriaBuilder.equal(root.get("isShadow"), false));
+
+            // Same category if provided
+            if (filter.getCategoryId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("categoryId"), filter.getCategoryId()));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+        Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "postDate"));
+        Page<Listing> recommendedListings = listingRepository.findAll(recommendationSpec, pageable);
+
+        return recommendedListings.getContent().stream()
+                .map(listing -> {
+                    ListingResponse response = listingMapper.toResponse(listing);
+                    populateOwnerZaloInfo(response, listing.getUserId());
+                    return response;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Create Sort object from sort field and direction
+     */
+    private Sort createSort(String sortBy, String sortDirection) {
+        String sortField = sortBy != null ? sortBy : "postDate";
+        Sort.Direction direction = "ASC".equalsIgnoreCase(sortDirection)
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+
+        // Map sortBy field to entity field
+        return switch (sortField) {
+            case "price" -> Sort.by(direction, "price");
+            case "area" -> Sort.by(direction, "area");
+            case "createdAt" -> Sort.by(direction, "createdAt");
+            case "updatedAt" -> Sort.by(direction, "updatedAt");
+            default -> Sort.by(direction, "postDate");
+        };
     }
 }

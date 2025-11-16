@@ -64,6 +64,9 @@ public class ListingResponse {
     @Schema(description = "Whether listing is expired")
     Boolean expired;
 
+    @Schema(description = "Whether listing is a draft (incomplete, not yet published)")
+    Boolean isDraft;
+
     @Schema(
         description = "VIP tier: NORMAL, SILVER, GOLD, DIAMOND",
         example = "SILVER",

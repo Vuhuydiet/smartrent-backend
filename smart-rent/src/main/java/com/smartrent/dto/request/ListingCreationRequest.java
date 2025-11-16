@@ -22,44 +22,36 @@ import java.util.Set;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ListingCreationRequest {
 
-    @NotBlank
-    @Size(max = 200)
-    String title;
-
-    @NotBlank
-    String description;
-
+    // Essential fields - always required
     @NotNull
     String userId;
 
+    // Fields that can be optional for draft listings
+    @Size(max = 200)
+    String title;
+
+    String description;
+
     LocalDateTime expiryDate;
 
-    @NotBlank
     String listingType;
-
 
     Boolean verified;
     Boolean isVerify;
     Boolean expired;
 
-    @NotBlank
     String vipType;
 
-    @NotNull
     Long categoryId;
 
-    @NotBlank
     String productType;
 
-    @NotNull
     @DecimalMin(value = "0.0", inclusive = false)
     BigDecimal price;
 
-    @NotBlank
     String priceUnit;
 
     @Valid
-    @NotNull(message = "Address information is required")
     AddressCreationRequest address;
 
     @DecimalMin(value = "0.0", inclusive = false)
@@ -81,6 +73,14 @@ public class ListingCreationRequest {
     Integer roomCapacity;
 
     Set<Long> amenityIds;
+
+    /**
+     * Whether this is a draft listing
+     * If true, validation is relaxed to allow incomplete data
+     * Default: false
+     */
+    @Builder.Default
+    Boolean isDraft = false;
 
     /**
      * List of media IDs to attach to this listing
