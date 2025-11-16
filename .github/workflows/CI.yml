@@ -88,12 +88,12 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./smart-rent
-          file: ./smart-rent/Dockerfile
+          context: ..
+          file: ../Dockerfile
           push: true
           tags: |
-            vuhuydiet/smartrent-backend:${{ github.sha }}
-            vuhuydiet/smartrent-backend:latest
+            vuhuydiet/smart-rent:${{ github.sha }}
+            vuhuydiet/smart-rent:dev
 
   update-dev-deployment:
     runs-on: ubuntu-latest
@@ -118,12 +118,12 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add charts/smartrent/environments/dev/values.yaml
-          
+
           if git diff --staged --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          
+
           COMMIT_LINK="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
           COMMIT_MESSAGE="Deploy: ${{ github.event.head_commit.message }} (${COMMIT_LINK})"
           git commit -m "$COMMIT_MESSAGE"
