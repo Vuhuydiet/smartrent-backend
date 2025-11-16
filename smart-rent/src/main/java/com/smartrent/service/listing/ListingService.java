@@ -42,20 +42,6 @@ public interface ListingService {
     ListingResponseWithAdmin getListingByIdWithAdmin(Long id, String adminId);
 
     /**
-     * Get all available duration plans with calculated prices for all tiers
-     * @return List of duration plan responses
-     */
-    List<com.smartrent.dto.response.ListingDurationPlanResponse> getAvailableDurationPlans();
-
-    /**
-     * Calculate listing price based on VIP tier and duration
-     * @param vipType VIP tier (NORMAL, SILVER, GOLD, DIAMOND)
-     * @param durationDays Duration in days
-     * @return Price calculation response
-     */
-    com.smartrent.dto.response.PriceCalculationResponse calculateListingPrice(String vipType, Integer durationDays);
-
-    /**
      * Complete listing creation (both NORMAL and VIP) after successful payment
      * This unified method handles both NORMAL and VIP listings by checking cache
      * @param transactionId Transaction ID

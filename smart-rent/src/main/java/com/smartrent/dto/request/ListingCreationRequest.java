@@ -90,10 +90,11 @@ public class ListingCreationRequest {
     Set<Long> mediaIds;
 
     /**
-     * Duration plan ID for the listing (5d, 7d, 10d, 15d, 30d)
-     * Required for NORMAL listings when creating through payment flow
+     * Duration in days for the listing
+     * Required when creating through payment flow
+     * Must match one of the durations available for the selected VIP tier (e.g., 5, 7, 10, 15, 30)
      */
-    Long durationPlanId;
+    Integer durationDays;
 
     /**
      * Whether to use membership quota (only applicable for VIP listings)

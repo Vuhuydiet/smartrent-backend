@@ -9,8 +9,6 @@ import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
-import com.smartrent.dto.response.ListingDurationPlanResponse;
-import com.smartrent.dto.response.PriceCalculationResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.PostSource;
 import com.smartrent.infra.exception.AppException;
@@ -22,7 +20,6 @@ import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.UserRepository;
-import com.smartrent.infra.repository.ListingDurationPlanRepository;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
@@ -67,7 +64,6 @@ public class ListingServiceImpl implements ListingService {
     TransactionRepository transactionRepository;
     PaymentService paymentService;
     AddressCreationService addressCreationService;
-    ListingDurationPlanRepository listingDurationPlanRepository;
     ListingRequestCacheService listingRequestCacheService;
 
     @Override
@@ -75,29 +71,25 @@ public class ListingServiceImpl implements ListingService {
     public ListingCreationResponse createListing(ListingCreationRequest request) {
         log.info("Creating listing with address - User: {}, Title: {}", request.getUserId(), request.getTitle());
 
-        // Check if this is a NORMAL listing with duration plan requiring payment
-        if (request.getDurationPlanId() != null && !Boolean.TRUE.equals(request.getUseMembershipQuota())) {
+        // Check if this is a NORMAL listing with duration requiring payment
+        if (request.getDurationDays() != null && !Boolean.TRUE.equals(request.getUseMembershipQuota())) {
             log.info("NORMAL listing requires payment - initiating payment flow");
 
-            // Validate duration plan exists
-            ListingDurationPlan plan = listingDurationPlanRepository.findById(request.getDurationPlanId())
-                    .orElseThrow(() -> new AppException(DomainCode.DURATION_PLAN_NOT_FOUND,
-                            "Duration plan not found: " + request.getDurationPlanId()));
-
-            if (!plan.getIsActive()) {
-                throw new AppException(DomainCode.DURATION_PLAN_NOT_FOUND,
-                        "Duration plan is not active: " + request.getDurationPlanId());
+            // Validate duration days
+            if (request.getDurationDays() <= 0) {
+                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                        "Duration days must be positive: " + request.getDurationDays());
             }
 
             // Calculate price for NORMAL listing
-            java.math.BigDecimal amount = PricingConstants.calculateNormalPostPrice(plan.getDurationDays());
+            java.math.BigDecimal amount = PricingConstants.calculateNormalPostPrice(request.getDurationDays());
 
             // Create PENDING transaction
             String transactionId = transactionService.createPostFeeTransaction(
                     request.getUserId(),
                     amount,
                     "NORMAL",
-                    plan.getDurationDays(),
+                    request.getDurationDays(),
                     request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
             );
 
@@ -112,7 +104,7 @@ public class ListingServiceImpl implements ListingService {
                             request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                     .amount(amount)
                     .currency(PricingConstants.DEFAULT_CURRENCY)
-                    .orderInfo("NORMAL Listing - " + plan.getDurationDays() + " days: " + request.getTitle())
+                    .orderInfo("NORMAL Listing - " + request.getDurationDays() + " days: " + request.getTitle())
                     .build();
 
             PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
@@ -564,64 +556,6 @@ public class ListingServiceImpl implements ListingService {
                 }
             });
         }
-    }
-
-    @Override
-    public List<ListingDurationPlanResponse> getAvailableDurationPlans() {
-        log.info("Fetching all available duration plans");
-
-        List<ListingDurationPlan> plans = listingDurationPlanRepository.findAllByIsActiveTrueOrderByDurationDaysAsc();
-
-        return plans.stream()
-                .map(plan -> {
-                    int days = plan.getDurationDays();
-                    BigDecimal discount = PricingConstants.getDiscountForDuration(days);
-
-                    return ListingDurationPlanResponse.builder()
-                            .planId(plan.getPlanId())
-                            .durationDays(days)
-                            .isActive(plan.getIsActive())
-                            .discountPercentage(discount)
-                            .discountDescription(formatDiscountDescription(discount))
-                            .normalPrice(PricingConstants.calculateNormalPostPrice(days))
-                            .silverPrice(PricingConstants.calculateSilverPostPrice(days))
-                            .goldPrice(PricingConstants.calculateGoldPostPrice(days))
-                            .diamondPrice(PricingConstants.calculateDiamondPostPrice(days))
-                            .build();
-                })
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public PriceCalculationResponse calculateListingPrice(String vipType, Integer durationDays) {
-        log.info("Calculating price for vipType: {}, duration: {} days", vipType, durationDays);
-
-        BigDecimal basePricePerDay = switch (vipType.toUpperCase()) {
-            case "NORMAL" -> PricingConstants.NORMAL_POST_PER_DAY;
-            case "SILVER" -> PricingConstants.SILVER_POST_PER_DAY;
-            case "GOLD" -> PricingConstants.GOLD_POST_PER_DAY;
-            case "DIAMOND" -> PricingConstants.DIAMOND_POST_PER_DAY;
-            default -> throw new AppException(DomainCode.BAD_REQUEST_ERROR,
-                    "Invalid VIP type: " + vipType);
-        };
-
-        BigDecimal totalBeforeDiscount = basePricePerDay.multiply(new BigDecimal(durationDays));
-        BigDecimal discountPercentage = PricingConstants.getDiscountForDuration(durationDays);
-        BigDecimal discountAmount = totalBeforeDiscount.multiply(discountPercentage)
-                .setScale(0, RoundingMode.HALF_UP);
-        BigDecimal finalPrice = totalBeforeDiscount.subtract(discountAmount);
-
-        return PriceCalculationResponse.builder()
-                .vipType(vipType.toUpperCase())
-                .durationDays(durationDays)
-                .basePricePerDay(basePricePerDay)
-                .totalBeforeDiscount(totalBeforeDiscount)
-                .discountPercentage(discountPercentage)
-                .discountAmount(discountAmount)
-                .finalPrice(finalPrice)
-                .currency(PricingConstants.DEFAULT_CURRENCY)
-                .savingsDescription(formatSavingsDescription(discountAmount, discountPercentage))
-                .build();
     }
 
     @Override

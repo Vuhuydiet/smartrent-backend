@@ -70,6 +70,18 @@ public class ListingController {
         description = """
             Creates a new property listing with automatic address creation in a single transaction.
 
+            **Payment Flow (for NORMAL listings):**
+            1. Call GET /v1/vip-tiers to get VIP tier information including available durations and prices
+            2. User selects vipType (NORMAL, SILVER, GOLD, DIAMOND) and durationDays from available options
+            3. Submit this request with durationDays - system will initiate payment if required
+            4. Complete payment via returned paymentUrl
+            5. Listing is created after successful payment
+
+            **Available Duration Options (check VIP tier API for exact prices):**
+            - 5 days, 7 days, 10 days (no discount)
+            - 15 days (11% discount)
+            - 30 days (18.5% discount)
+
             **Transactional Address Creation:**
             - Address is created first within the same transaction
             - If listing creation fails, address is automatically rolled back
@@ -81,6 +93,8 @@ public class ListingController {
             - listingType (RENT/SALE)
             - productType (APARTMENT/HOUSE/STUDIO/etc.)
             - price, priceUnit (MONTH/DAY/YEAR)
+            - vipType (NORMAL, SILVER, GOLD, DIAMOND)
+            - durationDays (when payment is required)
             - address object with:
               - addressType (OLD or NEW) - REQUIRED
               - For OLD: provinceId, districtId, wardId
@@ -92,6 +106,8 @@ public class ListingController {
             - amenityIds (array of amenity IDs)
             - address.streetId, address.streetNumber
             - address.latitude, address.longitude
+            - useMembershipQuota (for VIP listings with quota)
+            - paymentProvider (default: VNPAY)
             """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
@@ -956,72 +972,5 @@ public class ListingController {
             @RequestHeader("X-Admin-Id") String adminId) {
         ListingResponseWithAdmin response = listingService.getListingByIdWithAdmin(id, adminId);
         return ApiResponse.<ListingResponseWithAdmin>builder().data(response).build();
-    }
-
-    @GetMapping("/duration-plans")
-    @Operation(
-        summary = "Get all available duration plans",
-        description = """
-            Retrieves all active listing duration plans with calculated prices for all VIP tiers.
-
-            **Available Plans:**
-            - 5 days (no discount)
-            - 7 days (no discount)
-            - 10 days (no discount)
-            - 15 days (11% discount)
-            - 30 days (18.5% discount)
-
-            **Response includes:**
-            - Plan ID and duration in days
-            - Discount percentage and description
-            - Calculated prices for NORMAL, SILVER, GOLD, DIAMOND tiers
-
-            Use the planId when creating listings through payment flow.
-            """
-    )
-    public ApiResponse<List<com.smartrent.dto.response.ListingDurationPlanResponse>> getDurationPlans() {
-        List<com.smartrent.dto.response.ListingDurationPlanResponse> plans =
-            listingService.getAvailableDurationPlans();
-        return ApiResponse.<List<com.smartrent.dto.response.ListingDurationPlanResponse>>builder()
-            .code("200000")
-            .message("Duration plans retrieved successfully")
-            .data(plans)
-            .build();
-    }
-
-    @GetMapping("/calculate-price")
-    @Operation(
-        summary = "Calculate listing price based on tier and duration",
-        description = """
-            Calculates the total price for a listing based on VIP tier and duration.
-
-            **Parameters:**
-            - vipType: NORMAL, SILVER, GOLD, or DIAMOND
-            - durationDays: Duration in days (5, 7, 10, 15, or 30)
-
-            **Response includes:**
-            - Base price per day for the tier
-            - Total before discount
-            - Discount percentage and amount
-            - Final price after discount
-            - Savings description
-
-            Use this endpoint to show price preview to users before creating listing.
-            """
-    )
-    public ApiResponse<com.smartrent.dto.response.PriceCalculationResponse> calculatePrice(
-            @Parameter(description = "VIP tier (NORMAL, SILVER, GOLD, DIAMOND)", example = "SILVER")
-            @RequestParam String vipType,
-            @Parameter(description = "Duration in days", example = "30")
-            @RequestParam Integer durationDays) {
-
-        com.smartrent.dto.response.PriceCalculationResponse calculation =
-            listingService.calculateListingPrice(vipType, durationDays);
-
-        return ApiResponse.<com.smartrent.dto.response.PriceCalculationResponse>builder()
-            .code("200000")
-            .message("Price calculated successfully")
-            .data(calculation)
-            .build();
     }
 }
