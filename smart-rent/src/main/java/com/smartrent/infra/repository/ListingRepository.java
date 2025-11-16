@@ -23,6 +23,12 @@ public interface ListingRepository extends JpaRepository<Listing, Long> {
         return findByParentListingId(mainListingId);
     }
 
+    /**
+     * Find listing by transaction ID for idempotency check
+     * @param transactionId Transaction ID
+     * @return Optional listing
+     */
+    Optional<Listing> findByTransactionId(String transactionId);
 
 
     @Query("SELECT l FROM listings l LEFT JOIN FETCH l.amenities WHERE l.listingId = :id")

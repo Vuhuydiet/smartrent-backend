@@ -71,7 +71,7 @@ public enum DomainCode {
   AI_SERVICE_ERROR("9101", HttpStatus.INTERNAL_SERVER_ERROR, "AI service internal error"),
   AI_SERVICE_UNAVAILABLE("9102", HttpStatus.SERVICE_UNAVAILABLE, "AI service is unavailable"),
   AI_SERVICE_TIMEOUT("9103", HttpStatus.REQUEST_TIMEOUT, "AI service request timeout"),
-  AI_SERVICE_INVALID_RESPONSE("9104", HttpStatus.BAD_GATEWAY, "Invalid response from AI service")
+  AI_SERVICE_INVALID_RESPONSE("9104", HttpStatus.BAD_GATEWAY, "Invalid response from AI service"),
   //    OTP Error 10xxx
   OTP_INVALID_PHONE("10001", HttpStatus.BAD_REQUEST, "Invalid phone number format"),
   OTP_NON_VIETNAM_PHONE("10002", HttpStatus.BAD_REQUEST, "Only Vietnam phone numbers are supported"),
@@ -83,7 +83,15 @@ public enum DomainCode {
   OTP_VERIFICATION_ATTEMPTS_EXCEEDED("10008", HttpStatus.TOO_MANY_REQUESTS, "Maximum verification attempts exceeded"),
   OTP_ALREADY_VERIFIED("10009", HttpStatus.BAD_REQUEST, "OTP already verified"),
   OTP_PROVIDER_ERROR("10010", HttpStatus.SERVICE_UNAVAILABLE, "OTP provider error: %s"),
-  OTP_INVALID_REQUEST_ID("10011", HttpStatus.BAD_REQUEST, "Invalid request ID")
+  OTP_INVALID_REQUEST_ID("10011", HttpStatus.BAD_REQUEST, "Invalid request ID"),
+  //    Duration Plan Error 11xxx
+  DURATION_PLAN_NOT_FOUND("11001", HttpStatus.NOT_FOUND, "Duration plan not found"),
+  DURATION_PLAN_DUPLICATE_DURATION("11002", HttpStatus.CONFLICT, "Duration plan with this duration already exists"),
+  DURATION_PLAN_LAST_ACTIVE("11003", HttpStatus.BAD_REQUEST, "Cannot deactivate the last active duration plan"),
+  //    Listing Creation Error 12xxx
+  LISTING_CREATION_CACHE_NOT_FOUND("12001", HttpStatus.NOT_FOUND, "Listing creation request not found in cache"),
+  LISTING_CREATION_PAYMENT_FAILED("12002", HttpStatus.PAYMENT_REQUIRED, "Payment failed for listing creation"),
+  LISTING_ALREADY_EXISTS_FOR_TRANSACTION("12003", HttpStatus.CONFLICT, "Listing already exists for this transaction")
   ;
 
   private final String value;

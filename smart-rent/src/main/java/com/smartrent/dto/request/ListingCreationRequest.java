@@ -88,4 +88,24 @@ public class ListingCreationRequest {
      * Optional: If not provided, listing will be created without media
      */
     Set<Long> mediaIds;
+
+    /**
+     * Duration plan ID for the listing (5d, 7d, 10d, 15d, 30d)
+     * Required for NORMAL listings when creating through payment flow
+     */
+    Long durationPlanId;
+
+    /**
+     * Whether to use membership quota (only applicable for VIP listings)
+     * For NORMAL listings, this should always be false as they don't have quota
+     * Default: false
+     */
+    @Builder.Default
+    Boolean useMembershipQuota = false;
+
+    /**
+     * Payment provider to use (VNPAY, etc.)
+     * Required when useMembershipQuota is false
+     */
+    String paymentProvider;
 }
