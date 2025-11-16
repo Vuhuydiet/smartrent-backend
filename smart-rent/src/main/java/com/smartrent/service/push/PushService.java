@@ -2,6 +2,7 @@ package com.smartrent.service.push;
 
 import com.smartrent.dto.request.PushListingRequest;
 import com.smartrent.dto.request.SchedulePushRequest;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PushResponse;
 import com.smartrent.infra.repository.entity.PushHistory;
 
@@ -67,12 +68,32 @@ public interface PushService {
     List<PushResponse> getPushHistory(Long listingId);
 
     /**
+     * Get push history for a listing with pagination.
+     *
+     * @param listingId The listing ID
+     * @param page Page number (1-indexed)
+     * @param size Page size
+     * @return Paginated push responses
+     */
+    PageResponse<PushResponse> getPushHistory(Long listingId, int page, int size);
+
+    /**
      * Get push history for all listings owned by a user.
      *
      * @param userId The user ID
      * @return List of push responses for all user's listings
      */
     List<PushResponse> getUserPushHistory(String userId);
+
+    /**
+     * Get push history for all listings owned by a user with pagination.
+     *
+     * @param userId The user ID
+     * @param page Page number (1-indexed)
+     * @param size Page size
+     * @return Paginated push responses for all user's listings
+     */
+    PageResponse<PushResponse> getUserPushHistory(String userId, int page, int size);
 
     /**
      * Get push history for a specific listing

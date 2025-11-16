@@ -18,7 +18,7 @@ import org.springframework.data.domain.Pageable;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class PaymentHistoryByStatusRequest {
 
-    Long userId;
+    String userId;
     TransactionStatus status;
     Pageable pageable;
 }

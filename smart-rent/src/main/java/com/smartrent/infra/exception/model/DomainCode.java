@@ -27,6 +27,8 @@ public enum DomainCode {
   PHONE_EXISTING("3002", HttpStatus.CONFLICT, "Phone already exists"),
   DOCUMENT_EXISTING("3003", HttpStatus.CONFLICT, "Document already exists"),
   TAX_NUMBER_EXISTING("3004", HttpStatus.BAD_REQUEST, "Tax number already exists"),
+  ROLE_EXISTING("3005", HttpStatus.CONFLICT, "Role already exists"),
+  MEMBERSHIP_PACKAGE_EXISTING("3006", HttpStatus.CONFLICT, "Membership package already exists"),
   //    Not Found Error 4xxx
   USER_NOT_FOUND("4001", HttpStatus.NOT_FOUND, "User not found"),
   VERIFY_CODE_NOT_FOUND("4002", HttpStatus.NOT_FOUND, "Verify code not found"),
@@ -40,6 +42,9 @@ public enum DomainCode {
   STREET_NOT_FOUND("4010", HttpStatus.NOT_FOUND, "Street not found"),
   PROVINCE_MAPPING_NOT_FOUND("4011", HttpStatus.NOT_FOUND, "Province mapping not found"),
   WARD_MAPPING_NOT_FOUND("4012", HttpStatus.NOT_FOUND, "Ward mapping not found"),
+  ROLE_NOT_FOUND("4013", HttpStatus.NOT_FOUND, "Role not found"),
+  ADMIN_NOT_FOUND("4014", HttpStatus.NOT_FOUND, "Admin not found"),
+  MEMBERSHIP_PACKAGE_NOT_FOUND("4015", HttpStatus.NOT_FOUND, "Membership package not found"),
   //    Unauthorized	Client	5xxx (Unauthenticated error)
   UNAUTHENTICATED("5001", HttpStatus.UNAUTHORIZED, "Unauthenticated"),
   INVALID_EMAIL_PASSWORD("5002", HttpStatus.UNAUTHORIZED, "Invalid email or password"),

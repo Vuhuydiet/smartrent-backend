@@ -2,6 +2,7 @@ package com.smartrent.controller;
 
 import com.smartrent.dto.request.PhoneClickRequest;
 import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PhoneClickResponse;
 import com.smartrent.dto.response.PhoneClickStatsResponse;
 import com.smartrent.service.phoneclickdetail.PhoneClickDetailService;
@@ -132,9 +133,9 @@ public class PhoneClickDetailController {
     @Operation(
             summary = "Get users who clicked on listing's phone number",
             description = """
-                    Get all users who clicked on a specific listing's phone number.
+                    Get all users who clicked on a specific listing's phone number (paginated).
                     Returns unique users with their contact details.
-                    
+
                     **Use Case:**
                     - Renter views listing management page
                     - See which users are interested in the listing
@@ -159,15 +160,19 @@ public class PhoneClickDetailController {
                     description = "Listing not found"
             )
     })
-    public ApiResponse<List<PhoneClickResponse>> getPhoneClicksByListing(
+    public ApiResponse<PageResponse<PhoneClickResponse>> getPhoneClicksByListing(
             @Parameter(description = "Listing ID", example = "123")
-            @PathVariable Long listingId
+            @PathVariable Long listingId,
+            @Parameter(description = "Page number (1-indexed)", example = "1")
+            @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Number of items per page", example = "10")
+            @RequestParam(defaultValue = "10") int size
     ) {
-        log.info("Getting phone clicks for listing {}", listingId);
+        log.info("Getting phone clicks for listing {} - page: {}, size: {}", listingId, page, size);
 
-        List<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksByListing(listingId);
+        PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksByListing(listingId, page, size);
 
-        return ApiResponse.<List<PhoneClickResponse>>builder()
+        return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
                 .code("999999")
                 .data(responses)
                 .build();
@@ -177,8 +182,8 @@ public class PhoneClickDetailController {
     @Operation(
             summary = "Get my phone click history",
             description = """
-                    Get all listings the authenticated user has clicked phone numbers on.
-                    
+                    Get all listings the authenticated user has clicked phone numbers on (paginated).
+
                     **Use Case:**
                     - User views their browsing history
                     - See which listings they showed interest in
@@ -199,16 +204,21 @@ public class PhoneClickDetailController {
                     description = "Unauthorized - User not authenticated"
             )
     })
-    public ApiResponse<List<PhoneClickResponse>> getMyPhoneClicks() {
+    public ApiResponse<PageResponse<PhoneClickResponse>> getMyPhoneClicks(
+            @Parameter(description = "Page number (1-indexed)", example = "1")
+            @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Number of items per page", example = "10")
+            @RequestParam(defaultValue = "10") int size
+    ) {
         // Get authenticated user ID from JWT token
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userId = authentication.getName();
 
-        log.info("Getting phone clicks for user {}", userId);
+        log.info("Getting phone clicks for user {} - page: {}, size: {}", userId, page, size);
 
-        List<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksByUser(userId);
+        PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksByUser(userId, page, size);
 
-        return ApiResponse.<List<PhoneClickResponse>>builder()
+        return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
                 .code("999999")
                 .data(responses)
                 .build();
@@ -263,9 +273,9 @@ public class PhoneClickDetailController {
     @Operation(
             summary = "Get phone clicks for my listings",
             description = """
-                    Get all phone clicks for listings owned by the authenticated user.
+                    Get all phone clicks for listings owned by the authenticated user (paginated).
                     This is used in the renter's listing management page to see who is interested.
-                    
+
                     **Use Case:**
                     - Renter views listing management dashboard
                     - See all users who clicked on any of their listings
@@ -287,16 +297,81 @@ public class PhoneClickDetailController {
                     description = "Unauthorized - User not authenticated"
             )
     })
-    public ApiResponse<List<PhoneClickResponse>> getPhoneClicksForMyListings() {
+    public ApiResponse<PageResponse<PhoneClickResponse>> getPhoneClicksForMyListings(
+            @Parameter(description = "Page number (1-indexed)", example = "1")
+            @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Number of items per page", example = "10")
+            @RequestParam(defaultValue = "10") int size
+    ) {
         // Get authenticated user ID from JWT token
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userId = authentication.getName();
 
-        log.info("Getting phone clicks for all listings owned by user {}", userId);
+        log.info("Getting phone clicks for all listings owned by user {} - page: {}, size: {}", userId, page, size);
 
-        List<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksForOwnerListings(userId);
+        PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksForOwnerListings(userId, page, size);
 
-        return ApiResponse.<List<PhoneClickResponse>>builder()
+        return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
+                .code("999999")
+                .data(responses)
+                .build();
+    }
+
+    @GetMapping("/my-listings/search")
+    @Operation(
+            summary = "Search phone clicks for my listings by title",
+            description = """
+                    Search for users who clicked on phone numbers in listings owned by the authenticated user,
+                    filtered by listing title keyword (paginated).
+
+                    **Use Case:**
+                    - Renter wants to find who clicked on a specific listing
+                    - Search by listing title to narrow down results
+                    - See interested users for specific properties
+
+                    **Search Behavior:**
+                    - Case-insensitive partial match on listing title
+                    - Returns phone clicks with user details and listing title
+                    """,
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Successfully retrieved search results",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class)
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "Bad request - Invalid parameters"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - User not authenticated"
+            )
+    })
+    public ApiResponse<PageResponse<PhoneClickResponse>> searchPhoneClicksByListingTitle(
+            @Parameter(description = "Listing title keyword to search for", example = "apartment", required = true)
+            @RequestParam String title,
+            @Parameter(description = "Page number (1-indexed)", example = "1")
+            @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Number of items per page", example = "10")
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        // Get authenticated user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
+        log.info("Searching phone clicks for listings owned by user {} with title keyword '{}' - page: {}, size: {}",
+                userId, title, page, size);
+
+        PageResponse<PhoneClickResponse> responses = phoneClickDetailService.searchPhoneClicksByListingTitle(
+                userId, title, page, size);
+
+        return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
                 .code("999999")
                 .data(responses)
                 .build();

@@ -4,6 +4,7 @@ import com.smartrent.constants.PricingConstants;
 import com.smartrent.dto.request.PushListingRequest;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.request.SchedulePushRequest;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PushResponse;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.enums.*;
@@ -17,6 +18,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -301,6 +305,31 @@ public class PushServiceImpl implements PushService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<PushResponse> getPushHistory(Long listingId, int page, int size) {
+        log.info("Getting push history for listing: {} with pagination - page: {}, size: {}", listingId, page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<PushHistory> pushHistoryPage = pushHistoryRepository.findAll(pageable);
+
+        // Filter by listingId
+        List<PushResponse> pushResponses = pushHistoryPage.getContent().stream()
+                .filter(ph -> ph.getListingId().equals(listingId))
+                .map(ph -> mapToPushResponse(ph, null))
+                .collect(Collectors.toList());
+
+        log.info("Successfully retrieved {} push history records", pushResponses.size());
+
+        return PageResponse.<PushResponse>builder()
+                .page(page)
+                .size(pushHistoryPage.getSize())
+                .totalPages(pushHistoryPage.getTotalPages())
+                .totalElements(pushHistoryPage.getTotalElements())
+                .data(pushResponses)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<PushResponse> getUserPushHistory(String userId) {
         log.info("Getting push history for user: {}", userId);
 
@@ -320,6 +349,48 @@ public class PushServiceImpl implements PushService {
                 .stream()
                 .map(ph -> mapToPushResponse(ph, null))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<PushResponse> getUserPushHistory(String userId, int page, int size) {
+        log.info("Getting push history for user: {} with pagination - page: {}, size: {}", userId, page, size);
+
+        // Find all listings owned by the user
+        List<Listing> userListings = listingRepository.findByUserId(userId);
+        List<Long> listingIds = userListings.stream()
+                .map(Listing::getListingId)
+                .collect(Collectors.toList());
+
+        if (listingIds.isEmpty()) {
+            log.info("No listings found for user: {}", userId);
+            return PageResponse.<PushResponse>builder()
+                    .page(page)
+                    .size(size)
+                    .totalPages(0)
+                    .totalElements(0L)
+                    .data(List.of())
+                    .build();
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<PushHistory> pushHistoryPage = pushHistoryRepository.findAll(pageable);
+
+        // Filter by user's listing IDs
+        List<PushResponse> pushResponses = pushHistoryPage.getContent().stream()
+                .filter(ph -> listingIds.contains(ph.getListingId()))
+                .map(ph -> mapToPushResponse(ph, null))
+                .collect(Collectors.toList());
+
+        log.info("Successfully retrieved {} push history records for user", pushResponses.size());
+
+        return PageResponse.<PushResponse>builder()
+                .page(page)
+                .size(pushHistoryPage.getSize())
+                .totalPages(pushHistoryPage.getTotalPages())
+                .totalElements(pushHistoryPage.getTotalElements())
+                .data(pushResponses)
+                .build();
     }
 
     // ========== Helper Methods ==========
