@@ -1,9 +1,12 @@
 package com.smartrent.service.listing;
 
 import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.request.MyListingsFilterRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
@@ -48,4 +51,13 @@ public interface ListingService {
      * @return Listing creation response
      */
     ListingCreationResponse completeListingCreationAfterPayment(String transactionId);
+
+    /**
+     * Unified search API - handles both public search and my listings
+     * @param filter Filter criteria (all fields optional)
+     *               - If userId is null: public search (excludes drafts by default)
+     *               - If userId is provided: user's listings (includes drafts if isDraft filter allows)
+     * @return Paginated listing response with total count and recommendations
+     */
+    ListingListResponse searchListings(ListingFilterRequest filter);
 }

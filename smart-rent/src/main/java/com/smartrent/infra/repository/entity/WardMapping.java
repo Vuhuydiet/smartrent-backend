@@ -52,10 +52,18 @@ public class WardMapping {
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
 
+    /**
+     * Indicates if this is the default/primary mapping for the new ward
+     * When multiple legacy wards merge into one new ward, only one should be default (1)
+     * When one legacy ward splits to multiple new wards, only one should be default (1)
+     */
+    @Column(name = "is_default_new_ward")
+    Boolean isDefaultNewWard;
+
     public enum MergeType {
-        UNCHANGED,
-        MERGED_WITH_OTHERS,
-        SPLIT_TO_MULTIPLE,
-        RENAMED
+        UNCHANGED,           // Ward unchanged (was 'exact' in migrations)
+        MERGED_WITH_OTHERS,  // Multiple wards merged (was 'partial' in migrations)
+        SPLIT_TO_MULTIPLE,   // Ward split into multiple (was 'split_to_multiple' in migrations)
+        RENAMED              // Ward renamed (was 'exact' in migrations)
     }
 }
