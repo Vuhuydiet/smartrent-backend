@@ -91,6 +91,10 @@ public class Listing {
     @Column(name = "is_shadow", nullable = false)
     Boolean isShadow = false;
 
+    @Builder.Default
+    @Column(name = "is_draft", nullable = false)
+    Boolean isDraft = false;
+
     @Column(name = "parent_listing_id")
     Long parentListingId;
 
