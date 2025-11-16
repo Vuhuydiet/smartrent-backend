@@ -1,10 +1,14 @@
 package com.smartrent.service.membership.impl;
 
 import com.smartrent.constants.PricingConstants;
+import com.smartrent.dto.request.MembershipPackageCreateRequest;
+import com.smartrent.dto.request.MembershipPackageUpdateRequest;
 import com.smartrent.dto.request.MembershipPurchaseRequest;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.response.*;
 import com.smartrent.enums.*;
+import com.smartrent.infra.exception.MembershipPackageExistingException;
+import com.smartrent.infra.exception.MembershipPackageNotFoundException;
 import com.smartrent.infra.repository.*;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.service.membership.MembershipService;
@@ -15,6 +19,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,11 +61,139 @@ public class MembershipServiceImpl implements MembershipService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<MembershipPackageResponse> getAllActivePackages(int page, int size) {
+        log.info("Getting all active membership packages with pagination - page: {}, size: {}", page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<MembershipPackage> packagePage = membershipPackageRepository.findAll(pageable);
+
+        List<MembershipPackageResponse> packageResponses = packagePage.getContent().stream()
+                .filter(MembershipPackage::getIsActive)
+                .map(this::mapToPackageResponse)
+                .collect(Collectors.toList());
+
+        log.info("Successfully retrieved {} active membership packages", packageResponses.size());
+
+        return PageResponse.<MembershipPackageResponse>builder()
+                .page(page)
+                .size(packagePage.getSize())
+                .totalPages(packagePage.getTotalPages())
+                .totalElements(packagePage.getTotalElements())
+                .data(packageResponses)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public MembershipPackageResponse getPackageById(Long membershipId) {
         log.info("Getting membership package by ID: {}", membershipId);
         MembershipPackage membershipPackage = membershipPackageRepository.findById(membershipId)
-                .orElseThrow(() -> new RuntimeException("Membership package not found: " + membershipId));
+                .orElseThrow(MembershipPackageNotFoundException::new);
         return mapToPackageResponse(membershipPackage);
+    }
+
+    @Override
+    @Transactional
+    public MembershipPackageResponse createPackage(MembershipPackageCreateRequest request) {
+        log.info("Creating new membership package with code: {}", request.getPackageCode());
+
+        // Check if package code already exists
+        if (membershipPackageRepository.existsByPackageCode(request.getPackageCode())) {
+            throw new MembershipPackageExistingException();
+        }
+
+        // Validate package level
+        PackageLevel packageLevel;
+        try {
+            packageLevel = PackageLevel.valueOf(request.getPackageLevel().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid package level: " + request.getPackageLevel() + ". Must be one of: BASIC, STANDARD, ADVANCED");
+        }
+
+        // Create membership package
+        MembershipPackage membershipPackage = MembershipPackage.builder()
+                .packageCode(request.getPackageCode())
+                .packageName(request.getPackageName())
+                .packageLevel(packageLevel)
+                .durationMonths(request.getDurationMonths())
+                .originalPrice(request.getOriginalPrice())
+                .salePrice(request.getSalePrice())
+                .discountPercentage(request.getDiscountPercentage() != null ? request.getDiscountPercentage() : BigDecimal.ZERO)
+                .isActive(request.getIsActive() != null ? request.getIsActive() : true)
+                .description(request.getDescription())
+                .build();
+
+        membershipPackage = membershipPackageRepository.save(membershipPackage);
+        log.info("Successfully created membership package with ID: {}", membershipPackage.getMembershipId());
+
+        return mapToPackageResponse(membershipPackage);
+    }
+
+    @Override
+    @Transactional
+    public MembershipPackageResponse updatePackage(Long membershipId, MembershipPackageUpdateRequest request) {
+        log.info("Updating membership package with ID: {}", membershipId);
+
+        // Find existing package
+        MembershipPackage membershipPackage = membershipPackageRepository.findById(membershipId)
+                .orElseThrow(MembershipPackageNotFoundException::new);
+
+        // Update fields if provided
+        if (request.getPackageName() != null) {
+            membershipPackage.setPackageName(request.getPackageName());
+        }
+
+        if (request.getPackageLevel() != null) {
+            try {
+                PackageLevel packageLevel = PackageLevel.valueOf(request.getPackageLevel().toUpperCase());
+                membershipPackage.setPackageLevel(packageLevel);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Invalid package level: " + request.getPackageLevel() + ". Must be one of: BASIC, STANDARD, ADVANCED");
+            }
+        }
+
+        if (request.getDurationMonths() != null) {
+            membershipPackage.setDurationMonths(request.getDurationMonths());
+        }
+
+        if (request.getOriginalPrice() != null) {
+            membershipPackage.setOriginalPrice(request.getOriginalPrice());
+        }
+
+        if (request.getSalePrice() != null) {
+            membershipPackage.setSalePrice(request.getSalePrice());
+        }
+
+        if (request.getDiscountPercentage() != null) {
+            membershipPackage.setDiscountPercentage(request.getDiscountPercentage());
+        }
+
+        if (request.getIsActive() != null) {
+            membershipPackage.setIsActive(request.getIsActive());
+        }
+
+        if (request.getDescription() != null) {
+            membershipPackage.setDescription(request.getDescription());
+        }
+
+        membershipPackage = membershipPackageRepository.save(membershipPackage);
+        log.info("Successfully updated membership package with ID: {}", membershipId);
+
+        return mapToPackageResponse(membershipPackage);
+    }
+
+    @Override
+    @Transactional
+    public void deletePackage(Long membershipId) {
+        log.info("Deleting membership package with ID: {}", membershipId);
+
+        // Find existing package
+        MembershipPackage membershipPackage = membershipPackageRepository.findById(membershipId)
+                .orElseThrow(MembershipPackageNotFoundException::new);
+
+        // Delete the package
+        membershipPackageRepository.delete(membershipPackage);
+        log.info("Successfully deleted membership package with ID: {}", membershipId);
     }
 
     @Override
@@ -72,7 +207,7 @@ public class MembershipServiceImpl implements MembershipService {
 
         // Get membership package
         MembershipPackage membershipPackage = membershipPackageRepository.findById(request.getMembershipId())
-                .orElseThrow(() -> new RuntimeException("Membership package not found: " + request.getMembershipId()));
+                .orElseThrow(MembershipPackageNotFoundException::new);
 
         if (!membershipPackage.getIsActive()) {
             throw new RuntimeException("Membership package is not active");
@@ -123,7 +258,7 @@ public class MembershipServiceImpl implements MembershipService {
 
         // Get membership package
         MembershipPackage membershipPackage = membershipPackageRepository.findById(request.getMembershipId())
-                .orElseThrow(() -> new RuntimeException("Membership package not found: " + request.getMembershipId()));
+                .orElseThrow(MembershipPackageNotFoundException::new);
 
         if (!membershipPackage.getIsActive()) {
             throw new RuntimeException("Membership package is not active");
@@ -198,7 +333,7 @@ public class MembershipServiceImpl implements MembershipService {
 
         // Get membership package
         MembershipPackage membershipPackage = membershipPackageRepository.findById(membershipId)
-                .orElseThrow(() -> new RuntimeException("Membership package not found: " + membershipId));
+                .orElseThrow(MembershipPackageNotFoundException::new);
 
         // Check if user already has an active membership
         boolean hasActiveMembership = userMembershipRepository.hasActiveMembership(
@@ -256,6 +391,31 @@ public class MembershipServiceImpl implements MembershipService {
                 .stream()
                 .map(this::mapToUserMembershipResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<UserMembershipResponse> getMembershipHistory(String userId, int page, int size) {
+        log.info("Getting membership history for user: {} with pagination - page: {}, size: {}", userId, page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<UserMembership> membershipPage = userMembershipRepository.findAll(pageable);
+
+        // Filter by userId
+        List<UserMembershipResponse> membershipResponses = membershipPage.getContent().stream()
+                .filter(um -> um.getUserId().equals(userId))
+                .map(this::mapToUserMembershipResponse)
+                .collect(Collectors.toList());
+
+        log.info("Successfully retrieved {} membership history records", membershipResponses.size());
+
+        return PageResponse.<UserMembershipResponse>builder()
+                .page(page)
+                .size(membershipPage.getSize())
+                .totalPages(membershipPage.getTotalPages())
+                .totalElements(membershipPage.getTotalElements())
+                .data(membershipResponses)
+                .build();
     }
 
     @Override

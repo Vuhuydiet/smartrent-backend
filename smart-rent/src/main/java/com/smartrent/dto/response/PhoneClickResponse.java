@@ -28,6 +28,9 @@ public class PhoneClickResponse {
     @Schema(description = "Listing ID", example = "123")
     Long listingId;
 
+    @Schema(description = "Listing title", example = "Beautiful 2BR Apartment in District 1")
+    String listingTitle;
+
     @Schema(description = "User ID who clicked", example = "user-123e4567-e89b-12d3-a456-426614174000")
     String userId;
 

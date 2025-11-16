@@ -1,6 +1,8 @@
 package com.smartrent.infra.repository;
 
 import com.smartrent.infra.repository.entity.PhoneClickDetail;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -75,5 +77,36 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
            "WHERE pc.listing.listingId = :listingId " +
            "ORDER BY pc.clickedAt DESC")
     List<PhoneClickDetail> findDistinctUsersByListingId(@Param("listingId") Long listingId);
+
+    /**
+     * Get unique users who clicked on a specific listing's phone number (paginated)
+     */
+    @Query("SELECT DISTINCT pc FROM phone_clicks pc " +
+           "WHERE pc.listing.listingId = :listingId " +
+           "ORDER BY pc.clickedAt DESC")
+    Page<PhoneClickDetail> findDistinctUsersByListingId(@Param("listingId") Long listingId, Pageable pageable);
+
+    /**
+     * Find all phone clicks by a specific user (paginated)
+     */
+    Page<PhoneClickDetail> findByUser_UserIdOrderByClickedAtDesc(String userId, Pageable pageable);
+
+    /**
+     * Get phone clicks for all listings owned by a specific user (renter) (paginated)
+     */
+    @Query("SELECT pc FROM phone_clicks pc WHERE pc.listing.userId = :ownerId ORDER BY pc.clickedAt DESC")
+    Page<PhoneClickDetail> findByListingOwnerIdOrderByClickedAtDesc(@Param("ownerId") String ownerId, Pageable pageable);
+
+    /**
+     * Search phone clicks for listings owned by a specific user by listing title (paginated)
+     */
+    @Query("SELECT pc FROM phone_clicks pc " +
+           "WHERE pc.listing.userId = :ownerId " +
+           "AND LOWER(pc.listing.title) LIKE LOWER(CONCAT('%', :titleKeyword, '%')) " +
+           "ORDER BY pc.clickedAt DESC")
+    Page<PhoneClickDetail> searchByListingOwnerIdAndTitle(
+            @Param("ownerId") String ownerId,
+            @Param("titleKeyword") String titleKeyword,
+            Pageable pageable);
 }
 

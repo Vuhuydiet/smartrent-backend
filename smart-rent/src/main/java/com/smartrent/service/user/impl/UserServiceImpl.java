@@ -4,6 +4,7 @@ import com.smartrent.config.Constants;
 import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UpdateContactPhoneRequest;
 import com.smartrent.dto.request.UserCreationRequest;
+import com.smartrent.dto.request.UserUpdateRequest;
 import com.smartrent.dto.response.GetUserResponse;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.UserCreationResponse;
@@ -172,5 +173,85 @@ public class UserServiceImpl implements UserService {
     log.info("Contact phone updated successfully for user {}", userId);
 
     return userMapper.mapFromUserEntityToGetUserResponse(user);
+  }
+
+  @Override
+  @Transactional
+  @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId")
+  public GetUserResponse updateUser(String userId, UserUpdateRequest request) {
+    log.info("Updating user with ID: {}", userId);
+
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> {
+          log.error("User not found with ID: {}", userId);
+          return new UserNotFoundException();
+        });
+
+    // Update email if provided and different
+    if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
+      if (userRepository.existsByEmail(request.getEmail())) {
+        throw new EmailExistingException();
+      }
+      user.setEmail(request.getEmail());
+    }
+
+    // Update first name if provided
+    if (request.getFirstName() != null) {
+      user.setFirstName(request.getFirstName());
+    }
+
+    // Update last name if provided
+    if (request.getLastName() != null) {
+      user.setLastName(request.getLastName());
+    }
+
+    // Update ID document if provided and different
+    if (request.getIdDocument() != null && !request.getIdDocument().equals(user.getIdDocument())) {
+      if (userRepository.existsByIdDocument(request.getIdDocument())) {
+        throw new DocumentExistingException();
+      }
+      user.setIdDocument(request.getIdDocument());
+    }
+
+    // Update tax number if provided and different
+    if (request.getTaxNumber() != null && !request.getTaxNumber().equals(user.getTaxNumber())) {
+      if (userRepository.existsByTaxNumber(request.getTaxNumber())) {
+        throw new TaxNumberExisting();
+      }
+      user.setTaxNumber(request.getTaxNumber());
+    }
+
+    // Update contact phone number if provided
+    if (request.getContactPhoneNumber() != null) {
+      user.setContactPhoneNumber(request.getContactPhoneNumber());
+      // Reset verification status when phone is updated
+      user.setContactPhoneVerified(false);
+    }
+
+    // Update verification status if provided
+    if (request.getIsVerified() != null) {
+      user.setVerified(request.getIsVerified());
+    }
+
+    user = userRepository.saveAndFlush(user);
+    log.info("Successfully updated user: {}", userId);
+
+    return userMapper.mapFromUserEntityToGetUserResponse(user);
+  }
+
+  @Override
+  @Transactional
+  @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId")
+  public void deleteUser(String userId) {
+    log.info("Deleting user with ID: {}", userId);
+
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> {
+          log.error("User not found with ID: {}", userId);
+          return new UserNotFoundException();
+        });
+
+    userRepository.delete(user);
+    log.info("Successfully deleted user: {}", userId);
   }
 }
