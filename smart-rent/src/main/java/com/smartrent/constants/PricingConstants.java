@@ -135,7 +135,7 @@ public final class PricingConstants {
      * @param days Number of days
      * @return Discount as decimal (e.g., 0.11 for 11%)
      */
-    private static BigDecimal getDiscountForDuration(int days) {
+    public static BigDecimal getDiscountForDuration(int days) {
         if (days == DURATION_30_DAYS) {
             return DISCOUNT_30_DAYS;
         } else if (days == DURATION_15_DAYS) {

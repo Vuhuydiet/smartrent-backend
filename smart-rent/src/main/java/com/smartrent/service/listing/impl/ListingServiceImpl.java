@@ -9,6 +9,8 @@ import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
+import com.smartrent.dto.response.ListingDurationPlanResponse;
+import com.smartrent.dto.response.PriceCalculationResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.PostSource;
 import com.smartrent.infra.exception.AppException;
@@ -20,9 +22,11 @@ import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.UserRepository;
+import com.smartrent.infra.repository.ListingDurationPlanRepository;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
+import com.smartrent.service.listing.cache.ListingRequestCacheService;
 import com.smartrent.service.pricing.LocationPricingService;
 import com.smartrent.service.quota.QuotaService;
 import com.smartrent.service.payment.PaymentService;
@@ -38,6 +42,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -61,18 +67,79 @@ public class ListingServiceImpl implements ListingService {
     TransactionRepository transactionRepository;
     PaymentService paymentService;
     AddressCreationService addressCreationService;
+    ListingDurationPlanRepository listingDurationPlanRepository;
+    ListingRequestCacheService listingRequestCacheService;
 
     @Override
     @Transactional
     public ListingCreationResponse createListing(ListingCreationRequest request) {
         log.info("Creating listing with address - User: {}, Title: {}", request.getUserId(), request.getTitle());
 
+        // Check if this is a NORMAL listing with duration plan requiring payment
+        if (request.getDurationPlanId() != null && !Boolean.TRUE.equals(request.getUseMembershipQuota())) {
+            log.info("NORMAL listing requires payment - initiating payment flow");
+
+            // Validate duration plan exists
+            ListingDurationPlan plan = listingDurationPlanRepository.findById(request.getDurationPlanId())
+                    .orElseThrow(() -> new AppException(DomainCode.DURATION_PLAN_NOT_FOUND,
+                            "Duration plan not found: " + request.getDurationPlanId()));
+
+            if (!plan.getIsActive()) {
+                throw new AppException(DomainCode.DURATION_PLAN_NOT_FOUND,
+                        "Duration plan is not active: " + request.getDurationPlanId());
+            }
+
+            // Calculate price for NORMAL listing
+            java.math.BigDecimal amount = PricingConstants.calculateNormalPostPrice(plan.getDurationDays());
+
+            // Create PENDING transaction
+            String transactionId = transactionService.createPostFeeTransaction(
+                    request.getUserId(),
+                    amount,
+                    "NORMAL",
+                    plan.getDurationDays(),
+                    request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+            );
+
+            // Cache the listing request in Redis (30 min TTL)
+            listingRequestCacheService.storeNormalListingRequest(transactionId, request);
+            log.info("Cached NORMAL listing request for transaction: {}", transactionId);
+
+            // Generate payment URL using PaymentService
+            PaymentRequest paymentRequest = PaymentRequest.builder()
+                    .transactionId(transactionId) // Reuse the transaction created above
+                    .provider(com.smartrent.enums.PaymentProvider.valueOf(
+                            request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
+                    .amount(amount)
+                    .currency(PricingConstants.DEFAULT_CURRENCY)
+                    .orderInfo("NORMAL Listing - " + plan.getDurationDays() + " days: " + request.getTitle())
+                    .build();
+
+            PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
+
+            log.info("Payment URL generated for NORMAL listing transaction: {}", transactionId);
+
+            // Return payment response
+            return ListingCreationResponse.builder()
+                    .paymentRequired(true)
+                    .transactionId(transactionId)
+                    .amount(amount.longValue())
+                    .paymentUrl(paymentResponse.getPaymentUrl())
+                    .message("Payment required. Complete payment to create listing.")
+                    .build();
+        }
+
+        // Original flow for listings without payment requirement
         // Create address first (within the same transaction)
         Address address = createAddress(request.getAddress());
 
         // Create listing and set the address
         Listing listing = listingMapper.toEntity(request);
         listing.setAddress(address);
+        // Set default values for required fields
+        if (listing.getExpired() == null) {
+            listing.setExpired(false);
+        }
 
         // Save listing
         Listing saved = listingRepository.save(listing);
@@ -259,7 +326,7 @@ public class ListingServiceImpl implements ListingService {
                 .roomCapacity(premiumListing.getRoomCapacity())
                 .verified(premiumListing.getVerified())
                 .isVerify(premiumListing.getIsVerify())
-                .expired(premiumListing.getExpired())
+                .expired(premiumListing.getExpired() != null ? premiumListing.getExpired() : false)
                 .isShadow(true)
                 .parentListingId(premiumListing.getListingId())
                 .postSource(premiumListing.getPostSource()) // Same source as parent
@@ -322,7 +389,8 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional(readOnly = true)
     public List<ListingResponse> getListings(int page, int size) {
-        int safePage = Math.max(page, 0);
+        // Convert 1-based page to 0-based for Spring Data
+        int safePage = Math.max(page - 1, 0);
         int safeSize = Math.min(Math.max(size, 1), 100); // cap size to 100
         Pageable pageable = PageRequest.of(safePage, safeSize);
         Page<Listing> pageResult = listingRepository.findAll(pageable);
@@ -497,5 +565,215 @@ public class ListingServiceImpl implements ListingService {
                 }
             });
         }
+    }
+
+    @Override
+    public List<ListingDurationPlanResponse> getAvailableDurationPlans() {
+        log.info("Fetching all available duration plans");
+
+        List<ListingDurationPlan> plans = listingDurationPlanRepository.findAllByIsActiveTrueOrderByDurationDaysAsc();
+
+        return plans.stream()
+                .map(plan -> {
+                    int days = plan.getDurationDays();
+                    BigDecimal discount = PricingConstants.getDiscountForDuration(days);
+
+                    return ListingDurationPlanResponse.builder()
+                            .planId(plan.getPlanId())
+                            .durationDays(days)
+                            .isActive(plan.getIsActive())
+                            .discountPercentage(discount)
+                            .discountDescription(formatDiscountDescription(discount))
+                            .normalPrice(PricingConstants.calculateNormalPostPrice(days))
+                            .silverPrice(PricingConstants.calculateSilverPostPrice(days))
+                            .goldPrice(PricingConstants.calculateGoldPostPrice(days))
+                            .diamondPrice(PricingConstants.calculateDiamondPostPrice(days))
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public PriceCalculationResponse calculateListingPrice(String vipType, Integer durationDays) {
+        log.info("Calculating price for vipType: {}, duration: {} days", vipType, durationDays);
+
+        BigDecimal basePricePerDay = switch (vipType.toUpperCase()) {
+            case "NORMAL" -> PricingConstants.NORMAL_POST_PER_DAY;
+            case "SILVER" -> PricingConstants.SILVER_POST_PER_DAY;
+            case "GOLD" -> PricingConstants.GOLD_POST_PER_DAY;
+            case "DIAMOND" -> PricingConstants.DIAMOND_POST_PER_DAY;
+            default -> throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                    "Invalid VIP type: " + vipType);
+        };
+
+        BigDecimal totalBeforeDiscount = basePricePerDay.multiply(new BigDecimal(durationDays));
+        BigDecimal discountPercentage = PricingConstants.getDiscountForDuration(durationDays);
+        BigDecimal discountAmount = totalBeforeDiscount.multiply(discountPercentage)
+                .setScale(0, RoundingMode.HALF_UP);
+        BigDecimal finalPrice = totalBeforeDiscount.subtract(discountAmount);
+
+        return PriceCalculationResponse.builder()
+                .vipType(vipType.toUpperCase())
+                .durationDays(durationDays)
+                .basePricePerDay(basePricePerDay)
+                .totalBeforeDiscount(totalBeforeDiscount)
+                .discountPercentage(discountPercentage)
+                .discountAmount(discountAmount)
+                .finalPrice(finalPrice)
+                .currency(PricingConstants.DEFAULT_CURRENCY)
+                .savingsDescription(formatSavingsDescription(discountAmount, discountPercentage))
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public ListingCreationResponse completeListingCreationAfterPayment(String transactionId) {
+        log.info("Completing listing creation after payment for transaction: {}", transactionId);
+
+        // Check for idempotency - if listing already created, return it
+        return listingRepository.findByTransactionId(transactionId)
+                .map(existingListing -> {
+                    log.warn("Listing already created for transaction {}, returning existing listing",
+                            transactionId);
+                    return listingMapper.toCreationResponse(existingListing);
+                })
+                .orElseGet(() -> createListingFromCache(transactionId));
+    }
+
+    /**
+     * Create listing from cache - checks both NORMAL and VIP caches
+     */
+    private ListingCreationResponse createListingFromCache(String transactionId) {
+        // Try NORMAL listing first
+        if (listingRequestCacheService.normalListingRequestExists(transactionId)) {
+            return createNormalListingFromCache(transactionId);
+        }
+
+        // Try VIP listing
+        if (listingRequestCacheService.vipListingRequestExists(transactionId)) {
+            return createVipListingFromCache(transactionId);
+        }
+
+        // Cache expired or not found
+        throw new AppException(DomainCode.LISTING_CREATION_CACHE_NOT_FOUND,
+                "Listing request not found in cache for transaction: " + transactionId +
+                ". Cache may have expired (30 min TTL). Please create listing again.");
+    }
+
+    /**
+     * Create NORMAL listing from cached request
+     */
+    private ListingCreationResponse createNormalListingFromCache(String transactionId) {
+        log.info("Creating NORMAL listing from cache for transaction: {}", transactionId);
+
+        ListingCreationRequest request = listingRequestCacheService.getNormalListingRequest(transactionId);
+        if (request == null) {
+            throw new AppException(DomainCode.LISTING_CREATION_CACHE_NOT_FOUND,
+                    "Failed to retrieve NORMAL listing request from cache");
+        }
+
+        try {
+            // Create address
+            Address address = createAddress(request.getAddress());
+
+            // Create listing
+            Listing listing = listingMapper.toEntity(request);
+            listing.setAddress(address);
+            listing.setPostSource(PostSource.DIRECT_PAYMENT);
+            listing.setTransactionId(transactionId);
+            // Set default values for required fields if not provided
+            if (listing.getExpired() == null) {
+                listing.setExpired(false);
+            }
+
+            Listing saved = listingRepository.save(listing);
+            log.info("NORMAL listing created successfully with id: {} for transaction: {}",
+                    saved.getListingId(), transactionId);
+
+            // Link media if provided
+            if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
+                linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
+            }
+
+            // Remove from cache
+            listingRequestCacheService.removeNormalListingRequest(transactionId);
+
+            return listingMapper.toCreationResponse(saved);
+
+        } catch (Exception e) {
+            log.error("Error creating NORMAL listing from cache for transaction: {}", transactionId, e);
+            throw new AppException(DomainCode.UNKNOWN_ERROR,
+                    "Failed to create listing after payment: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Create VIP listing from cached request
+     */
+    private ListingCreationResponse createVipListingFromCache(String transactionId) {
+        log.info("Creating VIP listing from cache for transaction: {}", transactionId);
+
+        VipListingCreationRequest request = listingRequestCacheService.getVipListingRequest(transactionId);
+        if (request == null) {
+            throw new AppException(DomainCode.LISTING_CREATION_CACHE_NOT_FOUND,
+                    "Failed to retrieve VIP listing request from cache");
+        }
+
+        try {
+            // Create address
+            Address address = createAddress(request.getAddress());
+
+            // Build and save VIP listing
+            Listing vipListing = buildListingFromVipRequest(request, address);
+            vipListing.setPostSource(PostSource.DIRECT_PAYMENT);
+            vipListing.setTransactionId(transactionId);
+            // Set default values for required fields if not provided
+            if (vipListing.getExpired() == null) {
+                vipListing.setExpired(false);
+            }
+
+            Listing savedVipListing = listingRepository.save(vipListing);
+            log.info("VIP listing created with id: {} for transaction: {}",
+                    savedVipListing.getListingId(), transactionId);
+
+            // Link media if provided
+            if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
+                linkMediaToListing(savedVipListing, request.getMediaIds(), request.getUserId());
+            }
+
+            // Create shadow listing for DIAMOND tier
+            if (savedVipListing.isDiamond()) {
+                createShadowListing(savedVipListing);
+            }
+
+            // Remove from cache
+            listingRequestCacheService.removeVipListingRequest(transactionId);
+
+            return listingMapper.toCreationResponse(savedVipListing);
+
+        } catch (Exception e) {
+            log.error("Error creating VIP listing from cache for transaction: {}", transactionId, e);
+            throw new AppException(DomainCode.UNKNOWN_ERROR,
+                    "Failed to create VIP listing after payment: " + e.getMessage());
+        }
+    }
+
+    private String formatDiscountDescription(BigDecimal discount) {
+        if (discount.compareTo(BigDecimal.ZERO) == 0) {
+            return "No discount";
+        }
+        BigDecimal percentage = discount.multiply(new BigDecimal("100"));
+        return percentage.stripTrailingZeros().toPlainString() + "% off";
+    }
+
+    private String formatSavingsDescription(BigDecimal amount, BigDecimal percentage) {
+        if (amount.compareTo(BigDecimal.ZERO) == 0) {
+            return "No savings";
+        }
+        BigDecimal percentValue = percentage.multiply(new BigDecimal("100"));
+        return String.format("Save %s %s (%.1f%%)",
+                amount.toBigInteger(),
+                PricingConstants.DEFAULT_CURRENCY,
+                percentValue);
     }
 }

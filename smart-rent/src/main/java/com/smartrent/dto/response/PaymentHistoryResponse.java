@@ -53,8 +53,8 @@ public class PaymentHistoryResponse {
     @Schema(description = "Listing ID associated with payment", example = "67890")
     Long listingId;
 
-    @Schema(description = "User ID who made the payment", example = "11111")
-    Long userId;
+    @Schema(description = "User ID who made the payment", example = "13ad9071-279a-4758-9caf-9758d259187d")
+    String userId;
 
     @Schema(description = "Payment creation timestamp")
     LocalDateTime createdAt;

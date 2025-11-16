@@ -2,12 +2,14 @@ package com.smartrent.controller;
 
 import com.smartrent.dto.request.UpdateContactPhoneRequest;
 import com.smartrent.dto.request.UserCreationRequest;
+import com.smartrent.dto.request.UserUpdateRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.GetUserResponse;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.UserCreationResponse;
 import com.smartrent.service.user.UserService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -18,15 +20,10 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/v1/users")
@@ -235,7 +232,7 @@ public class UserController {
                         "code": "999999",
                         "message": null,
                         "data": {
-                          "page": 0,
+                          "page": 1,
                           "size": 10,
                           "totalElements": 25,
                           "totalPages": 3,
@@ -304,8 +301,8 @@ public class UserController {
   })
   public ApiResponse<PageResponse<GetUserResponse>> getUsers(
       @io.swagger.v3.oas.annotations.Parameter(
-          description = "Page number (0-indexed)",
-          example = "0",
+          description = "Page number (1-based indexing)",
+          example = "1",
           required = true
       )
       @RequestParam("page") int page,
@@ -391,5 +388,122 @@ public class UserController {
     return ApiResponse.<GetUserResponse>builder()
         .data(response)
         .build();
+  }
+
+  @PutMapping("/{userId}")
+  @Operation(
+      summary = "Update user (Admin operation)",
+      description = "Updates an existing user's information. This is an admin operation.",
+      security = @SecurityRequirement(name = "Bearer Authentication")
+  )
+  @ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "200",
+          description = "User updated successfully",
+          content = @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = ApiResponse.class),
+              examples = @ExampleObject(
+                  name = "Success Response",
+                  value = """
+                      {
+                        "code": "999999",
+                        "message": null,
+                        "data": {
+                          "userId": "user-123",
+                          "email": "updated@example.com",
+                          "firstName": "John",
+                          "lastName": "Doe",
+                          "idDocument": "ID123456789",
+                          "taxNumber": "TAX987654321",
+                          "isVerified": true,
+                          "contactPhoneNumber": "0912345678"
+                        }
+                      }
+                      """
+              )
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "404",
+          description = "User not found",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  name = "Not Found Error",
+                  value = """
+                      {
+                        "code": "4001",
+                        "message": "User not found",
+                        "data": null
+                      }
+                      """
+              )
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "409",
+          description = "Email, ID document, or tax number already exists",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  name = "Conflict Error",
+                  value = """
+                      {
+                        "code": "3001",
+                        "message": "Email already exists",
+                        "data": null
+                      }
+                      """
+              )
+          )
+      )
+  })
+  ApiResponse<GetUserResponse> updateUser(
+      @Parameter(description = "User ID", required = true)
+      @PathVariable String userId,
+      @Valid @RequestBody UserUpdateRequest request
+  ) {
+    GetUserResponse user = userService.updateUser(userId, request);
+    return ApiResponse.<GetUserResponse>builder()
+        .data(user)
+        .build();
+  }
+
+  @DeleteMapping("/{userId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(
+      summary = "Delete user (Admin operation)",
+      description = "Deletes a user from the system. This is an admin operation.",
+      security = @SecurityRequirement(name = "Bearer Authentication")
+  )
+  @ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "204",
+          description = "User deleted successfully"
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "404",
+          description = "User not found",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  name = "Not Found Error",
+                  value = """
+                      {
+                        "code": "4001",
+                        "message": "User not found",
+                        "data": null
+                      }
+                      """
+              )
+          )
+      )
+  })
+  void deleteUser(
+      @Parameter(description = "User ID", required = true)
+      @PathVariable String userId
+  ) {
+    userService.deleteUser(userId);
   }
 }

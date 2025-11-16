@@ -1,9 +1,10 @@
 package com.smartrent.controller;
 
 import com.smartrent.dto.request.SavedListingRequest;
+import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.SavedListingResponse;
 import com.smartrent.service.listing.SavedListingService;
-import com.smartrent.dto.response.ApiResponse;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -92,7 +94,7 @@ public class SavedListingController {
     @GetMapping("/my-saved")
     @Operation(
         summary = "Get my saved listings",
-        description = "Retrieve all listings saved by the current user",
+        description = "Retrieve all listings saved by the current user (paginated)",
         security = @SecurityRequirement(name = "Bearer Authentication")
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
@@ -101,15 +103,40 @@ public class SavedListingController {
             description = "Saved listings retrieved successfully",
             content = @Content(
                 mediaType = "application/json",
-                array = @io.swagger.v3.oas.annotations.media.ArraySchema(
-                    schema = @Schema(implementation = SavedListingResponse.class)
+                schema = @Schema(implementation = ApiResponse.class),
+                examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                    name = "Success Response",
+                    value = """
+                        {
+                          "code": "999999",
+                          "message": null,
+                          "data": {
+                            "page": 1,
+                            "size": 10,
+                            "totalElements": 15,
+                            "totalPages": 2,
+                            "data": [
+                              {
+                                "userId": "user123",
+                                "listingId": 1,
+                                "createdAt": "2024-01-01T00:00:00",
+                                "updatedAt": "2024-01-01T00:00:00"
+                              }
+                            ]
+                          }
+                        }
+                        """
                 )
             )
         )
     })
-    public ApiResponse<List<SavedListingResponse>> getMySavedListings() {
-        List<SavedListingResponse> responses = savedListingService.getMySavedListings();
-        return ApiResponse.<List<SavedListingResponse>>builder()
+    public ApiResponse<PageResponse<SavedListingResponse>> getMySavedListings(
+            @Parameter(description = "Page number (1-indexed)", example = "1")
+            @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Number of items per page", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        PageResponse<SavedListingResponse> responses = savedListingService.getMySavedListings(page, size);
+        return ApiResponse.<PageResponse<SavedListingResponse>>builder()
                 .data(responses)
                 .build();
     }

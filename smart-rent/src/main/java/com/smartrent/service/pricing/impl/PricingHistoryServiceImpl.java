@@ -1,6 +1,7 @@
 package com.smartrent.service.pricing.impl;
 
 import com.smartrent.dto.request.PriceUpdateRequest;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PricingHistoryResponse;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.PricingHistoryRepository;
@@ -12,6 +13,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,6 +72,30 @@ public class PricingHistoryServiceImpl implements PricingHistoryService {
     }
 
     @Override
+    public PageResponse<PricingHistoryResponse> getPricingHistoryByListingId(Long listingId, int page, int size) {
+        log.info("Getting pricing history for listing: {} with pagination - page: {}, size: {}", listingId, page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<PricingHistory> pricingHistoryPage = pricingHistoryRepository.findAll(pageable);
+
+        // Filter by listingId
+        List<PricingHistoryResponse> pricingHistoryResponses = pricingHistoryPage.getContent().stream()
+                .filter(ph -> ph.getListing().getListingId().equals(listingId))
+                .map(pricingHistoryMapper::toResponse)
+                .collect(Collectors.toList());
+
+        log.info("Successfully retrieved {} pricing history records", pricingHistoryResponses.size());
+
+        return PageResponse.<PricingHistoryResponse>builder()
+                .page(page)
+                .size(pricingHistoryPage.getSize())
+                .totalPages(pricingHistoryPage.getTotalPages())
+                .totalElements(pricingHistoryPage.getTotalElements())
+                .data(pricingHistoryResponses)
+                .build();
+    }
+
+    @Override
     public PricingHistoryResponse getCurrentPrice(Long listingId) {
         log.info("Getting current price for listing: {}", listingId);
         return pricingHistoryRepository.findByListingListingIdAndIsCurrentTrue(listingId)
@@ -82,6 +110,32 @@ public class PricingHistoryServiceImpl implements PricingHistoryService {
                 .stream()
                 .map(pricingHistoryMapper::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public PageResponse<PricingHistoryResponse> getPricingHistoryByDateRange(Long listingId, LocalDateTime startDate, LocalDateTime endDate, int page, int size) {
+        log.info("Getting pricing history for listing: {} between {} and {} with pagination - page: {}, size: {}",
+                listingId, startDate, endDate, page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<PricingHistory> pricingHistoryPage = pricingHistoryRepository.findAll(pageable);
+
+        // Filter by listingId and date range
+        List<PricingHistoryResponse> pricingHistoryResponses = pricingHistoryPage.getContent().stream()
+                .filter(ph -> ph.getListing().getListingId().equals(listingId))
+                .filter(ph -> !ph.getChangedAt().isBefore(startDate) && !ph.getChangedAt().isAfter(endDate))
+                .map(pricingHistoryMapper::toResponse)
+                .collect(Collectors.toList());
+
+        log.info("Successfully retrieved {} pricing history records for date range", pricingHistoryResponses.size());
+
+        return PageResponse.<PricingHistoryResponse>builder()
+                .page(page)
+                .size(pricingHistoryPage.getSize())
+                .totalPages(pricingHistoryPage.getTotalPages())
+                .totalElements(pricingHistoryPage.getTotalElements())
+                .data(pricingHistoryResponses)
+                .build();
     }
 
     @Override
@@ -175,6 +229,34 @@ public class PricingHistoryServiceImpl implements PricingHistoryService {
         log.info("Getting listings with price changes in last {} days", daysBack);
         LocalDateTime sinceDate = LocalDateTime.now().minusDays(daysBack);
         return pricingHistoryRepository.findDistinctListingIdsByChangedAtAfterAndChangeTypeNot(sinceDate);
+    }
+
+    @Override
+    public PageResponse<Long> getListingsWithRecentPriceChanges(int daysBack, int page, int size) {
+        log.info("Getting listings with price changes in last {} days with pagination - page: {}, size: {}", daysBack, page, size);
+        LocalDateTime sinceDate = LocalDateTime.now().minusDays(daysBack);
+        List<Long> allListingIds = pricingHistoryRepository.findDistinctListingIdsByChangedAtAfterAndChangeTypeNot(sinceDate);
+
+        // Manual pagination since repository returns List<Long>
+        int start = (page - 1) * size;
+        int end = Math.min(start + size, allListingIds.size());
+
+        List<Long> paginatedListingIds = (start < allListingIds.size())
+                ? allListingIds.subList(start, end)
+                : List.of();
+
+        int totalElements = allListingIds.size();
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+
+        log.info("Successfully retrieved {} listing IDs with recent price changes", paginatedListingIds.size());
+
+        return PageResponse.<Long>builder()
+                .page(page)
+                .size(size)
+                .totalPages(totalPages)
+                .totalElements((long) totalElements)
+                .data(paginatedListingIds)
+                .build();
     }
 
     private PricingHistory.PriceChangeType determineChangeType(BigDecimal oldPrice, BigDecimal newPrice,

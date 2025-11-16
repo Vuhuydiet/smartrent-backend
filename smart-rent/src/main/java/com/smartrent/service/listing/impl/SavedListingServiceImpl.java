@@ -1,6 +1,7 @@
 package com.smartrent.service.listing.impl;
 
 import com.smartrent.dto.request.SavedListingRequest;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.SavedListingResponse;
 import com.smartrent.infra.repository.SavedListingRepository;
 import com.smartrent.infra.repository.entity.SavedListing;
@@ -11,6 +12,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -66,12 +70,38 @@ public class SavedListingServiceImpl implements SavedListingService {
     public List<SavedListingResponse> getMySavedListings() {
         String userId = getCurrentUserId();
         log.info("Getting saved listings for user {}", userId);
-        
+
         List<SavedListing> savedListings = savedListingRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        
+
         return savedListings.stream()
                 .map(savedListingMapper::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<SavedListingResponse> getMySavedListings(int page, int size) {
+        String userId = getCurrentUserId();
+        log.info("Getting saved listings for user {} with pagination - page: {}, size: {}", userId, page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<SavedListing> savedListingPage = savedListingRepository.findAll(pageable);
+
+        // Filter by userId
+        List<SavedListingResponse> savedListingResponses = savedListingPage.getContent().stream()
+                .filter(sl -> sl.getId().getUserId().equals(userId))
+                .map(savedListingMapper::toResponse)
+                .collect(Collectors.toList());
+
+        log.info("Successfully retrieved {} saved listings", savedListingResponses.size());
+
+        return PageResponse.<SavedListingResponse>builder()
+                .page(page)
+                .size(savedListingPage.getSize())
+                .totalPages(savedListingPage.getTotalPages())
+                .totalElements(savedListingPage.getTotalElements())
+                .data(savedListingResponses)
+                .build();
     }
 
     @Override

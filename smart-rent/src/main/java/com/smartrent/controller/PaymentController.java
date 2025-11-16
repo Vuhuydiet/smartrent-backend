@@ -149,16 +149,37 @@ public class PaymentController {
     }
 
     @GetMapping("/history")
-    @Operation(summary = "Get payment history", description = "Get user payment history with pagination")
+    @Operation(
+        summary = "Get payment history",
+        description = "Get user payment history with pagination (1-based page indexing)",
+        parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(
+                name = "userId",
+                description = "User ID (UUID format)",
+                example = "13ad9071-279a-4758-9caf-9758d259187d",
+                required = true
+            ),
+            @io.swagger.v3.oas.annotations.Parameter(
+                name = "page",
+                description = "Page number (1-based indexing)",
+                example = "1"
+            ),
+            @io.swagger.v3.oas.annotations.Parameter(
+                name = "size",
+                description = "Number of items per page",
+                example = "20"
+            )
+        }
+    )
     public ApiResponse<Page<PaymentHistoryResponse>> getPaymentHistory(
-            @Parameter(description = "User ID") @RequestParam String userId,
-            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
+            @RequestParam String userId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        log.info("Getting payment history for user: {}", userId);
+        log.info("Getting payment history for user: {} - page: {}, size: {}", userId, page, size);
 
         try {
-            Pageable pageable = PageRequest.of(page, size);
+            Pageable pageable = PageRequest.of(page - 1, size);
             Page<PaymentHistoryResponse> response = paymentService.getPaymentHistory(userId, pageable);
 
             return ApiResponse.<Page<PaymentHistoryResponse>>builder()
@@ -177,17 +198,44 @@ public class PaymentController {
     }
 
     @GetMapping("/history/status/{status}")
-    @Operation(summary = "Get payment history by status", description = "Get user payment history filtered by status")
+    @Operation(
+        summary = "Get payment history by status",
+        description = "Get user payment history filtered by transaction status with pagination (1-based page indexing)",
+        parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(
+                name = "userId",
+                description = "User ID (UUID format)",
+                example = "13ad9071-279a-4758-9caf-9758d259187d",
+                required = true
+            ),
+            @io.swagger.v3.oas.annotations.Parameter(
+                name = "status",
+                description = "Transaction status to filter by",
+                example = "COMPLETED",
+                required = true
+            ),
+            @io.swagger.v3.oas.annotations.Parameter(
+                name = "page",
+                description = "Page number (1-based indexing)",
+                example = "1"
+            ),
+            @io.swagger.v3.oas.annotations.Parameter(
+                name = "size",
+                description = "Number of items per page",
+                example = "20"
+            )
+        }
+    )
     public ApiResponse<Page<PaymentHistoryResponse>> getPaymentHistoryByStatus(
-            @Parameter(description = "User ID") @RequestParam Long userId,
-            @Parameter(description = "Transaction status") @PathVariable TransactionStatus status,
-            @Parameter(description = "Page number (0-based)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
+            @RequestParam String userId,
+            @PathVariable TransactionStatus status,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
 
-        log.info("Getting payment history for user: {} with status: {}", userId, status);
+        log.info("Getting payment history for user: {} with status: {} - page: {}, size: {}", userId, status, page, size);
 
         try {
-            Pageable pageable = PageRequest.of(page, size);
+            Pageable pageable = PageRequest.of(page - 1, size);
             PaymentHistoryByStatusRequest historyRequest = PaymentHistoryByStatusRequest.builder()
                     .userId(userId)
                     .status(status)
@@ -338,8 +386,8 @@ public class PaymentController {
                     membershipService.completeMembershipPurchase(transactionRef);
                 }
                 case POST_FEE -> {
-                    log.info("Completing VIP listing creation for transaction: {}", transactionRef);
-                    listingService.completeVipListingCreation(transactionRef);
+                    log.info("Completing listing creation (NORMAL or VIP) for transaction: {}", transactionRef);
+                    listingService.completeListingCreationAfterPayment(transactionRef);
                 }
                 case PUSH_FEE -> {
                     log.info("Completing push after payment for transaction: {}", transactionRef);

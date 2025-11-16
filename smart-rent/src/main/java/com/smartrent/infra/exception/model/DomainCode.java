@@ -27,6 +27,8 @@ public enum DomainCode {
   PHONE_EXISTING("3002", HttpStatus.CONFLICT, "Phone already exists"),
   DOCUMENT_EXISTING("3003", HttpStatus.CONFLICT, "Document already exists"),
   TAX_NUMBER_EXISTING("3004", HttpStatus.BAD_REQUEST, "Tax number already exists"),
+  ROLE_EXISTING("3005", HttpStatus.CONFLICT, "Role already exists"),
+  MEMBERSHIP_PACKAGE_EXISTING("3006", HttpStatus.CONFLICT, "Membership package already exists"),
   //    Not Found Error 4xxx
   USER_NOT_FOUND("4001", HttpStatus.NOT_FOUND, "User not found"),
   VERIFY_CODE_NOT_FOUND("4002", HttpStatus.NOT_FOUND, "Verify code not found"),
@@ -40,6 +42,9 @@ public enum DomainCode {
   STREET_NOT_FOUND("4010", HttpStatus.NOT_FOUND, "Street not found"),
   PROVINCE_MAPPING_NOT_FOUND("4011", HttpStatus.NOT_FOUND, "Province mapping not found"),
   WARD_MAPPING_NOT_FOUND("4012", HttpStatus.NOT_FOUND, "Ward mapping not found"),
+  ROLE_NOT_FOUND("4013", HttpStatus.NOT_FOUND, "Role not found"),
+  ADMIN_NOT_FOUND("4014", HttpStatus.NOT_FOUND, "Admin not found"),
+  MEMBERSHIP_PACKAGE_NOT_FOUND("4015", HttpStatus.NOT_FOUND, "Membership package not found"),
   //    Unauthorized	Client	5xxx (Unauthenticated error)
   UNAUTHENTICATED("5001", HttpStatus.UNAUTHORIZED, "Unauthenticated"),
   INVALID_EMAIL_PASSWORD("5002", HttpStatus.UNAUTHORIZED, "Invalid email or password"),
@@ -67,6 +72,11 @@ public enum DomainCode {
   EXTERNAL_SERVICE_ERROR("9001", HttpStatus.SERVICE_UNAVAILABLE, "External service error"),
   TOO_MANY_REQUESTS("9002", HttpStatus.TOO_MANY_REQUESTS, "Too many requests to external service"),
   BAD_REQUEST_ERROR("9003", HttpStatus.BAD_REQUEST, "Bad request to external service"),
+  //    AI Service Error 9100-9199
+  AI_SERVICE_ERROR("9101", HttpStatus.INTERNAL_SERVER_ERROR, "AI service internal error"),
+  AI_SERVICE_UNAVAILABLE("9102", HttpStatus.SERVICE_UNAVAILABLE, "AI service is unavailable"),
+  AI_SERVICE_TIMEOUT("9103", HttpStatus.REQUEST_TIMEOUT, "AI service request timeout"),
+  AI_SERVICE_INVALID_RESPONSE("9104", HttpStatus.BAD_GATEWAY, "Invalid response from AI service"),
   //    OTP Error 10xxx
   OTP_INVALID_PHONE("10001", HttpStatus.BAD_REQUEST, "Invalid phone number format"),
   OTP_NON_VIETNAM_PHONE("10002", HttpStatus.BAD_REQUEST, "Only Vietnam phone numbers are supported"),
@@ -78,7 +88,15 @@ public enum DomainCode {
   OTP_VERIFICATION_ATTEMPTS_EXCEEDED("10008", HttpStatus.TOO_MANY_REQUESTS, "Maximum verification attempts exceeded"),
   OTP_ALREADY_VERIFIED("10009", HttpStatus.BAD_REQUEST, "OTP already verified"),
   OTP_PROVIDER_ERROR("10010", HttpStatus.SERVICE_UNAVAILABLE, "OTP provider error: %s"),
-  OTP_INVALID_REQUEST_ID("10011", HttpStatus.BAD_REQUEST, "Invalid request ID")
+  OTP_INVALID_REQUEST_ID("10011", HttpStatus.BAD_REQUEST, "Invalid request ID"),
+  //    Duration Plan Error 11xxx
+  DURATION_PLAN_NOT_FOUND("11001", HttpStatus.NOT_FOUND, "Duration plan not found"),
+  DURATION_PLAN_DUPLICATE_DURATION("11002", HttpStatus.CONFLICT, "Duration plan with this duration already exists"),
+  DURATION_PLAN_LAST_ACTIVE("11003", HttpStatus.BAD_REQUEST, "Cannot deactivate the last active duration plan"),
+  //    Listing Creation Error 12xxx
+  LISTING_CREATION_CACHE_NOT_FOUND("12001", HttpStatus.NOT_FOUND, "Listing creation request not found in cache"),
+  LISTING_CREATION_PAYMENT_FAILED("12002", HttpStatus.PAYMENT_REQUIRED, "Payment failed for listing creation"),
+  LISTING_ALREADY_EXISTS_FOR_TRANSACTION("12003", HttpStatus.CONFLICT, "Listing already exists for this transaction")
   ;
 
   private final String value;

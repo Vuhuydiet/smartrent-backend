@@ -24,7 +24,7 @@ public class PaymentMapperImpl implements PaymentMapper {
                 .orderInfo(transaction.getAdditionalInfo())
                 .paymentMethod(transaction.getPaymentProvider() != null ? transaction.getPaymentProvider().name() : null)
                 .paymentDate(transaction.isCompleted() ? transaction.getUpdatedAt() : null)
-                .userId(transaction.getUserId() != null ? Long.parseLong(transaction.getUserId()) : null)
+                .userId(transaction.getUserId())
                 .createdAt(transaction.getCreatedAt())
                 .updatedAt(transaction.getUpdatedAt())
                 .notes(transaction.getAdditionalInfo())

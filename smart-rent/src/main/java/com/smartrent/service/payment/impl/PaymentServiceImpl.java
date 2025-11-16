@@ -125,7 +125,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public Page<PaymentHistoryResponse> getPaymentHistoryByStatus(PaymentHistoryByStatusRequest request) {
         return paymentRepository.findByUserIdAndStatusOrderByCreatedAtDesc(
-                String.valueOf(request.getUserId()), request.getStatus(), request.getPageable())
+                request.getUserId(), request.getStatus(), request.getPageable())
                 .map(paymentMapper::toPaymentHistoryResponse);
     }
 

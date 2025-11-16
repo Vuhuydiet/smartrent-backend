@@ -1,6 +1,7 @@
 package com.smartrent.service.phoneclickdetail.impl;
 
 import com.smartrent.dto.request.PhoneClickRequest;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PhoneClickResponse;
 import com.smartrent.dto.response.PhoneClickStatsResponse;
 import com.smartrent.infra.repository.ListingRepository;
@@ -14,6 +15,9 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -71,34 +75,68 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PhoneClickResponse> getPhoneClicksByListing(Long listingId) {
-        log.info("Getting phone clicks for listing {}", listingId);
+    public PageResponse<PhoneClickResponse> getPhoneClicksByListing(Long listingId, int page, int size) {
+        log.info("Getting phone clicks for listing {} - page: {}, size: {}", listingId, page, size);
 
         // Verify listing exists
         listingRepository.findById(listingId)
                 .orElseThrow(() -> new RuntimeException("Listing not found with ID: " + listingId));
 
-        List<PhoneClickDetail> phoneClickDetails = phoneClickDetailRepository.findDistinctUsersByListingId(listingId);
-        
-        return phoneClickDetails.stream()
+        // Validate pagination parameters
+        if (page < 1) {
+            throw new RuntimeException("Page number must be greater than 0");
+        }
+        if (size <= 0) {
+            throw new RuntimeException("Page size must be greater than 0");
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<PhoneClickDetail> phoneClickPage = phoneClickDetailRepository.findDistinctUsersByListingId(listingId, pageable);
+
+        List<PhoneClickResponse> responses = phoneClickPage.getContent().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+
+        return PageResponse.<PhoneClickResponse>builder()
+                .page(page)
+                .size(phoneClickPage.getSize())
+                .totalPages(phoneClickPage.getTotalPages())
+                .totalElements(phoneClickPage.getTotalElements())
+                .data(responses)
+                .build();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<PhoneClickResponse> getPhoneClicksByUser(String userId) {
-        log.info("Getting phone clicks by user {}", userId);
+    public PageResponse<PhoneClickResponse> getPhoneClicksByUser(String userId, int page, int size) {
+        log.info("Getting phone clicks by user {} - page: {}, size: {}", userId, page, size);
 
         // Verify user exists
         userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
-        List<PhoneClickDetail> phoneClickDetails = phoneClickDetailRepository.findByUser_UserIdOrderByClickedAtDesc(userId);
-        
-        return phoneClickDetails.stream()
+        // Validate pagination parameters
+        if (page < 1) {
+            throw new RuntimeException("Page number must be greater than 0");
+        }
+        if (size <= 0) {
+            throw new RuntimeException("Page size must be greater than 0");
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<PhoneClickDetail> phoneClickPage = phoneClickDetailRepository.findByUser_UserIdOrderByClickedAtDesc(userId, pageable);
+
+        List<PhoneClickResponse> responses = phoneClickPage.getContent().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+
+        return PageResponse.<PhoneClickResponse>builder()
+                .page(page)
+                .size(phoneClickPage.getSize())
+                .totalPages(phoneClickPage.getTotalPages())
+                .totalElements(phoneClickPage.getTotalElements())
+                .data(responses)
+                .build();
     }
 
     @Override
@@ -122,18 +160,75 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PhoneClickResponse> getPhoneClicksForOwnerListings(String ownerId) {
-        log.info("Getting phone clicks for all listings owned by user {}", ownerId);
+    public PageResponse<PhoneClickResponse> getPhoneClicksForOwnerListings(String ownerId, int page, int size) {
+        log.info("Getting phone clicks for all listings owned by user {} - page: {}, size: {}", ownerId, page, size);
 
         // Verify user exists
         userRepository.findById(ownerId)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + ownerId));
 
-        List<PhoneClickDetail> phoneClickDetails = phoneClickDetailRepository.findByListingOwnerIdOrderByClickedAtDesc(ownerId);
-        
-        return phoneClickDetails.stream()
+        // Validate pagination parameters
+        if (page < 1) {
+            throw new RuntimeException("Page number must be greater than 0");
+        }
+        if (size <= 0) {
+            throw new RuntimeException("Page size must be greater than 0");
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<PhoneClickDetail> phoneClickPage = phoneClickDetailRepository.findByListingOwnerIdOrderByClickedAtDesc(ownerId, pageable);
+
+        List<PhoneClickResponse> responses = phoneClickPage.getContent().stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+
+        return PageResponse.<PhoneClickResponse>builder()
+                .page(page)
+                .size(phoneClickPage.getSize())
+                .totalPages(phoneClickPage.getTotalPages())
+                .totalElements(phoneClickPage.getTotalElements())
+                .data(responses)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<PhoneClickResponse> searchPhoneClicksByListingTitle(String ownerId, String titleKeyword, int page, int size) {
+        log.info("Searching phone clicks for listings owned by user {} with title keyword '{}' - page: {}, size: {}",
+                ownerId, titleKeyword, page, size);
+
+        // Verify user exists
+        userRepository.findById(ownerId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + ownerId));
+
+        // Validate pagination parameters
+        if (page < 1) {
+            throw new RuntimeException("Page number must be greater than 0");
+        }
+        if (size <= 0) {
+            throw new RuntimeException("Page size must be greater than 0");
+        }
+
+        // Validate title keyword
+        if (titleKeyword == null || titleKeyword.trim().isEmpty()) {
+            throw new RuntimeException("Title keyword cannot be empty");
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<PhoneClickDetail> phoneClickPage = phoneClickDetailRepository.searchByListingOwnerIdAndTitle(
+                ownerId, titleKeyword.trim(), pageable);
+
+        List<PhoneClickResponse> responses = phoneClickPage.getContent().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        return PageResponse.<PhoneClickResponse>builder()
+                .page(page)
+                .size(phoneClickPage.getSize())
+                .totalPages(phoneClickPage.getTotalPages())
+                .totalElements(phoneClickPage.getTotalElements())
+                .data(responses)
+                .build();
     }
 
     /**
@@ -141,10 +236,12 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
      */
     private PhoneClickResponse mapToResponse(PhoneClickDetail phoneClickDetail) {
         User user = phoneClickDetail.getUser();
-        
+        Listing listing = phoneClickDetail.getListing();
+
         return PhoneClickResponse.builder()
                 .id(phoneClickDetail.getId())
-                .listingId(phoneClickDetail.getListing().getListingId())
+                .listingId(listing.getListingId())
+                .listingTitle(listing.getTitle())
                 .userId(user.getUserId())
                 .userFirstName(user.getFirstName())
                 .userLastName(user.getLastName())
