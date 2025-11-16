@@ -88,12 +88,12 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ..
-          file: ../Dockerfile
+          context: ./smart-rent
+          file: ./smart-rent/Dockerfile
           push: true
           tags: |
-            vuhuydiet/smart-rent:${{ github.sha }}
-            vuhuydiet/smart-rent:dev
+            vuhuydiet/smartrent-backend:${{ github.sha }}
+            vuhuydiet/smartrent-backend:latest
 
   update-dev-deployment:
     runs-on: ubuntu-latest
