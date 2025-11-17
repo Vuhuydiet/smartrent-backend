@@ -45,6 +45,7 @@ public enum DomainCode {
   ROLE_NOT_FOUND("4013", HttpStatus.NOT_FOUND, "Role not found"),
   ADMIN_NOT_FOUND("4014", HttpStatus.NOT_FOUND, "Admin not found"),
   MEMBERSHIP_PACKAGE_NOT_FOUND("4015", HttpStatus.NOT_FOUND, "Membership package not found"),
+  CATEGORY_NOT_FOUND("4013", HttpStatus.NOT_FOUND, "Category not found"),
   //    Unauthorized	Client	5xxx (Unauthenticated error)
   UNAUTHENTICATED("5001", HttpStatus.UNAUTHORIZED, "Unauthenticated"),
   INVALID_EMAIL_PASSWORD("5002", HttpStatus.UNAUTHORIZED, "Invalid email or password"),

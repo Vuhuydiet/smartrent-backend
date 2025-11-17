@@ -33,11 +33,10 @@ public class AddressServiceImpl implements AddressService {
     private final LegacyProvinceRepository legacyProvinceRepository;
     private final LegacyDistrictRepository legacyDistrictRepository;
     private final LegacyWardRepository legacyWardRepository;
-    private final ProvinceMappingRepository provinceMappingRepository;
-    private final WardMappingRepository wardMappingRepository;
-    private final DistrictWardMappingRepository districtWardMappingRepository;
+    private final AddressMappingRepository addressMappingRepository;
     private final StreetRepository streetRepository;
     private final ProjectRepository projectRepository;
+    private final com.smartrent.mapper.AddressMapper addressMapper;
 
     // =====================================================================
     // New structure methods (not from interface - public API)
@@ -45,35 +44,35 @@ public class AddressServiceImpl implements AddressService {
 
     public Page<NewProvinceResponse> getAllNewProvinces(Pageable pageable) {
         return newProvinceRepository.findAll(pageable)
-                .map(this::toNewProvinceResponse);
+                .map(addressMapper::toNewProvinceResponse);
     }
 
     public Page<NewProvinceResponse> searchNewProvinces(String keyword, Pageable pageable, String code) {
         // Search provinces by keyword (code parameter is unused - provinces don't have parent codes)
         return newProvinceRepository.searchByKeyword(keyword, pageable)
-                .map(this::toNewProvinceResponse);
+                .map(addressMapper::toNewProvinceResponse);
     }
 
     public NewProvinceResponse getNewProvinceByCode(String code) {
         Province province = newProvinceRepository.findByCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Province not found with code: " + code));
-        return toNewProvinceResponse(province);
+        return addressMapper.toNewProvinceResponse(province);
     }
 
     public Page<NewWardResponse> getNewWardsByProvince(String provinceCode, Pageable pageable) {
         return newWardRepository.findByProvinceCode(provinceCode, pageable)
-                .map(this::toNewWardResponse);
+                .map(addressMapper::toNewWardResponse);
     }
 
     public Page<NewWardResponse> searchNewWardsByProvince(String provinceCode, String keyword, Pageable pageable) {
         return newWardRepository.searchByProvinceAndKeyword(provinceCode, keyword, pageable)
-                .map(this::toNewWardResponse);
+                .map(addressMapper::toNewWardResponse);
     }
 
     public NewWardResponse getNewWardByCode(String code) {
         Ward ward = newWardRepository.findByCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Ward not found with code: " + code));
-        return toNewWardResponse(ward);
+        return addressMapper.toNewWardResponse(ward);
     }
 
     public NewFullAddressResponse getNewFullAddress(String provinceCode, String wardCode) {
@@ -83,8 +82,8 @@ public class AddressServiceImpl implements AddressService {
                 .orElseThrow(() -> new ResourceNotFoundException("Ward not found with code: " + wardCode));
 
         return NewFullAddressResponse.builder()
-                .province(toNewProvinceResponse(province))
-                .ward(toNewWardResponse(ward))
+                .province(addressMapper.toNewProvinceResponse(province))
+                .ward(addressMapper.toNewWardResponse(ward))
                 .build();
     }
 
@@ -94,50 +93,66 @@ public class AddressServiceImpl implements AddressService {
 
     public Page<LegacyProvinceResponse> getAllLegacyProvinces(Pageable pageable) {
         return legacyProvinceRepository.findAll(pageable)
-                .map(this::toLegacyProvinceResponse);
+                .map(addressMapper::toLegacyProvinceResponse);
     }
 
     public Page<LegacyProvinceResponse> searchLegacyProvinces(String keyword, Pageable pageable) {
         return legacyProvinceRepository.searchByKeyword(keyword, pageable)
-                .map(this::toLegacyProvinceResponse);
+                .map(addressMapper::toLegacyProvinceResponse);
     }
 
     public LegacyProvinceResponse getLegacyProvinceById(Integer id) {
         LegacyProvince province = legacyProvinceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Legacy province not found with id: " + id));
-        return toLegacyProvinceResponse(province);
+        return addressMapper.toLegacyProvinceResponse(province);
     }
 
     public Page<LegacyDistrictResponse> getLegacyDistrictsByProvince(Integer provinceId, Pageable pageable) {
-        return legacyDistrictRepository.findByProvinceId(provinceId, pageable)
-                .map(this::toLegacyDistrictResponse);
+        // Get province to find its code
+        LegacyProvince province = legacyProvinceRepository.findById(provinceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Legacy province not found with id: " + provinceId));
+
+        return legacyDistrictRepository.findByProvinceCode(province.getCode(), pageable)
+                .map(addressMapper::toLegacyDistrictResponse);
     }
 
     public Page<LegacyDistrictResponse> searchLegacyDistrictsByProvince(Integer provinceId, String keyword, Pageable pageable) {
-        return legacyDistrictRepository.searchByProvinceAndKeyword(provinceId, keyword, pageable)
-                .map(this::toLegacyDistrictResponse);
+        // Get province to find its code
+        LegacyProvince province = legacyProvinceRepository.findById(provinceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Legacy province not found with id: " + provinceId));
+
+        return legacyDistrictRepository.searchByProvinceAndKeyword(province.getCode(), keyword, pageable)
+                .map(addressMapper::toLegacyDistrictResponse);
     }
 
     public LegacyDistrictResponse getLegacyDistrictById(Integer id) {
         District district = legacyDistrictRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Legacy district not found with id: " + id));
-        return toLegacyDistrictResponse(district);
+        return addressMapper.toLegacyDistrictResponse(district);
     }
 
     public Page<LegacyWardResponse> getLegacyWardsByDistrict(Integer districtId, Pageable pageable) {
-        return legacyWardRepository.findByDistrictId(districtId, pageable)
-                .map(this::toLegacyWardResponse);
+        // Get district to find its code
+        District district = legacyDistrictRepository.findById(districtId)
+                .orElseThrow(() -> new ResourceNotFoundException("Legacy district not found with id: " + districtId));
+
+        return legacyWardRepository.findByDistrictCode(district.getCode(), pageable)
+                .map(addressMapper::toLegacyWardResponse);
     }
 
     public Page<LegacyWardResponse> searchLegacyWardsByDistrict(Integer districtId, String keyword, Pageable pageable) {
-        return legacyWardRepository.searchByDistrictAndKeyword(districtId, keyword, pageable)
-                .map(this::toLegacyWardResponse);
+        // Get district to find its code
+        District district = legacyDistrictRepository.findById(districtId)
+                .orElseThrow(() -> new ResourceNotFoundException("Legacy district not found with id: " + districtId));
+
+        return legacyWardRepository.searchByDistrictAndKeyword(district.getCode(), keyword, pageable)
+                .map(addressMapper::toLegacyWardResponse);
     }
 
     public LegacyWardResponse getLegacyWardById(Integer id) {
         LegacyWard ward = legacyWardRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Legacy ward not found with id: " + id));
-        return toLegacyWardResponse(ward);
+        return addressMapper.toLegacyWardResponse(ward);
     }
 
     public FullAddressResponse getLegacyFullAddress(Integer provinceId, Integer districtId, Integer wardId) {
@@ -149,9 +164,9 @@ public class AddressServiceImpl implements AddressService {
                 .orElseThrow(() -> new ResourceNotFoundException("Legacy ward not found with id: " + wardId));
 
         return FullAddressResponse.builder()
-                .province(toLegacyProvinceResponse(province))
-                .district(toLegacyDistrictResponse(district))
-                .ward(toLegacyWardResponse(ward))
+                .province(addressMapper.toLegacyProvinceResponse(province))
+                .district(addressMapper.toLegacyDistrictResponse(district))
+                .ward(addressMapper.toLegacyWardResponse(ward))
                 .build();
     }
 
@@ -164,25 +179,33 @@ public class AddressServiceImpl implements AddressService {
         // Get legacy address
         FullAddressResponse legacyAddress = getLegacyFullAddress(legacyProvinceId, legacyDistrictId, legacyWardId);
 
-        // Find province mapping
-        ProvinceMapping provinceMapping = provinceMappingRepository.findByLegacyProvinceId(legacyProvinceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Province mapping not found for legacy province id: " + legacyProvinceId));
+        // Get province, district, ward codes
+        LegacyProvince legacyProvince = legacyProvinceRepository.findById(legacyProvinceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Legacy province not found with id: " + legacyProvinceId));
+        District legacyDistrict = legacyDistrictRepository.findById(legacyDistrictId)
+                .orElseThrow(() -> new ResourceNotFoundException("Legacy district not found with id: " + legacyDistrictId));
+        LegacyWard legacyWard = legacyWardRepository.findById(legacyWardId)
+                .orElseThrow(() -> new ResourceNotFoundException("Legacy ward not found with id: " + legacyWardId));
 
-        // Find ward mapping (use default if legacy ward was split to multiple new wards)
-        WardMapping wardMapping = wardMappingRepository.findDefaultByLegacyWardId(legacyWardId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ward mapping not found for legacy ward id: " + legacyWardId));
+        // Find best mapping (polygon contains > default > nearest)
+        AddressMapping mapping = addressMappingRepository.findBestByLegacyAddress(
+                        legacyProvince.getCode(),
+                        legacyDistrict.getCode(),
+                        legacyWard.getCode())
+                .orElseThrow(() -> new ResourceNotFoundException("Address mapping not found for legacy address"));
 
-        // Get new address
-        Province newProvince = provinceMapping.getNewProvince();
-        Ward newWard = wardMapping.getNewWard();
+        // Get new address from mapping
+        Province newProvince = mapping.getNewProvince();
+        Ward newWard = mapping.getNewWard();
 
         NewFullAddressResponse newAddress = NewFullAddressResponse.builder()
-                .province(toNewProvinceResponse(newProvince))
-                .ward(toNewWardResponse(newWard))
+                .province(addressMapper.toNewProvinceResponse(newProvince))
+                .ward(addressMapper.toNewWardResponse(newWard))
                 .build();
 
-        String conversionNote = String.format("Converted from legacy structure. Merge type: %s",
-                wardMapping.getMergeType());
+        String conversionNote = String.format("Converted from legacy structure. " +
+                        "Divided: %s, Merged: %s, Default: %s",
+                mapping.getIsDividedWard(), mapping.getIsMergedWard(), mapping.getIsDefaultNewWard());
 
         return AddressConversionResponse.builder()
                 .legacyAddress(legacyAddress)
@@ -192,8 +215,8 @@ public class AddressServiceImpl implements AddressService {
     }
 
     @Override
-    public AddressConversionResponse convertNewToLegacy(String newProvinceCode, String newWardCode) {
-        log.info("Converting new address to legacy - provinceCode: {}, wardCode: {}", newProvinceCode, newWardCode);
+    public AddressMergeHistoryResponse getMergeHistory(String newProvinceCode, String newWardCode) {
+        log.info("Getting merge history - provinceCode: {}, wardCode: {}", newProvinceCode, newWardCode);
 
         // Get new address
         Province newProvince = newProvinceRepository.findByCode(newProvinceCode)
@@ -202,194 +225,85 @@ public class AddressServiceImpl implements AddressService {
                 .orElseThrow(() -> new ResourceNotFoundException("Ward not found with code: " + newWardCode));
 
         NewFullAddressResponse newAddress = NewFullAddressResponse.builder()
-                .province(toNewProvinceResponse(newProvince))
-                .ward(toNewWardResponse(newWard))
+                .province(addressMapper.toNewProvinceResponse(newProvince))
+                .ward(addressMapper.toNewWardResponse(newWard))
                 .build();
 
-        // Try to find ward-to-ward mapping first (legacy ward -> new ward)
-        // Use default mapping to get the primary legacy ward when multiple wards were merged
-        Optional<WardMapping> defaultMappingOpt = wardMappingRepository.findDefaultByNewWardCode(newWardCode);
+        // Get all legacy addresses that were merged into this new address
+        List<AddressMapping> allMappings = addressMappingRepository.findByNewAddress(newProvinceCode, newWardCode);
 
-        if (defaultMappingOpt.isPresent()) {
-            // Found default ward-to-ward mapping
-            log.info("Found default ward-to-ward mapping for new ward code: {}", newWardCode);
-            WardMapping wardMapping = defaultMappingOpt.get();
-            LegacyWard legacyWard = wardMapping.getLegacyWard();
-            District legacyDistrict = legacyWard.getDistrict();
-            LegacyProvince legacyProvince = legacyWard.getProvince();
-
-            FullAddressResponse legacyAddress = FullAddressResponse.builder()
-                    .province(toLegacyProvinceResponse(legacyProvince))
-                    .district(toLegacyDistrictResponse(legacyDistrict))
-                    .ward(toLegacyWardResponse(legacyWard))
-                    .build();
-
-            // Check if there are multiple legacy wards for this new ward (merged scenario)
-            List<WardMapping> allMappings = wardMappingRepository.findByNewWardCode(newWardCode);
-            String conversionNote = allMappings.size() > 1
-                    ? String.format("Converted to legacy structure (ward-to-ward mapping). Note: This new ward was merged from %d legacy wards. Showing default/primary source. Merge type: %s",
-                            allMappings.size(), wardMapping.getMergeType())
-                    : String.format("Converted to legacy structure (ward-to-ward mapping). Merge type: %s", wardMapping.getMergeType());
-
-            return AddressConversionResponse.builder()
-                    .legacyAddress(legacyAddress)
-                    .newAddress(newAddress)
-                    .conversionNote(conversionNote)
-                    .build();
+        if (allMappings.isEmpty()) {
+            throw new ResourceNotFoundException(
+                    String.format("No merge history found for new address: province=%s, ward=%s",
+                            newProvinceCode, newWardCode));
         }
 
-        // If no ward-to-ward mapping, try district-to-ward mapping (legacy district -> new ward)
-        log.info("No ward-to-ward mapping found, checking district-to-ward mapping for new ward code: {}", newWardCode);
-        List<DistrictWardMapping> districtWardMappings = districtWardMappingRepository.findByNewWardCode(newWardCode);
+        // Build legacy source mappings
+        List<AddressMergeHistoryResponse.LegacyAddressMapping> legacySources = allMappings.stream()
+                .map(mapping -> {
+                    // Get legacy address components
+                    LegacyProvince legacyProvince = mapping.getLegacyProvince();
+                    District legacyDistrict = mapping.getLegacyDistrict();
+                    LegacyWard legacyWard = mapping.getLegacyWard();
 
-        if (!districtWardMappings.isEmpty()) {
-            // Found district-to-ward mapping (the entire legacy district became a new ward)
-            log.info("Found district-to-ward mapping for new ward code: {}", newWardCode);
-            DistrictWardMapping districtWardMapping = districtWardMappings.get(0);
-            District legacyDistrict = districtWardMapping.getLegacyDistrict();
-            LegacyProvince legacyProvince = legacyDistrict.getProvince();
+                    FullAddressResponse legacyAddress = FullAddressResponse.builder()
+                            .province(addressMapper.toLegacyProvinceResponse(legacyProvince))
+                            .district(legacyDistrict != null ? addressMapper.toLegacyDistrictResponse(legacyDistrict) : null)
+                            .ward(legacyWard != null ? addressMapper.toLegacyWardResponse(legacyWard) : null)
+                            .build();
 
-            // Note: Since the entire district became a ward, we don't have a specific legacy ward
-            // We return the district as the main administrative unit
-            FullAddressResponse legacyAddress = FullAddressResponse.builder()
-                    .province(toLegacyProvinceResponse(legacyProvince))
-                    .district(toLegacyDistrictResponse(legacyDistrict))
-                    .ward(null) // No specific ward - the entire district became this new ward
-                    .build();
+                    // Build merge description
+                    String mergeDescription = buildMergeDescription(mapping);
 
-            String conversionNote = districtWardMappings.size() > 1
-                    ? String.format("Converted to legacy structure (district-to-ward mapping). Note: This new ward represents an entire legacy district. %d legacy districts map to this ward. Showing first result.",
-                            districtWardMappings.size())
-                    : "Converted to legacy structure (district-to-ward mapping). This new ward represents an entire legacy district.";
+                    return AddressMergeHistoryResponse.LegacyAddressMapping.builder()
+                            .legacyAddress(legacyAddress)
+                            .isMergedProvince(mapping.getIsMergedProvince())
+                            .isMergedWard(mapping.getIsMergedWard())
+                            .isDividedWard(mapping.getIsDividedWard())
+                            .isDefault(mapping.getIsDefaultNewWard())
+                            .mergeDescription(mergeDescription)
+                            .build();
+                })
+                .collect(Collectors.toList());
 
-            return AddressConversionResponse.builder()
-                    .legacyAddress(legacyAddress)
-                    .newAddress(newAddress)
-                    .conversionNote(conversionNote)
-                    .build();
+        // Build summary note
+        String mergeNote;
+        if (allMappings.size() == 1) {
+            AddressMapping mapping = allMappings.get(0);
+            if (Boolean.TRUE.equals(mapping.getIsDividedWard())) {
+                mergeNote = "This new ward was created by dividing a legacy ward into multiple new wards.";
+            } else {
+                mergeNote = "This new ward has a 1:1 mapping with the legacy ward (no merge).";
+            }
+        } else {
+            long mergedCount = allMappings.stream()
+                    .filter(m -> Boolean.TRUE.equals(m.getIsMergedWard()))
+                    .count();
+            mergeNote = String.format("This new ward was created by merging %d legacy wards. " +
+                    "%d were merged, %d were divided.",
+                    allMappings.size(), mergedCount, allMappings.size() - mergedCount);
         }
 
-        // No mapping found in either table
-        throw new ResourceNotFoundException("No mapping found for new ward code: " + newWardCode + ". Checked both ward_mapping and district_ward_mapping tables.");
-    }
-
-    // Mapping methods
-    private NewProvinceResponse toNewProvinceResponse(Province province) {
-        return NewProvinceResponse.builder()
-                .code(province.getCode())
-                .name(province.getName())
-                .nameEn(province.getNameEn())
-                .fullName(province.getFullName())
-                .fullNameEn(province.getFullNameEn())
-                .codeName(province.getCodeName())
-                .administrativeUnitType(province.getAdministrativeUnit() != null ?
-                        province.getAdministrativeUnit().getFullName() : null)
+        return AddressMergeHistoryResponse.builder()
+                .newAddress(newAddress)
+                .legacySources(legacySources)
+                .totalMergedCount(allMappings.size())
+                .mergeNote(mergeNote)
                 .build();
     }
 
-    private NewWardResponse toNewWardResponse(Ward ward) {
-        return NewWardResponse.builder()
-                .code(ward.getCode())
-                .name(ward.getName())
-                .nameEn(ward.getNameEn())
-                .fullName(ward.getFullName())
-                .fullNameEn(ward.getFullNameEn())
-                .codeName(ward.getCodeName())
-                .provinceCode(ward.getProvince() != null ? ward.getProvince().getCode() : null)
-                .provinceName(ward.getProvince() != null ? ward.getProvince().getName() : null)
-                .administrativeUnitType(ward.getAdministrativeUnit() != null ?
-                        ward.getAdministrativeUnit().getFullName() : null)
-                .build();
-    }
-
-    private LegacyProvinceResponse toLegacyProvinceResponse(LegacyProvince province) {
-        return LegacyProvinceResponse.builder()
-                .id(province.getId())
-                .name(province.getName())
-                .nameEn(province.getNameEn())
-                .code(province.getCode())
-                .build();
-    }
-
-    private LegacyDistrictResponse toLegacyDistrictResponse(District district) {
-        return LegacyDistrictResponse.builder()
-                .id(district.getId())
-                .name(district.getName())
-                .nameEn(district.getNameEn())
-                .prefix(district.getPrefix())
-                .provinceId(district.getProvince() != null ? district.getProvince().getId() : null)
-                .provinceName(district.getProvince() != null ? district.getProvince().getName() : null)
-                .build();
-    }
-
-    private LegacyWardResponse toLegacyWardResponse(LegacyWard ward) {
-        return LegacyWardResponse.builder()
-                .id(ward.getId())
-                .name(ward.getName())
-                .nameEn(ward.getNameEn())
-                .prefix(ward.getPrefix())
-                .provinceId(ward.getProvince() != null ? ward.getProvince().getId() : null)
-                .provinceName(ward.getProvince() != null ? ward.getProvince().getName() : null)
-                .districtId(ward.getDistrict() != null ? ward.getDistrict().getId() : null)
-                .districtName(ward.getDistrict() != null ? ward.getDistrict().getName() : null)
-                .build();
-    }
-
-    private LegacyStreetResponse toLegacyStreetResponse(Street street) {
-        String provinceName = null;
-        String districtName = null;
-
-        if (street.getProvinceId() != null) {
-            provinceName = legacyProvinceRepository.findById(street.getProvinceId())
-                    .map(LegacyProvince::getName)
-                    .orElse(null);
+    private String buildMergeDescription(AddressMapping mapping) {
+        if (Boolean.TRUE.equals(mapping.getIsMergedProvince()) && Boolean.TRUE.equals(mapping.getIsMergedWard())) {
+            return "Both province and ward were merged";
+        } else if (Boolean.TRUE.equals(mapping.getIsMergedProvince())) {
+            return "Province was merged";
+        } else if (Boolean.TRUE.equals(mapping.getIsMergedWard())) {
+            return "Ward was merged";
+        } else if (Boolean.TRUE.equals(mapping.getIsDividedWard())) {
+            return "Ward was divided into multiple new wards";
+        } else {
+            return "Direct 1:1 mapping (no merge or division)";
         }
-
-        if (street.getDistrictId() != null) {
-            districtName = legacyDistrictRepository.findById(street.getDistrictId())
-                    .map(District::getName)
-                    .orElse(null);
-        }
-
-        return LegacyStreetResponse.builder()
-                .id(street.getId())
-                .name(street.getName())
-                .nameEn(street.getNameEn())
-                .prefix(street.getPrefix())
-                .provinceId(street.getProvinceId())
-                .provinceName(provinceName)
-                .districtId(street.getDistrictId())
-                .districtName(districtName)
-                .build();
-    }
-
-    private LegacyProjectResponse toLegacyProjectResponse(Project project) {
-        String provinceName = null;
-        String districtName = null;
-
-        if (project.getProvinceId() != null) {
-            provinceName = legacyProvinceRepository.findById(project.getProvinceId())
-                    .map(LegacyProvince::getName)
-                    .orElse(null);
-        }
-
-        if (project.getDistrictId() != null) {
-            districtName = legacyDistrictRepository.findById(project.getDistrictId())
-                    .map(District::getName)
-                    .orElse(null);
-        }
-
-        return LegacyProjectResponse.builder()
-                .id(project.getId())
-                .name(project.getName())
-                .nameEn(project.getNameEn())
-                .provinceId(project.getProvinceId())
-                .provinceName(provinceName)
-                .districtId(project.getDistrictId())
-                .districtName(districtName)
-                .latitude(project.getLatitude())
-                .longitude(project.getLongitude())
-                .build();
     }
 
     // =====================================================================
@@ -399,7 +313,7 @@ public class AddressServiceImpl implements AddressService {
     @Override
     public List<LegacyProvinceResponse> getAllProvinces() {
         return legacyProvinceRepository.findAll().stream()
-                .map(this::toLegacyProvinceResponse)
+                .map(addressMapper::toLegacyProvinceResponse)
                 .collect(Collectors.toList());
     }
 
@@ -412,20 +326,24 @@ public class AddressServiceImpl implements AddressService {
     public LegacyProvinceResponse getProvinceById(Integer provinceId) {
         LegacyProvince province = legacyProvinceRepository.findById(provinceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Province not found with id: " + provinceId));
-        return toLegacyProvinceResponse(province);
+        return addressMapper.toLegacyProvinceResponse(province);
     }
 
     @Override
     public List<LegacyProvinceResponse> searchProvinces(String searchTerm) {
         return legacyProvinceRepository.findByNameContainingIgnoreCase(searchTerm).stream()
-                .map(this::toLegacyProvinceResponse)
+                .map(addressMapper::toLegacyProvinceResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<LegacyDistrictResponse> getDistrictsByProvinceId(Integer provinceId) {
-        return legacyDistrictRepository.findByProvinceId(provinceId).stream()
-                .map(this::toLegacyDistrictResponse)
+        // Get province to find its code
+        LegacyProvince province = legacyProvinceRepository.findById(provinceId)
+                .orElseThrow(() -> new ResourceNotFoundException("Province not found with id: " + provinceId));
+
+        return legacyDistrictRepository.findByProvinceCode(province.getCode()).stream()
+                .map(addressMapper::toLegacyDistrictResponse)
                 .collect(Collectors.toList());
     }
 
@@ -433,27 +351,35 @@ public class AddressServiceImpl implements AddressService {
     public LegacyDistrictResponse getDistrictById(Integer districtId) {
         District district = legacyDistrictRepository.findById(districtId)
                 .orElseThrow(() -> new ResourceNotFoundException("District not found with id: " + districtId));
-        return toLegacyDistrictResponse(district);
+        return addressMapper.toLegacyDistrictResponse(district);
     }
 
     @Override
     public List<LegacyDistrictResponse> searchDistricts(String searchTerm, Integer provinceId) {
         if (provinceId != null) {
-            return legacyDistrictRepository.findByProvinceId(provinceId).stream()
+            // Get province to find its code
+            LegacyProvince province = legacyProvinceRepository.findById(provinceId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Province not found with id: " + provinceId));
+
+            return legacyDistrictRepository.findByProvinceCode(province.getCode()).stream()
                     .filter(d -> d.getName().toLowerCase().contains(searchTerm.toLowerCase()))
-                    .map(this::toLegacyDistrictResponse)
+                    .map(addressMapper::toLegacyDistrictResponse)
                     .collect(Collectors.toList());
         }
         return legacyDistrictRepository.findAll().stream()
                 .filter(d -> d.getName().toLowerCase().contains(searchTerm.toLowerCase()))
-                .map(this::toLegacyDistrictResponse)
+                .map(addressMapper::toLegacyDistrictResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<LegacyWardResponse> getWardsByDistrictId(Integer districtId) {
-        return legacyWardRepository.findByDistrictId(districtId).stream()
-                .map(this::toLegacyWardResponse)
+        // Get district to find its code
+        District district = legacyDistrictRepository.findById(districtId)
+                .orElseThrow(() -> new ResourceNotFoundException("District not found with id: " + districtId));
+
+        return legacyWardRepository.findByDistrictCode(district.getCode()).stream()
+                .map(addressMapper::toLegacyWardResponse)
                 .collect(Collectors.toList());
     }
 
@@ -461,206 +387,25 @@ public class AddressServiceImpl implements AddressService {
     public LegacyWardResponse getWardById(Integer wardId) {
         LegacyWard ward = legacyWardRepository.findById(wardId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ward not found with id: " + wardId));
-        return toLegacyWardResponse(ward);
+        return addressMapper.toLegacyWardResponse(ward);
     }
 
     @Override
     public List<LegacyWardResponse> searchWards(String searchTerm, Integer districtId) {
         if (districtId != null) {
-            return legacyWardRepository.findByDistrictId(districtId).stream()
+            // Get district to find its code
+            District district = legacyDistrictRepository.findById(districtId)
+                    .orElseThrow(() -> new ResourceNotFoundException("District not found with id: " + districtId));
+
+            return legacyWardRepository.findByDistrictCode(district.getCode()).stream()
                     .filter(w -> w.getName().toLowerCase().contains(searchTerm.toLowerCase()))
-                    .map(this::toLegacyWardResponse)
+                    .map(addressMapper::toLegacyWardResponse)
                     .collect(Collectors.toList());
         }
         return legacyWardRepository.findAll().stream()
                 .filter(w -> w.getName().toLowerCase().contains(searchTerm.toLowerCase()))
-                .map(this::toLegacyWardResponse)
+                .map(addressMapper::toLegacyWardResponse)
                 .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<LegacyStreetResponse> getStreetsByProvinceId(Integer provinceId) {
-        log.info("Fetching streets for province ID: {}", provinceId);
-
-        // Verify province exists
-        legacyProvinceRepository.findById(provinceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Province not found with ID: " + provinceId));
-
-        return streetRepository.findByProvinceId(provinceId).stream()
-                .map(this::toLegacyStreetResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<LegacyStreetResponse> getStreetsByDistrictId(Integer districtId) {
-        log.info("Fetching streets for district ID: {}", districtId);
-
-        // Verify district exists
-        legacyDistrictRepository.findById(districtId)
-                .orElseThrow(() -> new ResourceNotFoundException("District not found with ID: " + districtId));
-
-        return streetRepository.findByDistrictId(districtId).stream()
-                .map(this::toLegacyStreetResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public LegacyStreetResponse getStreetById(Integer streetId) {
-        log.info("Fetching street with ID: {}", streetId);
-
-        Street street = streetRepository.findById(streetId)
-                .orElseThrow(() -> new ResourceNotFoundException("Street not found with ID: " + streetId));
-
-        return toLegacyStreetResponse(street);
-    }
-
-    @Override
-    public List<LegacyStreetResponse> searchStreets(String searchTerm, Integer provinceId, Integer districtId) {
-        log.info("Searching streets with term: {}, provinceId: {}, districtId: {}", searchTerm, provinceId, districtId);
-
-        List<Street> streets;
-
-        if (provinceId != null && districtId != null) {
-            // Verify province and district exist
-            legacyProvinceRepository.findById(provinceId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Province not found with ID: " + provinceId));
-            legacyDistrictRepository.findById(districtId)
-                    .orElseThrow(() -> new ResourceNotFoundException("District not found with ID: " + districtId));
-
-            // Search within specific province and district
-            streets = streetRepository.findByProvinceIdAndDistrictId(provinceId, districtId).stream()
-                    .filter(street -> street.getName() != null &&
-                            street.getName().toLowerCase().contains(searchTerm.toLowerCase()) ||
-                            (street.getNameEn() != null &&
-                            street.getNameEn().toLowerCase().contains(searchTerm.toLowerCase())))
-                    .collect(Collectors.toList());
-        } else if (provinceId != null) {
-            // Verify province exists
-            legacyProvinceRepository.findById(provinceId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Province not found with ID: " + provinceId));
-
-            // Search within specific province
-            streets = streetRepository.findByProvinceId(provinceId).stream()
-                    .filter(street -> street.getName() != null &&
-                            street.getName().toLowerCase().contains(searchTerm.toLowerCase()) ||
-                            (street.getNameEn() != null &&
-                            street.getNameEn().toLowerCase().contains(searchTerm.toLowerCase())))
-                    .collect(Collectors.toList());
-        } else if (districtId != null) {
-            // Verify district exists
-            legacyDistrictRepository.findById(districtId)
-                    .orElseThrow(() -> new ResourceNotFoundException("District not found with ID: " + districtId));
-
-            // Search within specific district
-            streets = streetRepository.findByDistrictId(districtId).stream()
-                    .filter(street -> street.getName() != null &&
-                            street.getName().toLowerCase().contains(searchTerm.toLowerCase()) ||
-                            (street.getNameEn() != null &&
-                            street.getNameEn().toLowerCase().contains(searchTerm.toLowerCase())))
-                    .collect(Collectors.toList());
-        } else {
-            // Search all streets using repository search
-            streets = streetRepository.searchByKeyword(searchTerm, Pageable.unpaged()).getContent();
-        }
-
-        return streets.stream()
-                .map(this::toLegacyStreetResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<LegacyProjectResponse> getProjectsByProvinceId(Integer provinceId) {
-        log.info("Fetching projects for province ID: {}", provinceId);
-
-        // Verify province exists
-        legacyProvinceRepository.findById(provinceId)
-                .orElseThrow(() -> new ResourceNotFoundException("Province not found with ID: " + provinceId));
-
-        return projectRepository.findByProvinceId(provinceId).stream()
-                .map(this::toLegacyProjectResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<LegacyProjectResponse> getProjectsByDistrictId(Integer districtId) {
-        log.info("Fetching projects for district ID: {}", districtId);
-
-        // Verify district exists
-        legacyDistrictRepository.findById(districtId)
-                .orElseThrow(() -> new ResourceNotFoundException("District not found with ID: " + districtId));
-
-        return projectRepository.findByDistrictId(districtId).stream()
-                .map(this::toLegacyProjectResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public LegacyProjectResponse getProjectById(Integer projectId) {
-        log.info("Fetching project with ID: {}", projectId);
-
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new ResourceNotFoundException("Project not found with ID: " + projectId));
-
-        return toLegacyProjectResponse(project);
-    }
-
-    @Override
-    public List<LegacyProjectResponse> searchProjects(String searchTerm, Integer provinceId, Integer districtId) {
-        log.info("Searching projects with term: {}, provinceId: {}, districtId: {}", searchTerm, provinceId, districtId);
-
-        List<Project> projects;
-
-        if (provinceId != null && districtId != null) {
-            // Verify province and district exist
-            legacyProvinceRepository.findById(provinceId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Province not found with ID: " + provinceId));
-            legacyDistrictRepository.findById(districtId)
-                    .orElseThrow(() -> new ResourceNotFoundException("District not found with ID: " + districtId));
-
-            // Search within specific province and district
-            projects = projectRepository.findByProvinceIdAndDistrictId(provinceId, districtId).stream()
-                    .filter(project -> project.getName() != null &&
-                            project.getName().toLowerCase().contains(searchTerm.toLowerCase()) ||
-                            (project.getNameEn() != null &&
-                            project.getNameEn().toLowerCase().contains(searchTerm.toLowerCase())))
-                    .collect(Collectors.toList());
-        } else if (provinceId != null) {
-            // Verify province exists
-            legacyProvinceRepository.findById(provinceId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Province not found with ID: " + provinceId));
-
-            // Search within specific province
-            projects = projectRepository.findByProvinceId(provinceId).stream()
-                    .filter(project -> project.getName() != null &&
-                            project.getName().toLowerCase().contains(searchTerm.toLowerCase()) ||
-                            (project.getNameEn() != null &&
-                            project.getNameEn().toLowerCase().contains(searchTerm.toLowerCase())))
-                    .collect(Collectors.toList());
-        } else if (districtId != null) {
-            // Verify district exists
-            legacyDistrictRepository.findById(districtId)
-                    .orElseThrow(() -> new ResourceNotFoundException("District not found with ID: " + districtId));
-
-            // Search within specific district
-            projects = projectRepository.findByDistrictId(districtId).stream()
-                    .filter(project -> project.getName() != null &&
-                            project.getName().toLowerCase().contains(searchTerm.toLowerCase()) ||
-                            (project.getNameEn() != null &&
-                            project.getNameEn().toLowerCase().contains(searchTerm.toLowerCase())))
-                    .collect(Collectors.toList());
-        } else {
-            // Search all projects using repository search
-            projects = projectRepository.searchByKeyword(searchTerm, Pageable.unpaged()).getContent();
-        }
-
-        return projects.stream()
-                .map(this::toLegacyProjectResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<AddressResponse> getAddressesByStreetId(Integer streetId) {
-        return Collections.emptyList();
     }
 
     @Override

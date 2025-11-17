@@ -16,12 +16,17 @@ public interface LegacyProvinceRepository extends JpaRepository<LegacyProvince, 
 
     @Query("SELECT p FROM LegacyProvince p WHERE " +
             "LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(p.nameEn) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(p.shortName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(p.key) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(p.alias) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "LOWER(p.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(p.keywords) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "CAST(p.id AS string) = :keyword")
     Page<LegacyProvince> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     Optional<LegacyProvince> findById(Integer id);
+
+    Optional<LegacyProvince> findByCode(String code);
 
     List<LegacyProvince> findByNameContainingIgnoreCase(String name);
 }

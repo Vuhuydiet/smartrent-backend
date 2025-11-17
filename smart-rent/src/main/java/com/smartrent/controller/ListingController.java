@@ -4,6 +4,7 @@ import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.MyListingsFilterRequest;
+import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.*;
 import com.smartrent.enums.BenefitType;
@@ -436,31 +437,119 @@ public class ListingController {
 
     @PostMapping("/search")
     @Operation(
-        summary = "Search and filter listings with pagination and recommendations",
+        summary = "Tìm kiếm và lọc bài đăng - API tổng hợp cho tất cả filter",
         description = """
-            Search listings with comprehensive filtering options including:
-            - **Category filtering**: Filter by category ID
-            - **Province filtering**: Supports both old (63 provinces) and new (34 provinces) address structures
-            - **Price range**: Min/max price filtering
-            - **Area range**: Min/max area in square meters
-            - **Listing type**: RENT, SALE, SHARE
-            - **VIP type**: NORMAL, SILVER, GOLD, DIAMOND
-            - **Product type**: ROOM, APARTMENT, HOUSE, OFFICE, STUDIO
-            - **Bedrooms/Bathrooms**: Filter by number of rooms
-            - **Verified status**: Show only verified listings
-            - **Sorting**: Sort by postDate, price, area, createdAt (ASC/DESC)
+            ## MÔ TẢ CHUNG
+            API tìm kiếm và lọc bài đăng **tổng hợp tất cả các bộ lọc** trong một lần gọi duy nhất.
+            Frontend chỉ cần gọi API này để áp dụng nhiều filter cùng lúc.
 
-            **Response includes:**
-            - Paginated list of listings matching filter criteria
-            - Total count of matching listings
-            - Current page, page size, total pages
-            - Recommendations: Top 5 high-tier (GOLD/DIAMOND) listings in same category
-              (Placeholder for future ML-based recommendation system)
+            ---
 
-            **Notes:**
-            - Draft listings are automatically excluded from search results
-            - Shadow listings are excluded
-            - Expired listings can be excluded with `excludeExpired: true` (default)
+            ## CÁC BỘ LỌC ĐƯỢC HỖ TRỢ
+
+            ### 1. LỌC THEO VỊ TRÍ
+            - **Tỉnh/Thành phố**: `provinceId` (63 tỉnh cũ) HOẶC `provinceCode` (34 tỉnh mới)
+              - VD: Hà Nội (old): `provinceId: 1`, Đà Nẵng (old): `provinceId: 48`
+              - VD: Hà Nội (new): `provinceCode: "01"`, Đà Nẵng (new): `provinceCode: "48"`
+            - **Quận/Huyện**: `districtId` (chỉ dùng cho old structure)
+            - **Phường/Xã**: `wardId` (old) HOẶC `newWardCode` (new)
+            - **Đường**: `streetId`
+            - **Tìm theo bán kính GPS**: `userLatitude`, `userLongitude`, `radiusKm`
+
+            ### 2. LỌC THEO GIÁ VÀ DIỆN TÍCH
+            - **Khoảng giá**: `minPrice`, `maxPrice` (VNĐ)
+            - **Khoảng diện tích**: `minArea`, `maxArea` (m²)
+
+            ### 3. LỌC THEO ĐẶC ĐIỂM NHÀ
+            - **Số phòng ngủ**: `minBedrooms`, `maxBedrooms` (hoặc `bedrooms` cho số chính xác)
+            - **Số phòng tắm**: `minBathrooms`, `maxBathrooms` (hoặc `bathrooms` cho số chính xác)
+            - **Hướng nhà**: `direction` - NORTH, SOUTH, EAST, WEST, NORTHEAST, NORTHWEST, SOUTHEAST, SOUTHWEST
+            - **Nội thất**: `furnishing` - FULLY_FURNISHED, SEMI_FURNISHED, UNFURNISHED
+            - **Loại nhà**: `propertyType` - APARTMENT, HOUSE, ROOM, STUDIO, OFFICE
+            - **Loại sản phẩm**: `productType` - ROOM, APARTMENT, HOUSE, OFFICE, STUDIO
+            - **Sức chứa**: `minRoomCapacity`, `maxRoomCapacity`
+
+            ### 4. LỌC THEO TRẠNG THÁI & LOẠI BÀI ĐĂNG
+            - **Bài đăng verified**: `verified: true` (chỉ lấy tin đã verify)
+            - **Loại giao dịch**: `listingType` - RENT (cho thuê), SALE (bán), SHARE (ở ghép)
+            - **Gói VIP**: `vipType` - NORMAL, SILVER, GOLD, DIAMOND
+
+            ### 5. LỌC THEO TIỆN ÍCH
+            - **Danh sách tiện ích**: `amenityIds` - array các ID tiện ích (VD: [1, 3, 5])
+            - **Chế độ match**: `amenityMatchMode`
+              - `"ALL"`: Phải có TẤT CẢ các tiện ích trong danh sách
+              - `"ANY"`: Có ÍT NHẤT 1 tiện ích trong danh sách
+
+            ### 6. LỌC THEO MEDIA
+            - **Có ảnh/video**: `hasMedia: true`
+            - **Số lượng media tối thiểu**: `minMediaCount`
+
+            ### 7. TÌM KIẾM THEO TỪ KHÓA
+            - **Keyword**: `keyword` - Tìm trong title và description
+
+            ### 8. LỌC THEO LIÊN HỆ
+            - **SDT chủ nhà đã verify**: `ownerPhoneVerified: true`
+
+            ### 9. LỌC THEO THỜI GIAN
+            - **Đăng trong X ngày gần đây**: `postedWithinDays` (VD: 7 = đăng trong 7 ngày qua)
+            - **Cập nhật trong X ngày**: `updatedWithinDays`
+
+            ### 10. PHÂN TRANG & SẮP XẾP
+            - **Trang**: `page` (bắt đầu từ 0)
+            - **Kích thước trang**: `size` (mặc định 20, tối đa 100)
+            - **Sắp xếp theo**: `sortBy` - postDate, price, area, createdAt, updatedAt
+            - **Hướng sắp xếp**: `sortDirection` - ASC (tăng dần), DESC (giảm dần)
+
+            ---
+
+            ## RESPONSE TRẢ VỀ
+            - Danh sách bài đăng khớp filter (có phân trang)
+            - Tổng số bài đăng tìm được (`totalCount`)
+            - Thông tin phân trang (`currentPage`, `pageSize`, `totalPages`)
+            - Danh sách bài đăng gợi ý (top 5 GOLD/DIAMOND cùng danh mục)
+            - Bản copy lại filter criteria đã apply
+
+            ---
+
+            ## LƯU Ý QUAN TRỌNG
+            - Bài nháp (draft) tự động bị loại trừ khỏi kết quả tìm kiếm công khai
+            - Bài shadow (bài phụ của DIAMOND tier) tự động bị loại trừ
+            - Bài hết hạn có thể loại trừ với `excludeExpired: true` (mặc định)
+            - Tất cả filter đều optional - có thể gọi không cần body để lấy tất cả
+            - Kết hợp nhiều filter trong một lần gọi để tìm kiếm chính xác
+
+            ---
+
+            ## GỢI Ý SỬ DỤNG
+            **Use Case 1**: Tìm căn hộ cho thuê tại Hà Nội, 2-3PN, giá 5-15 triệu, có điều hòa + WiFi
+            ```json
+            {
+              "provinceId": 1,
+              "listingType": "RENT",
+              "productType": "APARTMENT",
+              "minBedrooms": 2,
+              "maxBedrooms": 3,
+              "minPrice": 5000000,
+              "maxPrice": 15000000,
+              "amenityIds": [1, 5],
+              "amenityMatchMode": "ALL",
+              "verified": true
+            }
+            ```
+
+            **Use Case 2**: Tìm nhà bán tại Đà Nẵng, diện tích trên 100m², có ảnh, verified
+            ```json
+            {
+              "provinceId": 48,
+              "listingType": "SALE",
+              "productType": "HOUSE",
+              "minArea": 100,
+              "hasMedia": true,
+              "verified": true,
+              "sortBy": "price",
+              "sortDirection": "ASC"
+            }
+            ```
             """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = false,
@@ -469,17 +558,68 @@ public class ListingController {
                 schema = @Schema(implementation = ListingFilterRequest.class),
                 examples = {
                     @ExampleObject(
-                        name = "1. Public Search - By Location",
-                        summary = "Find apartments in Hanoi, Ba Dinh District",
+                        name = "1. Tìm căn hộ Hà Nội - Đầy đủ filter",
+                        summary = "Căn hộ cho thuê Hà Nội, 2-3PN, 5-15tr, có AC + WiFi",
                         value = """
                             {
-                              "categoryId": 1,
                               "provinceId": 1,
-                              "districtId": 5,
                               "listingType": "RENT",
                               "productType": "APARTMENT",
+                              "minBedrooms": 2,
+                              "maxBedrooms": 3,
                               "minPrice": 5000000,
                               "maxPrice": 15000000,
+                              "amenityIds": [1, 5],
+                              "amenityMatchMode": "ALL",
+                              "verified": true,
+                              "hasMedia": true,
+                              "page": 0,
+                              "size": 20,
+                              "sortBy": "postDate",
+                              "sortDirection": "DESC"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "2. Tìm nhà bán Đà Nẵng - Theo khu vực",
+                        summary = "Nhà bán Đà Nẵng, >100m², hướng Đông, có ảnh",
+                        value = """
+                            {
+                              "provinceId": 48,
+                              "listingType": "SALE",
+                              "productType": "HOUSE",
+                              "minArea": 100,
+                              "direction": "EAST",
+                              "hasMedia": true,
+                              "verified": true,
+                              "sortBy": "price",
+                              "sortDirection": "ASC",
+                              "page": 0,
+                              "size": 20
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "3. Tìm theo từ khóa - Keyword search",
+                        summary = "Tìm kiếm theo từ khóa trong title/description",
+                        value = """
+                            {
+                              "keyword": "căn hộ cao cấp view biển",
+                              "provinceId": 48,
+                              "verified": true,
+                              "minPrice": 10000000,
+                              "page": 0,
+                              "size": 20
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "4. Tìm tin VIP - GOLD/DIAMOND",
+                        summary = "Chỉ lấy bài đăng VIP tier cao",
+                        value = """
+                            {
+                              "vipType": "GOLD",
+                              "provinceId": 79,
                               "verified": true,
                               "page": 0,
                               "size": 20,
@@ -489,49 +629,8 @@ public class ListingController {
                             """
                     ),
                     @ExampleObject(
-                        name = "2. My Draft Listings",
-                        summary = "Get my draft listings (auto-saved)",
-                        value = """
-                            {
-                              "userId": "user-123",
-                              "isDraft": true,
-                              "page": 0,
-                              "size": 20,
-                              "sortBy": "updatedAt",
-                              "sortDirection": "DESC"
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "3. My Active Listings",
-                        summary = "Get my verified, non-expired listings",
-                        value = """
-                            {
-                              "userId": "user-123",
-                              "verified": true,
-                              "expired": false,
-                              "isDraft": false,
-                              "page": 0,
-                              "size": 20
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "4. Keyword Search",
-                        summary = "Search by keyword in title and description",
-                        value = """
-                            {
-                              "keyword": "căn hộ cao cấp view đẹp",
-                              "provinceId": 1,
-                              "verified": true,
-                              "page": 0,
-                              "size": 20
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "5. Filter by Amenities",
-                        summary = "Find listings with specific amenities (AC, WiFi, Washing Machine)",
+                        name = "5. Lọc theo tiện ích cụ thể",
+                        summary = "Phải có TẤT CẢ: điều hòa, máy giặt, WiFi",
                         value = """
                             {
                               "provinceId": 1,
@@ -544,8 +643,8 @@ public class ListingController {
                             """
                     ),
                     @ExampleObject(
-                        name = "6. Filter by Property Specs",
-                        summary = "2-3 bedrooms, fully furnished, south facing",
+                        name = "6. Lọc chi tiết - Nhiều điều kiện",
+                        summary = "2-3PN, full nội thất, hướng Nam, >60m²",
                         value = """
                             {
                               "minBedrooms": 2,
@@ -555,14 +654,15 @@ public class ListingController {
                               "minArea": 60.0,
                               "hasMedia": true,
                               "verified": true,
+                              "provinceId": 1,
                               "page": 0,
                               "size": 20
                             }
                             """
                     ),
                     @ExampleObject(
-                        name = "7. Recent Listings",
-                        summary = "Listings posted in last 7 days with photos",
+                        name = "7. Tin mới đăng - Trong 7 ngày",
+                        summary = "Bài đăng trong 7 ngày gần đây, có ảnh",
                         value = """
                             {
                               "postedWithinDays": 7,
@@ -576,8 +676,8 @@ public class ListingController {
                             """
                     ),
                     @ExampleObject(
-                        name = "8. Verified Owner Contacts",
-                        summary = "Only listings with verified owner phone",
+                        name = "8. SDT chủ nhà đã verify",
+                        summary = "Chỉ lấy tin có SDT chủ nhà đã xác thực",
                         value = """
                             {
                               "ownerPhoneVerified": true,
@@ -585,6 +685,37 @@ public class ListingController {
                               "provinceId": 1,
                               "page": 0,
                               "size": 20
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "9. Tìm theo GPS - Bán kính 5km",
+                        summary = "Tìm trong bán kính 5km từ vị trí hiện tại",
+                        value = """
+                            {
+                              "userLatitude": 21.0285,
+                              "userLongitude": 105.8542,
+                              "radiusKm": 5.0,
+                              "verified": true,
+                              "sortBy": "distance",
+                              "page": 0,
+                              "size": 20
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "10. Bài đăng của tôi - My listings",
+                        summary = "Xem bài đăng của user (đã verify, chưa hết hạn)",
+                        value = """
+                            {
+                              "userId": "user-123",
+                              "verified": true,
+                              "expired": false,
+                              "isDraft": false,
+                              "page": 0,
+                              "size": 20,
+                              "sortBy": "postDate",
+                              "sortDirection": "DESC"
                             }
                             """
                     )
@@ -682,7 +813,7 @@ public class ListingController {
     @Operation(
         summary = "[DEPRECATED] Get current user's listings - Use /search instead",
         description = """
-            **⚠️ DEPRECATED - Use POST /v1/listings/search instead**
+            **DEPRECATED - Use POST /v1/listings/search instead**
 
             This endpoint is deprecated. Please migrate to the unified search API:
 
@@ -1304,6 +1435,182 @@ public class ListingController {
         request.setUserId(userId);
         Object response = listingService.createVipListing(request);
         return ApiResponse.builder().data(response).build();
+    }
+
+    /**
+     * Get listing statistics by provinces (for home screen)
+     * POST /v1/listings/stats/provinces
+     */
+    @PostMapping("/stats/provinces")
+    @Operation(
+        summary = "Lấy thống kê số lượng bài đăng theo tỉnh/thành phố",
+        description = """
+            ## MÔ TẢ
+            API này được thiết kế cho **màn hình Home** - Frontend truyền danh sách tỉnh/thành phố
+            và nhận về thống kê số lượng bài đăng của từng tỉnh.
+
+            **Use Case**: Hiển thị 5 địa điểm (tỉnh/thành phố) với số lượng bài đăng trên màn Home.
+
+            ---
+
+            ## AUTHENTICATION
+            - **API CÔNG KHAI** - KHÔNG CẦN authentication token
+            - **KHÔNG CẦN userId** trong request body
+            - Có thể gọi trực tiếp từ màn hình Home mà không cần đăng nhập
+
+            ---
+
+            ## REQUEST
+            Truyền danh sách **provinceIds** (old structure) HOẶC **provinceCodes** (new structure).
+            - Không cần truyền cả hai, chỉ cần 1 trong 2 (provinceIds hoặc provinceCodes)
+            - Nếu muốn lọc chỉ bài verified, set `verifiedOnly: true`
+
+            ---
+
+            ## RESPONSE
+            Trả về array thống kê cho từng tỉnh bao gồm:
+            - Tên tỉnh/thành phố
+            - Tổng số bài đăng (`totalListings`)
+            - Số bài đăng verified (`verifiedListings`)
+            - Số bài đăng VIP tier cao (`vipListings` - SILVER/GOLD/DIAMOND)
+
+            ---
+
+            ## GỢI Ý SỬ DỤNG
+
+            **Ví dụ 1**: Lấy thống kê 5 tỉnh lớn (Hà Nội, TP.HCM, Đà Nẵng, Hải Phòng, Cần Thơ)
+            ```json
+            {
+              "provinceIds": [1, 79, 48, 31, 92],
+              "verifiedOnly": false
+            }
+            ```
+
+            **Ví dụ 2**: Chỉ đếm bài đã verify (new structure)
+            ```json
+            {
+              "provinceCodes": ["01", "79", "48", "31", "92"],
+              "verifiedOnly": true
+            }
+            ```
+
+            ---
+
+            ## LƯU Ý QUAN TRỌNG
+            - **KHÔNG CẦN userId** - API công khai, không yêu cầu authentication
+            - **KHÔNG CẦN access token** - Gọi trực tiếp từ màn Home
+            - Tự động loại trừ bài nháp (draft) và bài shadow
+            - Tự động loại trừ bài hết hạn (expired)
+            - Response được sắp xếp theo thứ tự trong request
+            """,
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ProvinceStatsRequest.class),
+                examples = {
+                    @ExampleObject(
+                        name = "1. Top 5 tỉnh lớn - Old structure",
+                        summary = "Hà Nội, TP.HCM, Đà Nẵng, Hải Phòng, Cần Thơ",
+                        value = """
+                            {
+                              "provinceIds": [1, 79, 48, 31, 92],
+                              "verifiedOnly": false,
+                              "addressType": "OLD"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "2. Top 5 tỉnh - New structure (chỉ verified)",
+                        summary = "Chỉ đếm bài đã verify",
+                        value = """
+                            {
+                              "provinceCodes": ["01", "79", "48", "31", "92"],
+                              "verifiedOnly": true,
+                              "addressType": "NEW"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "3. Ba miền - North/Central/South",
+                        summary = "Hà Nội (Bắc), Đà Nẵng (Trung), TP.HCM (Nam)",
+                        value = """
+                            {
+                              "provinceIds": [1, 48, 79],
+                              "verifiedOnly": false
+                            }
+                            """
+                    )
+                }
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Thống kê thành công",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Province Statistics Response",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": [
+                                {
+                                  "provinceId": 1,
+                                  "provinceCode": null,
+                                  "provinceName": "Hà Nội",
+                                  "totalListings": 1250,
+                                  "verifiedListings": 980,
+                                  "vipListings": 345
+                                },
+                                {
+                                  "provinceId": 79,
+                                  "provinceCode": null,
+                                  "provinceName": "Thành phố Hồ Chí Minh",
+                                  "totalListings": 2340,
+                                  "verifiedListings": 1890,
+                                  "vipListings": 678
+                                },
+                                {
+                                  "provinceId": 48,
+                                  "provinceCode": null,
+                                  "provinceName": "Đà Nẵng",
+                                  "totalListings": 680,
+                                  "verifiedListings": 520,
+                                  "vipListings": 156
+                                },
+                                {
+                                  "provinceId": 31,
+                                  "provinceCode": null,
+                                  "provinceName": "Hải Phòng",
+                                  "totalListings": 420,
+                                  "verifiedListings": 310,
+                                  "vipListings": 89
+                                },
+                                {
+                                  "provinceId": 92,
+                                  "provinceCode": null,
+                                  "provinceName": "Cần Thơ",
+                                  "totalListings": 280,
+                                  "verifiedListings": 195,
+                                  "vipListings": 52
+                                }
+                              ]
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<List<ProvinceListingStatsResponse>> getProvinceStats(
+            @Valid @RequestBody ProvinceStatsRequest request) {
+        List<ProvinceListingStatsResponse> stats = listingService.getProvinceStats(request);
+        return ApiResponse.<List<ProvinceListingStatsResponse>>builder()
+                .data(stats)
+                .build();
     }
 
     /**

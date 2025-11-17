@@ -24,20 +24,7 @@ public interface AddressService {
     LegacyWardResponse getWardById(Integer wardId);
     List<LegacyWardResponse> searchWards(String searchTerm, Integer districtId);
 
-    // Street operations
-    List<LegacyStreetResponse> getStreetsByProvinceId(Integer provinceId);
-    List<LegacyStreetResponse> getStreetsByDistrictId(Integer districtId);
-    LegacyStreetResponse getStreetById(Integer streetId);
-    List<LegacyStreetResponse> searchStreets(String searchTerm, Integer provinceId, Integer districtId);
-
-    // Project operations
-    List<LegacyProjectResponse> getProjectsByProvinceId(Integer provinceId);
-    List<LegacyProjectResponse> getProjectsByDistrictId(Integer districtId);
-    LegacyProjectResponse getProjectById(Integer projectId);
-    List<LegacyProjectResponse> searchProjects(String searchTerm, Integer provinceId, Integer districtId);
-
     // Address operations
-    List<AddressResponse> getAddressesByStreetId(Integer streetId);
     AddressResponse getAddressById(Integer addressId);
     List<AddressResponse> searchAddresses(String searchTerm);
     List<AddressResponse> getNearbyAddresses(BigDecimal latitude, BigDecimal longitude, Double radiusKm);
@@ -49,5 +36,7 @@ public interface AddressService {
 
     // Address structure conversion
     AddressConversionResponse convertLegacyToNew(Integer legacyProvinceId, Integer legacyDistrictId, Integer legacyWardId);
-    AddressConversionResponse convertNewToLegacy(String newProvinceCode, String newWardCode);
+
+    // Merge history
+    AddressMergeHistoryResponse getMergeHistory(String newProvinceCode, String newWardCode);
 }

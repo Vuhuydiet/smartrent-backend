@@ -15,6 +15,7 @@ import lombok.experimental.FieldDefaults;
 public class LegacyProvinceResponse {
     Integer id;
     String name;
-    String nameEn;
+    String shortName;
     String code;
+    String key;
 }
