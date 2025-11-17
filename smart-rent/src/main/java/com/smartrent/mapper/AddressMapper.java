@@ -11,7 +11,6 @@ public interface AddressMapper {
     LegacyProvinceResponse toLegacyProvinceResponse(LegacyProvince province);
     LegacyDistrictResponse toLegacyDistrictResponse(District district);
     LegacyWardResponse toLegacyWardResponse(LegacyWard ward);
-    LegacyStreetResponse toLegacyStreetResponse(Street street);
 
     NewProvinceResponse toNewProvinceResponse(Province province);
     NewWardResponse toNewWardResponse(Ward ward);

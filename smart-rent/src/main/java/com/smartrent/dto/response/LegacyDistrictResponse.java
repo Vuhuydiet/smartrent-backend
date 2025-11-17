@@ -15,8 +15,9 @@ import lombok.experimental.FieldDefaults;
 public class LegacyDistrictResponse {
     Integer id;
     String name;
-    String nameEn;
-    String prefix;
-    Integer provinceId;
+    String shortName;
+    String code;
+    String type;
+    String provinceCode;
     String provinceName;
 }

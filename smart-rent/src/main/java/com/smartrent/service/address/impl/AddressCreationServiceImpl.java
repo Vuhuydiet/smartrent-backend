@@ -94,8 +94,8 @@ public class AddressCreationServiceImpl implements AddressCreationService {
         LegacyWard ward = legacyWardRepository.findById(request.getWardId())
                 .orElseThrow(() -> new ResourceNotFoundException("Ward not found with ID: " + request.getWardId()));
 
-        if (ward.getPrefix() != null && !ward.getPrefix().isEmpty()) {
-            sb.append(ward.getPrefix()).append(" ");
+        if (ward.getType() != null && !ward.getType().isEmpty()) {
+            sb.append(ward.getType()).append(" ");
         }
         sb.append(ward.getName()).append(", ");
 
@@ -103,8 +103,8 @@ public class AddressCreationServiceImpl implements AddressCreationService {
         District district = legacyDistrictRepository.findById(request.getDistrictId())
                 .orElseThrow(() -> new ResourceNotFoundException("District not found with ID: " + request.getDistrictId()));
 
-        if (district.getPrefix() != null && !district.getPrefix().isEmpty()) {
-            sb.append(district.getPrefix()).append(" ");
+        if (district.getType() != null && !district.getType().isEmpty()) {
+            sb.append(district.getType()).append(" ");
         }
         sb.append(district.getName()).append(", ");
 
@@ -143,12 +143,12 @@ public class AddressCreationServiceImpl implements AddressCreationService {
         // Add ward
         Ward ward = wardRepository.findByCode(request.getNewWardCode())
                 .orElseThrow(() -> new ResourceNotFoundException("Ward not found with code: " + request.getNewWardCode()));
-        sb.append(ward.getFullName()).append(", ");
+        sb.append(ward.getName()).append(", ");
 
         // Add province
         Province province = provinceRepository.findByCode(request.getNewProvinceCode())
                 .orElseThrow(() -> new ResourceNotFoundException("Province not found with code: " + request.getNewProvinceCode()));
-        sb.append(province.getFullName());
+        sb.append(province.getName());
 
         return sb.toString();
     }

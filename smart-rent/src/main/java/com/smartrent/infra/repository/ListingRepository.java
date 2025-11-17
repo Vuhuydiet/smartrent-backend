@@ -173,4 +173,46 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         @Param("productType") Listing.ProductType productType,
         @Param("priceUnit") Listing.PriceUnit priceUnit
     );
+
+    /**
+     * Get listing statistics grouped by province (old structure)
+     * Returns: provinceId, totalCount, verifiedCount, vipCount
+     */
+    @Query("""
+        SELECT
+            am.provinceId,
+            COUNT(l.listingId),
+            SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
+        FROM listings l
+        JOIN l.address a
+        JOIN AddressMetadata am ON am.address.addressId = a.addressId
+        WHERE am.provinceId IN :provinceIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.expired = false
+        GROUP BY am.provinceId
+    """)
+    List<Object[]> getListingStatsByProvinceIds(@Param("provinceIds") List<Integer> provinceIds);
+
+    /**
+     * Get listing statistics grouped by province code (new structure)
+     * Returns: provinceCode, totalCount, verifiedCount, vipCount
+     */
+    @Query("""
+        SELECT
+            am.newProvinceCode,
+            COUNT(l.listingId),
+            SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
+        FROM listings l
+        JOIN l.address a
+        JOIN AddressMetadata am ON am.address.addressId = a.addressId
+        WHERE am.newProvinceCode IN :provinceCodes
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.expired = false
+        GROUP BY am.newProvinceCode
+    """)
+    List<Object[]> getListingStatsByProvinceCodes(@Param("provinceCodes") List<String> provinceCodes);
 }

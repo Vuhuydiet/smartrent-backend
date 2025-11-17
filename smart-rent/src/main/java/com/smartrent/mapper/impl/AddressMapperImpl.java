@@ -47,8 +47,9 @@ public class AddressMapperImpl implements AddressMapper {
         return LegacyProvinceResponse.builder()
                 .id(province.getId())
                 .name(province.getName())
-                .nameEn(province.getNameEn())
+                .shortName(province.getShortName())
                 .code(province.getCode())
+                .key(province.getKey())
                 .build();
     }
 
@@ -61,10 +62,11 @@ public class AddressMapperImpl implements AddressMapper {
         return LegacyDistrictResponse.builder()
                 .id(district.getId())
                 .name(district.getName())
-                .nameEn(district.getNameEn())
-                .prefix(district.getPrefix())
-                .provinceId(district.getProvince() != null ? district.getProvince().getId() : null)
-                .provinceName(district.getProvince() != null ? district.getProvince().getName() : null)
+                .shortName(district.getShortName())
+                .code(district.getCode())
+                .type(district.getType())
+                .provinceCode(district.getProvinceCode())
+                .provinceName(district.getProvinceName())
                 .build();
     }
 
@@ -77,30 +79,13 @@ public class AddressMapperImpl implements AddressMapper {
         return LegacyWardResponse.builder()
                 .id(ward.getId())
                 .name(ward.getName())
-                .nameEn(ward.getNameEn())
-                .prefix(ward.getPrefix())
-                .provinceId(ward.getProvince() != null ? ward.getProvince().getId() : null)
-                .provinceName(ward.getProvince() != null ? ward.getProvince().getName() : null)
-                .districtId(ward.getDistrict() != null ? ward.getDistrict().getId() : null)
-                .districtName(ward.getDistrict() != null ? ward.getDistrict().getName() : null)
-                .build();
-    }
-
-    @Override
-    public LegacyStreetResponse toLegacyStreetResponse(Street street) {
-        if (street == null) {
-            return null;
-        }
-
-        return LegacyStreetResponse.builder()
-                .id(street.getId())
-                .name(street.getName())
-                .nameEn(street.getNameEn())
-                .prefix(street.getPrefix())
-                .provinceId(street.getProvinceId())
-                .provinceName(null) // Will be populated in service layer
-                .districtId(street.getDistrictId())
-                .districtName(null) // Will be populated in service layer
+                .shortName(ward.getShortName())
+                .code(ward.getCode())
+                .type(ward.getType())
+                .provinceCode(ward.getProvinceCode())
+                .provinceName(ward.getProvinceName())
+                .districtCode(ward.getDistrictCode())
+                .districtName(ward.getDistrictName())
                 .build();
     }
 
@@ -115,12 +100,11 @@ public class AddressMapperImpl implements AddressMapper {
         return NewProvinceResponse.builder()
                 .code(province.getCode())
                 .name(province.getName())
-                .nameEn(province.getNameEn())
-                .fullName(province.getFullName())
-                .fullNameEn(province.getFullNameEn())
-                .codeName(province.getCodeName())
-                .administrativeUnitType(province.getAdministrativeUnit() != null ?
-                        province.getAdministrativeUnit().getFullName() : null)
+                .shortName(province.getShortName())
+                .key(province.getKey())
+                .latitude(province.getLatitude())
+                .longitude(province.getLongitude())
+                .alias(province.getAlias())
                 .build();
     }
 
@@ -130,19 +114,17 @@ public class AddressMapperImpl implements AddressMapper {
             return null;
         }
 
-        Province province = ward.getProvince();
-
         return NewWardResponse.builder()
                 .code(ward.getCode())
                 .name(ward.getName())
-                .nameEn(ward.getNameEn())
-                .fullName(ward.getFullName())
-                .fullNameEn(ward.getFullNameEn())
-                .codeName(ward.getCodeName())
-                .provinceCode(province != null ? province.getCode() : null)
-                .provinceName(province != null ? province.getName() : null)
-                .administrativeUnitType(ward.getAdministrativeUnit() != null ?
-                        ward.getAdministrativeUnit().getFullName() : null)
+                .shortName(ward.getShortName())
+                .type(ward.getType())
+                .key(ward.getKey())
+                .latitude(ward.getLatitude())
+                .longitude(ward.getLongitude())
+                .provinceCode(ward.getProvinceCode())
+                .provinceName(ward.getProvinceName())
+                .alias(ward.getAlias())
                 .build();
     }
 
@@ -160,21 +142,14 @@ public class AddressMapperImpl implements AddressMapper {
             return null;
         }
 
-        Province province = ward.getProvince();
-        String fullAddress = ward.getName();
-        if (province != null) {
-            fullAddress = ward.getName() + ", " + province.getName();
-        }
-
-        String type = ward.getAdministrativeUnit() != null ?
-                ward.getAdministrativeUnit().getFullName() : "Ward";
+        String fullAddress = ward.getName() + ", " + ward.getProvinceName();
 
         return NewAddressSearchResponse.builder()
                 .code(ward.getCode())
                 .name(ward.getName())
-                .type(type)
-                .provinceCode(province != null ? province.getCode() : null)
-                .provinceName(province != null ? province.getName() : null)
+                .type(ward.getType())
+                .provinceCode(ward.getProvinceCode())
+                .provinceName(ward.getProvinceName())
                 .fullAddress(fullAddress)
                 .build();
     }
@@ -185,13 +160,10 @@ public class AddressMapperImpl implements AddressMapper {
             return null;
         }
 
-        String type = province.getAdministrativeUnit() != null ?
-                province.getAdministrativeUnit().getFullName() : "Province";
-
         return NewAddressSearchResponse.builder()
                 .code(province.getCode())
                 .name(province.getName())
-                .type(type)
+                .type("Province")
                 .provinceCode(province.getCode())
                 .provinceName(province.getName())
                 .fullAddress(province.getName())

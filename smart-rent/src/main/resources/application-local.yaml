@@ -47,6 +47,7 @@ application:
         - "/v1/users/**"
         - "/v1/housing-predictor/**"
         - "/v1/support/contact"
+        - "/v1/categories/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
@@ -55,7 +56,7 @@ application:
         - "/v1/housing-predictor/**"
         - "/v1/payments/ipn/**"
         - "/v1/verification/**"
-
+        - "/v1/listings/stats/provinces/**"
 # Enable debug logging for authentication
 logging:
   level:

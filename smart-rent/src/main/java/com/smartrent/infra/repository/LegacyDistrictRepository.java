@@ -14,19 +14,24 @@ import java.util.Optional;
 @Repository
 public interface LegacyDistrictRepository extends JpaRepository<District, Integer> {
 
-    @Query("SELECT d FROM District d WHERE d.province.id = :provinceId")
-    Page<District> findByProvinceId(@Param("provinceId") Integer provinceId, Pageable pageable);
+    @Query("SELECT d FROM District d WHERE d.provinceCode = :provinceCode")
+    Page<District> findByProvinceCode(@Param("provinceCode") String provinceCode, Pageable pageable);
 
-    @Query("SELECT d FROM District d WHERE d.province.id = :provinceId AND (" +
+    @Query("SELECT d FROM District d WHERE d.provinceCode = :provinceCode AND (" +
             "LOWER(d.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-            "LOWER(d.nameEn) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(d.shortName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(d.key) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(d.alias) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(d.code) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
             "CAST(d.id AS string) = :keyword)")
     Page<District> searchByProvinceAndKeyword(
-            @Param("provinceId") Integer provinceId,
+            @Param("provinceCode") String provinceCode,
             @Param("keyword") String keyword,
             Pageable pageable);
 
     Optional<District> findById(Integer id);
 
-    List<District> findByProvinceId(Integer provinceId);
+    Optional<District> findByCode(String code);
+
+    List<District> findByProvinceCode(String provinceCode);
 }
