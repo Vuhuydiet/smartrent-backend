@@ -81,11 +81,32 @@ public class ListingFilterRequest {
     String productType;
 
     // ============ PROPERTY SPECS FILTERS ============
-    @Schema(description = "Minimum price")
+    // Basic price range filters
+    @Schema(description = "Minimum price (in VND)")
     java.math.BigDecimal minPrice;
 
-    @Schema(description = "Maximum price")
+    @Schema(description = "Maximum price (in VND)")
     java.math.BigDecimal maxPrice;
+
+    // Price unit filter
+    @Schema(description = "Filter by price unit", example = "MONTH", allowableValues = {"MONTH", "DAY", "YEAR"})
+    String priceUnit;
+
+    // Price change filters (based on pricing history)
+    @Schema(description = "Only show listings with recent price reductions", example = "true")
+    Boolean hasPriceReduction;
+
+    @Schema(description = "Only show listings with recent price increases", example = "false")
+    Boolean hasPriceIncrease;
+
+    @Schema(description = "Minimum price reduction percentage (e.g., 10 for 10% off)", example = "10")
+    java.math.BigDecimal minPriceReductionPercent;
+
+    @Schema(description = "Maximum price reduction percentage (e.g., 50 for up to 50% off)", example = "50")
+    java.math.BigDecimal maxPriceReductionPercent;
+
+    @Schema(description = "Filter listings with price changes within last X days", example = "30")
+    Integer priceChangedWithinDays;
 
     @Schema(description = "Minimum area in square meters")
     Float minArea;
