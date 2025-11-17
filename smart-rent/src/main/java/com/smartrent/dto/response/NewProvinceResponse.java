@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
+
 /**
  * Response DTO for new province structure (34 provinces after 1/7/2025)
  * This represents the simplified administrative structure.
@@ -24,18 +26,14 @@ public class NewProvinceResponse {
     String code;
     String name;
 
-    @JsonProperty("name_en")
-    String nameEn;
+    @JsonProperty("short_name")
+    String shortName;
 
-    @JsonProperty("full_name")
-    String fullName;
+    String key;
 
-    @JsonProperty("full_name_en")
-    String fullNameEn;
+    BigDecimal latitude;
 
-    @JsonProperty("code_name")
-    String codeName;
+    BigDecimal longitude;
 
-    @JsonProperty("administrative_unit_type")
-    String administrativeUnitType;
+    String alias;
 }

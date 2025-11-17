@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
+
 /**
  * Response DTO for wards in new province structure (after 1/7/2025)
  * In the new structure, wards are directly under provinces without districts.
@@ -24,17 +26,16 @@ public class NewWardResponse {
     String code;
     String name;
 
-    @JsonProperty("name_en")
-    String nameEn;
+    @JsonProperty("short_name")
+    String shortName;
 
-    @JsonProperty("full_name")
-    String fullName;
+    String type;
 
-    @JsonProperty("full_name_en")
-    String fullNameEn;
+    String key;
 
-    @JsonProperty("code_name")
-    String codeName;
+    BigDecimal latitude;
+
+    BigDecimal longitude;
 
     @JsonProperty("province_code")
     String provinceCode;
@@ -42,6 +43,5 @@ public class NewWardResponse {
     @JsonProperty("province_name")
     String provinceName;
 
-    @JsonProperty("administrative_unit_type")
-    String administrativeUnitType;
+    String alias;
 }

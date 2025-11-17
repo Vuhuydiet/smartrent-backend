@@ -4,12 +4,14 @@ import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.MyListingsFilterRequest;
+import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
+import com.smartrent.dto.response.ProvinceListingStatsResponse;
 
 import java.util.List;
 import java.util.Set;
@@ -60,4 +62,12 @@ public interface ListingService {
      * @return Paginated listing response with total count and recommendations
      */
     ListingListResponse searchListings(ListingFilterRequest filter);
+
+    /**
+     * Get listing statistics by provinces (for home screen)
+     * Returns statistics for each province including total listings, verified, and VIP counts
+     * @param request Province statistics request (provinceIds or provinceCodes)
+     * @return List of province statistics
+     */
+    List<ProvinceListingStatsResponse> getProvinceStats(ProvinceStatsRequest request);
 }

@@ -40,6 +40,7 @@ public enum DomainCode {
   STREET_NOT_FOUND("4010", HttpStatus.NOT_FOUND, "Street not found"),
   PROVINCE_MAPPING_NOT_FOUND("4011", HttpStatus.NOT_FOUND, "Province mapping not found"),
   WARD_MAPPING_NOT_FOUND("4012", HttpStatus.NOT_FOUND, "Ward mapping not found"),
+  CATEGORY_NOT_FOUND("4013", HttpStatus.NOT_FOUND, "Category not found"),
   //    Unauthorized	Client	5xxx (Unauthenticated error)
   UNAUTHENTICATED("5001", HttpStatus.UNAUTHORIZED, "Unauthenticated"),
   INVALID_EMAIL_PASSWORD("5002", HttpStatus.UNAUTHORIZED, "Invalid email or password"),

@@ -624,4 +624,14 @@ public class OpenAPIConfig {
                             .pathsToMatch("/v1/phone-click-details/**")
                             .build();
     }
+
+    @Bean
+    public GroupedOpenApi categoryApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("categories")
+                            .displayName("Category Management")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/categories/**")
+                            .build();
+    }
 }

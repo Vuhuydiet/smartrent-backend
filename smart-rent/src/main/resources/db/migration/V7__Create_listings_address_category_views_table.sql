@@ -181,10 +181,7 @@ INSERT INTO categories (name, slug, description, icon, is_active) VALUES
     ('Cho thuê căn hộ', 'cho-thue-can-ho', 'Căn hộ chung cư, căn hộ dịch vụ', 'apartment', TRUE),
     ('Cho thuê nhà nguyên căn', 'cho-thue-nha-nguyen-can', 'Nhà nguyên căn, villa, biệt thự', 'house', TRUE),
     ('Cho thuê văn phòng', 'cho-thue-van-phong', 'Văn phòng, mặt bằng kinh doanh', 'office', TRUE),
-    ('Cho thuê mặt bằng', 'cho-thue-mat-bang', 'Mặt bằng kinh doanh, cửa hàng', 'store', TRUE),
-    ('Bán căn hộ', 'ban-can-ho', 'Bán căn hộ chung cư', 'apartment-sale', TRUE),
-    ('Bán nhà', 'ban-nha', 'Bán nhà riêng, biệt thự', 'house-sale', TRUE),
-    ('Bán đất', 'ban-dat', 'Bán đất nền, lô đất', 'land', TRUE);
+    ('Cho thuê mặt bằng', 'cho-thue-mat-bang', 'Mặt bằng kinh doanh, cửa hàng', 'store', TRUE);
 
 -- Insert default amenities
 INSERT INTO amenities (name, icon, category, is_active) VALUES

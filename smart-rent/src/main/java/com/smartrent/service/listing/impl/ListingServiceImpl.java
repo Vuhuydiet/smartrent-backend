@@ -6,12 +6,14 @@ import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.MyListingsFilterRequest;
 import com.smartrent.dto.request.PaymentRequest;
+import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
+import com.smartrent.dto.response.ProvinceListingStatsResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.PostSource;
 import com.smartrent.infra.exception.AppException;
@@ -19,8 +21,10 @@ import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AddressRepository;
 import com.smartrent.infra.repository.AddressMetadataRepository;
 import com.smartrent.infra.repository.AdminRepository;
+import com.smartrent.infra.repository.LegacyProvinceRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
+import com.smartrent.infra.repository.ProvinceRepository;
 import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.*;
@@ -65,6 +69,8 @@ public class ListingServiceImpl implements ListingService {
     AddressMetadataRepository addressMetadataRepository;
     AdminRepository adminRepository;
     UserRepository userRepository;
+    LegacyProvinceRepository legacyProvinceRepository;
+    ProvinceRepository provinceRepository;
     ListingMapper listingMapper;
     LocationPricingService locationPricingService;
     QuotaService quotaService;
@@ -929,5 +935,107 @@ public class ListingServiceImpl implements ListingService {
             case "updatedAt" -> Sort.by(direction, "updatedAt");
             default -> Sort.by(direction, "postDate");
         };
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProvinceListingStatsResponse> getProvinceStats(ProvinceStatsRequest request) {
+        log.info("Getting province stats - provinceIds: {}, provinceCodes: {}, verifiedOnly: {}",
+                request.getProvinceIds(), request.getProvinceCodes(), request.getVerifiedOnly());
+
+        // Validate request - must have either provinceIds or provinceCodes
+        if ((request.getProvinceIds() == null || request.getProvinceIds().isEmpty()) &&
+            (request.getProvinceCodes() == null || request.getProvinceCodes().isEmpty())) {
+            log.warn("Province stats request missing both provinceIds and provinceCodes");
+            return Collections.emptyList();
+        }
+
+        List<ProvinceListingStatsResponse> results = new ArrayList<>();
+
+        // Handle old structure (63 provinces)
+        if (request.getProvinceIds() != null && !request.getProvinceIds().isEmpty()) {
+            log.info("Processing old structure with {} provinces", request.getProvinceIds().size());
+
+            List<Object[]> statsData = listingRepository.getListingStatsByProvinceIds(request.getProvinceIds());
+
+            // Map to response objects
+            for (Object[] row : statsData) {
+                Integer provinceId = (Integer) row[0];
+                Long totalCount = (Long) row[1];
+                Long verifiedCount = (Long) row[2];
+                Long vipCount = (Long) row[3];
+
+                // Get province name
+                String provinceName = legacyProvinceRepository.findById(provinceId)
+                        .map(com.smartrent.infra.repository.entity.LegacyProvince::getName)
+                        .orElse("Unknown Province");
+
+                // Filter if verifiedOnly is requested
+                if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
+                    continue;
+                }
+
+                results.add(ProvinceListingStatsResponse.builder()
+                        .provinceId(provinceId)
+                        .provinceCode(null)
+                        .provinceName(provinceName)
+                        .totalListings(totalCount)
+                        .verifiedListings(verifiedCount)
+                        .vipListings(vipCount)
+                        .build());
+            }
+        }
+
+        // Handle new structure (34 provinces)
+        if (request.getProvinceCodes() != null && !request.getProvinceCodes().isEmpty()) {
+            log.info("Processing new structure with {} provinces", request.getProvinceCodes().size());
+
+            List<Object[]> statsData = listingRepository.getListingStatsByProvinceCodes(request.getProvinceCodes());
+
+            // Map to response objects
+            for (Object[] row : statsData) {
+                String provinceCode = (String) row[0];
+                Long totalCount = (Long) row[1];
+                Long verifiedCount = (Long) row[2];
+                Long vipCount = (Long) row[3];
+
+                // Get province name
+                String provinceName = provinceRepository.findByCode(provinceCode)
+                        .map(Province::getName)
+                        .orElse("Unknown Province");
+
+                // Filter if verifiedOnly is requested
+                if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
+                    continue;
+                }
+
+                results.add(ProvinceListingStatsResponse.builder()
+                        .provinceId(null)
+                        .provinceCode(provinceCode)
+                        .provinceName(provinceName)
+                        .totalListings(totalCount)
+                        .verifiedListings(verifiedCount)
+                        .vipListings(vipCount)
+                        .build());
+            }
+        }
+
+        // Sort results to match input order
+        if (request.getProvinceIds() != null && !request.getProvinceIds().isEmpty()) {
+            results.sort((a, b) -> {
+                int indexA = request.getProvinceIds().indexOf(a.getProvinceId());
+                int indexB = request.getProvinceIds().indexOf(b.getProvinceId());
+                return Integer.compare(indexA, indexB);
+            });
+        } else if (request.getProvinceCodes() != null && !request.getProvinceCodes().isEmpty()) {
+            results.sort((a, b) -> {
+                int indexA = request.getProvinceCodes().indexOf(a.getProvinceCode());
+                int indexB = request.getProvinceCodes().indexOf(b.getProvinceCode());
+                return Integer.compare(indexA, indexB);
+            });
+        }
+
+        log.info("Province stats retrieved successfully - {} results", results.size());
+        return results;
     }
 }
