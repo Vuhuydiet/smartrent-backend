@@ -130,7 +130,7 @@ spring:
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"
   admin:
-    contact-phone-number: "${ADMIN_CONTACT_PHONE:0912345678}"
+    contact-phone-number: "${ADMIN_CONTACT_PHONE}"
   authorize-ignored:
     methods:
       get:
