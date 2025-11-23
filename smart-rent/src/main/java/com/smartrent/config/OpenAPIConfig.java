@@ -634,4 +634,14 @@ public class OpenAPIConfig {
                             .pathsToMatch("/v1/categories/**")
                             .build();
     }
+
+    @Bean
+    public GroupedOpenApi supportApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("support")
+                            .displayName("Customer Support")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/support/**")
+                            .build();
+    }
 }
