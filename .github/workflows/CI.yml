@@ -92,8 +92,8 @@ jobs:
         file: ./smart-rent/Dockerfile
         push: true
         tags: |
-          vuhuydiet/smart-rent:${{ github.sha }}
-          vuhuydiet/smart-rent:dev
+          vuhuydiet/smartrent-backend:${{ github.sha }}
+          vuhuydiet/smartrent-backend:dev
 
   update-dev-deployment:
     runs-on: ubuntu-latest
