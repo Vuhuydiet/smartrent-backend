@@ -20,13 +20,13 @@ public class SupportContactResponse {
 
   @Schema(
       description = "Admin's Zalo phone number for support contact",
-      example = "0777460670"
+      example = "0123456789"
   )
   String adminZaloPhoneNumber;
 
   @Schema(
       description = "Direct Zalo link to contact admin",
-      example = "https://zalo.me/0777460670"
+      example = "https://zalo.me/0123456789"
   )
   String zaloLink;
 }

@@ -44,8 +44,8 @@ public class SupportController {
                         "code": "999999",
                         "message": null,
                         "data": {
-                          "adminZaloPhoneNumber": "0777460670",
-                          "zaloLink": "https://zalo.me/0777460670"
+                          "adminZaloPhoneNumber": "0123456789",
+                          "zaloLink": "https://zalo.me/0123456789"
                         }
                       }
                       """
