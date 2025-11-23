@@ -1,5 +1,5 @@
 -- ============================================================================
--- Flyway Migration: V39__Create_indexes.sql
+-- Flyway Migration: V31__Create_indexes.sql
 -- Description: Create indexes for provinces and wards tables to optimize queries
 -- Date: 2025-11-16
 -- Author: Generated Script
@@ -10,90 +10,62 @@
 -- ============================================================================
 
 -- Index on province_code (already UNIQUE, but explicit index for foreign key lookups)
-CREATE INDEX idx_provinces_code ON provinces(province_code);
+CREATE INDEX IF NOT EXISTS idx_provinces_code ON provinces(province_code);
 
 -- Index on province_key for lookup/search operations
-CREATE INDEX idx_provinces_key ON provinces(province_key);
+CREATE INDEX IF NOT EXISTS idx_provinces_key ON provinces(province_key);
 
 -- Index on province_short_key for short name lookups
-CREATE INDEX idx_provinces_short_key ON provinces(province_short_key);
+CREATE INDEX IF NOT EXISTS idx_provinces_short_key ON provinces(province_short_key);
 
 -- Index on province_name for full-text search
-CREATE INDEX idx_provinces_name ON provinces(province_name);
+CREATE INDEX IF NOT EXISTS idx_provinces_name ON provinces(province_name);
 
 -- Index on province_short_name for short name search
-CREATE INDEX idx_provinces_short_name ON provinces(province_short_name);
+CREATE INDEX IF NOT EXISTS idx_provinces_short_name ON provinces(province_short_name);
 
 -- Composite index for geographic queries (lat, lon)
-CREATE INDEX idx_provinces_location ON provinces(province_latitude, province_longitude);
+CREATE INDEX IF NOT EXISTS idx_provinces_location ON provinces(province_latitude, province_longitude);
 
 -- Index on province_alias for alias lookup
-CREATE INDEX idx_provinces_alias ON provinces(province_alias);
+CREATE INDEX IF NOT EXISTS idx_provinces_alias ON provinces(province_alias);
 
 -- ============================================================================
 -- WARDS TABLE INDEXES
 -- ============================================================================
 
 -- Index on ward_code (already UNIQUE, but explicit index)
-CREATE INDEX idx_wards_code ON wards(ward_code);
+CREATE INDEX IF NOT EXISTS idx_wards_code ON wards(ward_code);
 
 -- Index on province_code for foreign key and filtering by province
-CREATE INDEX idx_wards_province_code ON wards(province_code);
+CREATE INDEX IF NOT EXISTS idx_wards_province_code ON wards(province_code);
 
 -- Index on ward_key for lookup/search operations
-CREATE INDEX idx_wards_key ON wards(ward_key);
+CREATE INDEX IF NOT EXISTS idx_wards_key ON wards(ward_key);
 
 -- Index on ward_short_key for short name lookups
-CREATE INDEX idx_wards_short_key ON wards(ward_short_key);
+CREATE INDEX IF NOT EXISTS idx_wards_short_key ON wards(ward_short_key);
 
 -- Index on ward_name for full-text search
-CREATE INDEX idx_wards_name ON wards(ward_name);
+CREATE INDEX IF NOT EXISTS idx_wards_name ON wards(ward_name);
 
 -- Index on ward_short_name for short name search
-CREATE INDEX idx_wards_short_name ON wards(ward_short_name);
+CREATE INDEX IF NOT EXISTS idx_wards_short_name ON wards(ward_short_name);
 
 -- Index on ward_type for filtering by type (Phường/Xã/Thị trấn)
-CREATE INDEX idx_wards_type ON wards(ward_type);
+CREATE INDEX IF NOT EXISTS idx_wards_type ON wards(ward_type);
 
 -- Index for ward_unique flag queries (MySQL doesn't support partial indexes)
-CREATE INDEX idx_wards_unique ON wards(ward_unique);
+CREATE INDEX IF NOT EXISTS idx_wards_unique ON wards(ward_unique);
 
 -- Composite index for geographic queries (lat, lon)
-CREATE INDEX idx_wards_location ON wards(ward_latitude, ward_longitude);
+CREATE INDEX IF NOT EXISTS idx_wards_location ON wards(ward_latitude, ward_longitude);
 
 -- Composite index for province + ward lookup
-CREATE INDEX idx_wards_province_ward ON wards(province_code, ward_code);
+CREATE INDEX IF NOT EXISTS idx_wards_province_ward ON wards(province_code, ward_code);
 
 -- Composite index for province + ward name lookup
-CREATE INDEX idx_wards_province_name_ward_name ON wards(province_name, ward_name);
+CREATE INDEX IF NOT EXISTS idx_wards_province_name_ward_name ON wards(province_name, ward_name);
 
 -- Index on ward_area_km2 for area-based queries
-CREATE INDEX idx_wards_area ON wards(ward_area_km2);
-
--- Full-text search indexes (PostgreSQL specific - using GIN)
--- Uncomment these if you need full-text search capabilities
-
--- CREATE INDEX idx_provinces_keywords_gin ON provinces USING GIN (to_tsvector('simple', province_keywords));
--- CREATE INDEX idx_wards_keywords_gin ON wards USING GIN (to_tsvector('simple', ward_keywords));
-
--- ============================================================================
--- ANALYZE TABLES
--- ============================================================================
-
--- Update table statistics for query optimization (MySQL syntax)
-ANALYZE TABLE provinces;
-ANALYZE TABLE wards;
-
--- ============================================================================
--- COMMENTS
--- ============================================================================
-
---COMMENT ON INDEX idx_provinces_code IS 'Index on province code for fast lookups';
---COMMENT ON INDEX idx_provinces_key IS 'Index on normalized province key for search operations';
---COMMENT ON INDEX idx_provinces_location IS 'Composite index for geographic queries';
---
---COMMENT ON INDEX idx_wards_code IS 'Index on ward code for fast lookups';
---COMMENT ON INDEX idx_wards_province_code IS 'Index on province code for filtering wards by province';
---COMMENT ON INDEX idx_wards_province_ward IS 'Composite index for province + ward lookups';
---COMMENT ON INDEX idx_wards_location IS 'Composite index for geographic queries';
---COMMENT ON INDEX idx_wards_type IS 'Index on ward type for filtering by Phường/Xã/Thị trấn';
+CREATE INDEX IF NOT EXISTS idx_wards_area ON wards(ward_area_km2);

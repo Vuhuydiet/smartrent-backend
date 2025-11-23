@@ -78,6 +78,7 @@ spring:
     enabled: true
     out-of-order: true
     validate-on-migrate: false
+    clean-on-validation-error: false
   jpa:
     database: MYSQL
     openInView: true
