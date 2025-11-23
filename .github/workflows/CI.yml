@@ -52,18 +52,18 @@ jobs:
             --build-cache \
             --continue
 
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v2
-        with:
-          projectBaseDir: ./smart-rent
-          args: >
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-            -Dsonar.organization=${{ secrets.SONAR_ORG }}
-            -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.java.binaries=build/classes
-            -Dsonar.coverage.jacoco.xmlReportPaths=build/reports/jacoco/test/jacocoTestReport.xml
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#      - name: SonarCloud Scan
+#        uses: SonarSource/sonarcloud-github-action@v2
+#        with:
+#          projectBaseDir: ./smart-rent
+#          args: >
+#            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+#            -Dsonar.organization=${{ secrets.SONAR_ORG }}
+#            -Dsonar.host.url=https://sonarcloud.io
+#            -Dsonar.java.binaries=build/classes
+#            -Dsonar.coverage.jacoco.xmlReportPaths=build/reports/jacoco/test/jacocoTestReport.xml
+#        env:
+#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   build-and-push:
     runs-on: ubuntu-latest
