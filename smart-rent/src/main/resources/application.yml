@@ -152,6 +152,7 @@ application:
         - "/v1/vip-tiers/**"
         - "/v1/push-details/**"
         - "/v1/support/contact"
+        - "/v1/listings/reports/reasons"
       post:
         - "/v1/auth/**"
         - "/v1/users"
@@ -159,6 +160,7 @@ application:
         - "/v1/verification/**"
         - "/v1/payments/ipn/**"
         - "/otp/**"
+        - "/v1/listings/*/reports"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
