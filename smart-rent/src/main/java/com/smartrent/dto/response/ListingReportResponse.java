@@ -40,7 +40,25 @@ public class ListingReportResponse {
     @Schema(description = "Report category", example = "LISTING", allowableValues = {"LISTING", "MAP"})
     String category;
 
+    @Schema(description = "Report status", example = "PENDING", allowableValues = {"PENDING", "RESOLVED", "REJECTED"})
+    String status;
+
+    @Schema(description = "Admin ID who resolved the report", example = "admin-123")
+    String resolvedBy;
+
+    @Schema(description = "Admin name who resolved the report", example = "John Doe")
+    String resolvedByName;
+
+    @Schema(description = "Resolution timestamp")
+    LocalDateTime resolvedAt;
+
+    @Schema(description = "Admin notes/comments on the report", example = "Verified and took action")
+    String adminNotes;
+
     @Schema(description = "Report creation timestamp")
     LocalDateTime createdAt;
+
+    @Schema(description = "Report last update timestamp")
+    LocalDateTime updatedAt;
 }
 

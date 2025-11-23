@@ -35,7 +35,12 @@ public class ListingReportMapperImpl implements ListingReportMapper {
                         .collect(Collectors.toList()))
                 .otherFeedback(listingReport.getOtherFeedback())
                 .category(listingReport.getCategory().name())
+                .status(listingReport.getStatus().name())
+                .resolvedBy(listingReport.getResolvedBy())
+                .resolvedAt(listingReport.getResolvedAt())
+                .adminNotes(listingReport.getAdminNotes())
                 .createdAt(listingReport.getCreatedAt())
+                .updatedAt(listingReport.getUpdatedAt())
                 .build();
     }
 }

@@ -77,7 +77,6 @@ spring:
   flyway:
     enabled: true
     out-of-order: true
-    validate-on-migrate: false
   jpa:
     database: MYSQL
     openInView: true
@@ -254,7 +253,7 @@ open:
         - video/quicktime
 
 # VNPay Payment Gateway Configuration
-vnpay:
+vnpay:  
   tmn-code: ${VNPAY_TMN_CODE:DEMO}
   hash-secret: ${VNPAY_HASH_SECRET:DEMOSECRETKEY}
   payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}

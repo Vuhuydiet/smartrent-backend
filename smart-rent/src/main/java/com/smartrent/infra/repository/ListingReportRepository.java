@@ -1,5 +1,6 @@
 package com.smartrent.infra.repository;
 
+import com.smartrent.enums.ReportStatus;
 import com.smartrent.infra.repository.entity.ListingReport;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,5 +44,35 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
      */
     @Query("SELECT COUNT(r) > 0 FROM listing_reports r WHERE r.listingId = :listingId AND (r.reporterEmail = :email OR r.reporterPhone = :phone)")
     boolean existsByListingIdAndReporter(@Param("listingId") Long listingId, @Param("email") String email, @Param("phone") String phone);
+
+    /**
+     * Find all reports with pagination (for admin)
+     */
+    Page<ListingReport> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    /**
+     * Find reports by status with pagination
+     */
+    Page<ListingReport> findByStatusOrderByCreatedAtDesc(ReportStatus status, Pageable pageable);
+
+    /**
+     * Find reports by status
+     */
+    List<ListingReport> findByStatusOrderByCreatedAtDesc(ReportStatus status);
+
+    /**
+     * Count reports by status
+     */
+    long countByStatus(ReportStatus status);
+
+    /**
+     * Find reports resolved by a specific admin
+     */
+    List<ListingReport> findByResolvedByOrderByResolvedAtDesc(String adminId);
+
+    /**
+     * Find reports resolved by a specific admin with pagination
+     */
+    Page<ListingReport> findByResolvedByOrderByResolvedAtDesc(String adminId, Pageable pageable);
 }
 
