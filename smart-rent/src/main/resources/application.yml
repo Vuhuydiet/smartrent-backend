@@ -75,7 +75,7 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
   flyway:
-    enabled: false
+    enabled: true
     out-of-order: true
     validate-on-migrate: false
     clean-on-validation-error: false
