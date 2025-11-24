@@ -22,6 +22,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -83,13 +85,31 @@ public class SecurityConfig {
   }
 
   @Bean
-  public CorsFilter corsFilter(@Value("${application.client-url}") String clientUrl) {
+  public CorsFilter corsFilter(
+      @Value("${application.client-url}") String clientUrl,
+      @Value("${application.cors.allowed-origins:}") String additionalOrigins) {
     CorsConfiguration config = new CorsConfiguration();
 
-    config.setAllowedOrigins(List.of(clientUrl));
+    // Build list of allowed origins
+    List<String> allowedOrigins = new ArrayList<>();
+    allowedOrigins.add(clientUrl);
+
+    // Add additional origins if specified (comma-separated)
+    if (additionalOrigins != null && !additionalOrigins.isBlank()) {
+      if (additionalOrigins.equals("*")) {
+        config.setAllowedOriginPatterns(List.of("*"));
+      } else {
+        allowedOrigins.addAll(Arrays.asList(additionalOrigins.split(",")));
+      }
+    }
+
+    if (!additionalOrigins.equals("*")) {
+      config.setAllowedOrigins(allowedOrigins);
+    }
+
     config.setAllowedHeaders(List.of("*"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
-    config.setAllowCredentials(true);
+    config.setAllowCredentials(!additionalOrigins.equals("*"));
     config.setExposedHeaders(List.of(
         "Content-Disposition",
         "X-Suggested-Filename",
