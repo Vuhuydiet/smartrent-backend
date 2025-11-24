@@ -90,26 +90,25 @@ public class SecurityConfig {
       @Value("${application.cors.allowed-origins:}") String additionalOrigins) {
     CorsConfiguration config = new CorsConfiguration();
 
-    // Build list of allowed origins
-    List<String> allowedOrigins = new ArrayList<>();
-    allowedOrigins.add(clientUrl);
-
     // Add additional origins if specified (comma-separated)
     if (additionalOrigins != null && !additionalOrigins.isBlank()) {
       if (additionalOrigins.equals("*")) {
         config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowCredentials(false);
       } else {
+        List<String> allowedOrigins = new ArrayList<>();
+        allowedOrigins.add(clientUrl);
         allowedOrigins.addAll(Arrays.asList(additionalOrigins.split(",")));
+        config.setAllowedOrigins(allowedOrigins);
+        config.setAllowCredentials(true);
       }
-    }
-
-    if (!additionalOrigins.equals("*")) {
-      config.setAllowedOrigins(allowedOrigins);
+    } else {
+      config.setAllowedOrigins(List.of(clientUrl));
+      config.setAllowCredentials(true);
     }
 
     config.setAllowedHeaders(List.of("*"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
-    config.setAllowCredentials(!additionalOrigins.equals("*"));
     config.setExposedHeaders(List.of(
         "Content-Disposition",
         "X-Suggested-Filename",
