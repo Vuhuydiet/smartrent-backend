@@ -84,6 +84,13 @@ public class ListingCreationRequest {
     @Builder.Default
     Boolean isDraft = false;
 
+    LocalDateTime postedAt;
+
+    String waterPrice;
+    String electricityPrice;
+    String internetPrice;
+    String serviceFee;
+
     /**
      * List of media IDs to attach to this listing
      * Media must be already uploaded and belong to the same user
@@ -96,7 +103,8 @@ public class ListingCreationRequest {
      * Required for NORMAL listings when creating through payment flow
      * The price will be calculated based on the VIP tier and duration
      */
-    Integer durationDays;
+    @Builder.Default
+    Integer durationDays=30;
 
     /**
      * Whether to use membership quota (only applicable for VIP listings)

@@ -6,7 +6,6 @@
 -- ============================================================================
 
 -- drop table if exists address_mapping;
-DROP TABLE IF EXISTS address_mapping;
 
 CREATE TABLE address_mapping (
     mapping_id INT AUTO_INCREMENT PRIMARY KEY,

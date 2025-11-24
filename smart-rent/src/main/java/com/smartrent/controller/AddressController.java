@@ -3,6 +3,7 @@ package com.smartrent.controller;
 import com.smartrent.dto.response.*;
 import com.smartrent.service.address.AddressService;
 import com.smartrent.service.address.NewAddressService;
+import com.smartrent.service.geocoding.GeocodingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -54,6 +55,7 @@ public class AddressController {
 
     private final AddressService addressService;
     private final NewAddressService newAddressService;
+    private final GeocodingService geocodingService;
 
     @GetMapping("/provinces")
     @Operation(
@@ -933,6 +935,173 @@ public class AddressController {
         return ResponseEntity.ok(ApiResponse.<AddressMergeHistoryResponse>builder()
                 .data(response)
                 .message("Successfully retrieved merge history")
+                .build());
+    }
+
+    // ==================== GEOCODING API ====================
+
+    @GetMapping("/geocode")
+    @Operation(
+        summary = "Convert address to coordinates (Geocoding)",
+        description = """
+            Converts a text address into geographic coordinates (latitude and longitude) using Google Geocoding API.
+
+            **This is a public endpoint** - no authentication required.
+
+            **What is Geocoding?**
+            Geocoding is the process of converting addresses (like "1600 Amphitheatre Parkway, Mountain View, CA")
+            into geographic coordinates (like latitude 37.423021 and longitude -122.083739), which you can use to
+            place markers on a map or position the map.
+
+            **Input Formats Supported**:
+            - Full address: "123 Nguyen Hue Street, District 1, Ho Chi Minh City, Vietnam"
+            - City/Province: "Hanoi, Vietnam" or "Ho Chi Minh City"
+            - Partial address: "Hoan Kiem District, Hanoi"
+            - Landmark: "Ben Thanh Market, Ho Chi Minh City"
+            - Street address: "Nguyen Hue Street, District 1"
+            **API Limits**:
+            - Google Maps API has usage quotas
+            - For production, ensure proper API key configuration and billing setup
+
+            **Response Accuracy**:
+            - `locationType` indicates accuracy level:
+              - `ROOFTOP`: Most accurate (exact building location)
+              - `RANGE_INTERPOLATED`: Interpolated between two points
+              - `GEOMETRIC_CENTER`: Center of a location (street, city, etc.)
+              - `APPROXIMATE`: Approximate location (city/region level)
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully geocoded address",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = {
+                        @ExampleObject(
+                            name = "Full Address Example",
+                            summary = "Geocoding full street address in Ho Chi Minh City",
+                            value = """
+                                {
+                                  "data": {
+                                    "latitude": 10.7730647,
+                                    "longitude": 106.7000933,
+                                    "formattedAddress": "Nguyen Hue Walking Street, Ben Nghe Ward, District 1, Ho Chi Minh City, Vietnam",
+                                    "originalAddress": "Nguyen Hue Street, District 1, Ho Chi Minh City",
+                                    "locationType": "GEOMETRIC_CENTER",
+                                    "placeId": "ChIJ0T2NLikpdTERKxE8d61aX_E"
+                                  },
+                                  "message": "Successfully geocoded address"
+                                }
+                                """
+                        ),
+                        @ExampleObject(
+                            name = "City Example",
+                            summary = "Geocoding city name (Hanoi)",
+                            value = """
+                                {
+                                  "data": {
+                                    "latitude": 21.0285,
+                                    "longitude": 105.8542,
+                                    "formattedAddress": "Hanoi, Vietnam",
+                                    "originalAddress": "Hanoi",
+                                    "locationType": "APPROXIMATE",
+                                    "placeId": "ChIJoRyG2ZurNTERqRfKcnt_iOk"
+                                  },
+                                  "message": "Successfully geocoded address"
+                                }
+                                """
+                        ),
+                        @ExampleObject(
+                            name = "Landmark Example",
+                            summary = "Geocoding famous landmark",
+                            value = """
+                                {
+                                  "data": {
+                                    "latitude": 10.7728832,
+                                    "longitude": 106.6980117,
+                                    "formattedAddress": "Ben Thanh Market, Le Loi, Ben Thanh Ward, District 1, Ho Chi Minh City 700000, Vietnam",
+                                    "originalAddress": "Ben Thanh Market, Ho Chi Minh City",
+                                    "locationType": "ROOFTOP",
+                                    "placeId": "ChIJjbqJZS4vdTER3VChuMHxR5k"
+                                  },
+                                  "message": "Successfully geocoded address"
+                                }
+                                """
+                        )
+                    }
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Invalid request (empty address)",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        value = """
+                            {
+                              "code": 2001,
+                              "message": "Address cannot be empty"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Address not found",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        value = """
+                            {
+                              "code": 4001,
+                              "message": "No location found for the provided address"
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "500",
+                description = "Geocoding service error (API quota exceeded, access denied, etc.)",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        value = """
+                            {
+                              "code": 1000,
+                              "message": "Geocoding service temporarily unavailable. Please try again later."
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ResponseEntity<ApiResponse<GeocodingResponse>> geocodeAddress(
+            @Parameter(
+                description = """
+                    Address to convert to coordinates. Can be:
+                    - Full address (e.g., "123 Nguyen Hue Street, District 1, Ho Chi Minh City, Vietnam")
+                    - City name (e.g., "Hanoi" or "Hanoi, Vietnam")
+                    - Partial address (e.g., "Hoan Kiem District, Hanoi")
+                    - Landmark (e.g., "Ben Thanh Market, Ho Chi Minh City")
+
+                    For best results, include as much detail as possible and add "Vietnam" for Vietnamese addresses.
+                    """,
+                example = "Nguyen Hue Street, District 1, Ho Chi Minh City, Vietnam",
+                required = true
+            )
+            @RequestParam String address) {
+
+        log.info("GET /v1/addresses/geocode - address: {}", address);
+
+        GeocodingResponse response = geocodingService.geocodeAddress(address);
+
+        return ResponseEntity.ok(ApiResponse.<GeocodingResponse>builder()
+                .data(response)
+                .message("Successfully geocoded address")
                 .build());
     }
 
