@@ -6,7 +6,6 @@
 -- ============================================================================
 
 -- drop table if exists legacy_wards;
-DROP TABLE IF EXISTS legacy_wards;
 
 CREATE TABLE legacy_wards (
     legacy_ward_id INT AUTO_INCREMENT PRIMARY KEY,

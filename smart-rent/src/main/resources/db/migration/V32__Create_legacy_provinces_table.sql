@@ -6,7 +6,6 @@
 -- ============================================================================
 
 -- drop table if exists legacy_provinces;
-DROP TABLE IF EXISTS legacy_provinces;
 
 CREATE TABLE legacy_provinces (
     legacy_province_id INT AUTO_INCREMENT PRIMARY KEY,

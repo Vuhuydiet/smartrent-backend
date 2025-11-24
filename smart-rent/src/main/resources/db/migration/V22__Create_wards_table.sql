@@ -4,7 +4,6 @@
 -- Date: 2025-11-16
 
 -- drop table if exists wards;
-DROP TABLE IF EXISTS wards;
 
 CREATE TABLE wards (
     ward_id INT AUTO_INCREMENT PRIMARY KEY,

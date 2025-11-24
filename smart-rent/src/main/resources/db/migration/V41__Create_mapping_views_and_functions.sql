@@ -170,7 +170,6 @@ ORDER BY am.new_province_name, am.new_ward_name;
 -- STORED PROCEDURE 1: Convert Legacy Province to New Province
 -- ============================================================================
 
-DROP PROCEDURE IF EXISTS sp_convert_legacy_province_to_new;
 
 DELIMITER $$
 
@@ -197,7 +196,6 @@ DELIMITER ;
 -- STORED PROCEDURE 2: Convert Legacy Full Address to New Address
 -- ============================================================================
 
-DROP PROCEDURE IF EXISTS sp_convert_legacy_address_to_new;
 
 DELIMITER $$
 
@@ -250,7 +248,6 @@ DELIMITER ;
 -- STORED PROCEDURE 3: Find All Possible New Addresses for Legacy Address
 -- ============================================================================
 
-DROP PROCEDURE IF EXISTS sp_find_all_new_addresses_for_legacy;
 
 DELIMITER $$
 
@@ -303,7 +300,6 @@ DELIMITER ;
 -- STORED PROCEDURE 4: Get Province Change Summary
 -- ============================================================================
 
-DROP PROCEDURE IF EXISTS sp_get_province_change_summary;
 
 DELIMITER $$
 

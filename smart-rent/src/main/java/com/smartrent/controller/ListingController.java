@@ -104,6 +104,29 @@ public class ListingController {
             - No orphaned address data
             - Full address text is auto-generated if not provided
 
+            **Address Structure (Two Formats Supported):**
+
+            **Nested Format:**
+            ```json
+            "address": {
+              "legacy": {
+                "provinceId": 1,
+                "districtId": 5,
+                "wardId": 20,
+                "street": "Nguyen Trai",
+                "streetNumber": "123"
+              },
+              "new": {
+                "provinceCode": "01",
+                "wardCode": "00004",
+                "street": "Le Duan",
+                "streetNumber": "88"
+              },
+              "latitude": 21.0285,
+              "longitude": 105.8542
+            }
+            ```
+         
             **Required Fields for Standard Listing:**
             - title, description
             - listingType (RENT/SALE/SHARE)
@@ -112,9 +135,13 @@ public class ListingController {
             - productType (APARTMENT/HOUSE/STUDIO/ROOM/OFFICE)
             - price, priceUnit (MONTH/DAY/YEAR)
             - address object with:
-              - addressType (OLD or NEW) - REQUIRED
-              - For OLD: provinceId, districtId, wardId
-              - For NEW: newProvinceCode, newWardCode
+              - **Nested format:**
+                - For legacy: legacy.provinceId, legacy.districtId, legacy.wardId
+                - For new: new.provinceCode, new.wardCode
+              - **Flat format (deprecated):**
+                - addressType (OLD or NEW)
+                - For OLD: provinceId, districtId, wardId
+                - For NEW: newProvinceCode, newWardCode
 
             **Optional Fields:**
             - isDraft (default: false)
@@ -122,8 +149,10 @@ public class ListingController {
             - direction, furnishing, propertyType
             - roomCapacity
             - amenityIds (array of amenity IDs)
-            - mediaIds (array of uploaded media IDs)
-            - address.streetId, address.streetNumber
+            - mediaIds (array of uploaded media IDs) - See Media Upload Integration Flow above
+            - address.legacy.street or address.new.street (street name as string)
+            - address.streetId (street reference - flat format)
+            - address.projectId (building/complex reference)
             - address.latitude, address.longitude
             - durationDays (Integer: 10, 15, or 30 for payment flow)
             - useMembershipQuota (for VIP listings with existing quota)
@@ -136,8 +165,8 @@ public class ListingController {
                 schema = @Schema(implementation = ListingCreationRequest.class),
                 examples = {
                     @ExampleObject(
-                        name = "Standard Listing",
-                        summary = "Create complete listing (published immediately)",
+                        name = "Listing Creation",
+                        summary = "Create listing fully with all details",
                         value = """
                             {
                               "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
@@ -149,12 +178,17 @@ public class ListingController {
                               "price": 12000000,
                               "priceUnit": "MONTH",
                               "address": {
-                                "addressType": "OLD",
-                                "streetNumber": "123",
-                                "streetId": 1,
-                                "wardId": 1,
-                                "districtId": 1,
-                                "provinceId": 1,
+                                "legacy": {
+                                  "provinceId": 1,
+                                  "districtId": 5,
+                                  "wardId": 20,
+                                  "street": "123 Nguyễn Trãi"
+                                },
+                                "new": {
+                                  "provinceCode": "01",
+                                  "wardCode": "00004",
+                                  "street": "88 Lê Duẩn"
+                                },
                                 "latitude": 21.0285,
                                 "longitude": 105.8542
                               },
@@ -167,7 +201,13 @@ public class ListingController {
                               "roomCapacity": 4,
                               "amenityIds": [1, 3, 5],
                               "mediaIds": [101, 102, 103],
-                              "isDraft": false
+                              "isDraft": false,
+                              "durationDays": 30,
+                              "waterPrice": "NEGOTIABLE",
+                              "electricityPrice": "SET_BY_OWNER",
+                              "internetPrice": "PROVIDER_RATE",
+                              "useMembershipQuota": false,
+                              "benefitsMembership": ["SILVER"]
                             }
                             """
                     ),
@@ -187,7 +227,7 @@ public class ListingController {
                     ),
                     @ExampleObject(
                         name = "Listing with Payment (NORMAL tier)",
-                        summary = "Create NORMAL listing with duration (requires payment)",
+                        summary = "Create NORMAL listing with duration (requires payment) - Using nested new address",
                         value = """
                             {
                               "title": "Phòng trọ sinh viên giá rẻ",
@@ -199,10 +239,12 @@ public class ListingController {
                               "price": 3000000,
                               "priceUnit": "MONTH",
                               "address": {
-                                "addressType": "NEW",
-                                "streetNumber": "45",
-                                "newProvinceCode": "01",
-                                "newWardCode": "00001",
+                                "new": {
+                                  "provinceCode": "01",
+                                  "wardCode": "00001",
+                                  "street": "Đại Cồ Việt",
+                                  "streetNumber": "45"
+                                },
                                 "latitude": 21.0285,
                                 "longitude": 105.8542
                               },
@@ -1288,7 +1330,7 @@ public class ListingController {
                 examples = {
                     @ExampleObject(
                         name = "SILVER with Quota",
-                        summary = "SILVER listing sử dụng quota từ membership",
+                        summary = "SILVER listing sử dụng quota từ membership - Nested legacy address",
                         value = """
                             {
                               "title": "Căn hộ cao cấp tại Quận Ba Đình",
@@ -1300,11 +1342,13 @@ public class ListingController {
                               "price": 15000000,
                               "priceUnit": "MONTH",
                               "address": {
-                                "streetNumber": "45A",
-                                "streetId": 10,
-                                "wardId": 1,
-                                "districtId": 1,
-                                "provinceId": 1,
+                                "legacy": {
+                                  "provinceId": 1,
+                                  "districtId": 1,
+                                  "wardId": 1,
+                                  "street": "Hoàng Diệu",
+                                  "streetNumber": "45A"
+                                },
                                 "latitude": 21.0285,
                                 "longitude": 105.8542
                               },
@@ -1320,7 +1364,7 @@ public class ListingController {
                     ),
                     @ExampleObject(
                         name = "GOLD with Payment",
-                        summary = "GOLD listing với thanh toán VNPay",
+                        summary = "GOLD listing với thanh toán VNPay - Nested new address",
                         value = """
                             {
                               "title": "Biệt thự GOLD tại Quận 2",
@@ -1332,11 +1376,12 @@ public class ListingController {
                               "price": 35000000,
                               "priceUnit": "MONTH",
                               "address": {
-                                "streetNumber": "120",
-                                "streetId": 50,
-                                "wardId": 20,
-                                "districtId": 10,
-                                "provinceId": 79,
+                                "new": {
+                                  "provinceCode": "79",
+                                  "wardCode": "26734",
+                                  "street": "Nguyễn Văn Hưởng",
+                                  "streetNumber": "120"
+                                },
                                 "latitude": 10.7769,
                                 "longitude": 106.7009
                               },
@@ -1353,7 +1398,7 @@ public class ListingController {
                     ),
                     @ExampleObject(
                         name = "DIAMOND with Shadow",
-                        summary = "DIAMOND listing (tự động tạo shadow NORMAL listing)",
+                        summary = "DIAMOND listing (tự động tạo shadow NORMAL listing) - Nested legacy address",
                         value = """
                             {
                               "title": "Penthouse DIAMOND Landmark 81",
@@ -1365,11 +1410,13 @@ public class ListingController {
                               "price": 100000000,
                               "priceUnit": "MONTH",
                               "address": {
-                                "streetNumber": "720A",
-                                "streetId": 100,
-                                "wardId": 50,
-                                "districtId": 20,
-                                "provinceId": 79,
+                                "legacy": {
+                                  "provinceId": 79,
+                                  "districtId": 20,
+                                  "wardId": 50,
+                                  "street": "Đường Tân Cảng",
+                                  "streetNumber": "720A"
+                                },
                                 "latitude": 10.7941,
                                 "longitude": 106.7218
                               },

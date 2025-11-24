@@ -6,7 +6,6 @@
 -- ============================================================================
 
 -- drop table if exists legacy_districts;
-DROP TABLE IF EXISTS legacy_districts;
 
 CREATE TABLE legacy_districts (
     legacy_district_id INT AUTO_INCREMENT PRIMARY KEY,

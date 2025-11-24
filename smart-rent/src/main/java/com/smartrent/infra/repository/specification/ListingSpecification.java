@@ -7,6 +7,7 @@ import com.smartrent.infra.repository.entity.AddressMetadata;
 import com.smartrent.infra.repository.entity.Amenity;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.Media;
+import com.smartrent.infra.repository.entity.PricingHistory;
 import com.smartrent.infra.repository.entity.User;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
@@ -14,6 +15,7 @@ import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -158,12 +160,171 @@ public class ListingSpecification {
                 ));
             }
 
-            // Price range filter
+            // ============ PRICING FILTERS ============
+            // Basic price range filter
             if (filter.getMinPrice() != null) {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("price"), filter.getMinPrice()));
             }
             if (filter.getMaxPrice() != null) {
                 predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("price"), filter.getMaxPrice()));
+            }
+
+            // Price unit filter
+            if (filter.getPriceUnit() != null) {
+                predicates.add(criteriaBuilder.equal(
+                    root.get("priceUnit"),
+                    Listing.PriceUnit.valueOf(filter.getPriceUnit())
+                ));
+            }
+
+            // Price reduction filter - listings with recent price drops
+            if (Boolean.TRUE.equals(filter.getHasPriceReduction())) {
+                Subquery<Long> priceReductionSubquery = query.subquery(Long.class);
+                var priceHistoryRoot = priceReductionSubquery.from(PricingHistory.class);
+
+                List<Predicate> priceReductionPredicates = new ArrayList<>();
+                priceReductionPredicates.add(criteriaBuilder.equal(
+                    priceHistoryRoot.get("listing").get("listingId"),
+                    root.get("listingId")
+                ));
+                priceReductionPredicates.add(criteriaBuilder.equal(
+                    priceHistoryRoot.get("isCurrent"),
+                    true
+                ));
+                priceReductionPredicates.add(criteriaBuilder.equal(
+                    priceHistoryRoot.get("changeType"),
+                    PricingHistory.PriceChangeType.DECREASE
+                ));
+
+                // If priceChangedWithinDays is specified, filter by date
+                if (filter.getPriceChangedWithinDays() != null && filter.getPriceChangedWithinDays() > 0) {
+                    LocalDateTime cutoffDate = LocalDateTime.now().minusDays(filter.getPriceChangedWithinDays());
+                    priceReductionPredicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                        priceHistoryRoot.get("changedAt"),
+                        cutoffDate
+                    ));
+                }
+
+                priceReductionSubquery.select(priceHistoryRoot.get("listing").get("listingId"))
+                        .where(criteriaBuilder.and(priceReductionPredicates.toArray(new Predicate[0])));
+
+                predicates.add(criteriaBuilder.exists(priceReductionSubquery));
+            }
+
+            // Price increase filter - listings with recent price increases
+            if (Boolean.TRUE.equals(filter.getHasPriceIncrease())) {
+                Subquery<Long> priceIncreaseSubquery = query.subquery(Long.class);
+                var priceHistoryRoot = priceIncreaseSubquery.from(PricingHistory.class);
+
+                List<Predicate> priceIncreasePredicates = new ArrayList<>();
+                priceIncreasePredicates.add(criteriaBuilder.equal(
+                    priceHistoryRoot.get("listing").get("listingId"),
+                    root.get("listingId")
+                ));
+                priceIncreasePredicates.add(criteriaBuilder.equal(
+                    priceHistoryRoot.get("isCurrent"),
+                    true
+                ));
+                priceIncreasePredicates.add(criteriaBuilder.equal(
+                    priceHistoryRoot.get("changeType"),
+                    PricingHistory.PriceChangeType.INCREASE
+                ));
+
+                // If priceChangedWithinDays is specified, filter by date
+                if (filter.getPriceChangedWithinDays() != null && filter.getPriceChangedWithinDays() > 0) {
+                    LocalDateTime cutoffDate = LocalDateTime.now().minusDays(filter.getPriceChangedWithinDays());
+                    priceIncreasePredicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                        priceHistoryRoot.get("changedAt"),
+                        cutoffDate
+                    ));
+                }
+
+                priceIncreaseSubquery.select(priceHistoryRoot.get("listing").get("listingId"))
+                        .where(criteriaBuilder.and(priceIncreasePredicates.toArray(new Predicate[0])));
+
+                predicates.add(criteriaBuilder.exists(priceIncreaseSubquery));
+            }
+
+            // Price reduction percentage filter - filter by discount percentage
+            if (filter.getMinPriceReductionPercent() != null || filter.getMaxPriceReductionPercent() != null) {
+                Subquery<Long> pricePercentSubquery = query.subquery(Long.class);
+                var priceHistoryRoot = pricePercentSubquery.from(PricingHistory.class);
+
+                List<Predicate> pricePercentPredicates = new ArrayList<>();
+                pricePercentPredicates.add(criteriaBuilder.equal(
+                    priceHistoryRoot.get("listing").get("listingId"),
+                    root.get("listingId")
+                ));
+                pricePercentPredicates.add(criteriaBuilder.equal(
+                    priceHistoryRoot.get("isCurrent"),
+                    true
+                ));
+                pricePercentPredicates.add(criteriaBuilder.equal(
+                    priceHistoryRoot.get("changeType"),
+                    PricingHistory.PriceChangeType.DECREASE
+                ));
+
+                // Filter by percentage range
+                if (filter.getMinPriceReductionPercent() != null) {
+                    // Use ABS because changePercentage for DECREASE is stored as negative value
+                    pricePercentPredicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                        criteriaBuilder.abs(priceHistoryRoot.get("changePercentage")),
+                        filter.getMinPriceReductionPercent()
+                    ));
+                }
+                if (filter.getMaxPriceReductionPercent() != null) {
+                    pricePercentPredicates.add(criteriaBuilder.lessThanOrEqualTo(
+                        criteriaBuilder.abs(priceHistoryRoot.get("changePercentage")),
+                        filter.getMaxPriceReductionPercent()
+                    ));
+                }
+
+                // If priceChangedWithinDays is specified, filter by date
+                if (filter.getPriceChangedWithinDays() != null && filter.getPriceChangedWithinDays() > 0) {
+                    LocalDateTime cutoffDate = LocalDateTime.now().minusDays(filter.getPriceChangedWithinDays());
+                    pricePercentPredicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                        priceHistoryRoot.get("changedAt"),
+                        cutoffDate
+                    ));
+                }
+
+                pricePercentSubquery.select(priceHistoryRoot.get("listing").get("listingId"))
+                        .where(criteriaBuilder.and(pricePercentPredicates.toArray(new Predicate[0])));
+
+                predicates.add(criteriaBuilder.exists(pricePercentSubquery));
+            }
+
+            // General price changed within days filter (any type of change)
+            if (filter.getPriceChangedWithinDays() != null && filter.getPriceChangedWithinDays() > 0
+                && filter.getHasPriceReduction() == null && filter.getHasPriceIncrease() == null
+                && filter.getMinPriceReductionPercent() == null && filter.getMaxPriceReductionPercent() == null) {
+
+                Subquery<Long> priceChangeSubquery = query.subquery(Long.class);
+                var priceHistoryRoot = priceChangeSubquery.from(PricingHistory.class);
+
+                LocalDateTime cutoffDate = LocalDateTime.now().minusDays(filter.getPriceChangedWithinDays());
+
+                priceChangeSubquery.select(priceHistoryRoot.get("listing").get("listingId"))
+                        .where(criteriaBuilder.and(
+                                criteriaBuilder.equal(
+                                    priceHistoryRoot.get("listing").get("listingId"),
+                                    root.get("listingId")
+                                ),
+                                criteriaBuilder.equal(
+                                    priceHistoryRoot.get("isCurrent"),
+                                    true
+                                ),
+                                criteriaBuilder.greaterThanOrEqualTo(
+                                    priceHistoryRoot.get("changedAt"),
+                                    cutoffDate
+                                ),
+                                criteriaBuilder.notEqual(
+                                    priceHistoryRoot.get("changeType"),
+                                    PricingHistory.PriceChangeType.INITIAL
+                                )
+                        ));
+
+                predicates.add(criteriaBuilder.exists(priceChangeSubquery));
             }
 
             // Area range filter
