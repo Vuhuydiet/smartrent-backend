@@ -38,49 +38,26 @@ public class NewAddressServiceImpl implements NewAddressService {
     private final WardRepository wardRepository;
     private final AddressMapper addressMapper;
 
+    // Constants for paginated methods
     private static final int DEFAULT_PAGE = 1;
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
 
     @Override
     @Transactional(readOnly = true)
-    public PaginatedResponse<List<NewProvinceResponse>> getNewProvinces(
-            String keyword
-
-    ) {
-        log.info("Fetching new provinces from database - keyword: {}, page: {}, limit: {}", keyword);
+    public List<NewProvinceResponse> getNewProvinces() {
+        log.info("Fetching all new provinces from database");
 
         try {
-            Integer validPage = DEFAULT_PAGE;
-            Integer validLimit = DEFAULT_LIMIT;
+            List<Province> provinces = provinceRepository.findAll();
 
-            Pageable pageable = PageRequest.of(validPage - 1, validLimit);
-            Page<Province> provincePage;
-
-            if (keyword != null && !keyword.trim().isEmpty()) {
-                provincePage = provinceRepository.searchByKeyword(keyword.trim(), pageable);
-            } else {
-                provincePage = provinceRepository.findAll(pageable);
-            }
-
-            List<NewProvinceResponse> provinceResponses = provincePage.getContent().stream()
+            List<NewProvinceResponse> provinceResponses = provinces.stream()
                     .map(addressMapper::toNewProvinceResponse)
                     .collect(Collectors.toList());
 
             log.info("Successfully fetched {} new provinces from database", provinceResponses.size());
 
-            PaginatedResponse.Metadata metadata = PaginatedResponse.Metadata.builder()
-                    .total((int) provincePage.getTotalElements())
-                    .page(validPage)
-                    .limit(validLimit)
-                    .build();
-
-            return PaginatedResponse.<List<NewProvinceResponse>>builder()
-                    .success(true)
-                    .message("Success")
-                    .data(provinceResponses)
-                    .metadata(metadata)
-                    .build();
+            return provinceResponses;
 
         } catch (Exception e) {
             log.error("Error fetching new provinces from database: {}", e.getMessage(), e);

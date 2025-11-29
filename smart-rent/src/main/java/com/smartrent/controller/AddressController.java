@@ -458,16 +458,14 @@ public class AddressController {
     @Operation(
         summary = "Get all provinces (34 provinces - new structure)",
         description = """
-            Returns all provinces in Vietnam's new administrative structure (after 1/7/2025).
+            Returns all 34 provinces in Vietnam's new administrative structure (after 1/7/2025).
 
-            **Returns**: 34 provinces including:
+            **Returns**: All 34 provinces including:
             - Merged provinces from the old 63-province structure
             - New administrative boundaries
 
-            **Query Parameters**:
-            - keyword: Search by province name or code
-            - page: Page number (default: 1)
-            - limit: Items per page (default: 20, max: 100)
+            **Note**: This endpoint returns all provinces without filtering.
+            For search functionality, use the `/search-new-address` endpoint.
 
             **Use Cases**:
             - Populate province dropdown in address forms
@@ -477,59 +475,45 @@ public class AddressController {
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Successfully retrieved provinces",
+                description = "Successfully retrieved all 34 provinces",
                 content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = PaginatedResponse.class),
+                    schema = @Schema(implementation = List.class),
                     examples = @ExampleObject(
                         name = "New Province List Example",
                         summary = "Danh sách 34 tỉnh/thành phố mới",
                         value = """
-                            {
-                              "success": true,
-                              "message": "Success",
-                              "data": [
-                                  {
-                                    "id": "46",
-                                    "name": "Thành phố Huế",
-                                    "key": "thanhphohue",
-                                    "latitude": 16.3316,
-                                    "longitude": 107.517,
-                                    "alias": null,
-                                    "short_name": "Huế"
-                                  },
-                                  {
-                                    "id": "48",
-                                    "name": "Thành phố Đà Nẵng",
-                                    "key": "thanhphoanang",
-                                    "latitude": 15.631,
-                                    "longitude": 107.966,
-                                    "alias": null,
-                                    "short_name": "Đà Nẵng"
-                                  }
-                                ],
-                                "metadata": {
-                                  "total": 34,
-                                  "page": 1,
-                                  "limit": 20
-                                }
-                            }
+                            [
+                              {
+                                "id": "46",
+                                "name": "Thành phố Huế",
+                                "key": "thanhphohue",
+                                "latitude": 16.3316,
+                                "longitude": 107.517,
+                                "alias": null,
+                                "short_name": "Huế"
+                              },
+                              {
+                                "id": "48",
+                                "name": "Thành phố Đà Nẵng",
+                                "key": "thanhphoanang",
+                                "latitude": 15.631,
+                                "longitude": 107.966,
+                                "alias": null,
+                                "short_name": "Đà Nẵng"
+                              }
+                            ]
                             """
                     )
                 )
             )
         }
     )
-    public ResponseEntity<PaginatedResponse<List<NewProvinceResponse>>> getNewProvinces(
-            @Parameter(description = "Search keyword", example = "Hà Nội")
-            @RequestParam(required = false) String keyword
-            ) {
+    public ResponseEntity<List<NewProvinceResponse>> getNewProvinces() {
 
-        log.info("GET /v1/addresses/new-provinces - keyword: {}, page: {}, limit: {}",
-                keyword);
+        log.info("GET /v1/addresses/new-provinces - Fetching all new provinces");
 
-        PaginatedResponse<List<NewProvinceResponse>> response =
-                newAddressService.getNewProvinces(keyword);
+        List<NewProvinceResponse> response = newAddressService.getNewProvinces();
 
         return ResponseEntity.ok(response);
     }

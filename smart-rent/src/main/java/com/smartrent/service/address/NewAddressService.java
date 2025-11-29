@@ -17,12 +17,9 @@ public interface NewAddressService {
     /**
      * Get all provinces in new structure (34 provinces)
      *
-     * @param keyword Search keyword (optional)
-     * @param page Page number (default: 1)
-     * @param limit Items per page (default: 20)
-     * @return Paginated list of provinces
+     * @return List of all 34 provinces
      */
-    PaginatedResponse<List<NewProvinceResponse>> getNewProvinces(String keyword);
+    List<NewProvinceResponse> getNewProvinces();
 
     /**
      * Get wards by province code in new structure
