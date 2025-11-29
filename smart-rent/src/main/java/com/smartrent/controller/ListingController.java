@@ -422,6 +422,38 @@ public class ListingController {
                                     "isActive": true
                                   }
                                 ],
+                                "media": [
+                                  {
+                                    "mediaId": 1,
+                                    "listingId": 123,
+                                    "mediaType": "IMAGE",
+                                    "url": "https://placehold.co/400x300/cccccc/969696.png?font=lato",
+                                    "isPrimary": true,
+                                    "sortOrder": 0,
+                                    "status": "ACTIVE",
+                                    "createdAt": "2025-09-01T10:00:00"
+                                  },
+                                  {
+                                    "mediaId": 2,
+                                    "listingId": 123,
+                                    "mediaType": "IMAGE",
+                                    "url": "https://placehold.co/400x300/cccccc/969696.png?font=lato",
+                                    "isPrimary": false,
+                                    "sortOrder": 1,
+                                    "status": "ACTIVE",
+                                    "createdAt": "2025-09-01T10:05:00"
+                                  },
+                                  {
+                                    "mediaId": 3,
+                                    "listingId": 123,
+                                    "mediaType": "IMAGE",
+                                    "url": "https://placehold.co/400x300/cccccc/969696.png?font=lato",
+                                    "isPrimary": false,
+                                    "sortOrder": 2,
+                                    "status": "ACTIVE",
+                                    "createdAt": "2025-09-01T10:10:00"
+                                  }
+                                ],
                                 "locationPricing": {
                                   "wardPricing": {
                                     "locationType": "WARD",
@@ -511,9 +543,11 @@ public class ListingController {
             ## CÁC BỘ LỌC HỖ TRỢ
 
             ### 1. Lọc theo vị trí
-            - `provinceId` (63 tỉnh cũ) hoặc `provinceCode` (34 tỉnh mới)
-            - `districtId`, `wardId` (old) hoặc `newWardCode` (new), `streetId`
-            - Tìm theo bán kính GPS: `userLatitude`, `userLongitude`, `radiusKm`
+            - `provinceId` (String - có thể là 63 tỉnh cũ hoặc 34 tỉnh mới) hoặc `provinceCode` (String - 34 tỉnh mới)
+            - `districtId`, `wardId` (String - old) hoặc `newWardCode` (new), `streetId`
+            - `isLegacy`: true (dùng cấu trúc 63 tỉnh cũ), false (dùng cấu trúc 34 tỉnh mới)
+            - Tọa độ: `latitude`, `longitude` (dùng chung cho cả user location và listing location)
+            - Tìm theo bán kính GPS: `userLatitude`, `userLongitude`, `radiusKm` (backward compatibility)
 
             ### 2. Lọc theo giá và diện tích
             - Khoảng giá: `minPrice`, `maxPrice` (VNĐ)
@@ -528,30 +562,37 @@ public class ListingController {
             - Loại: `propertyType`, `productType` (APARTMENT, HOUSE, ROOM, STUDIO, OFFICE)
             - Sức chứa: `minRoomCapacity`, `maxRoomCapacity`
 
-            ### 4. Lọc theo loại giao dịch và VIP
+            ### 4. Lọc theo chi phí tiện ích
+            - `waterPrice`: giá nước (LOW, MEDIUM, HIGH)
+            - `electricityPrice`: giá điện (LOW, MEDIUM, HIGH)
+            - `internetPrice`: giá internet (FREE, LOW, MEDIUM, HIGH)
+            - `serviceFee`: phí dịch vụ (LOW, MEDIUM, HIGH)
+
+            ### 5. Lọc theo loại giao dịch, VIP và trạng thái
             - `listingType`: RENT, SALE, SHARE
             - `vipType`: NORMAL, SILVER, GOLD, DIAMOND
             - `verified`: true (chỉ lấy tin đã verify)
+            - `status`: ACTIVE, EXPIRED, PENDING, DRAFT (trạng thái bài đăng)
 
-            ### 5. Lọc theo tiện ích
+            ### 6. Lọc theo tiện ích
             - `amenityIds`: array ID tiện ích (VD: [1, 3, 5])
             - `amenityMatchMode`: ALL (phải có tất cả), ANY (có ít nhất 1)
 
-            ### 6. Lọc theo media
+            ### 7. Lọc theo media
             - `hasMedia`: true (chỉ bài có ảnh/video)
             - `minMediaCount`: số lượng ảnh tối thiểu
 
-            ### 7. Tìm kiếm từ khóa
+            ### 8. Tìm kiếm từ khóa
             - `keyword`: tìm trong title và description
 
-            ### 8. Lọc theo liên hệ
+            ### 9. Lọc theo liên hệ
             - `ownerPhoneVerified`: true (chủ nhà đã xác thực SĐT)
 
-            ### 9. Lọc theo thời gian
+            ### 10. Lọc theo thời gian
             - `postedWithinDays`: đăng trong X ngày
             - `updatedWithinDays`: cập nhật trong X ngày
 
-            ### 10. Phân trang và sắp xếp
+            ### 11. Phân trang và sắp xếp
             - `page`: số trang (bắt đầu từ 0)
             - `size`: kích thước trang (mặc định 20, tối đa 100)
             - `sortBy`: postDate, price, area, distance, createdAt, updatedAt
@@ -578,12 +619,12 @@ public class ListingController {
 
             **Use Case 2: Lọc căn hộ cho thuê tại Hà Nội**
             ```json
-            {"provinceId": 1, "listingType": "RENT", "productType": "APARTMENT", "verified": true, "hasMedia": true, "page": 0, "size": 20}
+            {"provinceId": "1", "isLegacy": true, "listingType": "RENT", "productType": "APARTMENT", "verified": true, "hasMedia": true, "page": 0, "size": 20}
             ```
 
             **Use Case 3: Tìm nhà giá 5-15 triệu/tháng, 2-3 phòng ngủ**
             ```json
-            {"provinceId": 1, "minPrice": 5000000, "maxPrice": 15000000, "priceUnit": "MONTH", "minBedrooms": 2, "maxBedrooms": 3, "verified": true, "sortBy": "price"}
+            {"provinceId": "1", "isLegacy": true, "minPrice": 5000000, "maxPrice": 15000000, "priceUnit": "MONTH", "minBedrooms": 2, "maxBedrooms": 3, "verified": true, "sortBy": "price"}
             ```
 
             **Use Case 4: Bài đăng đang giảm giá**
@@ -593,17 +634,17 @@ public class ListingController {
 
             **Use Case 5: Tìm nhà gần vị trí hiện tại (GPS)**
             ```json
-            {"userLatitude": 21.0285, "userLongitude": 105.8542, "radiusKm": 5.0, "verified": true, "sortBy": "distance"}
+            {"latitude": 21.0285, "longitude": 105.8542, "radiusKm": 5.0, "verified": true, "sortBy": "distance"}
             ```
 
             **Use Case 6: Lọc theo tiện ích (điều hòa + WiFi + máy giặt)**
             ```json
-            {"amenityIds": [1, 3, 5], "amenityMatchMode": "ALL", "provinceId": 1, "verified": true}
+            {"amenityIds": [1, 3, 5], "amenityMatchMode": "ALL", "provinceId": "1", "isLegacy": true, "verified": true}
             ```
 
             **Use Case 7: Tìm kiếm theo từ khóa**
             ```json
-            {"keyword": "căn hộ cao cấp view biển", "provinceId": 48, "verified": true, "hasMedia": true}
+            {"keyword": "căn hộ cao cấp view biển", "provinceId": "48", "isLegacy": true, "verified": true, "hasMedia": true}
             ```
 
             **Use Case 8: Tin mới nhất (trong 7 ngày)**
@@ -618,7 +659,12 @@ public class ListingController {
 
             **Use Case 10: Lọc đầy đủ - Căn hộ cao cấp**
             ```json
-            {"provinceId": 1, "listingType": "RENT", "productType": "APARTMENT", "minBedrooms": 2, "maxBedrooms": 3, "minPrice": 10000000, "maxPrice": 20000000, "priceUnit": "MONTH", "minArea": 60.0, "furnishing": "FULLY_FURNISHED", "direction": "SOUTH", "amenityIds": [1, 3, 5, 7], "amenityMatchMode": "ALL", "hasMedia": true, "verified": true, "ownerPhoneVerified": true}
+            {"provinceId": "1", "isLegacy": true, "listingType": "RENT", "productType": "APARTMENT", "minBedrooms": 2, "maxBedrooms": 3, "minPrice": 10000000, "maxPrice": 20000000, "priceUnit": "MONTH", "minArea": 60.0, "furnishing": "FULLY_FURNISHED", "direction": "SOUTH", "waterPrice": "LOW", "electricityPrice": "LOW", "internetPrice": "FREE", "amenityIds": [1, 3, 5, 7], "amenityMatchMode": "ALL", "hasMedia": true, "verified": true, "ownerPhoneVerified": true}
+            ```
+
+            **Use Case 11: Tìm phòng trọ giá rẻ - Theo cấu trúc mới (34 tỉnh)**
+            ```json
+            {"provinceCode": "79", "isLegacy": false, "listingType": "RENT", "productType": "ROOM", "maxPrice": 3000000, "priceUnit": "MONTH", "waterPrice": "LOW", "electricityPrice": "LOW", "internetPrice": "FREE", "verified": true, "status": "ACTIVE"}
             ```
             """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -638,12 +684,16 @@ public class ListingController {
                               "isVerify": false,
                               "expired": false,
                               "excludeExpired": true,
-                              "provinceId": 1,
+                              "status": "ACTIVE",
+                              "provinceId": "1",
                               "provinceCode": "01",
                               "districtId": 5,
-                              "wardId": 123,
+                              "wardId": "123",
                               "newWardCode": "00001",
                               "streetId": 10,
+                              "isLegacy": true,
+                              "latitude": 21.0285,
+                              "longitude": 105.8542,
                               "userLatitude": 21.0285,
                               "userLongitude": 105.8542,
                               "radiusKm": 5.0,
@@ -672,6 +722,10 @@ public class ListingController {
                               "propertyType": "APARTMENT",
                               "minRoomCapacity": 2,
                               "maxRoomCapacity": 4,
+                              "waterPrice": "LOW",
+                              "electricityPrice": "MEDIUM",
+                              "internetPrice": "FREE",
+                              "serviceFee": "LOW",
                               "amenityIds": [1, 3, 5],
                               "amenityMatchMode": "ALL",
                               "hasMedia": true,
@@ -1828,6 +1882,28 @@ public class ListingController {
                                     "description": "Kết nối internet tốc độ cao",
                                     "category": "CONVENIENCE",
                                     "isActive": true
+                                  }
+                                ],
+                                "media": [
+                                  {
+                                    "mediaId": 1,
+                                    "listingId": 123,
+                                    "mediaType": "IMAGE",
+                                    "url": "https://placehold.co/400x300/cccccc/969696.png?font=lato",
+                                    "isPrimary": true,
+                                    "sortOrder": 0,
+                                    "status": "ACTIVE",
+                                    "createdAt": "2025-09-01T10:00:00"
+                                  },
+                                  {
+                                    "mediaId": 2,
+                                    "listingId": 123,
+                                    "mediaType": "IMAGE",
+                                    "url": "https://placehold.co/400x300/cccccc/969696.png?font=lato",
+                                    "isPrimary": false,
+                                    "sortOrder": 1,
+                                    "status": "ACTIVE",
+                                    "createdAt": "2025-09-01T10:05:00"
                                   }
                                 ],
                                 "adminVerification": {

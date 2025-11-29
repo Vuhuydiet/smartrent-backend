@@ -38,9 +38,12 @@ public class ListingFilterRequest {
     @Builder.Default
     Boolean excludeExpired = true;
 
+    @Schema(description = "Filter by post status (ACTIVE, EXPIRED, PENDING, DRAFT, etc.)", example = "ACTIVE")
+    String status;
+
     // ============ LOCATION FILTERS ============
-    @Schema(description = "Province ID (old structure - 63 provinces)", example = "1")
-    Integer provinceId;
+    @Schema(description = "Province ID (can be Integer or String for compatibility)", example = "1")
+    String provinceId;
 
     @Schema(description = "Province code (new structure - 34 provinces)", example = "01")
     String provinceCode;
@@ -48,8 +51,8 @@ public class ListingFilterRequest {
     @Schema(description = "District ID (old structure)", example = "5")
     Integer districtId;
 
-    @Schema(description = "Ward ID (old structure)", example = "123")
-    Integer wardId;
+    @Schema(description = "Ward ID (can be Integer or String for compatibility)", example = "123")
+    String wardId;
 
     @Schema(description = "Ward code (new structure)", example = "00001")
     String newWardCode;
@@ -57,7 +60,17 @@ public class ListingFilterRequest {
     @Schema(description = "Street ID", example = "10")
     Integer streetId;
 
-    // User location-based search
+    @Schema(description = "Use legacy address structure (true) or new structure (false)", example = "true")
+    Boolean isLegacy;
+
+    // Location coordinates (can be used for both user location and listing location)
+    @Schema(description = "Latitude for location-based search", example = "21.0285")
+    Double latitude;
+
+    @Schema(description = "Longitude for location-based search", example = "105.8542")
+    Double longitude;
+
+    // User location-based search (kept for backward compatibility)
     @Schema(description = "User's current latitude for distance-based search", example = "21.0285")
     Double userLatitude;
 
@@ -146,6 +159,19 @@ public class ListingFilterRequest {
 
     @Schema(description = "Maximum room capacity")
     Integer maxRoomCapacity;
+
+    // ============ UTILITY PRICE FILTERS ============
+    @Schema(description = "Water price filter (e.g., 'LOW', 'MEDIUM', 'HIGH', or specific range)", example = "LOW")
+    String waterPrice;
+
+    @Schema(description = "Electricity price filter (e.g., 'LOW', 'MEDIUM', 'HIGH', or specific range)", example = "MEDIUM")
+    String electricityPrice;
+
+    @Schema(description = "Internet price filter (e.g., 'FREE', 'LOW', 'MEDIUM', 'HIGH')", example = "FREE")
+    String internetPrice;
+
+    @Schema(description = "Service fee filter (e.g., 'LOW', 'MEDIUM', 'HIGH', or specific range)", example = "LOW")
+    String serviceFee;
 
     // ============ AMENITIES & MEDIA FILTERS ============
     @Schema(description = "List of amenity IDs to filter by", example = "[1, 3, 5]")
