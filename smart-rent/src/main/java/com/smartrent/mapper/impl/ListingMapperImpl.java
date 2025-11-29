@@ -13,6 +13,7 @@ import com.smartrent.dto.response.UserCreationResponse;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.AmenityMapper;
 import com.smartrent.mapper.ListingMapper;
+import com.smartrent.mapper.MediaMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 public class ListingMapperImpl implements ListingMapper {
 
     private final AmenityMapper amenityMapper;
+    private final MediaMapper mediaMapper;
     @Override
     public Listing toEntity(ListingCreationRequest req) {
         return Listing.builder()
@@ -76,6 +78,21 @@ public class ListingMapperImpl implements ListingMapper {
                     .map(Amenity::getAmenityId)
                     .collect(Collectors.toSet());
         }
+        // Map media to MediaResponse list
+        List<MediaResponse> mediaResponses = null;
+        if (entity.getMedia() != null && !entity.getMedia().isEmpty()) {
+            mediaResponses = entity.getMedia().stream()
+                    .filter(media -> media.getStatus() == Media.MediaStatus.ACTIVE)
+                    .sorted((m1, m2) -> {
+                        // Primary media first
+                        if (m1.getIsPrimary() && !m2.getIsPrimary()) return -1;
+                        if (!m1.getIsPrimary() && m2.getIsPrimary()) return 1;
+                        // Then sort by sortOrder
+                        return m1.getSortOrder().compareTo(m2.getSortOrder());
+                    })
+                    .map(mediaMapper::toResponse)
+                    .collect(Collectors.toList());
+        }
 
         return ListingResponse.builder()
                 .listingId(entity.getListingId())
@@ -107,10 +124,12 @@ public class ListingMapperImpl implements ListingMapper {
                 .internetPrice(entity.getInternetPrice())
                 .serviceFee(entity.getServiceFee())
                 .amenities(amenityResponses)
+                .media(mediaResponses)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }
+
 
     @Override
     public ListingCreationResponse toCreationResponse(Listing entity) {
@@ -128,6 +147,22 @@ public class ListingMapperImpl implements ListingMapper {
         if (entity.getAmenities() != null && !entity.getAmenities().isEmpty()) {
             amenityResponses = entity.getAmenities().stream()
                     .map(amenityMapper::toResponse)
+                    .collect(Collectors.toList());
+        }
+
+        // Map media to MediaResponse list
+        List<MediaResponse> mediaResponses = null;
+        if (entity.getMedia() != null && !entity.getMedia().isEmpty()) {
+            mediaResponses = entity.getMedia().stream()
+                    .filter(media -> media.getStatus() == Media.MediaStatus.ACTIVE)
+                    .sorted((m1, m2) -> {
+                        // Primary media first
+                        if (m1.getIsPrimary() && !m2.getIsPrimary()) return -1;
+                        if (!m1.getIsPrimary() && m2.getIsPrimary()) return 1;
+                        // Then sort by sortOrder
+                        return m1.getSortOrder().compareTo(m2.getSortOrder());
+                    })
+                    .map(mediaMapper::toResponse)
                     .collect(Collectors.toList());
         }
 
@@ -178,6 +213,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .internetPrice(entity.getInternetPrice())
                 .serviceFee(entity.getServiceFee())
                 .amenities(amenityResponses)
+                .media(mediaResponses)
                 .adminVerification(adminVerificationInfo)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -203,6 +239,7 @@ public class ListingMapperImpl implements ListingMapper {
                     .map(amenityMapper::toResponse)
                     .collect(Collectors.toList());
         }
+
 
         return ListingResponseForOwner.builder()
                 // Base fields from ListingResponse

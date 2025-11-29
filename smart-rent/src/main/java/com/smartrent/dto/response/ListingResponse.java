@@ -114,6 +114,10 @@ public class ListingResponse {
     @Schema(description = "List of amenities associated with this listing")
     List<AmenityResponse> amenities;
 
+    @Schema(description = "List of media (images/videos) for this listing, ordered by sort_order")
+    List<MediaResponse> media;
+
+
     @Schema(description = "Location-based pricing information for this listing and similar listings in the same area")
     LocationPricingResponse locationPricing;
 
