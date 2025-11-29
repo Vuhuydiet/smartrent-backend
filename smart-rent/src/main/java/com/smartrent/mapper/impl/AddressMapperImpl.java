@@ -29,7 +29,6 @@ public class AddressMapperImpl implements AddressMapper {
                 .addressId(address.getAddressId())
                 .fullAddress(address.getFullAddress())
                 .fullNewAddress(address.getFullNewAddress())
-                .displayAddress(address.getDisplayAddress())
                 .latitude(address.getLatitude())
                 .longitude(address.getLongitude())
                 // Note: Metadata fields should be populated from AddressMetadata if needed
@@ -98,7 +97,7 @@ public class AddressMapperImpl implements AddressMapper {
         }
 
         return NewProvinceResponse.builder()
-                .code(province.getCode())
+                .id(province.getCode())
                 .name(province.getName())
                 .shortName(province.getShortName())
                 .key(province.getKey())

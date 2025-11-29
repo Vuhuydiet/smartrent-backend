@@ -84,6 +84,18 @@ public class ListingResponseWithAdmin {
 
     Integer roomCapacity;
 
+    @Schema(description = "Water price information", example = "50000 VND/month")
+    String waterPrice;
+
+    @Schema(description = "Electricity price information", example = "3500 VND/kWh")
+    String electricityPrice;
+
+    @Schema(description = "Internet price information", example = "100000 VND/month")
+    String internetPrice;
+
+    @Schema(description = "Service fee information", example = "200000 VND/month")
+    String serviceFee;
+
     @Schema(description = "List of amenities associated with this listing")
     List<AmenityResponse> amenities;
 

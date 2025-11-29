@@ -22,7 +22,7 @@ public interface NewAddressService {
      * @param limit Items per page (default: 20)
      * @return Paginated list of provinces
      */
-    PaginatedResponse<List<NewProvinceResponse>> getNewProvinces(String keyword, Integer page, Integer limit);
+    PaginatedResponse<List<NewProvinceResponse>> getNewProvinces(String keyword);
 
     /**
      * Get wards by province code in new structure

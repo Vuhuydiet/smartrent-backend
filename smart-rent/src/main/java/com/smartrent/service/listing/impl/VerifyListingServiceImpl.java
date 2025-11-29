@@ -23,6 +23,9 @@ public class VerifyListingServiceImpl implements VerifyListingService {
 
     ListingRepository listingRepository;
     ListingMapper listingMapper;
+    com.smartrent.mapper.UserMapper userMapper;
+    com.smartrent.mapper.AddressMapper addressMapper;
+    com.smartrent.infra.repository.UserRepository userRepository;
 
     @Override
     @Transactional
@@ -43,6 +46,13 @@ public class VerifyListingServiceImpl implements VerifyListingService {
         log.info("Successfully updated listing {} verification status to: {}",
                 listingId, request.getVerified());
 
-        return listingMapper.toResponse(updatedListing);
+        // Build user and address responses
+        com.smartrent.dto.response.UserCreationResponse user = userRepository.findById(updatedListing.getUserId())
+                .map(userMapper::mapFromUserEntityToUserCreationResponse)
+                .orElse(null);
+        com.smartrent.dto.response.AddressResponse addressResponse =
+                updatedListing.getAddress() != null ? addressMapper.toResponse(updatedListing.getAddress()) : null;
+
+        return listingMapper.toResponse(updatedListing, user, addressResponse);
     }
 }

@@ -45,15 +45,14 @@ public class NewAddressServiceImpl implements NewAddressService {
     @Override
     @Transactional(readOnly = true)
     public PaginatedResponse<List<NewProvinceResponse>> getNewProvinces(
-            String keyword,
-            Integer page,
-            Integer limit
+            String keyword
+
     ) {
-        log.info("Fetching new provinces from database - keyword: {}, page: {}, limit: {}", keyword, page, limit);
+        log.info("Fetching new provinces from database - keyword: {}, page: {}, limit: {}", keyword);
 
         try {
-            Integer validPage = page != null && page > 0 ? page : DEFAULT_PAGE;
-            Integer validLimit = limit != null && limit > 0 ? Math.min(limit, MAX_LIMIT) : DEFAULT_LIMIT;
+            Integer validPage = DEFAULT_PAGE;
+            Integer validLimit = DEFAULT_LIMIT;
 
             Pageable pageable = PageRequest.of(validPage - 1, validLimit);
             Page<Province> provincePage;

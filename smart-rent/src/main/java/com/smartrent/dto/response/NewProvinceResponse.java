@@ -23,7 +23,7 @@ import java.math.BigDecimal;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class NewProvinceResponse {
 
-    String code;
+    String id;
     String name;
 
     @JsonProperty("short_name")
