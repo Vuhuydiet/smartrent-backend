@@ -6,10 +6,13 @@ import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.MyListingsFilterRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
+import com.smartrent.dto.response.AdminListingListResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.dto.response.ListingResponseForOwner;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
+import com.smartrent.dto.response.OwnerListingListResponse;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.dto.response.ProvinceListingStatsResponse;
 
@@ -70,4 +73,38 @@ public interface ListingService {
      * @return List of province statistics
      */
     List<ProvinceListingStatsResponse> getProvinceStats(ProvinceStatsRequest request);
+
+    /**
+     * Get my listing detail with owner-specific information (Owner only)
+     * Returns detailed listing information including transaction details, media, payment info, etc.
+     * Only the owner can view this information.
+     *
+     * @param id Listing ID
+     * @param userId User ID (owner) who is requesting the listing details
+     * @return ListingResponseForOwner containing listing details with owner-specific information
+     * @throws RuntimeException if listing not found or user is not the owner
+     */
+    ListingResponseForOwner getMyListingDetail(Long id, String userId);
+
+    /**
+     * Get all listings for admin with pagination and filters (Admin only)
+     * Returns paginated list of all listings with admin-specific information
+     * Supports comprehensive filtering and statistics
+     *
+     * @param filter Filter criteria (all fields optional) - supports all listing filters
+     * @param adminId Admin ID who is requesting the listing list
+     * @return AdminListingListResponse containing paginated listings with admin info and statistics
+     */
+    AdminListingListResponse getAllListingsForAdmin(ListingFilterRequest filter, String adminId);
+
+    /**
+     * Get my listings with owner-specific information (Owner only)
+     * Returns paginated list of owner's listings with detailed information including
+     * transaction details, media, payment info, and statistics for each listing
+     *
+     * @param filter Filter criteria (verified, expired, isDraft, vipType, etc.)
+     * @param userId User ID (owner) who is requesting the listings
+     * @return OwnerListingListResponse containing paginated listings with owner-specific information and statistics
+     */
+    OwnerListingListResponse getMyListings(ListingFilterRequest filter, String userId);
 }

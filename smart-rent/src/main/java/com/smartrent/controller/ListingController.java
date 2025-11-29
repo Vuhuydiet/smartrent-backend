@@ -113,14 +113,12 @@ public class ListingController {
                 "provinceId": 1,
                 "districtId": 5,
                 "wardId": 20,
-                "street": "Nguyen Trai",
-                "streetNumber": "123"
+                "street": "123 Nguyen Trai"
               },
-              "new": {
+              "newAddress": {
                 "provinceCode": "01",
                 "wardCode": "00004",
-                "street": "Le Duan",
-                "streetNumber": "88"
+                "street": "88 Le Duan"
               },
               "latitude": 21.0285,
               "longitude": 105.8542
@@ -137,7 +135,7 @@ public class ListingController {
             - address object with:
               - **Nested format:**
                 - For legacy: legacy.provinceId, legacy.districtId, legacy.wardId
-                - For new: new.provinceCode, new.wardCode
+                - For new: newAddress.provinceCode, newAddress.wardCode
               - **Flat format (deprecated):**
                 - addressType (OLD or NEW)
                 - For OLD: provinceId, districtId, wardId
@@ -150,7 +148,7 @@ public class ListingController {
             - roomCapacity
             - amenityIds (array of amenity IDs)
             - mediaIds (array of uploaded media IDs) - See Media Upload Integration Flow above
-            - address.legacy.street or address.new.street (street name as string)
+            - address.legacy.street or address.newAddress.street (street name as string)
             - address.streetId (street reference - flat format)
             - address.projectId (building/complex reference)
             - address.latitude, address.longitude
@@ -184,7 +182,7 @@ public class ListingController {
                                   "wardId": 20,
                                   "street": "123 Nguyễn Trãi"
                                 },
-                                "new": {
+                                "newAddress": {
                                   "provinceCode": "01",
                                   "wardCode": "00004",
                                   "street": "88 Lê Duẩn"
@@ -239,11 +237,10 @@ public class ListingController {
                               "price": 3000000,
                               "priceUnit": "MONTH",
                               "address": {
-                                "new": {
+                                "newAddress": {
                                   "provinceCode": "01",
                                   "wardCode": "00001",
-                                  "street": "Đại Cồ Việt",
-                                  "streetNumber": "45"
+                                  "street": "45 Đại Cồ Việt"
                                 },
                                 "latitude": 21.0285,
                                 "longitude": 105.8542
@@ -351,7 +348,16 @@ public class ListingController {
                                 "listingId": 123,
                                 "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
                                 "description": "Căn hộ rộng rãi 2 phòng ngủ có ban công và tầm nhìn thành phố.",
-                                "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                "user": {
+                                  "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                  "phoneCode": "+84",
+                                  "phoneNumber": "912345678",
+                                  "email": "owner@example.com",
+                                  "firstName": "Nguyen",
+                                  "lastName": "Van A",
+                                  "contactPhoneNumber": "0912345678",
+                                  "contactPhoneVerified": true
+                                },
                                 "postDate": "2025-09-01T10:00:00",
                                 "expiryDate": "2025-12-31T23:59:59",
                                 "listingType": "RENT",
@@ -363,7 +369,26 @@ public class ListingController {
                                 "productType": "APARTMENT",
                                 "price": 1200.00,
                                 "priceUnit": "MONTH",
-                                "addressId": 501,
+                                "address": {
+                                  "addressId": 501,
+                                  "fullAddress": "123 Nguyễn Trãi, Phường 5, Quận 5, Thành Phố Hồ Chí Minh",
+                                  "fullNewAddress": "123 Nguyễn Trãi, Phường Bến Nghé, Thành Phố Hồ Chí Minh",
+                                  "latitude": 10.7545,
+                                  "longitude": 106.6679,
+                                  "addressType": "OLD",
+                                  "legacyProvinceId": 79,
+                                  "legacyProvinceName": "Thành Phố Hồ Chí Minh",
+                                  "legacyDistrictId": 765,
+                                  "legacyDistrictName": "Quận 5",
+                                  "legacyWardId": 26800,
+                                  "legacyWardName": "Phường 5",
+                                  "legacyStreet": "Nguyễn Trãi",
+                                  "newProvinceCode": "79",
+                                  "newProvinceName": "Thành Phố Hồ Chí Minh",
+                                  "newWardCode": "26734",
+                                  "newWardName": "Phường Bến Nghé",
+                                  "newStreet": "Nguyễn Trãi"
+                                },
                                 "area": 78.5,
                                 "bedrooms": 2,
                                 "bathrooms": 1,
@@ -479,118 +504,121 @@ public class ListingController {
 
     @PostMapping("/search")
     @Operation(
-        summary = "Tìm kiếm và lọc bài đăng - API tổng hợp cho tất cả filter",
+        summary = "Tìm kiếm và lọc bài đăng - API tổng hợp cho màn hình chính",
         description = """
-            ## MÔ TẢ CHUNG
-            API tìm kiếm và lọc bài đăng **tổng hợp tất cả các bộ lọc** trong một lần gọi duy nhất.
-            Frontend chỉ cần gọi API này để áp dụng nhiều filter cùng lúc.
+            API tìm kiếm và lọc bài đăng tổng hợp tất cả các bộ lọc trong một lần gọi. Frontend chỉ cần gọi API này cho tất cả tính năng lọc ở màn hình chính.
 
-            ---
+            ## CÁC BỘ LỌC HỖ TRỢ
 
-            ## CÁC BỘ LỌC ĐƯỢC HỖ TRỢ
+            ### 1. Lọc theo vị trí
+            - `provinceId` (63 tỉnh cũ) hoặc `provinceCode` (34 tỉnh mới)
+            - `districtId`, `wardId` (old) hoặc `newWardCode` (new), `streetId`
+            - Tìm theo bán kính GPS: `userLatitude`, `userLongitude`, `radiusKm`
 
-            ### 1. LỌC THEO VỊ TRÍ
-            - **Tỉnh/Thành phố**: `provinceId` (63 tỉnh cũ) HOẶC `provinceCode` (34 tỉnh mới)
-              - VD: Hà Nội (old): `provinceId: 1`, Đà Nẵng (old): `provinceId: 48`
-              - VD: Hà Nội (new): `provinceCode: "01"`, Đà Nẵng (new): `provinceCode: "48"`
-            - **Quận/Huyện**: `districtId` (chỉ dùng cho old structure)
-            - **Phường/Xã**: `wardId` (old) HOẶC `newWardCode` (new)
-            - **Đường**: `streetId`
-            - **Tìm theo bán kính GPS**: `userLatitude`, `userLongitude`, `radiusKm`
+            ### 2. Lọc theo giá và diện tích
+            - Khoảng giá: `minPrice`, `maxPrice` (VNĐ)
+            - Đơn vị giá: `priceUnit` (MONTH, DAY, YEAR)
+            - Giảm giá: `hasPriceReduction`, `minPriceReductionPercent`, `maxPriceReductionPercent`, `priceChangedWithinDays`
+            - Diện tích: `minArea`, `maxArea` (m²)
 
-            ### 2. LỌC THEO GIÁ VÀ DIỆN TÍCH
-            - **Khoảng giá**: `minPrice`, `maxPrice` (VNĐ)
-            - **Khoảng diện tích**: `minArea`, `maxArea` (m²)
+            ### 3. Lọc theo đặc điểm nhà
+            - Phòng: `minBedrooms`, `maxBedrooms`, `minBathrooms`, `maxBathrooms`
+            - Nội thất: `furnishing` (FULLY_FURNISHED, SEMI_FURNISHED, UNFURNISHED)
+            - Hướng: `direction` (NORTH, SOUTH, EAST, WEST, NORTHEAST, NORTHWEST, SOUTHEAST, SOUTHWEST)
+            - Loại: `propertyType`, `productType` (APARTMENT, HOUSE, ROOM, STUDIO, OFFICE)
+            - Sức chứa: `minRoomCapacity`, `maxRoomCapacity`
 
-            ### 3. LỌC THEO ĐẶC ĐIỂM NHÀ
-            - **Số phòng ngủ**: `minBedrooms`, `maxBedrooms` (hoặc `bedrooms` cho số chính xác)
-            - **Số phòng tắm**: `minBathrooms`, `maxBathrooms` (hoặc `bathrooms` cho số chính xác)
-            - **Hướng nhà**: `direction` - NORTH, SOUTH, EAST, WEST, NORTHEAST, NORTHWEST, SOUTHEAST, SOUTHWEST
-            - **Nội thất**: `furnishing` - FULLY_FURNISHED, SEMI_FURNISHED, UNFURNISHED
-            - **Loại nhà**: `propertyType` - APARTMENT, HOUSE, ROOM, STUDIO, OFFICE
-            - **Loại sản phẩm**: `productType` - ROOM, APARTMENT, HOUSE, OFFICE, STUDIO
-            - **Sức chứa**: `minRoomCapacity`, `maxRoomCapacity`
+            ### 4. Lọc theo loại giao dịch và VIP
+            - `listingType`: RENT, SALE, SHARE
+            - `vipType`: NORMAL, SILVER, GOLD, DIAMOND
+            - `verified`: true (chỉ lấy tin đã verify)
 
-            ### 4. LỌC THEO TRẠNG THÁI & LOẠI BÀI ĐĂNG
-            - **Bài đăng verified**: `verified: true` (chỉ lấy tin đã verify)
-            - **Loại giao dịch**: `listingType` - RENT (cho thuê), SALE (bán), SHARE (ở ghép)
-            - **Gói VIP**: `vipType` - NORMAL, SILVER, GOLD, DIAMOND
+            ### 5. Lọc theo tiện ích
+            - `amenityIds`: array ID tiện ích (VD: [1, 3, 5])
+            - `amenityMatchMode`: ALL (phải có tất cả), ANY (có ít nhất 1)
 
-            ### 5. LỌC THEO TIỆN ÍCH
-            - **Danh sách tiện ích**: `amenityIds` - array các ID tiện ích (VD: [1, 3, 5])
-            - **Chế độ match**: `amenityMatchMode`
-              - `"ALL"`: Phải có TẤT CẢ các tiện ích trong danh sách
-              - `"ANY"`: Có ÍT NHẤT 1 tiện ích trong danh sách
+            ### 6. Lọc theo media
+            - `hasMedia`: true (chỉ bài có ảnh/video)
+            - `minMediaCount`: số lượng ảnh tối thiểu
 
-            ### 6. LỌC THEO MEDIA
-            - **Có ảnh/video**: `hasMedia: true`
-            - **Số lượng media tối thiểu**: `minMediaCount`
+            ### 7. Tìm kiếm từ khóa
+            - `keyword`: tìm trong title và description
 
-            ### 7. TÌM KIẾM THEO TỪ KHÓA
-            - **Keyword**: `keyword` - Tìm trong title và description
+            ### 8. Lọc theo liên hệ
+            - `ownerPhoneVerified`: true (chủ nhà đã xác thực SĐT)
 
-            ### 8. LỌC THEO LIÊN HỆ
-            - **SDT chủ nhà đã verify**: `ownerPhoneVerified: true`
+            ### 9. Lọc theo thời gian
+            - `postedWithinDays`: đăng trong X ngày
+            - `updatedWithinDays`: cập nhật trong X ngày
 
-            ### 9. LỌC THEO THỜI GIAN
-            - **Đăng trong X ngày gần đây**: `postedWithinDays` (VD: 7 = đăng trong 7 ngày qua)
-            - **Cập nhật trong X ngày**: `updatedWithinDays`
+            ### 10. Phân trang và sắp xếp
+            - `page`: số trang (bắt đầu từ 0)
+            - `size`: kích thước trang (mặc định 20, tối đa 100)
+            - `sortBy`: postDate, price, area, distance, createdAt, updatedAt
+            - `sortDirection`: ASC, DESC (mặc định)
 
-            ### 10. PHÂN TRANG & SẮP XẾP
-            - **Trang**: `page` (bắt đầu từ 0)
-            - **Kích thước trang**: `size` (mặc định 20, tối đa 100)
-            - **Sắp xếp theo**: `sortBy` - postDate, price, area, createdAt, updatedAt
-            - **Hướng sắp xếp**: `sortDirection` - ASC (tăng dần), DESC (giảm dần)
+            ## RESPONSE
+            - Danh sách bài đăng có phân trang
+            - Tổng số bài (`totalCount`), thông tin phân trang
+            - Danh sách gợi ý (top 5 GOLD/DIAMOND cùng danh mục)
+            - Filter criteria đã áp dụng
 
-            ---
+            ## LƯU Ý
+            - Bài nháp, bài shadow, bài hết hạn tự động bị loại trừ
+            - Tất cả filter đều optional
+            - Có thể kết hợp nhiều filter
+            - Frontend chỉ gửi các field cần thiết
 
-            ## RESPONSE TRẢ VỀ
-            - Danh sách bài đăng khớp filter (có phân trang)
-            - Tổng số bài đăng tìm được (`totalCount`)
-            - Thông tin phân trang (`currentPage`, `pageSize`, `totalPages`)
-            - Danh sách bài đăng gợi ý (top 5 GOLD/DIAMOND cùng danh mục)
-            - Bản copy lại filter criteria đã apply
+            ## USE CASES
 
-            ---
-
-            ## LƯU Ý QUAN TRỌNG
-            - Bài nháp (draft) tự động bị loại trừ khỏi kết quả tìm kiếm công khai
-            - Bài shadow (bài phụ của DIAMOND tier) tự động bị loại trừ
-            - Bài hết hạn có thể loại trừ với `excludeExpired: true` (mặc định)
-            - Tất cả filter đều optional - có thể gọi không cần body để lấy tất cả
-            - Kết hợp nhiều filter trong một lần gọi để tìm kiếm chính xác
-
-            ---
-
-            ## GỢI Ý SỬ DỤNG
-            **Use Case 1**: Tìm căn hộ cho thuê tại Hà Nội, 2-3PN, giá 5-15 triệu, có điều hòa + WiFi
+            **Use Case 1: Màn hình chính - Tất cả bài đăng**
             ```json
-            {
-              "provinceId": 1,
-              "listingType": "RENT",
-              "productType": "APARTMENT",
-              "minBedrooms": 2,
-              "maxBedrooms": 3,
-              "minPrice": 5000000,
-              "maxPrice": 15000000,
-              "amenityIds": [1, 5],
-              "amenityMatchMode": "ALL",
-              "verified": true
-            }
+            {"verified": true, "excludeExpired": true, "page": 0, "size": 20, "sortBy": "postDate", "sortDirection": "DESC"}
             ```
 
-            **Use Case 2**: Tìm nhà bán tại Đà Nẵng, diện tích trên 100m², có ảnh, verified
+            **Use Case 2: Lọc căn hộ cho thuê tại Hà Nội**
             ```json
-            {
-              "provinceId": 48,
-              "listingType": "SALE",
-              "productType": "HOUSE",
-              "minArea": 100,
-              "hasMedia": true,
-              "verified": true,
-              "sortBy": "price",
-              "sortDirection": "ASC"
-            }
+            {"provinceId": 1, "listingType": "RENT", "productType": "APARTMENT", "verified": true, "hasMedia": true, "page": 0, "size": 20}
+            ```
+
+            **Use Case 3: Tìm nhà giá 5-15 triệu/tháng, 2-3 phòng ngủ**
+            ```json
+            {"provinceId": 1, "minPrice": 5000000, "maxPrice": 15000000, "priceUnit": "MONTH", "minBedrooms": 2, "maxBedrooms": 3, "verified": true, "sortBy": "price"}
+            ```
+
+            **Use Case 4: Bài đăng đang giảm giá**
+            ```json
+            {"hasPriceReduction": true, "minPriceReductionPercent": 10, "priceChangedWithinDays": 30, "verified": true, "hasMedia": true}
+            ```
+
+            **Use Case 5: Tìm nhà gần vị trí hiện tại (GPS)**
+            ```json
+            {"userLatitude": 21.0285, "userLongitude": 105.8542, "radiusKm": 5.0, "verified": true, "sortBy": "distance"}
+            ```
+
+            **Use Case 6: Lọc theo tiện ích (điều hòa + WiFi + máy giặt)**
+            ```json
+            {"amenityIds": [1, 3, 5], "amenityMatchMode": "ALL", "provinceId": 1, "verified": true}
+            ```
+
+            **Use Case 7: Tìm kiếm theo từ khóa**
+            ```json
+            {"keyword": "căn hộ cao cấp view biển", "provinceId": 48, "verified": true, "hasMedia": true}
+            ```
+
+            **Use Case 8: Tin mới nhất (trong 7 ngày)**
+            ```json
+            {"postedWithinDays": 7, "verified": true, "hasMedia": true, "sortBy": "postDate", "sortDirection": "DESC"}
+            ```
+
+            **Use Case 9: Chỉ lấy bài VIP (GOLD/DIAMOND)**
+            ```json
+            {"vipType": "GOLD", "verified": true, "sortBy": "postDate", "sortDirection": "DESC"}
+            ```
+
+            **Use Case 10: Lọc đầy đủ - Căn hộ cao cấp**
+            ```json
+            {"provinceId": 1, "listingType": "RENT", "productType": "APARTMENT", "minBedrooms": 2, "maxBedrooms": 3, "minPrice": 10000000, "maxPrice": 20000000, "priceUnit": "MONTH", "minArea": 60.0, "furnishing": "FULLY_FURNISHED", "direction": "SOUTH", "amenityIds": [1, 3, 5, 7], "amenityMatchMode": "ALL", "hasMedia": true, "verified": true, "ownerPhoneVerified": true}
             ```
             """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -600,160 +628,58 @@ public class ListingController {
                 schema = @Schema(implementation = ListingFilterRequest.class),
                 examples = {
                     @ExampleObject(
-                        name = "1. Tìm căn hộ Hà Nội - Đầy đủ filter",
-                        summary = "Căn hộ cho thuê Hà Nội, 2-3PN, 5-15tr, có AC + WiFi",
-                        value = """
-                            {
-                              "provinceId": 1,
-                              "listingType": "RENT",
-                              "productType": "APARTMENT",
-                              "minBedrooms": 2,
-                              "maxBedrooms": 3,
-                              "minPrice": 5000000,
-                              "maxPrice": 15000000,
-                              "amenityIds": [1, 5],
-                              "amenityMatchMode": "ALL",
-                              "verified": true,
-                              "hasMedia": true,
-                              "page": 0,
-                              "size": 20,
-                              "sortBy": "postDate",
-                              "sortDirection": "DESC"
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "2. Tìm nhà bán Đà Nẵng - Theo khu vực",
-                        summary = "Nhà bán Đà Nẵng, >100m², hướng Đông, có ảnh",
-                        value = """
-                            {
-                              "provinceId": 48,
-                              "listingType": "SALE",
-                              "productType": "HOUSE",
-                              "minArea": 100,
-                              "direction": "EAST",
-                              "hasMedia": true,
-                              "verified": true,
-                              "sortBy": "price",
-                              "sortDirection": "ASC",
-                              "page": 0,
-                              "size": 20
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "3. Tìm theo từ khóa - Keyword search",
-                        summary = "Tìm kiếm theo từ khóa trong title/description",
-                        value = """
-                            {
-                              "keyword": "căn hộ cao cấp view biển",
-                              "provinceId": 48,
-                              "verified": true,
-                              "minPrice": 10000000,
-                              "page": 0,
-                              "size": 20
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "4. Tìm tin VIP - GOLD/DIAMOND",
-                        summary = "Chỉ lấy bài đăng VIP tier cao",
-                        value = """
-                            {
-                              "vipType": "GOLD",
-                              "provinceId": 79,
-                              "verified": true,
-                              "page": 0,
-                              "size": 20,
-                              "sortBy": "postDate",
-                              "sortDirection": "DESC"
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "5. Lọc theo tiện ích cụ thể",
-                        summary = "Phải có TẤT CẢ: điều hòa, máy giặt, WiFi",
-                        value = """
-                            {
-                              "provinceId": 1,
-                              "amenityIds": [1, 3, 5],
-                              "amenityMatchMode": "ALL",
-                              "verified": true,
-                              "page": 0,
-                              "size": 20
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "6. Lọc chi tiết - Nhiều điều kiện",
-                        summary = "2-3PN, full nội thất, hướng Nam, >60m²",
-                        value = """
-                            {
-                              "minBedrooms": 2,
-                              "maxBedrooms": 3,
-                              "furnishing": "FULLY_FURNISHED",
-                              "direction": "SOUTH",
-                              "minArea": 60.0,
-                              "hasMedia": true,
-                              "verified": true,
-                              "provinceId": 1,
-                              "page": 0,
-                              "size": 20
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "7. Tin mới đăng - Trong 7 ngày",
-                        summary = "Bài đăng trong 7 ngày gần đây, có ảnh",
-                        value = """
-                            {
-                              "postedWithinDays": 7,
-                              "hasMedia": true,
-                              "verified": true,
-                              "page": 0,
-                              "size": 20,
-                              "sortBy": "postDate",
-                              "sortDirection": "DESC"
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "8. SDT chủ nhà đã verify",
-                        summary = "Chỉ lấy tin có SDT chủ nhà đã xác thực",
-                        value = """
-                            {
-                              "ownerPhoneVerified": true,
-                              "verified": true,
-                              "provinceId": 1,
-                              "page": 0,
-                              "size": 20
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "9. Tìm theo GPS - Bán kính 5km",
-                        summary = "Tìm trong bán kính 5km từ vị trí hiện tại",
-                        value = """
-                            {
-                              "userLatitude": 21.0285,
-                              "userLongitude": 105.8542,
-                              "radiusKm": 5.0,
-                              "verified": true,
-                              "sortBy": "distance",
-                              "page": 0,
-                              "size": 20
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "10. Bài đăng của tôi - My listings",
-                        summary = "Xem bài đăng của user (đã verify, chưa hết hạn)",
+                        name = "Request Example - Đầy đủ tất cả filter",
+                        summary = "Tham khảo tất cả các filter có thể sử dụng (Frontend chỉ cần gửi các field cần thiết)",
                         value = """
                             {
                               "userId": "user-123",
-                              "verified": true,
-                              "expired": false,
                               "isDraft": false,
+                              "verified": true,
+                              "isVerify": false,
+                              "expired": false,
+                              "excludeExpired": true,
+                              "provinceId": 1,
+                              "provinceCode": "01",
+                              "districtId": 5,
+                              "wardId": 123,
+                              "newWardCode": "00001",
+                              "streetId": 10,
+                              "userLatitude": 21.0285,
+                              "userLongitude": 105.8542,
+                              "radiusKm": 5.0,
+                              "categoryId": 1,
+                              "listingType": "RENT",
+                              "vipType": "GOLD",
+                              "productType": "APARTMENT",
+                              "minPrice": 5000000,
+                              "maxPrice": 15000000,
+                              "priceUnit": "MONTH",
+                              "hasPriceReduction": true,
+                              "hasPriceIncrease": false,
+                              "minPriceReductionPercent": 10,
+                              "maxPriceReductionPercent": 50,
+                              "priceChangedWithinDays": 30,
+                              "minArea": 50.0,
+                              "maxArea": 100.0,
+                              "bedrooms": null,
+                              "bathrooms": null,
+                              "minBedrooms": 2,
+                              "maxBedrooms": 3,
+                              "minBathrooms": 1,
+                              "maxBathrooms": 2,
+                              "furnishing": "FULLY_FURNISHED",
+                              "direction": "SOUTH",
+                              "propertyType": "APARTMENT",
+                              "minRoomCapacity": 2,
+                              "maxRoomCapacity": 4,
+                              "amenityIds": [1, 3, 5],
+                              "amenityMatchMode": "ALL",
+                              "hasMedia": true,
+                              "minMediaCount": 3,
+                              "keyword": "căn hộ cao cấp view đẹp",
+                              "ownerPhoneVerified": true,
+                              "postedWithinDays": 7,
+                              "updatedWithinDays": 3,
                               "page": 0,
                               "size": 20,
                               "sortBy": "postDate",
@@ -783,9 +709,36 @@ public class ListingController {
                                     "listingId": 123,
                                     "title": "Căn hộ 2PN cao cấp view Hồ Tây",
                                     "description": "Căn hộ đầy đủ nội thất, view đẹp",
-                                    "userId": "user-abc",
+                                    "user": {
+                                      "userId": "user-abc-123",
+                                      "firstName": "Nguyen",
+                                      "lastName": "Van B",
+                                      "email": "owner@example.com",
+                                      "contactPhoneNumber": "0987654321",
+                                      "contactPhoneVerified": true
+                                    },
                                     "price": 12000000,
                                     "priceUnit": "MONTH",
+                                    "address": {
+                                      "addressId": 601,
+                                      "fullAddress": "50 Yên Phụ, Phường Yên Phụ, Quận Tây Hồ, Thành Phố Hà Nội",
+                                      "fullNewAddress": "50 Yên Phụ, Phường Yên Phụ, Thành Phố Hà Nội",
+                                      "latitude": 21.0562,
+                                      "longitude": 105.8251,
+                                      "addressType": "OLD",
+                                      "legacyProvinceId": 1,
+                                      "legacyProvinceName": "Thành Phố Hà Nội",
+                                      "legacyDistrictId": 17,
+                                      "legacyDistrictName": "Quận Tây Hồ",
+                                      "legacyWardId": 608,
+                                      "legacyWardName": "Phường Yên Phụ",
+                                      "legacyStreet": "Yên Phụ",
+                                      "newProvinceCode": "01",
+                                      "newProvinceName": "Thành Phố Hà Nội",
+                                      "newWardCode": "00268",
+                                      "newWardName": "Phường Yên Phụ",
+                                      "newStreet": "Yên Phụ"
+                                    },
                                     "area": 78.5,
                                     "bedrooms": 2,
                                     "bathrooms": 1,
@@ -1074,7 +1027,14 @@ public class ListingController {
                                   "listingId": 123,
                                   "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
                                   "description": "Căn hộ rộng rãi 2 phòng ngủ có ban công và tầm nhìn thành phố.",
-                                  "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                  "user": {
+                                    "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                    "firstName": "Tran",
+                                    "lastName": "Van C",
+                                    "email": "user1@example.com",
+                                    "contactPhoneNumber": "0901234567",
+                                    "contactPhoneVerified": true
+                                  },
                                   "postDate": "2025-09-01T10:00:00",
                                   "expiryDate": "2025-12-31T23:59:59",
                                   "listingType": "RENT",
@@ -1086,7 +1046,26 @@ public class ListingController {
                                   "productType": "APARTMENT",
                                   "price": 1200.00,
                                   "priceUnit": "MONTH",
-                                  "addressId": 501,
+                                  "address": {
+                                    "addressId": 501,
+                                    "fullAddress": "123 Nguyễn Trãi, Phường 5, Quận 5, Thành Phố Hồ Chí Minh",
+                                    "fullNewAddress": "123 Nguyễn Trãi, Phường Bến Nghé, Thành Phố Hồ Chí Minh",
+                                    "latitude": 10.7545,
+                                    "longitude": 106.6679,
+                                    "addressType": "OLD",
+                                    "legacyProvinceId": 79,
+                                    "legacyProvinceName": "Thành Phố Hồ Chí Minh",
+                                    "legacyDistrictId": 765,
+                                    "legacyDistrictName": "Quận 5",
+                                    "legacyWardId": 26800,
+                                    "legacyWardName": "Phường 5",
+                                    "legacyStreet": "Nguyễn Trãi",
+                                    "newProvinceCode": "79",
+                                    "newProvinceName": "Thành Phố Hồ Chí Minh",
+                                    "newWardCode": "26734",
+                                    "newWardName": "Phường Bến Nghé",
+                                    "newStreet": "Nguyễn Trãi"
+                                  },
                                   "area": 78.5,
                                   "bedrooms": 2,
                                   "bathrooms": 1,
@@ -1127,7 +1106,14 @@ public class ListingController {
                                   "listingId": 124,
                                   "title": "Căn hộ Studio hiện đại gần công viên",
                                   "description": "Studio hiện đại với đầy đủ tiện nghi gần công viên lớn.",
-                                  "userId": "user-456e7890-e89b-12d3-a456-426614174001",
+                                  "user": {
+                                    "userId": "user-456e7890-e89b-12d3-a456-426614174001",
+                                    "firstName": "Le",
+                                    "lastName": "Thi D",
+                                    "email": "user2@example.com",
+                                    "contactPhoneNumber": "0909876543",
+                                    "contactPhoneVerified": true
+                                  },
                                   "postDate": "2025-09-05T14:30:00",
                                   "expiryDate": "2025-12-31T23:59:59",
                                   "listingType": "RENT",
@@ -1139,7 +1125,26 @@ public class ListingController {
                                   "productType": "STUDIO",
                                   "price": 700.00,
                                   "priceUnit": "MONTH",
-                                  "addressId": 502,
+                                  "address": {
+                                    "addressId": 502,
+                                    "fullAddress": "456 Lê Lợi, Phường Bến Thành, Quận 1, Thành Phố Hồ Chí Minh",
+                                    "fullNewAddress": "456 Lê Lợi, Phường Bến Thành, Thành Phố Hồ Chí Minh",
+                                    "latitude": 10.7756,
+                                    "longitude": 106.7019,
+                                    "addressType": "OLD",
+                                    "legacyProvinceId": 79,
+                                    "legacyProvinceName": "Thành Phố Hồ Chí Minh",
+                                    "legacyDistrictId": 762,
+                                    "legacyDistrictName": "Quận 1",
+                                    "legacyWardId": 26700,
+                                    "legacyWardName": "Phường Bến Thành",
+                                    "legacyStreet": "Lê Lợi",
+                                    "newProvinceCode": "79",
+                                    "newProvinceName": "Thành Phố Hồ Chí Minh",
+                                    "newWardCode": "26734",
+                                    "newWardName": "Phường Bến Thành",
+                                    "newStreet": "Lê Lợi"
+                                  },
                                   "area": 35.0,
                                   "bedrooms": 0,
                                   "bathrooms": 1,
@@ -1346,8 +1351,7 @@ public class ListingController {
                                   "provinceId": 1,
                                   "districtId": 1,
                                   "wardId": 1,
-                                  "street": "Hoàng Diệu",
-                                  "streetNumber": "45A"
+                                  "street": "45A Hoàng Diệu"
                                 },
                                 "latitude": 21.0285,
                                 "longitude": 105.8542
@@ -1376,11 +1380,10 @@ public class ListingController {
                               "price": 35000000,
                               "priceUnit": "MONTH",
                               "address": {
-                                "new": {
+                                "newAddress": {
                                   "provinceCode": "79",
                                   "wardCode": "26734",
-                                  "street": "Nguyễn Văn Hưởng",
-                                  "streetNumber": "120"
+                                  "street": "120 Nguyễn Văn Hưởng"
                                 },
                                 "latitude": 10.7769,
                                 "longitude": 106.7009
@@ -1414,8 +1417,7 @@ public class ListingController {
                                   "provinceId": 79,
                                   "districtId": 20,
                                   "wardId": 50,
-                                  "street": "Đường Tân Cảng",
-                                  "streetNumber": "720A"
+                                  "street": "720A Đường Tân Cảng"
                                 },
                                 "latitude": 10.7941,
                                 "longitude": 106.7218
@@ -1869,6 +1871,420 @@ public class ListingController {
             @RequestHeader("X-Admin-Id") String adminId) {
         ListingResponseWithAdmin response = listingService.getListingByIdWithAdmin(id, adminId);
         return ApiResponse.<ListingResponseWithAdmin>builder().data(response).build();
+    }
+
+    /**
+     * Get my listing detail with owner-specific information (Owner only)
+     * GET /v1/listings/{id}/my-detail
+     */
+    @GetMapping("/{id}/my-detail")
+    @Operation(
+        summary = "Get my listing detail with owner information (Owner only)",
+        description = """
+            Retrieves detailed listing information with owner-specific data including:
+            - Transaction details (postSource, transactionId, payment info)
+            - All media (images/videos) attached to the listing
+            - Complete address information
+            - Listing statistics (views, contacts, etc.)
+            - Verification notes and rejection reason (if any)
+
+            This endpoint is only accessible by the listing owner.
+            User authentication is required via JWT token.
+            """,
+        parameters = {
+            @Parameter(name = "id", description = "Listing ID", required = true)
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Listing found with owner details",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "My Listing Detail Example",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "listingId": 123,
+                                "title": "Modern 2BR Apartment in District 1",
+                                "description": "Beautiful apartment with city view",
+                                "user": {
+                                  "userId": "user-uuid-123",
+                                  "phoneCode": "+84",
+                                  "phoneNumber": "912345678",
+                                  "email": "owner@example.com",
+                                  "firstName": "John",
+                                  "lastName": "Doe",
+                                  "contactPhoneNumber": "0912345678",
+                                  "contactPhoneVerified": true
+                                },
+                                "postDate": "2025-01-15T10:30:00",
+                                "expiryDate": "2025-02-14T10:30:00",
+                                "listingType": "FOR_RENT",
+                                "verified": true,
+                                "isVerify": true,
+                                "expired": false,
+                                "isDraft": false,
+                                "vipType": "GOLD",
+                                "price": 15000000,
+                                "priceUnit": "VND_PER_MONTH",
+                                "postSource": "DIRECT_PAYMENT",
+                                "transactionId": "txn-123-abc",
+                                "isShadow": false,
+                                "parentListingId": null,
+                                "media": [
+                                  {
+                                    "mediaId": 1,
+                                    "url": "https://storage.example.com/listing-123/image1.jpg",
+                                    "mediaType": "IMAGE",
+                                    "isPrimary": true,
+                                    "sortOrder": 1
+                                  }
+                                ],
+                                "address": {
+                                  "addressId": 456,
+                                  "fullAddress": "123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành Phố Hồ Chí Minh",
+                                  "fullNewAddress": "123 Nguyễn Huệ, Phường Bến Nghé, Thành Phố Hồ Chí Minh",
+                                  "latitude": 10.7769,
+                                  "longitude": 106.7009,
+                                  "addressType": "OLD",
+                                  "legacyProvinceId": 79,
+                                  "legacyProvinceName": "Thành Phố Hồ Chí Minh",
+                                  "legacyDistrictId": 760,
+                                  "legacyDistrictName": "Quận 1",
+                                  "legacyWardId": 26734,
+                                  "legacyWardName": "Phường Bến Nghé",
+                                  "legacyStreet": "Nguyễn Huệ",
+                                  "newProvinceCode": "79",
+                                  "newProvinceName": "Thành Phố Hồ Chí Minh",
+                                  "newWardCode": "26734",
+                                  "newWardName": "Phường Bến Nghé",
+                                  "newStreet": "Nguyễn Huệ"
+                                },
+                                "paymentInfo": {
+                                  "provider": "VNPAY",
+                                  "status": "SUCCESS",
+                                  "paidAt": "2025-01-15T10:25:00",
+                                  "amount": 1200000,
+                                  "vipTierPurchased": "GOLD",
+                                  "durationPurchased": 30
+                                },
+                                "statistics": {
+                                  "viewCount": 1245,
+                                  "contactCount": 23,
+                                  "saveCount": 15,
+                                  "reportCount": 0
+                                },
+                                "verificationNotes": "Listing approved - all information verified",
+                                "rejectionReason": null
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "User not authenticated or not the owner",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Unauthorized",
+                        value = """
+                            {
+                              "code": "401001",
+                              "message": "UNAUTHORIZED - You don't have permission to view this listing's detail",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Listing not found",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Not Found",
+                        value = """
+                            {
+                              "code": "404001",
+                              "message": "LISTING_NOT_FOUND",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<ListingResponseForOwner> getMyListingDetail(@PathVariable Long id) {
+        String userId = extractUserId();
+        ListingResponseForOwner response = listingService.getMyListingDetail(id, userId);
+        return ApiResponse.<ListingResponseForOwner>builder().data(response).build();
+    }
+
+    /**
+     * Get my listings with owner-specific information (Owner only)
+     * GET /v1/listings/my-listings
+     */
+    @GetMapping("/my-listings")
+    @Operation(
+        summary = "Get my listings with owner-specific information (Owner only)",
+        description = """
+            Retrieves paginated list of owner's listings with detailed owner-specific information including:
+            - Transaction details (postSource, transactionId, payment info)
+            - All media (images/videos) for each listing
+            - Complete address information
+            - Listing statistics (views, contacts, etc.)
+            - Verification notes and rejection reason (if any)
+
+            **Features:**
+            - Full owner-specific data for each listing
+            - Flexible filtering (verified, expired, isDraft, vipType, etc.)
+            - Pagination support
+            - Owner dashboard statistics (drafts, pending, active, expired, by VIP tier)
+
+            **Use Cases:**
+            - Owner dashboard to manage all listings
+            - View detailed information about each owned listing
+            - Filter by status, VIP type, etc.
+
+            User authentication is required via JWT token.
+            """,
+        parameters = {
+            @Parameter(name = "page", description = "Page number (0-indexed)", example = "0"),
+            @Parameter(name = "size", description = "Page size (max 100)", example = "20"),
+            @Parameter(name = "sortBy", description = "Sort field (postDate, price, area, createdAt, updatedAt)", example = "postDate"),
+            @Parameter(name = "sortDirection", description = "Sort direction (ASC, DESC)", example = "DESC"),
+            @Parameter(name = "verified", description = "Filter by verification status (true/false)"),
+            @Parameter(name = "expired", description = "Filter by expiry status (true/false)"),
+            @Parameter(name = "isDraft", description = "Filter by draft status (true/false)"),
+            @Parameter(name = "vipType", description = "Filter by VIP type (NORMAL, SILVER, GOLD, DIAMOND)")
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "My listings retrieved successfully with statistics",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "My Listings Example",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "listings": [
+                                  {
+                                    "listingId": 123,
+                                    "title": "Modern 2BR Apartment in District 1",
+                                    "user": {
+                                      "userId": "user-uuid-123",
+                                      "firstName": "John",
+                                      "lastName": "Doe",
+                                      "email": "owner@example.com",
+                                      "contactPhoneNumber": "0912345678",
+                                      "contactPhoneVerified": true
+                                    },
+                                    "verified": true,
+                                    "vipType": "GOLD",
+                                    "postSource": "DIRECT_PAYMENT",
+                                    "transactionId": "txn-123-abc",
+                                    "media": [
+                                      {
+                                        "mediaId": 1,
+                                        "url": "https://storage.example.com/image1.jpg",
+                                        "isPrimary": true
+                                      }
+                                    ],
+                                    "address": {
+                                      "addressId": 456,
+                                      "fullAddress": "123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, Thành Phố Hồ Chí Minh",
+                                      "fullNewAddress": "123 Nguyễn Huệ, Phường Bến Nghé, Thành Phố Hồ Chí Minh",
+                                      "latitude": 10.7769,
+                                      "longitude": 106.7009,
+                                      "addressType": "OLD",
+                                      "legacyProvinceId": 79,
+                                      "legacyProvinceName": "Thành Phố Hồ Chí Minh",
+                                      "legacyDistrictId": 760,
+                                      "legacyDistrictName": "Quận 1",
+                                      "legacyWardId": 26734,
+                                      "legacyWardName": "Phường Bến Nghé",
+                                      "legacyStreet": "Nguyễn Huệ",
+                                      "newProvinceCode": "79",
+                                      "newProvinceName": "Thành Phố Hồ Chí Minh",
+                                      "newWardCode": "26734",
+                                      "newWardName": "Phường Bến Nghé",
+                                      "newStreet": "Nguyễn Huệ"
+                                    },
+                                    "statistics": {
+                                      "viewCount": 1245,
+                                      "contactCount": 23
+                                    }
+                                  }
+                                ],
+                                "totalCount": 25,
+                                "currentPage": 0,
+                                "pageSize": 20,
+                                "totalPages": 2,
+                                "statistics": {
+                                  "drafts": 3,
+                                  "pendingVerification": 5,
+                                  "active": 12,
+                                  "expired": 5,
+                                  "normalListings": 15,
+                                  "silverListings": 5,
+                                  "goldListings": 3,
+                                  "diamondListings": 2
+                                }
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "User not authenticated",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Unauthorized",
+                        value = """
+                            {
+                              "code": "401001",
+                              "message": "UNAUTHORIZED - User not authenticated",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<OwnerListingListResponse> getMyListings(@Valid ListingFilterRequest filter) {
+        String userId = extractUserId();
+        OwnerListingListResponse response = listingService.getMyListings(filter, userId);
+        return ApiResponse.<OwnerListingListResponse>builder().data(response).build();
+    }
+
+    /**
+     * Get all listings for admin with pagination and filters (Admin only)
+     * GET /v1/listings/admin/list
+     */
+    @GetMapping("/admin/list")
+    @Operation(
+        summary = "Get all listings for admin with pagination (Admin only)",
+        description = """
+            Retrieves paginated list of all listings with admin-specific information and comprehensive statistics.
+            This endpoint is for administrators only.
+
+            **Features:**
+            - Complete listing data with admin verification info
+            - Flexible filtering (category, province, VIP type, verification status, etc.)
+            - Pagination support
+            - Dashboard statistics (pending, verified, expired, by VIP tier, etc.)
+
+            **Use Cases:**
+            - Admin dashboard listing management
+            - Verification queue management
+            - Analytics and reporting
+            """,
+        parameters = {
+            @Parameter(name = "X-Admin-Id", description = "Admin ID from authentication header", required = true),
+            @Parameter(name = "page", description = "Page number (0-indexed)", example = "0"),
+            @Parameter(name = "size", description = "Page size (max 100)", example = "20"),
+            @Parameter(name = "sortBy", description = "Sort field (postDate, price, area, createdAt, updatedAt)", example = "postDate"),
+            @Parameter(name = "sortDirection", description = "Sort direction (ASC, DESC)", example = "DESC"),
+            @Parameter(name = "categoryId", description = "Filter by category ID", example = "1"),
+            @Parameter(name = "provinceId", description = "Filter by province ID (old structure)", example = "79"),
+            @Parameter(name = "provinceCode", description = "Filter by province code (new structure)", example = "79"),
+            @Parameter(name = "vipType", description = "Filter by VIP type (NORMAL, SILVER, GOLD, DIAMOND)"),
+            @Parameter(name = "verified", description = "Filter by verification status (true/false)"),
+            @Parameter(name = "expired", description = "Filter by expiry status (true/false)"),
+            @Parameter(name = "isDraft", description = "Filter by draft status (true/false)")
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Listings retrieved successfully with statistics",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Admin Listing List Example",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "listings": [
+                                  {
+                                    "listingId": 123,
+                                    "title": "Modern 2BR Apartment",
+                                    "userId": "user-uuid-123",
+                                    "verified": false,
+                                    "isVerify": true,
+                                    "vipType": "GOLD",
+                                    "adminVerification": {
+                                      "adminId": "admin-uuid-456",
+                                      "adminName": "John Admin",
+                                      "verificationStatus": "PENDING",
+                                      "verificationNotes": null
+                                    }
+                                  }
+                                ],
+                                "totalCount": 150,
+                                "currentPage": 0,
+                                "pageSize": 20,
+                                "totalPages": 8,
+                                "statistics": {
+                                  "pendingVerification": 45,
+                                  "verified": 1250,
+                                  "expired": 180,
+                                  "drafts": 23,
+                                  "shadows": 89,
+                                  "normalListings": 800,
+                                  "silverListings": 200,
+                                  "goldListings": 150,
+                                  "diamondListings": 100
+                                }
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "Admin not authenticated or not authorized",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Unauthorized",
+                        value = """
+                            {
+                              "code": "401001",
+                              "message": "UNAUTHORIZED - Admin not found",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<AdminListingListResponse> getAllListingsForAdmin(
+            @RequestHeader("X-Admin-Id") String adminId,
+            @Valid ListingFilterRequest filter) {
+        AdminListingListResponse response = listingService.getAllListingsForAdmin(filter, adminId);
+        return ApiResponse.<AdminListingListResponse>builder().data(response).build();
     }
 
     /**

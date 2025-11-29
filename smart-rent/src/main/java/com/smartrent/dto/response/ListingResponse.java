@@ -3,11 +3,11 @@ package com.smartrent.dto.response;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -16,7 +16,7 @@ import java.util.Set;
 
 @Getter
 @Setter
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -31,8 +31,8 @@ public class ListingResponse {
     @Schema(description = "Detailed description")
     String description;
 
-    @Schema(description = "User ID of the listing owner", example = "user-123")
-    String userId;
+    @Schema(description = "User information of the listing owner")
+    UserCreationResponse user;
 
     @Schema(description = "Owner's contact phone number for Zalo or other messaging", example = "0912345678")
     String ownerContactPhoneNumber;
@@ -82,7 +82,8 @@ public class ListingResponse {
 
     String priceUnit;
 
-    Long addressId;
+    @Schema(description = "Full address information with nested legacy/new structure")
+    AddressResponse address;
 
     Float area;
 
@@ -97,6 +98,18 @@ public class ListingResponse {
     String propertyType;
 
     Integer roomCapacity;
+
+    @Schema(description = "Water price information", example = "50000 VND/month")
+    String waterPrice;
+
+    @Schema(description = "Electricity price information", example = "3500 VND/kWh")
+    String electricityPrice;
+
+    @Schema(description = "Internet price information", example = "100000 VND/month")
+    String internetPrice;
+
+    @Schema(description = "Service fee information", example = "200000 VND/month")
+    String serviceFee;
 
     @Schema(description = "List of amenities associated with this listing")
     List<AmenityResponse> amenities;

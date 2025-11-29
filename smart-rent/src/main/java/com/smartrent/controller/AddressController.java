@@ -489,24 +489,30 @@ public class AddressController {
                               "success": true,
                               "message": "Success",
                               "data": [
-                                {
-                                  "province_id": 13,
-                                  "code": "01",
-                                  "name": "Hà Nội",
-                                  "type": "Thành phố"
-                                },
-                                {
-                                  "province_id": 15,
-                                  "code": "79",
-                                  "name": "Hồ Chí Minh",
-                                  "type": "Thành phố"
+                                  {
+                                    "id": "46",
+                                    "name": "Thành phố Huế",
+                                    "key": "thanhphohue",
+                                    "latitude": 16.3316,
+                                    "longitude": 107.517,
+                                    "alias": null,
+                                    "short_name": "Huế"
+                                  },
+                                  {
+                                    "id": "48",
+                                    "name": "Thành phố Đà Nẵng",
+                                    "key": "thanhphoanang",
+                                    "latitude": 15.631,
+                                    "longitude": 107.966,
+                                    "alias": null,
+                                    "short_name": "Đà Nẵng"
+                                  }
+                                ],
+                                "metadata": {
+                                  "total": 34,
+                                  "page": 1,
+                                  "limit": 20
                                 }
-                              ],
-                              "metadata": {
-                                "total": 34,
-                                "page": 1,
-                                "limit": 20
-                              }
                             }
                             """
                     )
@@ -516,19 +522,14 @@ public class AddressController {
     )
     public ResponseEntity<PaginatedResponse<List<NewProvinceResponse>>> getNewProvinces(
             @Parameter(description = "Search keyword", example = "Hà Nội")
-            @RequestParam(required = false) String keyword,
-
-            @Parameter(description = "Page number", example = "1")
-            @RequestParam(required = false) Integer page,
-
-            @Parameter(description = "Items per page (max 100)", example = "20")
-            @RequestParam(required = false) Integer limit) {
+            @RequestParam(required = false) String keyword
+            ) {
 
         log.info("GET /v1/addresses/new-provinces - keyword: {}, page: {}, limit: {}",
-                keyword, page, limit);
+                keyword);
 
         PaginatedResponse<List<NewProvinceResponse>> response =
-                newAddressService.getNewProvinces(keyword, page, limit);
+                newAddressService.getNewProvinces(keyword);
 
         return ResponseEntity.ok(response);
     }

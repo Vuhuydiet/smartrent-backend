@@ -106,6 +106,7 @@ public class Address {
     /**
      * Address structure type
      */
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "address_type", nullable = false)
     AddressMetadata.AddressType addressType = AddressMetadata.AddressType.OLD;

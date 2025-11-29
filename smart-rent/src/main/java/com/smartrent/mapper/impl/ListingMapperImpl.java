@@ -1,11 +1,15 @@
 package com.smartrent.mapper.impl;
 
 import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.response.AddressResponse;
 import com.smartrent.dto.response.AdminVerificationInfo;
 import com.smartrent.dto.response.AmenityResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingResponseForOwner;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
+import com.smartrent.dto.response.MediaResponse;
+import com.smartrent.dto.response.UserCreationResponse;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.mapper.AmenityMapper;
 import com.smartrent.mapper.ListingMapper;
@@ -46,11 +50,18 @@ public class ListingMapperImpl implements ListingMapper {
                 .furnishing(req.getFurnishing() != null ? Listing.Furnishing.valueOf(req.getFurnishing()) : null)
                 .propertyType(req.getPropertyType() != null ? Listing.PropertyType.valueOf(req.getPropertyType()) : null)
                 .roomCapacity(req.getRoomCapacity())
+                .waterPrice(req.getWaterPrice())
+                .electricityPrice(req.getElectricityPrice())
+                .internetPrice(req.getInternetPrice())
+                .serviceFee(req.getServiceFee())
+                .durationDays(req.getDurationDays() != null ? req.getDurationDays() : 30)
+                .useMembershipQuota(req.getUseMembershipQuota() != null ? req.getUseMembershipQuota() : false)
+                .paymentProvider(req.getPaymentProvider())
                 .build();
     }
 
     @Override
-    public ListingResponse toResponse(Listing entity) {
+    public ListingResponse toResponse(Listing entity, UserCreationResponse user, AddressResponse address) {
         // Map amenities to AmenityResponse list
         List<AmenityResponse> amenityResponses = null;
         Set<Long> amenityIds = null;
@@ -70,19 +81,20 @@ public class ListingMapperImpl implements ListingMapper {
                 .listingId(entity.getListingId())
                 .title(entity.getTitle())
                 .description(entity.getDescription())
-                .userId(entity.getUserId())
+                .user(user)
                 .postDate(entity.getPostDate())
                 .expiryDate(entity.getExpiryDate())
                 .listingType(entity.getListingType() != null ? entity.getListingType().name() : null)
                 .verified(entity.getVerified())
                 .isVerify(entity.getIsVerify())
+                .isDraft(entity.getIsDraft())
                 .expired(entity.getExpired())
                 .vipType(entity.getVipType() != null ? entity.getVipType().name() : null)
                 .categoryId(entity.getCategoryId())
                 .productType(entity.getProductType() != null ? entity.getProductType().name() : null)
                 .price(entity.getPrice())
                 .priceUnit(entity.getPriceUnit() != null ? entity.getPriceUnit().name() : null)
-                .addressId(entity.getAddress() != null ? entity.getAddress().getAddressId() : null)
+                .address(address)
                 .area(entity.getArea())
                 .bedrooms(entity.getBedrooms())
                 .bathrooms(entity.getBathrooms())
@@ -90,6 +102,10 @@ public class ListingMapperImpl implements ListingMapper {
                 .furnishing(entity.getFurnishing() != null ? entity.getFurnishing().name() : null)
                 .propertyType(entity.getPropertyType() != null ? entity.getPropertyType().name() : null)
                 .roomCapacity(entity.getRoomCapacity())
+                .waterPrice(entity.getWaterPrice())
+                .electricityPrice(entity.getElectricityPrice())
+                .internetPrice(entity.getInternetPrice())
+                .serviceFee(entity.getServiceFee())
                 .amenities(amenityResponses)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
@@ -157,11 +173,85 @@ public class ListingMapperImpl implements ListingMapper {
                 .furnishing(entity.getFurnishing() != null ? entity.getFurnishing().name() : null)
                 .propertyType(entity.getPropertyType() != null ? entity.getPropertyType().name() : null)
                 .roomCapacity(entity.getRoomCapacity())
+                .waterPrice(entity.getWaterPrice())
+                .electricityPrice(entity.getElectricityPrice())
+                .internetPrice(entity.getInternetPrice())
+                .serviceFee(entity.getServiceFee())
                 .amenities(amenityResponses)
                 .adminVerification(adminVerificationInfo)
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .updatedBy(entity.getUpdatedBy())
+                .build();
+    }
+
+    @Override
+    public ListingResponseForOwner toResponseForOwner(
+            Listing entity,
+            UserCreationResponse user,
+            List<MediaResponse> media,
+            AddressResponse address,
+            ListingResponseForOwner.PaymentInfo paymentInfo,
+            ListingResponseForOwner.ListingStatistics statistics,
+            String verificationNotes,
+            String rejectionReason) {
+
+        // Map amenities to AmenityResponse list
+        List<AmenityResponse> amenityResponses = null;
+        if (entity.getAmenities() != null && !entity.getAmenities().isEmpty()) {
+            amenityResponses = entity.getAmenities().stream()
+                    .map(amenityMapper::toResponse)
+                    .collect(Collectors.toList());
+        }
+
+        return ListingResponseForOwner.builder()
+                // Base fields from ListingResponse
+                .listingId(entity.getListingId())
+                .title(entity.getTitle())
+                .description(entity.getDescription())
+                .user(user)
+                .postDate(entity.getPostDate())
+                .expiryDate(entity.getExpiryDate())
+                .listingType(entity.getListingType() != null ? entity.getListingType().name() : null)
+                .verified(entity.getVerified())
+                .isVerify(entity.getIsVerify())
+                .expired(entity.getExpired())
+                .isDraft(entity.getIsDraft())
+                .vipType(entity.getVipType() != null ? entity.getVipType().name() : null)
+                .categoryId(entity.getCategoryId())
+                .productType(entity.getProductType() != null ? entity.getProductType().name() : null)
+                .price(entity.getPrice())
+                .priceUnit(entity.getPriceUnit() != null ? entity.getPriceUnit().name() : null)
+                .address(address)
+                .area(entity.getArea())
+                .bedrooms(entity.getBedrooms())
+                .bathrooms(entity.getBathrooms())
+                .direction(entity.getDirection() != null ? entity.getDirection().name() : null)
+                .furnishing(entity.getFurnishing() != null ? entity.getFurnishing().name() : null)
+                .propertyType(entity.getPropertyType() != null ? entity.getPropertyType().name() : null)
+                .roomCapacity(entity.getRoomCapacity())
+                .waterPrice(entity.getWaterPrice())
+                .electricityPrice(entity.getElectricityPrice())
+                .internetPrice(entity.getInternetPrice())
+                .serviceFee(entity.getServiceFee())
+                .amenities(amenityResponses)
+                .createdAt(entity.getCreatedAt())
+                .updatedAt(entity.getUpdatedAt())
+
+                // Owner-specific fields
+                .postSource(entity.getPostSource() != null ? entity.getPostSource().name() : null)
+                .transactionId(entity.getTransactionId())
+                .isShadow(entity.getIsShadow())
+                .parentListingId(entity.getParentListingId())
+                .durationDays(entity.getDurationDays())
+                .useMembershipQuota(entity.getUseMembershipQuota())
+                .paymentProvider(entity.getPaymentProvider())
+                .media(media)
+                .address(address)
+                .paymentInfo(paymentInfo)
+                .statistics(statistics)
+                .verificationNotes(verificationNotes)
+                .rejectionReason(rejectionReason)
                 .build();
     }
 }

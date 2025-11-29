@@ -147,6 +147,31 @@ public class Listing {
     @Column(name = "room_capacity")
     Integer roomCapacity;
 
+    // Utility Costs
+    @Column(name = "water_price", length = 50)
+    String waterPrice;
+
+    @Column(name = "electricity_price", length = 50)
+    String electricityPrice;
+
+    @Column(name = "internet_price", length = 50)
+    String internetPrice;
+
+    @Column(name = "service_fee", length = 50)
+    String serviceFee;
+
+    // Listing Duration and Payment
+    @Builder.Default
+    @Column(name = "duration_days")
+    Integer durationDays = 30;
+
+    @Builder.Default
+    @Column(name = "use_membership_quota", nullable = false)
+    Boolean useMembershipQuota = false;
+
+    @Column(name = "payment_provider", length = 50)
+    String paymentProvider;
+
     // Relationships
     @OneToMany(mappedBy = "listing", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     List<Media> media;
