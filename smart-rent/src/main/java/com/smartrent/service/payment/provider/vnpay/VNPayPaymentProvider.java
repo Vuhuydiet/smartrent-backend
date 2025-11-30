@@ -51,15 +51,19 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             // Build VNPay parameters
             Map<String, String> vnpParams = buildVNPayParams(transaction, request, ipAddress);
 
-            // Generate secure hash (do NOT add it to vnpParams)
+            // Generate secure hash from raw values (do NOT add it to vnpParams)
             String secureHash = VNPayUtil.generateSecureHash(vnpParams, vnPayProperties.getHashSecret());
 
-            // Build payment URL with query string + secure hash at the end
+            // Build payment URL with URL-encoded query string + secure hash
             String queryString = VNPayUtil.buildQueryString(vnpParams);
             String paymentUrl = vnPayProperties.getPaymentUrl() + "?" + queryString + "&vnp_SecureHash=" + secureHash;
 
             log.info("VNPay payment created successfully. Transaction ref: {}, IP: {}", transaction.getTransactionId(), ipAddress);
-            log.debug("VNPay query string for hash: {}", queryString);
+            log.info("VNPay parameters: {}", vnpParams);
+            log.info("VNPay hash secret: {}", vnPayProperties.getHashSecret());
+            log.info("VNPay query string: {}", queryString);
+            log.info("VNPay secure hash: {}", secureHash);
+            log.info("VNPay payment URL: {}", paymentUrl);
 
             // Use current time for createdAt and expiresAt since @CreationTimestamp may not be populated yet
             java.time.LocalDateTime now = java.time.LocalDateTime.now();
@@ -265,7 +269,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         params.put("vnp_Amount", VNPayUtil.formatAmount(transaction.getAmount().longValue()));
         params.put("vnp_CurrCode", vnPayProperties.getCurrencyCode());
         params.put("vnp_TxnRef", transaction.getTransactionId());
-        params.put("vnp_OrderInfo", request.getOrderInfo());
+        params.put("vnp_OrderInfo", "Payment");
         params.put("vnp_OrderType", vnPayProperties.getOrderType());
         params.put("vnp_Locale", getLanguageFromMetadata(request));
         params.put("vnp_ReturnUrl", request.getReturnUrl() != null ? request.getReturnUrl() : vnPayProperties.getReturnUrl());
