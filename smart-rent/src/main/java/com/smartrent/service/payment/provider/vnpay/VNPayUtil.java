@@ -23,7 +23,7 @@ public class VNPayUtil {
      * Generate VNPay secure hash (expects raw values in params)
      * - Excludes vnp_SecureHash and vnp_SecureHashType automatically.
      * - Sorts keys alphabetically.
-     * - Encodes values using URLEncoder (Java's encoding uses + for spaces).
+     * - Uses RAW values for hash calculation (no URL encoding).
      * - Joins pairs with single '&' (no extra ampersands for empty fields).
      */
     public static String generateSecureHash(Map<String, String> params, String secretKey) {
@@ -42,15 +42,12 @@ public class VNPayUtil {
         }
         Collections.sort(fieldNames);
 
-        // Build canonical string using StringJoiner to avoid stray '&'
+        // Build canonical string using RAW values (no URL encoding for hash calculation)
         StringJoiner joiner = new StringJoiner("&");
         for (String fieldName : fieldNames) {
             String fieldValue = copy.get(fieldName);
-            // encode value once here
-            String encoded = URLEncoder.encode(fieldValue, StandardCharsets.UTF_8);
-            // URLEncoder encodes spaces as '+', but in case any '%20' exists (from pre-encoded values), normalize
-            encoded = encoded.replaceAll("%20", "+");
-            joiner.add(fieldName + "=" + encoded);
+            // Use raw value directly for hash calculation
+            joiner.add(fieldName + "=" + fieldValue);
         }
 
         String hashInput = joiner.toString();
