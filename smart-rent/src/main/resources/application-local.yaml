@@ -58,6 +58,7 @@ application:
         - "/v1/payments/ipn/**"
         - "/v1/verification/**"
         - "/v1/listings/stats/provinces/**"
+        - "/v1/ai/**"
         - "/v1/listings/*/reports"
 # Enable debug logging for authentication
 logging:

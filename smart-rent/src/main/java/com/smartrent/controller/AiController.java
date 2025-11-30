@@ -35,7 +35,7 @@ public class AiController {
               schema = @Schema(implementation = ListingDescriptionRequest.class),
               examples = @ExampleObject(
                   name = "Generate description",
-                  value = "{ \"category\": \"CHO_THUE\", \"propertyType\": \"APARTMENT\", \"price\": 12000000, \"priceUnit\": \"MONTH\", \"addressText\": { \"newAddress\": \"123 Đường Láng, Đống Đa, Hà Nội\" }, \"area\": 78.5, \"bedrooms\": 2, \"bathrooms\": 1, \"direction\": \"Đông Nam\", \"furnishing\": \"SEMI_FURNISHED\", \"amenities\": [\"Điều hòa\", \"Tủ lạnh\", \"Máy giặt\"], \"waterPrice\": \"20000 VND/m3\", \"electricityPrice\": \"3500 VND/kWh\", \"internetPrice\": \"100000 VND/tháng\", \"serviceFee\": \"500000 VND/tháng\", \"tone\": \"friendly\", \"minWords\": 30, \"maxWords\": 50 }"
+                  value = "{ \"category\": \"CHO_THUE\", \"propertyType\": \"APARTMENT\", \"price\": 12000000, \"priceUnit\": \"MONTH\", \"addressText\": { \"newAddress\": \"123 Đường Láng, Đống Đa, Hà Nội\" }, \"area\": 78.5, \"bedrooms\": 2, \"bathrooms\": 1, \"direction\": \"Đông Nam\", \"furnishing\": \"SEMI_FURNISHED\", \"amenities\": [\"Điều hòa\", \"Tủ lạnh\", \"Máy giặt\"], \"waterPrice\": \"20000 VND/m3\", \"electricityPrice\": \"3500 VND/kWh\", \"internetPrice\": \"100000 VND/tháng\", \"serviceFee\": \"500000 VND/tháng\", \"tone\": \"friendly\", \"titleMinWords\": 5, \"titleMaxWords\": 10, \"descriptionMinWords\": 30, \"descriptionMaxWords\": 50 }"
               )
           )
       ),
