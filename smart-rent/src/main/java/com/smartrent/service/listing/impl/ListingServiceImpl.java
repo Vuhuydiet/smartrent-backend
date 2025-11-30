@@ -367,8 +367,12 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional(readOnly = true)
     public ListingResponse getListingById(Long id) {
+        // Fetch listing with amenities first
         Listing listing = listingRepository.findByIdWithAmenities(id)
                 .orElseThrow(() -> new RuntimeException("Listing not found"));
+
+        // Fetch media separately to avoid MultipleBagFetchException
+        listingRepository.findByIdWithMedia(id);
 
         // Build user and address responses
         com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
@@ -408,7 +412,13 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional(readOnly = true)
     public List<ListingResponse> getListingsByIds(Set<Long> ids) {
-        return listingRepository.findByIdsWithAmenities(ids).stream()
+        // Fetch listings with amenities first
+        List<Listing> listings = listingRepository.findByIdsWithAmenities(ids);
+
+        // Fetch media separately to avoid MultipleBagFetchException
+        listingRepository.findByIdsWithMedia(ids);
+
+        return listings.stream()
                 .map(listing -> {
                     com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
                     com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
@@ -481,6 +491,9 @@ public class ListingServiceImpl implements ListingService {
         // Get listing with amenities
         Listing listing = listingRepository.findByIdWithAmenities(id)
                 .orElseThrow(() -> new RuntimeException("Listing not found"));
+
+        // Fetch media separately to avoid MultipleBagFetchException
+        listingRepository.findByIdWithMedia(id);
 
         // Get admin information if updatedBy is set
         Admin verifyingAdmin = null;
@@ -1068,6 +1081,9 @@ public class ListingServiceImpl implements ListingService {
         // Get listing with amenities
         Listing listing = listingRepository.findByIdWithAmenities(id)
                 .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
+
+        // Fetch media separately to avoid MultipleBagFetchException (though we fetch it again below)
+        listingRepository.findByIdWithMedia(id);
 
         // Validate ownership
         if (!listing.getUserId().equals(userId)) {
