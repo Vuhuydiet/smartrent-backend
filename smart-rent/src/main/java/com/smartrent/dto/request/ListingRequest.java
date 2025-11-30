@@ -88,9 +88,6 @@ public class ListingRequest {
     @Pattern(regexp = "FULLY_FURNISHED|SEMI_FURNISHED|UNFURNISHED", message = "furnishing must be a valid value")
     String furnishing;
 
-    @Pattern(regexp = "APARTMENT|HOUSE|ROOM|STUDIO|OFFICE", message = "propertyType must be a valid value")
-    String propertyType;
-
     @Min(0)
     Integer roomCapacity;
 

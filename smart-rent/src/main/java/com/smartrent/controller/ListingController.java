@@ -1,6 +1,7 @@
 package com.smartrent.controller;
 
 import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingDraftUpdateRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.MyListingsFilterRequest;
@@ -144,7 +145,7 @@ public class ListingController {
             **Optional Fields:**
             - isDraft (default: false)
             - area, bedrooms, bathrooms
-            - direction, furnishing, propertyType
+            - direction, furnishing
             - roomCapacity
             - amenityIds (array of amenity IDs)
             - mediaIds (array of uploaded media IDs) - See Media Upload Integration Flow above
@@ -195,7 +196,6 @@ public class ListingController {
                               "bathrooms": 1,
                               "direction": "NORTHEAST",
                               "furnishing": "SEMI_FURNISHED",
-                              "propertyType": "APARTMENT",
                               "roomCapacity": 4,
                               "amenityIds": [1, 3, 5],
                               "mediaIds": [101, 102, 103],
@@ -394,7 +394,6 @@ public class ListingController {
                                 "bathrooms": 1,
                                 "direction": "NORTHEAST",
                                 "furnishing": "SEMI_FURNISHED",
-                                "propertyType": "APARTMENT",
                                 "roomCapacity": 4,
                                 "amenities": [
                                   {
@@ -536,8 +535,10 @@ public class ListingController {
 
     @PostMapping("/search")
     @Operation(
-        summary = "Tìm kiếm và lọc bài đăng - API tổng hợp cho màn hình chính",
+        summary = "[PUBLIC API] Tìm kiếm và lọc bài đăng - API tổng hợp cho màn hình chính",
         description = """
+            **PUBLIC API - Không cần authentication**
+
             API tìm kiếm và lọc bài đăng tổng hợp tất cả các bộ lọc trong một lần gọi. Frontend chỉ cần gọi API này cho tất cả tính năng lọc ở màn hình chính.
 
             ## CÁC BỘ LỌC HỖ TRỢ
@@ -559,7 +560,7 @@ public class ListingController {
             - Phòng: `minBedrooms`, `maxBedrooms`, `minBathrooms`, `maxBathrooms`
             - Nội thất: `furnishing` (FULLY_FURNISHED, SEMI_FURNISHED, UNFURNISHED)
             - Hướng: `direction` (NORTH, SOUTH, EAST, WEST, NORTHEAST, NORTHWEST, SOUTHEAST, SOUTHWEST)
-            - Loại: `propertyType`, `productType` (APARTMENT, HOUSE, ROOM, STUDIO, OFFICE)
+            - Loại: `productType` (APARTMENT, HOUSE, ROOM, STUDIO, OFFICE)
             - Sức chứa: `minRoomCapacity`, `maxRoomCapacity`
 
             ### 4. Lọc theo chi phí tiện ích
@@ -573,6 +574,14 @@ public class ListingController {
             - `vipType`: NORMAL, SILVER, GOLD, DIAMOND
             - `verified`: true (chỉ lấy tin đã verify)
             - `status`: ACTIVE, EXPIRED, PENDING, DRAFT (trạng thái bài đăng)
+            - `listingStatus`: EXPIRED, EXPIRING_SOON, DISPLAYING, IN_REVIEW, PENDING_PAYMENT, REJECTED, VERIFIED
+              - EXPIRED: Hết hạn
+              - EXPIRING_SOON: Sắp hết hạn (còn 7 ngày)
+              - DISPLAYING: Đang hiển thị
+              - IN_REVIEW: Đang chờ duyệt
+              - PENDING_PAYMENT: Chờ thanh toán
+              - REJECTED: Bị từ chối
+              - VERIFIED: Đã xác thực
 
             ### 6. Lọc theo tiện ích
             - `amenityIds`: array ID tiện ích (VD: [1, 3, 5])
@@ -605,10 +614,11 @@ public class ListingController {
             - Filter criteria đã áp dụng
 
             ## LƯU Ý
-            - Bài nháp, bài shadow, bài hết hạn tự động bị loại trừ
-            - Tất cả filter đều optional
-            - Có thể kết hợp nhiều filter
-            - Frontend chỉ gửi các field cần thiết
+            - **Public API**: Không yêu cầu JWT token
+            - **Mặc định**: Chỉ trả về bài đăng công khai (excludes drafts, shadow listings, expired listings)
+            - **Tất cả filter đều optional**: Frontend chỉ gửi các field cần thiết
+            - **Có thể kết hợp nhiều filter**: Hỗ trợ filter phức tạp
+            - **Auto-filter cho public search**: Bài nháp (isDraft), bài shadow, bài hết hạn tự động bị loại trừ
 
             ## USE CASES
 
@@ -666,6 +676,26 @@ public class ListingController {
             ```json
             {"provinceCode": "79", "isLegacy": false, "listingType": "RENT", "productType": "ROOM", "maxPrice": 3000000, "priceUnit": "MONTH", "waterPrice": "LOW", "electricityPrice": "LOW", "internetPrice": "FREE", "verified": true, "status": "ACTIVE"}
             ```
+
+            **Use Case 12: Owner - Listings đang hiển thị**
+            ```json
+            {"userId": "user-123", "listingStatus": "DISPLAYING", "page": 0, "size": 20}
+            ```
+
+            **Use Case 13: Owner - Listings sắp hết hạn**
+            ```json
+            {"userId": "user-123", "listingStatus": "EXPIRING_SOON", "sortBy": "expiryDate", "sortDirection": "ASC"}
+            ```
+
+            **Use Case 14: Owner - Listings đang chờ duyệt**
+            ```json
+            {"userId": "user-123", "listingStatus": "IN_REVIEW", "sortBy": "createdAt", "sortDirection": "DESC"}
+            ```
+
+            **Use Case 15: Owner - Listings bị từ chối**
+            ```json
+            {"userId": "user-123", "listingStatus": "REJECTED"}
+            ```
             """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = false,
@@ -719,7 +749,6 @@ public class ListingController {
                               "maxBathrooms": 2,
                               "furnishing": "FULLY_FURNISHED",
                               "direction": "SOUTH",
-                              "propertyType": "APARTMENT",
                               "minRoomCapacity": 2,
                               "maxRoomCapacity": 4,
                               "waterPrice": "LOW",
@@ -841,7 +870,11 @@ public class ListingController {
             filter = ListingFilterRequest.builder().build();
         }
 
-        // If userId is not provided in filter but user is authenticated, use authenticated user
+        // PUBLIC API: This endpoint supports both authenticated and non-authenticated requests
+        // - Public users (authentication == null): Can search but won't see drafts/private data
+        // - Authenticated users: Can search AND request their own listings by omitting userId in filter
+
+        // Auto-fill userId from JWT for authenticated users ONLY when requesting ownership-specific data
         // This allows frontend to omit userId for "my listings" - backend auto-fills from JWT
         if ((filter.getUserId() == null || filter.getUserId().isEmpty()) &&
             authentication != null && authentication.isAuthenticated() &&
@@ -853,6 +886,8 @@ public class ListingController {
             }
         }
 
+        // Service layer will automatically filter out drafts, shadow listings, and expired listings
+        // when userId is not provided (public search)
         ListingListResponse response = listingService.searchListings(filter);
         return ApiResponse.<ListingListResponse>builder().data(response).build();
     }
@@ -1204,7 +1239,6 @@ public class ListingController {
                                   "bathrooms": 1,
                                   "direction": "SOUTH",
                                   "furnishing": "FULLY_FURNISHED",
-                                  "propertyType": "APARTMENT",
                                   "roomCapacity": 2,
                                   "amenities": [
                                     {
@@ -1280,7 +1314,6 @@ public class ListingController {
                           "bathrooms": 1,
                           "direction": "NORTH",
                           "furnishing": "FULLY_FURNISHED",
-                          "propertyType": "APARTMENT",
                           "roomCapacity": 4,
                           "amenityIds": [1, 2, 3]
                         }
@@ -1481,7 +1514,6 @@ public class ListingController {
                               "bathrooms": 5,
                               "direction": "NORTHEAST",
                               "furnishing": "LUXURY_FURNISHED",
-                              "propertyType": "PENTHOUSE",
                               "roomCapacity": 10,
                               "useMembershipQuota": true,
                               "durationDays": 30
@@ -1856,7 +1888,6 @@ public class ListingController {
                                 "bathrooms": 1,
                                 "direction": "NORTHEAST",
                                 "furnishing": "SEMI_FURNISHED",
-                                "propertyType": "APARTMENT",
                                 "roomCapacity": 4,
                                 "amenities": [
                                   {
@@ -2361,6 +2392,215 @@ public class ListingController {
             @Valid ListingFilterRequest filter) {
         AdminListingListResponse response = listingService.getAllListingsForAdmin(filter, adminId);
         return ApiResponse.<AdminListingListResponse>builder().data(response).build();
+    }
+
+    // ============ DRAFT MANAGEMENT ENDPOINTS ============
+
+    /**
+     * Update draft listing (auto-save)
+     * PATCH /v1/listings/{id}/draft
+     */
+    @PostMapping("/{id}/draft")
+    @Operation(
+        summary = "Update draft listing (auto-save)",
+        description = """
+            Update draft listing with partial data. All fields are optional.
+            This endpoint is used for auto-saving draft listings during creation.
+
+            - No validation for required fields (validation happens on publish)
+            - Automatically sets isDraft=true
+            - Only the owner can update their draft
+
+            **Use case**: Auto-save every 30 seconds when user is creating a listing
+            """,
+        parameters = {
+            @Parameter(name = "id", description = "Listing ID", required = true, example = "123")
+        }
+    )
+    public ApiResponse<ListingResponse> updateDraft(
+            @PathVariable Long id,
+            @RequestBody ListingDraftUpdateRequest request) {
+        String userId = extractUserId();
+        ListingResponse response = listingService.updateDraft(id, request, userId);
+        return ApiResponse.<ListingResponse>builder().data(response).build();
+    }
+
+    /**
+     * Get all draft listings for current user
+     * GET /v1/listings/my-drafts
+     */
+    @GetMapping("/my-drafts")
+    @Operation(
+        summary = "Get my draft listings",
+        description = """
+            Get all draft listings for the authenticated user.
+            Returns drafts sorted by last updated time (newest first).
+
+            **Use case**: Display list of drafts for user to continue editing
+            """,
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved draft listings",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = List.class),
+                    examples = @ExampleObject(
+                        name = "Draft Listings Example",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": [
+                                {
+                                  "listingId": 123,
+                                  "title": "Căn hộ 2PN Q7",
+                                  "description": "Chưa hoàn thiện mô tả...",
+                                  "isDraft": true,
+                                  "price": 5000000,
+                                  "priceUnit": "MONTH",
+                                  "updatedAt": "2025-11-29T10:30:00",
+                                  "media": [
+                                    {
+                                      "mediaId": 1,
+                                      "url": "https://example.com/image1.jpg",
+                                      "isPrimary": true
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<List<com.smartrent.dto.response.ListingResponseForOwner>> getMyDrafts() {
+        String userId = extractUserId();
+        List<com.smartrent.dto.response.ListingResponseForOwner> response = listingService.getMyDrafts(userId);
+        return ApiResponse.<List<com.smartrent.dto.response.ListingResponseForOwner>>builder().data(response).build();
+    }
+
+    /**
+     * Publish draft listing
+     * POST /v1/listings/{id}/publish
+     */
+    @PostMapping("/{id}/publish")
+    @Operation(
+        summary = "Publish draft listing",
+        description = """
+            Publish a draft listing after validating all required fields.
+
+            **Validation**:
+            - Validates all required fields (title, description, price, address, etc.)
+            - Sets isDraft=false
+            - Sets postDate to current time
+            - Sets expiryDate if not already set
+
+            **Required fields**:
+            - title, description
+            - listingType, productType
+            - price, priceUnit
+            - address
+            - categoryId
+
+            **Use case**: User clicks "Publish" button after completing the listing
+            """,
+        parameters = {
+            @Parameter(name = "id", description = "Listing ID", required = true, example = "123")
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully published draft listing",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class)
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Missing required fields or listing is not a draft",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Validation Error",
+                        value = """
+                            {
+                              "code": "400001",
+                              "message": "Cannot publish listing. Missing required fields: title, description, price",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<ListingResponse> publishDraft(@PathVariable Long id) {
+        String userId = extractUserId();
+        ListingResponse response = listingService.publishDraft(id, userId);
+        return ApiResponse.<ListingResponse>builder().data(response).build();
+    }
+
+    /**
+     * Delete draft listing
+     * DELETE /v1/listings/{id}/draft
+     */
+    @DeleteMapping("/{id}/draft")
+    @Operation(
+        summary = "Delete draft listing",
+        description = """
+            Delete a draft listing. Only draft listings can be deleted.
+            Published listings cannot be deleted through this endpoint.
+
+            **Use case**: User wants to discard a draft
+            """,
+        parameters = {
+            @Parameter(name = "id", description = "Listing ID", required = true, example = "123")
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully deleted draft listing",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Success",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": "Draft deleted successfully",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Listing is not a draft",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Not a draft",
+                        value = """
+                            {
+                              "code": "400001",
+                              "message": "Only draft listings can be deleted. Published listings cannot be deleted.",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<Void> deleteDraft(@PathVariable Long id) {
+        String userId = extractUserId();
+        listingService.deleteDraft(id, userId);
+        return ApiResponse.<Void>builder().message("Draft deleted successfully").build();
     }
 
     /**

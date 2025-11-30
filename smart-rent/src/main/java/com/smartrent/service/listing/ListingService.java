@@ -1,6 +1,7 @@
 package com.smartrent.service.listing;
 
 import com.smartrent.dto.request.ListingCreationRequest;
+import com.smartrent.dto.request.ListingDraftUpdateRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.MyListingsFilterRequest;
@@ -107,4 +108,50 @@ public interface ListingService {
      * @return OwnerListingListResponse containing paginated listings with owner-specific information and statistics
      */
     OwnerListingListResponse getMyListings(ListingFilterRequest filter, String userId);
+
+    // ============ DRAFT MANAGEMENT METHODS ============
+
+    /**
+     * Update draft listing (auto-save)
+     * Allows partial updates without validation
+     * Automatically sets isDraft=true and updates lastAutoSavedAt
+     *
+     * @param id Listing ID
+     * @param request Draft update request (all fields optional)
+     * @param userId User ID (owner) who is updating the draft
+     * @return Updated listing response
+     * @throws RuntimeException if listing not found or user is not the owner
+     */
+    ListingResponse updateDraft(Long id, ListingDraftUpdateRequest request, String userId);
+
+    /**
+     * Get all draft listings for current user
+     * Returns list of draft listings sorted by last updated time (newest first)
+     *
+     * @param userId User ID (owner)
+     * @return List of draft listings
+     */
+    List<ListingResponseForOwner> getMyDrafts(String userId);
+
+    /**
+     * Publish draft listing
+     * Validates all required fields and sets isDraft=false
+     * Sets postDate to current time
+     *
+     * @param id Listing ID
+     * @param userId User ID (owner) who is publishing the draft
+     * @return Published listing response
+     * @throws RuntimeException if listing not found, user is not the owner, or validation fails
+     */
+    ListingResponse publishDraft(Long id, String userId);
+
+    /**
+     * Delete draft listing
+     * Only draft listings can be deleted by owner
+     *
+     * @param id Listing ID
+     * @param userId User ID (owner) who is deleting the draft
+     * @throws RuntimeException if listing not found, user is not the owner, or listing is not a draft
+     */
+    void deleteDraft(Long id, String userId);
 }

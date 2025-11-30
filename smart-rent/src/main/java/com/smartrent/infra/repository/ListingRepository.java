@@ -33,11 +33,17 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     Optional<Listing> findByTransactionId(String transactionId);
 
 
-    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.amenities LEFT JOIN FETCH l.media WHERE l.listingId = :id")
+    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.amenities WHERE l.listingId = :id")
     Optional<Listing> findByIdWithAmenities(@Param("id") Long id);
 
-    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.amenities LEFT JOIN FETCH l.media WHERE l.listingId IN :ids")
+    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.media WHERE l.listingId = :id")
+    Optional<Listing> findByIdWithMedia(@Param("id") Long id);
+
+    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.amenities WHERE l.listingId IN :ids")
     List<Listing> findByIdsWithAmenities(@Param("ids") Collection<Long> ids);
+
+    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.media WHERE l.listingId IN :ids")
+    List<Listing> findByIdsWithMedia(@Param("ids") Collection<Long> ids);
 
     /**
      * Find listings by ward ID for location-based pricing

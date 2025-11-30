@@ -66,6 +66,21 @@ public class ListingSpecification {
                 predicates.add(criteriaBuilder.equal(root.get("expired"), false));
             }
 
+            // Listing Status filter (owner-specific computed status)
+            if (filter.getListingStatus() != null) {
+                try {
+                    com.smartrent.enums.ListingStatus requestedStatus =
+                        com.smartrent.enums.ListingStatus.valueOf(filter.getListingStatus());
+
+                    Predicate statusPredicate = buildStatusPredicate(root, criteriaBuilder, requestedStatus);
+                    if (statusPredicate != null) {
+                        predicates.add(statusPredicate);
+                    }
+                } catch (IllegalArgumentException e) {
+                    // Invalid status value, skip filter
+                }
+            }
+
             // ============ LOCATION FILTERS ============
             // Category filter
             if (filter.getCategoryId() != null) {
@@ -376,14 +391,6 @@ public class ListingSpecification {
                 ));
             }
 
-            // Property type filter
-            if (filter.getPropertyType() != null) {
-                predicates.add(criteriaBuilder.equal(
-                    root.get("propertyType"),
-                    Listing.PropertyType.valueOf(filter.getPropertyType())
-                ));
-            }
-
             // Room capacity range
             if (filter.getMinRoomCapacity() != null) {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("roomCapacity"), filter.getMinRoomCapacity()));
@@ -563,6 +570,99 @@ public class ListingSpecification {
             predicates.add(criteriaBuilder.equal(root.get("isShadow"), false));
 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    /**
+     * Build predicate for filtering by listing status
+     * Translates computed status logic into JPA criteria predicates
+     */
+    private static Predicate buildStatusPredicate(
+            jakarta.persistence.criteria.Root<Listing> root,
+            jakarta.persistence.criteria.CriteriaBuilder criteriaBuilder,
+            com.smartrent.enums.ListingStatus status) {
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime sevenDaysFromNow = now.plusDays(7);
+
+        return switch (status) {
+            case EXPIRED ->
+                // expired = true OR expiryDate < now
+                criteriaBuilder.or(
+                    criteriaBuilder.isTrue(root.get("expired")),
+                    criteriaBuilder.lessThan(root.get("expiryDate"), now)
+                );
+
+            case EXPIRING_SOON ->
+                // verified = true AND expiryDate between now and 7 days from now
+                criteriaBuilder.and(
+                    criteriaBuilder.isTrue(root.get("verified")),
+                    criteriaBuilder.between(root.get("expiryDate"), now, sevenDaysFromNow),
+                    criteriaBuilder.or(
+                        criteriaBuilder.isFalse(root.get("expired")),
+                        criteriaBuilder.isNull(root.get("expired"))
+                    )
+                );
+
+            case DISPLAYING ->
+                // verified = true AND NOT expired AND expiryDate > now
+                criteriaBuilder.and(
+                    criteriaBuilder.isTrue(root.get("verified")),
+                    criteriaBuilder.or(
+                        criteriaBuilder.isFalse(root.get("expired")),
+                        criteriaBuilder.isNull(root.get("expired"))
+                    ),
+                    criteriaBuilder.or(
+                        criteriaBuilder.isNull(root.get("expiryDate")),
+                        criteriaBuilder.greaterThan(root.get("expiryDate"), now)
+                    )
+                );
+
+            case IN_REVIEW ->
+                // isVerify = true AND verified = false
+                criteriaBuilder.and(
+                    criteriaBuilder.isTrue(root.get("isVerify")),
+                    criteriaBuilder.or(
+                        criteriaBuilder.isFalse(root.get("verified")),
+                        criteriaBuilder.isNull(root.get("verified"))
+                    )
+                );
+
+            case PENDING_PAYMENT ->
+                // transactionId is not null AND verified = false AND isVerify = false
+                criteriaBuilder.and(
+                    criteriaBuilder.isNotNull(root.get("transactionId")),
+                    criteriaBuilder.or(
+                        criteriaBuilder.isFalse(root.get("verified")),
+                        criteriaBuilder.isNull(root.get("verified"))
+                    ),
+                    criteriaBuilder.or(
+                        criteriaBuilder.isFalse(root.get("isVerify")),
+                        criteriaBuilder.isNull(root.get("isVerify"))
+                    )
+                );
+
+            case REJECTED ->
+                // verified = false AND isVerify = false AND isDraft = false AND postDate is not null
+                criteriaBuilder.and(
+                    criteriaBuilder.or(
+                        criteriaBuilder.isFalse(root.get("verified")),
+                        criteriaBuilder.isNull(root.get("verified"))
+                    ),
+                    criteriaBuilder.or(
+                        criteriaBuilder.isFalse(root.get("isVerify")),
+                        criteriaBuilder.isNull(root.get("isVerify"))
+                    ),
+                    criteriaBuilder.or(
+                        criteriaBuilder.isFalse(root.get("isDraft")),
+                        criteriaBuilder.isNull(root.get("isDraft"))
+                    ),
+                    criteriaBuilder.isNotNull(root.get("postDate"))
+                );
+
+            case VERIFIED ->
+                // verified = true
+                criteriaBuilder.isTrue(root.get("verified"));
         };
     }
 }

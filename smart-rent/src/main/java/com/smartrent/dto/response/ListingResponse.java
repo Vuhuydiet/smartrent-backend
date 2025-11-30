@@ -67,6 +67,11 @@ public class ListingResponse {
     @Schema(description = "Whether listing is a draft (incomplete, not yet published)")
     Boolean isDraft;
 
+    @Schema(description = "Computed listing status for owner view",
+            example = "DISPLAYING",
+            allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED"})
+    String listingStatus;
+
     @Schema(
         description = "VIP tier: NORMAL, SILVER, GOLD, DIAMOND",
         example = "SILVER",
@@ -76,6 +81,7 @@ public class ListingResponse {
 
     Long categoryId;
 
+    @Schema(description = "Product type (loại bất động sản)", example = "APARTMENT", allowableValues = {"ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO"})
     String productType;
 
     BigDecimal price;
@@ -94,8 +100,6 @@ public class ListingResponse {
     String direction;
 
     String furnishing;
-
-    String propertyType;
 
     Integer roomCapacity;
 
