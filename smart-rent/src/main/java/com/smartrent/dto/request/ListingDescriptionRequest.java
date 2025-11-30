@@ -72,11 +72,17 @@ public class ListingDescriptionRequest {
     @Schema(description = "Tone for the generated description (short, friendly, professional)", example = "friendly")
     String tone;
 
+    @Schema(description = "Maximum length of title in words", example = "10")
+    Integer titleMaxWords;
+
+    @Schema(description = "Minimum length of title in words", example = "5")
+    Integer titleMinWords;
+
     @Schema(description = "Maximum length of description in words", example = "50")
-    Integer maxWords;
+    Integer descriptionMaxWords;
 
     @Schema(description = "Minimum length of description in words", example = "20")
-    Integer minWords;
+    Integer descriptionMinWords;
 
     @Getter
     @Setter

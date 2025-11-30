@@ -683,4 +683,14 @@ public class OpenAPIConfig {
                             .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
+
+    @Bean
+    public GroupedOpenApi aiApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("ai")
+                            .displayName("AI")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/ai/**")
+                            .build();
+    }
 }

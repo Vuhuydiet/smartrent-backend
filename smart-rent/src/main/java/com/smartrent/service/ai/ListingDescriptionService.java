@@ -50,7 +50,18 @@ public class ListingDescriptionService {
 
     prompt.append("Generate a short, catchy listing title in Vietnamese.");
     prompt.append(" Tone: ").append(req.getTone() != null ? req.getTone() : "friendly").append(".");
-    prompt.append(" Keep it concise (under 10 words).");
+
+    if (req.getTitleMinWords() != null && req.getTitleMaxWords() != null) {
+      prompt.append(" Keep the title between ").append(req.getTitleMinWords())
+            .append(" and ").append(req.getTitleMaxWords()).append(" words.");
+    } else if (req.getTitleMaxWords() != null) {
+      prompt.append(" Keep the title under ").append(req.getTitleMaxWords()).append(" words.");
+    } else if (req.getTitleMinWords() != null) {
+      prompt.append(" Keep the title at least ").append(req.getTitleMinWords()).append(" words.");
+    } else {
+      prompt.append(" Keep it concise (under 10 words).");
+    }
+    prompt.append("Please only provide the title without any additional explanation.");
 
     if (req.getPropertyType() != null) {
       prompt.append(" Property type: ").append(req.getPropertyType()).append(".");
@@ -131,14 +142,15 @@ public class ListingDescriptionService {
       prompt.append(" Service fee: ").append(req.getServiceFee()).append(".");
     }
 
-    if (req.getMinWords() != null && req.getMaxWords() != null) {
-      prompt.append(" Keep the description between ").append(req.getMinWords())
-            .append(" and ").append(req.getMaxWords()).append(" words.");
-    } else if (req.getMaxWords() != null) {
-      prompt.append(" Keep the description under ").append(req.getMaxWords()).append(" words.");
-    } else if (req.getMinWords() != null) {
-      prompt.append(" Keep the description at least ").append(req.getMinWords()).append(" words.");
+    if (req.getDescriptionMinWords() != null && req.getDescriptionMaxWords() != null) {
+      prompt.append(" Keep the description between ").append(req.getDescriptionMinWords())
+            .append(" and ").append(req.getDescriptionMaxWords()).append(" words.");
+    } else if (req.getDescriptionMaxWords() != null) {
+      prompt.append(" Keep the description under ").append(req.getDescriptionMaxWords()).append(" words.");
+    } else if (req.getDescriptionMinWords() != null) {
+      prompt.append(" Keep the description at least ").append(req.getDescriptionMinWords()).append(" words.");
     }
+    prompt.append("Please only provide the description without any additional explanation.");
 
     return prompt.toString();
   }
