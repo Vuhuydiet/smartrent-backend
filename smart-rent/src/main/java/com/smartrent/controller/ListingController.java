@@ -1,7 +1,7 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.request.DraftListingRequest;
 import com.smartrent.dto.request.ListingCreationRequest;
-import com.smartrent.dto.request.ListingDraftUpdateRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.MyListingsFilterRequest;
@@ -143,7 +143,6 @@ public class ListingController {
                 - For NEW: newProvinceCode, newWardCode
 
             **Optional Fields:**
-            - isDraft (default: false)
             - area, bedrooms, bathrooms
             - direction, furnishing
             - roomCapacity
@@ -155,7 +154,10 @@ public class ListingController {
             - address.latitude, address.longitude
             - durationDays (Integer: 10, 15, or 30 for payment flow)
             - useMembershipQuota (for VIP listings with existing quota)
+            - benefitIds (required when useMembershipQuota=true, vipType is inferred from benefit type)
             - paymentProvider (VNPAY, etc.)
+
+            **Note:** For draft listings, use POST /v1/listings/draft endpoint instead.
             """,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
@@ -164,14 +166,14 @@ public class ListingController {
                 schema = @Schema(implementation = ListingCreationRequest.class),
                 examples = {
                     @ExampleObject(
-                        name = "Listing Creation",
-                        summary = "Create listing fully with all details",
+                        name = "Listing Creation with Payment",
+                        summary = "Create listing with payment (no membership quota)",
                         value = """
                             {
                               "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
                               "description": "Căn hộ rộng rãi 2 phòng ngủ có ban công và tầm nhìn thành phố.",
                               "listingType": "RENT",
-                              "vipType": "NORMAL",
+                              "vipType": "SILVER",
                               "categoryId": 1,
                               "productType": "APARTMENT",
                               "price": 12000000,
@@ -182,11 +184,6 @@ public class ListingController {
                                   "districtId": 5,
                                   "wardId": 20,
                                   "street": "123 Nguyễn Trãi"
-                                },
-                                "newAddress": {
-                                  "provinceCode": "01",
-                                  "wardCode": "00004",
-                                  "street": "88 Lê Duẩn"
                                 },
                                 "latitude": 21.0285,
                                 "longitude": 105.8542
@@ -199,27 +196,47 @@ public class ListingController {
                               "roomCapacity": 4,
                               "amenityIds": [1, 3, 5],
                               "mediaIds": [101, 102, 103],
-                              "isDraft": false,
                               "durationDays": 30,
                               "waterPrice": "NEGOTIABLE",
                               "electricityPrice": "SET_BY_OWNER",
                               "internetPrice": "PROVIDER_RATE",
                               "useMembershipQuota": false,
-                              "benefitsMembership": ["SILVER"]
+                              "paymentProvider": "VNPAY"
                             }
                             """
                     ),
                     @ExampleObject(
-                        name = "Draft Listing",
-                        summary = "Save incomplete listing as draft (for auto-save/connection loss)",
+                        name = "Listing with Membership Quota",
+                        summary = "Create VIP listing using membership quota - vipType is inferred from benefitIds",
                         value = """
                             {
-                              "title": "Căn hộ 2 phòng ngủ",
-                              "description": "Căn hộ đang cập nhật thông tin...",
+                              "title": "Căn hộ cao cấp 3 phòng ngủ",
+                              "description": "Căn hộ cao cấp với đầy đủ tiện nghi, view đẹp. VIP type will be inferred from the benefit type (POST_SILVER->SILVER, POST_GOLD->GOLD, POST_DIAMOND->DIAMOND)",
                               "listingType": "RENT",
                               "categoryId": 1,
-                              "price": 12000000,
-                              "isDraft": true
+                              "productType": "APARTMENT",
+                              "price": 25000000,
+                              "priceUnit": "MONTH",
+                              "address": {
+                                "legacy": {
+                                  "provinceId": 1,
+                                  "districtId": 5,
+                                  "wardId": 20,
+                                  "street": "456 Lê Lợi"
+                                },
+                                "latitude": 21.0285,
+                                "longitude": 105.8542
+                              },
+                              "area": 120.0,
+                              "bedrooms": 3,
+                              "bathrooms": 2,
+                              "direction": "SOUTH",
+                              "furnishing": "FULLY_FURNISHED",
+                              "roomCapacity": 6,
+                              "amenityIds": [1, 2, 3, 4, 5],
+                              "mediaIds": [201, 202, 203],
+                              "useMembershipQuota": true,
+                              "benefitIds": [101, 102]
                             }
                             """
                     ),
@@ -324,6 +341,116 @@ public class ListingController {
         request.setUserId(userId);
         ListingCreationResponse response = listingService.createListing(request);
         return ApiResponse.<ListingCreationResponse>builder().data(response).build();
+    }
+
+    @Operation(
+        summary = "Create draft listing",
+        description = """
+            Create a draft listing with all optional fields.
+            Used for auto-save functionality during listing creation.
+
+            **All fields are optional** - you can save partial data at any time.
+
+            The draft can later be:
+            - Updated via PATCH /v1/listings/{id}/draft
+            - Published via POST /v1/listings/{id}/publish
+            - Deleted via DELETE /v1/listings/{id}/draft
+            """,
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = DraftListingRequest.class),
+                examples = {
+                    @ExampleObject(
+                        name = "Minimal Draft",
+                        summary = "Save draft with minimal data",
+                        value = """
+                            {
+                              "title": "Căn hộ 2 phòng ngủ"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Partial Draft",
+                        summary = "Save draft with partial data",
+                        value = """
+                            {
+                              "title": "Căn hộ 2 phòng ngủ",
+                              "description": "Căn hộ đang cập nhật thông tin...",
+                              "listingType": "RENT",
+                              "categoryId": 1,
+                              "price": 12000000
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Complete Draft",
+                        summary = "Save draft with all data",
+                        value = """
+                            {
+                              "title": "Căn hộ cao cấp 3 phòng ngủ",
+                              "description": "Căn hộ cao cấp với đầy đủ tiện nghi",
+                              "listingType": "RENT",
+                              "vipType": "GOLD",
+                              "categoryId": 1,
+                              "productType": "APARTMENT",
+                              "price": 25000000,
+                              "priceUnit": "MONTH",
+                              "address": {
+                                "legacy": {
+                                  "provinceId": 1,
+                                  "districtId": 5,
+                                  "wardId": 20,
+                                  "street": "456 Lê Lợi"
+                                },
+                                "latitude": 21.0285,
+                                "longitude": 105.8542
+                              },
+                              "area": 120.0,
+                              "bedrooms": 3,
+                              "bathrooms": 2,
+                              "direction": "SOUTH",
+                              "furnishing": "FULLY_FURNISHED",
+                              "roomCapacity": 6,
+                              "amenityIds": [1, 2, 3, 4, 5],
+                              "mediaIds": [201, 202, 203]
+                            }
+                            """
+                    )
+                }
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Draft listing created successfully",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Draft Created",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "listingId": 123,
+                                "status": "DRAFT"
+                              }
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    @PostMapping("/draft")
+    public ApiResponse<DraftListingResponse> createDraftListing(@RequestBody DraftListingRequest request) {
+        String userId = extractUserId();
+        request.setUserId(userId);
+        DraftListingResponse response = listingService.createDraftListing(request);
+        return ApiResponse.<DraftListingResponse>builder().data(response).build();
     }
 
     @Operation(
@@ -2399,9 +2526,9 @@ public class ListingController {
 
     /**
      * Update draft listing (auto-save)
-     * PATCH /v1/listings/{id}/draft
+     * PATCH /v1/listings/draft/{draftId}
      */
-    @PostMapping("/{id}/draft")
+    @PostMapping("/draft/{draftId}")
     @Operation(
         summary = "Update draft listing (auto-save)",
         description = """
@@ -2409,21 +2536,58 @@ public class ListingController {
             This endpoint is used for auto-saving draft listings during creation.
 
             - No validation for required fields (validation happens on publish)
-            - Automatically sets isDraft=true
             - Only the owner can update their draft
+            - Drafts are stored in a separate table from published listings
 
             **Use case**: Auto-save every 30 seconds when user is creating a listing
             """,
         parameters = {
-            @Parameter(name = "id", description = "Listing ID", required = true, example = "123")
+            @Parameter(name = "draftId", description = "Draft ID", required = true, example = "123")
         }
     )
-    public ApiResponse<ListingResponse> updateDraft(
-            @PathVariable Long id,
-            @RequestBody ListingDraftUpdateRequest request) {
+    public ApiResponse<DraftListingResponse> updateDraft(
+            @PathVariable Long draftId,
+            @RequestBody DraftListingRequest request) {
         String userId = extractUserId();
-        ListingResponse response = listingService.updateDraft(id, request, userId);
-        return ApiResponse.<ListingResponse>builder().data(response).build();
+        DraftListingResponse response = listingService.updateDraft(draftId, request, userId);
+        return ApiResponse.<DraftListingResponse>builder().data(response).build();
+    }
+
+    /**
+     * Get draft by ID
+     * GET /v1/listings/draft/{draftId}
+     */
+    @GetMapping("/draft/{draftId}")
+    @Operation(
+        summary = "Get draft listing by ID",
+        description = """
+            Get a specific draft listing by its ID.
+            Only the owner can view their draft.
+
+            **Use case**: Load draft data when user wants to continue editing
+            """,
+        parameters = {
+            @Parameter(name = "draftId", description = "Draft ID", required = true, example = "123")
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved draft listing",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class)
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Draft not found"
+            )
+        }
+    )
+    public ApiResponse<DraftListingResponse> getDraftById(@PathVariable Long draftId) {
+        String userId = extractUserId();
+        DraftListingResponse response = listingService.getDraftById(draftId, userId);
+        return ApiResponse.<DraftListingResponse>builder().data(response).build();
     }
 
     /**
@@ -2454,20 +2618,13 @@ public class ListingController {
                               "message": null,
                               "data": [
                                 {
-                                  "listingId": 123,
+                                  "draftId": 123,
                                   "title": "Căn hộ 2PN Q7",
                                   "description": "Chưa hoàn thiện mô tả...",
-                                  "isDraft": true,
                                   "price": 5000000,
                                   "priceUnit": "MONTH",
                                   "updatedAt": "2025-11-29T10:30:00",
-                                  "media": [
-                                    {
-                                      "mediaId": 1,
-                                      "url": "https://example.com/image1.jpg",
-                                      "isPrimary": true
-                                    }
-                                  ]
+                                  "mediaIds": [1, 2, 3]
                                 }
                               ]
                             }
@@ -2477,40 +2634,88 @@ public class ListingController {
             )
         }
     )
-    public ApiResponse<List<com.smartrent.dto.response.ListingResponseForOwner>> getMyDrafts() {
+    public ApiResponse<List<DraftListingResponse>> getMyDrafts() {
         String userId = extractUserId();
-        List<com.smartrent.dto.response.ListingResponseForOwner> response = listingService.getMyDrafts(userId);
-        return ApiResponse.<List<com.smartrent.dto.response.ListingResponseForOwner>>builder().data(response).build();
+        List<DraftListingResponse> response = listingService.getMyDrafts(userId);
+        return ApiResponse.<List<DraftListingResponse>>builder().data(response).build();
     }
 
     /**
      * Publish draft listing
-     * POST /v1/listings/{id}/publish
+     * POST /v1/listings/draft/{draftId}/publish
      */
-    @PostMapping("/{id}/publish")
+    @PostMapping("/draft/{draftId}/publish")
     @Operation(
         summary = "Publish draft listing",
         description = """
             Publish a draft listing after validating all required fields.
+            The draft data is merged with the request body (request takes precedence).
 
             **Validation**:
             - Validates all required fields (title, description, price, address, etc.)
-            - Sets isDraft=false
-            - Sets postDate to current time
-            - Sets expiryDate if not already set
+            - Creates a new listing in the listings table
+            - Deletes the draft after successful publish
 
-            **Required fields**:
+            **Required fields** (from draft or request):
             - title, description
             - listingType, productType
             - price, priceUnit
             - address
             - categoryId
 
-            **Use case**: User clicks "Publish" button after completing the listing
+            **Payment/Quota options** (in request body):
+            - useMembershipQuota: true/false
+            - benefitIds: [1, 2] (when using quota)
+            - durationDays: 10/15/30 (when paying)
+            - paymentProvider: VNPAY (when paying)
+
+            **Use case**: User finishes editing draft and wants to publish
             """,
         parameters = {
-            @Parameter(name = "id", description = "Listing ID", required = true, example = "123")
+            @Parameter(name = "draftId", description = "Draft ID", required = true, example = "123")
         },
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ListingCreationRequest.class),
+                examples = {
+                    @ExampleObject(
+                        name = "Publish with Quota",
+                        summary = "Publish using membership quota",
+                        value = """
+                            {
+                              "useMembershipQuota": true,
+                              "benefitIds": [1]
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Publish with Payment",
+                        summary = "Publish with direct payment",
+                        value = """
+                            {
+                              "vipType": "GOLD",
+                              "durationDays": 30,
+                              "paymentProvider": "VNPAY"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Publish with Override",
+                        summary = "Publish with some fields overridden",
+                        value = """
+                            {
+                              "title": "Updated Title",
+                              "price": 15000000,
+                              "useMembershipQuota": true,
+                              "benefitIds": [1]
+                            }
+                            """
+                    )
+                }
+            )
+        ),
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
@@ -2522,7 +2727,7 @@ public class ListingController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "400",
-                description = "Missing required fields or listing is not a draft",
+                description = "Missing required fields",
                 content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(
@@ -2530,7 +2735,7 @@ public class ListingController {
                         value = """
                             {
                               "code": "400001",
-                              "message": "Cannot publish listing. Missing required fields: title, description, price",
+                              "message": "Cannot publish draft. Missing required fields: title, description, price",
                               "data": null
                             }
                             """
@@ -2539,27 +2744,28 @@ public class ListingController {
             )
         }
     )
-    public ApiResponse<ListingResponse> publishDraft(@PathVariable Long id) {
+    public ApiResponse<ListingCreationResponse> publishDraft(
+            @PathVariable Long draftId,
+            @RequestBody ListingCreationRequest request) {
         String userId = extractUserId();
-        ListingResponse response = listingService.publishDraft(id, userId);
-        return ApiResponse.<ListingResponse>builder().data(response).build();
+        ListingCreationResponse response = listingService.publishDraft(draftId, request, userId);
+        return ApiResponse.<ListingCreationResponse>builder().data(response).build();
     }
 
     /**
      * Delete draft listing
-     * DELETE /v1/listings/{id}/draft
+     * DELETE /v1/listings/draft/{draftId}
      */
-    @DeleteMapping("/{id}/draft")
+    @DeleteMapping("/draft/{draftId}")
     @Operation(
         summary = "Delete draft listing",
         description = """
-            Delete a draft listing. Only draft listings can be deleted.
-            Published listings cannot be deleted through this endpoint.
+            Delete a draft listing.
 
             **Use case**: User wants to discard a draft
             """,
         parameters = {
-            @Parameter(name = "id", description = "Listing ID", required = true, example = "123")
+            @Parameter(name = "draftId", description = "Draft ID", required = true, example = "123")
         },
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -2580,27 +2786,14 @@ public class ListingController {
                 )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "400",
-                description = "Listing is not a draft",
-                content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                        name = "Not a draft",
-                        value = """
-                            {
-                              "code": "400001",
-                              "message": "Only draft listings can be deleted. Published listings cannot be deleted.",
-                              "data": null
-                            }
-                            """
-                    )
-                )
+                responseCode = "404",
+                description = "Draft not found"
             )
         }
     )
-    public ApiResponse<Void> deleteDraft(@PathVariable Long id) {
+    public ApiResponse<Void> deleteDraft(@PathVariable Long draftId) {
         String userId = extractUserId();
-        listingService.deleteDraft(id, userId);
+        listingService.deleteDraft(draftId, userId);
         return ApiResponse.<Void>builder().message("Draft deleted successfully").build();
     }
 

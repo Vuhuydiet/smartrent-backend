@@ -43,6 +43,17 @@ public class ListingCreationRequest {
     Boolean isVerify;
     Boolean expired;
 
+    /**
+     * VIP tier type for the listing (NORMAL, SILVER, GOLD, DIAMOND)
+     * Optional when useMembershipQuota=true with benefitIds - will be inferred from benefit type:
+     * - POST_SILVER benefit -> SILVER vipType
+     * - POST_GOLD benefit -> GOLD vipType
+     * - POST_DIAMOND benefit -> DIAMOND vipType
+     * Required when useMembershipQuota=false (payment flow)
+     */
+    @Schema(description = "VIP tier type. Optional when using membership quota (inferred from benefitIds)",
+            example = "GOLD",
+            allowableValues = {"NORMAL", "SILVER", "GOLD", "DIAMOND"})
     String vipType;
 
     Long categoryId;
@@ -76,14 +87,6 @@ public class ListingCreationRequest {
 
     Set<Long> amenityIds;
 
-    /**
-     * Whether this is a draft listing
-     * If true, validation is relaxed to allow incomplete data
-     * Default: false
-     */
-    @Builder.Default
-    Boolean isDraft = false;
-
     LocalDateTime postedAt;
 
     String waterPrice;
@@ -113,6 +116,17 @@ public class ListingCreationRequest {
      */
     @Builder.Default
     Boolean useMembershipQuota = false;
+
+    /**
+     * List of user membership benefit IDs to use for creating this listing
+     * Required when useMembershipQuota is true
+     * Each benefitId corresponds to a UserMembershipBenefit record
+     * The system will consume quota from these specific benefits
+     * All benefits must have the same type (e.g., all POST_GOLD)
+     * The vipType will be automatically inferred from the benefit type
+     */
+    @Schema(description = "List of user membership benefit IDs to use when useMembershipQuota=true. VipType is inferred from benefit type.")
+    Set<Long> benefitIds;
 
     /**
      * Payment provider to use (VNPAY, etc.)

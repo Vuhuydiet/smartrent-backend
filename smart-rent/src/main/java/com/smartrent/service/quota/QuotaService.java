@@ -2,6 +2,9 @@ package com.smartrent.service.quota;
 
 import com.smartrent.dto.response.QuotaStatusResponse;
 import com.smartrent.enums.BenefitType;
+import com.smartrent.infra.repository.entity.UserMembershipBenefit;
+
+import java.util.Set;
 
 /**
  * Service for managing user quotas
@@ -32,6 +35,26 @@ public interface QuotaService {
      * @return true if quota was consumed successfully, false if insufficient quota
      */
     boolean consumeQuota(String userId, BenefitType benefitType, int quantity);
+
+    /**
+     * Consume quota from specific user membership benefits
+     * @param userId User ID
+     * @param benefitIds Set of UserMembershipBenefit IDs to consume from
+     * @param expectedBenefitType Expected benefit type for validation
+     * @return true if quota was consumed successfully from all specified benefits
+     * @throws IllegalArgumentException if benefitIds are invalid or don't belong to user
+     * @throws IllegalStateException if any benefit has no available quota
+     */
+    boolean consumeQuotaByBenefitIds(String userId, Set<Long> benefitIds, BenefitType expectedBenefitType);
+
+    /**
+     * Get user membership benefit by ID with validation
+     * @param userId User ID for ownership validation
+     * @param benefitId UserMembershipBenefit ID
+     * @return UserMembershipBenefit entity
+     * @throws IllegalArgumentException if benefit not found or doesn't belong to user
+     */
+    UserMembershipBenefit getBenefitById(String userId, Long benefitId);
 
     /**
      * Check if user has sufficient quota

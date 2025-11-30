@@ -1,14 +1,17 @@
 package com.smartrent.service.listing.impl;
 
 import com.smartrent.constants.PricingConstants;
+import com.smartrent.dto.request.AddressCreationRequest;
+import com.smartrent.dto.request.DraftListingRequest;
+import com.smartrent.dto.request.LegacyAddressData;
 import com.smartrent.dto.request.ListingCreationRequest;
-import com.smartrent.dto.request.ListingDraftUpdateRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
-import com.smartrent.dto.request.MyListingsFilterRequest;
+import com.smartrent.dto.request.NewAddressData;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
+import com.smartrent.dto.response.DraftListingResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
@@ -23,6 +26,7 @@ import com.smartrent.infra.repository.AddressRepository;
 import com.smartrent.infra.repository.AddressMetadataRepository;
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.LegacyProvinceRepository;
+import com.smartrent.infra.repository.ListingDraftRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.ProvinceRepository;
@@ -30,7 +34,6 @@ import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.VipTierDetailRepository;
 import com.smartrent.infra.repository.entity.*;
-import com.smartrent.infra.repository.specification.ListingSpecification;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.ListingQueryService;
@@ -53,7 +56,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -67,6 +69,7 @@ import java.util.stream.Collectors;
 public class ListingServiceImpl implements ListingService {
 
     ListingRepository listingRepository;
+    ListingDraftRepository listingDraftRepository;
     MediaRepository mediaRepository;
     AddressRepository addressRepository;
     AddressMetadataRepository addressMetadataRepository;
@@ -91,20 +94,44 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     public ListingCreationResponse createListing(ListingCreationRequest request) {
-        log.info("Creating listing with address - User: {}, Title: {}, IsDraft: {}",
-                request.getUserId(), request.getTitle(), request.getIsDraft());
-
-        // For draft listings, skip validation and payment flow
-        if (Boolean.TRUE.equals(request.getIsDraft())) {
-            return createDraftListing(request);
-        }
+        log.info("Creating listing with address - User: {}, Title: {}, UseMembershipQuota: {}",
+                request.getUserId(), request.getTitle(), request.getUseMembershipQuota());
 
         // Validate required fields for non-draft listings
         validateNonDraftListing(request);
 
-        // Check if this is a NORMAL listing with duration days requiring payment
-        if (request.getDurationDays() != null && !Boolean.TRUE.equals(request.getUseMembershipQuota())) {
-            log.info("NORMAL listing requires payment - initiating payment flow");
+        // Check if user wants to use membership quota with specific benefit IDs
+        if (Boolean.TRUE.equals(request.getUseMembershipQuota())) {
+            return createListingWithMembershipQuota(request);
+        }
+
+        // Create address first (within the same transaction)
+        Address address = createAddress(request.getAddress());
+
+        // Create listing and set the address
+        Listing listing = listingMapper.toEntity(request);
+        listing.setAddress(address);
+        listing.setPostSource(PostSource.DIRECT_PAYMENT);
+
+        // Set default values for required fields
+        if (listing.getExpired() == null) {
+            listing.setExpired(false);
+        }
+
+        // Save listing to database first
+        Listing saved = listingRepository.save(listing);
+        log.info("Listing created successfully with id: {} and address id: {}",
+                saved.getListingId(), address.getAddressId());
+
+        // Link media to listing if provided (within same transaction)
+        if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
+            linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
+            log.info("Linked {} media items to listing {}", request.getMediaIds().size(), saved.getListingId());
+        }
+
+        // Check if this is a listing with duration days requiring payment
+        if (request.getDurationDays() != null) {
+            log.info("Listing requires payment - initiating payment flow for listing id: {}", saved.getListingId());
 
             // Validate duration days
             if (request.getDurationDays() <= 0) {
@@ -121,7 +148,7 @@ public class ListingServiceImpl implements ListingService {
             // Calculate price based on VIP tier and duration
             java.math.BigDecimal amount = vipTier.getPriceForDuration(request.getDurationDays());
 
-            // Create PENDING transaction
+            // Create PENDING transaction linked to the listing
             String transactionId = transactionService.createPostFeeTransaction(
                     request.getUserId(),
                     amount,
@@ -130,13 +157,17 @@ public class ListingServiceImpl implements ListingService {
                     request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
             );
 
-            // Cache the listing request in Redis (30 min TTL)
+            // Update listing with transaction ID
+            saved.setTransactionId(transactionId);
+            listingRepository.save(saved);
+
+            // Cache the listing ID in Redis for payment callback (30 min TTL)
             listingRequestCacheService.storeNormalListingRequest(transactionId, request);
-            log.info("Cached {} listing request for transaction: {}", vipType, transactionId);
+            log.info("Cached {} listing request for transaction: {}, listingId: {}", vipType, transactionId, saved.getListingId());
 
             // Generate payment URL using PaymentService
             PaymentRequest paymentRequest = PaymentRequest.builder()
-                    .transactionId(transactionId) // Reuse the transaction created above
+                    .transactionId(transactionId)
                     .provider(com.smartrent.enums.PaymentProvider.valueOf(
                             request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                     .amount(amount)
@@ -146,25 +177,83 @@ public class ListingServiceImpl implements ListingService {
 
             PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
 
-            log.info("Payment URL generated for {} listing transaction: {}", vipType, transactionId);
+            log.info("Payment URL generated for {} listing transaction: {}, listingId: {}", vipType, transactionId, saved.getListingId());
 
-            // Return payment response
+            // Return payment response with listing ID
             return ListingCreationResponse.builder()
+                    .listingId(saved.getListingId())
                     .paymentRequired(true)
                     .transactionId(transactionId)
                     .amount(amount.longValue())
                     .paymentUrl(paymentResponse.getPaymentUrl())
-                    .message("Payment required. Complete payment to create listing.")
+                    .message("Payment required. Complete payment to activate listing.")
                     .build();
         }
 
-        // Original flow for listings without payment requirement
+        // Return listing response (no payment required - this case shouldn't happen normally)
+        return listingMapper.toCreationResponse(saved);
+    }
+
+    /**
+     * Create listing using membership quota with specific benefit IDs
+     * This allows users to specify which membership benefits to use for creating a listing
+     */
+    private ListingCreationResponse createListingWithMembershipQuota(ListingCreationRequest request) {
+        log.info("Creating listing with membership quota for user: {}, benefitIds: {}",
+                request.getUserId(), request.getBenefitIds());
+
+        // Validate benefitIds are provided
+        if (request.getBenefitIds() == null || request.getBenefitIds().isEmpty()) {
+            throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                    "benefitIds are required when useMembershipQuota is true");
+        }
+
+        // Get the first benefit to determine the benefit type and infer vipType
+        Long firstBenefitId = request.getBenefitIds().iterator().next();
+        UserMembershipBenefit firstBenefit;
+        try {
+            firstBenefit = quotaService.getBenefitById(request.getUserId(), firstBenefitId);
+        } catch (IllegalArgumentException e) {
+            throw new AppException(DomainCode.BENEFIT_NOT_FOUND, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new AppException(DomainCode.BENEFIT_EXPIRED, e.getMessage());
+        }
+
+        BenefitType benefitType = firstBenefit.getBenefitType();
+
+        // Validate benefit type is a posting type (POST_SILVER, POST_GOLD, POST_DIAMOND)
+        String vipType = switch (benefitType) {
+            case POST_SILVER -> "SILVER";
+            case POST_GOLD -> "GOLD";
+            case POST_DIAMOND -> "DIAMOND";
+            default -> throw new AppException(DomainCode.BENEFIT_TYPE_MISMATCH,
+                    "Benefit type " + benefitType + " cannot be used for creating listings. Only POST_SILVER, POST_GOLD, POST_DIAMOND are supported.");
+        };
+
+        log.info("Inferred vipType {} from benefit type {}", vipType, benefitType);
+
+        // Consume quota from specified benefit IDs (this also validates all benefits have the same type)
+        try {
+            quotaService.consumeQuotaByBenefitIds(request.getUserId(), request.getBenefitIds(), benefitType);
+        } catch (IllegalArgumentException e) {
+            throw new AppException(DomainCode.BAD_REQUEST_ERROR, e.getMessage());
+        } catch (IllegalStateException e) {
+            throw new AppException(DomainCode.INSUFFICIENT_QUOTA, e.getMessage());
+        }
+
+        // Set the inferred vipType on the request so the mapper uses it
+        request.setVipType(vipType);
+
         // Create address first (within the same transaction)
         Address address = createAddress(request.getAddress());
 
-        // Create listing and set the address
+        // Create listing with postSource = QUOTA
         Listing listing = listingMapper.toEntity(request);
         listing.setAddress(address);
+        listing.setPostSource(PostSource.QUOTA);
+        listing.setTransactionId(null);
+        listing.setUseMembershipQuota(true);
+
         // Set default values for required fields
         if (listing.getExpired() == null) {
             listing.setExpired(false);
@@ -172,13 +261,18 @@ public class ListingServiceImpl implements ListingService {
 
         // Save listing
         Listing saved = listingRepository.save(listing);
-        log.info("Listing created successfully with id: {} and address id: {}",
-                saved.getListingId(), address.getAddressId());
+        log.info("Listing created successfully with quota - id: {}, vipType: {}, benefitIds: {}",
+                saved.getListingId(), vipType, request.getBenefitIds());
 
         // Link media to listing if provided (within same transaction)
         if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
             linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
             log.info("Linked {} media items to listing {}", request.getMediaIds().size(), saved.getListingId());
+        }
+
+        // If Diamond, create shadow NORMAL listing
+        if ("DIAMOND".equalsIgnoreCase(vipType)) {
+            createShadowListing(saved);
         }
 
         return listingMapper.toCreationResponse(saved);
@@ -791,7 +885,11 @@ public class ListingServiceImpl implements ListingService {
         if (request.getListingType() == null || request.getListingType().isBlank()) {
             missingFields.add("listingType");
         }
-        if (request.getVipType() == null || request.getVipType().isBlank()) {
+        // vipType is optional when using membership quota with benefitIds (will be inferred from benefit type)
+        boolean usingMembershipQuotaWithBenefits = Boolean.TRUE.equals(request.getUseMembershipQuota())
+                && request.getBenefitIds() != null
+                && !request.getBenefitIds().isEmpty();
+        if (!usingMembershipQuotaWithBenefits && (request.getVipType() == null || request.getVipType().isBlank())) {
             missingFields.add("vipType");
         }
         if (request.getCategoryId() == null) {
@@ -816,58 +914,81 @@ public class ListingServiceImpl implements ListingService {
         }
     }
 
-    /**
-     * Create a draft listing with minimal validation
-     */
-    private ListingCreationResponse createDraftListing(ListingCreationRequest request) {
+    @Override
+    @Transactional
+    public DraftListingResponse createDraftListing(DraftListingRequest request) {
         log.info("Creating draft listing for user: {}", request.getUserId());
 
-        // Create listing entity with available data
-        Listing listing = Listing.builder()
+        // Create draft entity with available data
+        ListingDraft draft = ListingDraft.builder()
                 .userId(request.getUserId())
                 .title(request.getTitle())
                 .description(request.getDescription())
-                .listingType(request.getListingType() != null ?
-                        Listing.ListingType.valueOf(request.getListingType()) : null)
-                .vipType(request.getVipType() != null ?
-                        Listing.VipType.valueOf(request.getVipType()) : Listing.VipType.NORMAL)
+                .listingType(request.getListingType())
+                .vipType(request.getVipType())
                 .categoryId(request.getCategoryId())
-                .productType(request.getProductType() != null ?
-                        Listing.ProductType.valueOf(request.getProductType()) : null)
+                .productType(request.getProductType())
                 .price(request.getPrice())
-                .priceUnit(request.getPriceUnit() != null ?
-                        Listing.PriceUnit.valueOf(request.getPriceUnit()) : null)
+                .priceUnit(request.getPriceUnit())
                 .area(request.getArea())
                 .bedrooms(request.getBedrooms())
                 .bathrooms(request.getBathrooms())
-                .direction(request.getDirection() != null ?
-                        Listing.Direction.valueOf(request.getDirection()) : null)
-                .furnishing(request.getFurnishing() != null ?
-                        Listing.Furnishing.valueOf(request.getFurnishing()) : null)
+                .direction(request.getDirection())
+                .furnishing(request.getFurnishing())
                 .roomCapacity(request.getRoomCapacity())
-                .isDraft(true)
-                .verified(false)
-                .isVerify(false)
-                .expired(false)
+                .waterPrice(request.getWaterPrice())
+                .electricityPrice(request.getElectricityPrice())
+                .internetPrice(request.getInternetPrice())
+                .serviceFee(request.getServiceFee())
                 .build();
 
-        // Create address if provided
+        // Extract address fields if provided
         if (request.getAddress() != null) {
-            Address address = createAddress(request.getAddress());
-            listing.setAddress(address);
+            var addressReq = request.getAddress();
+            if (addressReq.getLegacy() != null) {
+                draft.setAddressType("OLD");
+                draft.setProvinceId(addressReq.getLegacy().getProvinceId() != null
+                        ? addressReq.getLegacy().getProvinceId().longValue() : null);
+                draft.setDistrictId(addressReq.getLegacy().getDistrictId() != null
+                        ? addressReq.getLegacy().getDistrictId().longValue() : null);
+                draft.setWardId(addressReq.getLegacy().getWardId() != null
+                        ? addressReq.getLegacy().getWardId().longValue() : null);
+                draft.setStreet(addressReq.getLegacy().getStreet());
+            } else if (addressReq.getNewAddress() != null) {
+                draft.setAddressType("NEW");
+                draft.setProvinceCode(addressReq.getNewAddress().getProvinceCode());
+                draft.setWardCode(addressReq.getNewAddress().getWardCode());
+                draft.setStreet(addressReq.getNewAddress().getStreet());
+            }
+            draft.setStreetId(addressReq.getStreetId() != null
+                    ? addressReq.getStreetId().longValue() : null);
+            draft.setProjectId(addressReq.getProjectId() != null
+                    ? addressReq.getProjectId().longValue() : null);
+            draft.setLatitude(addressReq.getLatitude() != null
+                    ? addressReq.getLatitude().doubleValue() : null);
+            draft.setLongitude(addressReq.getLongitude() != null
+                    ? addressReq.getLongitude().doubleValue() : null);
         }
 
-        // Save draft listing
-        Listing saved = listingRepository.save(listing);
-        log.info("Draft listing created successfully with id: {}", saved.getListingId());
+        // Store amenity IDs as comma-separated string
+        if (request.getAmenityIds() != null && !request.getAmenityIds().isEmpty()) {
+            draft.setAmenityIds(request.getAmenityIds().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",")));
+        }
 
-        // Link media to listing if provided
+        // Store media IDs as comma-separated string
         if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
-            linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
-            log.info("Linked {} media items to draft listing {}", request.getMediaIds().size(), saved.getListingId());
+            draft.setMediaIds(request.getMediaIds().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",")));
         }
 
-        return listingMapper.toCreationResponse(saved);
+        // Save draft
+        ListingDraft saved = listingDraftRepository.save(draft);
+        log.info("Draft listing created successfully with id: {}", saved.getDraftId());
+
+        return mapDraftToResponse(saved);
     }
 
     private String formatDiscountDescription(BigDecimal discount) {
@@ -1384,304 +1505,376 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional
-    public ListingResponse updateDraft(Long id, ListingDraftUpdateRequest request, String userId) {
-        log.info("Updating draft listing {} for user {}", id, userId);
+    public DraftListingResponse updateDraft(Long draftId, DraftListingRequest request, String userId) {
+        log.info("Updating draft listing {} for user {}", draftId, userId);
 
-        // Get listing and verify ownership
-        Listing listing = listingRepository.findById(id)
+        // Get draft and verify ownership
+        ListingDraft draft = listingDraftRepository.findByDraftIdAndUserId(draftId, userId)
                 .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND,
-                        "Listing not found with id: " + id));
-
-        // Verify user is the owner
-        if (!listing.getUserId().equals(userId)) {
-            throw new AppException(DomainCode.UNAUTHORIZED,
-                    "You are not the owner of this listing");
-        }
+                        "Draft not found with id: " + draftId));
 
         // Update fields if provided (partial update)
         if (request.getTitle() != null) {
-            listing.setTitle(request.getTitle());
+            draft.setTitle(request.getTitle());
         }
         if (request.getDescription() != null) {
-            listing.setDescription(request.getDescription());
+            draft.setDescription(request.getDescription());
         }
         if (request.getListingType() != null) {
-            listing.setListingType(Listing.ListingType.valueOf(request.getListingType()));
+            draft.setListingType(request.getListingType());
         }
         if (request.getVipType() != null) {
-            listing.setVipType(Listing.VipType.valueOf(request.getVipType()));
+            draft.setVipType(request.getVipType());
         }
         if (request.getCategoryId() != null) {
-            listing.setCategoryId(request.getCategoryId());
+            draft.setCategoryId(request.getCategoryId());
         }
         if (request.getProductType() != null) {
-            listing.setProductType(Listing.ProductType.valueOf(request.getProductType()));
+            draft.setProductType(request.getProductType());
         }
         if (request.getPrice() != null) {
-            listing.setPrice(request.getPrice());
+            draft.setPrice(request.getPrice());
         }
         if (request.getPriceUnit() != null) {
-            listing.setPriceUnit(Listing.PriceUnit.valueOf(request.getPriceUnit()));
+            draft.setPriceUnit(request.getPriceUnit());
         }
         if (request.getArea() != null) {
-            listing.setArea(request.getArea());
+            draft.setArea(request.getArea());
         }
         if (request.getBedrooms() != null) {
-            listing.setBedrooms(request.getBedrooms());
+            draft.setBedrooms(request.getBedrooms());
         }
         if (request.getBathrooms() != null) {
-            listing.setBathrooms(request.getBathrooms());
+            draft.setBathrooms(request.getBathrooms());
         }
         if (request.getDirection() != null) {
-            listing.setDirection(Listing.Direction.valueOf(request.getDirection()));
+            draft.setDirection(request.getDirection());
         }
         if (request.getFurnishing() != null) {
-            listing.setFurnishing(Listing.Furnishing.valueOf(request.getFurnishing()));
+            draft.setFurnishing(request.getFurnishing());
         }
         if (request.getRoomCapacity() != null) {
-            listing.setRoomCapacity(request.getRoomCapacity());
+            draft.setRoomCapacity(request.getRoomCapacity());
         }
         if (request.getWaterPrice() != null) {
-            listing.setWaterPrice(request.getWaterPrice());
+            draft.setWaterPrice(request.getWaterPrice());
         }
         if (request.getElectricityPrice() != null) {
-            listing.setElectricityPrice(request.getElectricityPrice());
+            draft.setElectricityPrice(request.getElectricityPrice());
         }
         if (request.getInternetPrice() != null) {
-            listing.setInternetPrice(request.getInternetPrice());
+            draft.setInternetPrice(request.getInternetPrice());
         }
         if (request.getServiceFee() != null) {
-            listing.setServiceFee(request.getServiceFee());
-        }
-        if (request.getDurationDays() != null) {
-            listing.setDurationDays(request.getDurationDays());
-        }
-        if (request.getPaymentProvider() != null) {
-            listing.setPaymentProvider(request.getPaymentProvider());
+            draft.setServiceFee(request.getServiceFee());
         }
 
         // Update address if provided
-        if (request.getFullAddress() != null || request.getLatitude() != null) {
-            Address address = listing.getAddress();
-            if (address == null) {
-                // Create new address if not exists
-                address = Address.builder()
-                        .addressType(request.getAddressType() != null ?
-                                AddressMetadata.AddressType.valueOf(request.getAddressType()) : AddressMetadata.AddressType.NEW)
-                        .build();
+        if (request.getAddress() != null) {
+            var addressReq = request.getAddress();
+            if (addressReq.getLegacy() != null) {
+                draft.setAddressType("OLD");
+                draft.setProvinceId(addressReq.getLegacy().getProvinceId() != null
+                        ? addressReq.getLegacy().getProvinceId().longValue() : null);
+                draft.setDistrictId(addressReq.getLegacy().getDistrictId() != null
+                        ? addressReq.getLegacy().getDistrictId().longValue() : null);
+                draft.setWardId(addressReq.getLegacy().getWardId() != null
+                        ? addressReq.getLegacy().getWardId().longValue() : null);
+                draft.setStreet(addressReq.getLegacy().getStreet());
+            } else if (addressReq.getNewAddress() != null) {
+                draft.setAddressType("NEW");
+                draft.setProvinceCode(addressReq.getNewAddress().getProvinceCode());
+                draft.setWardCode(addressReq.getNewAddress().getWardCode());
+                draft.setStreet(addressReq.getNewAddress().getStreet());
             }
-
-            if (request.getFullAddress() != null) {
-                address.setFullAddress(request.getFullAddress());
-                address.setFullNewAddress(request.getFullAddress());
+            if (addressReq.getStreetId() != null) {
+                draft.setStreetId(addressReq.getStreetId().longValue());
             }
-            if (request.getLatitude() != null) {
-                address.setLatitude(BigDecimal.valueOf(request.getLatitude()));
+            if (addressReq.getProjectId() != null) {
+                draft.setProjectId(addressReq.getProjectId().longValue());
             }
-            if (request.getLongitude() != null) {
-                address.setLongitude(BigDecimal.valueOf(request.getLongitude()));
+            if (addressReq.getLatitude() != null) {
+                draft.setLatitude(addressReq.getLatitude().doubleValue());
             }
-            if (request.getLegacyProvinceId() != null) {
-                address.setLegacyProvinceId(request.getLegacyProvinceId());
+            if (addressReq.getLongitude() != null) {
+                draft.setLongitude(addressReq.getLongitude().doubleValue());
             }
-            if (request.getLegacyDistrictId() != null) {
-                address.setLegacyDistrictId(request.getLegacyDistrictId());
-            }
-            if (request.getLegacyWardId() != null) {
-                address.setLegacyWardId(request.getLegacyWardId());
-            }
-            if (request.getLegacyStreet() != null) {
-                address.setLegacyStreet(request.getLegacyStreet());
-            }
-            if (request.getNewProvinceCode() != null) {
-                address.setNewProvinceCode(request.getNewProvinceCode());
-            }
-            if (request.getNewWardCode() != null) {
-                address.setNewWardCode(request.getNewWardCode());
-            }
-            if (request.getNewStreet() != null) {
-                address.setNewStreet(request.getNewStreet());
-            }
-
-            address = addressRepository.save(address);
-            listing.setAddress(address);
         }
 
-        // Ensure listing is marked as draft
-        listing.setIsDraft(true);
+        // Update amenity IDs if provided
+        if (request.getAmenityIds() != null) {
+            draft.setAmenityIds(request.getAmenityIds().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",")));
+        }
 
-        // Save listing
-        Listing savedListing = listingRepository.save(listing);
+        // Update media IDs if provided
+        if (request.getMediaIds() != null) {
+            draft.setMediaIds(request.getMediaIds().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",")));
+        }
 
-        log.info("Draft listing {} updated successfully", id);
+        // Save draft
+        ListingDraft savedDraft = listingDraftRepository.save(draft);
+        log.info("Draft listing {} updated successfully", draftId);
 
-        // Build response
-        com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(userId);
-        com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(savedListing.getAddress());
-
-        return listingMapper.toResponse(savedListing, user, addressResponse);
+        return mapDraftToResponse(savedDraft);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<com.smartrent.dto.response.ListingResponseForOwner> getMyDrafts(String userId) {
+    public List<DraftListingResponse> getMyDrafts(String userId) {
         log.info("Getting draft listings for user {}", userId);
 
-        // Find all draft listings for user, sorted by updatedAt DESC
-        List<Listing> drafts = listingRepository.findAll(
-                (root, query, cb) -> cb.and(
-                        cb.equal(root.get("userId"), userId),
-                        cb.equal(root.get("isDraft"), true)
-                ),
-                Sort.by(Sort.Direction.DESC, "updatedAt")
-        );
-
+        List<ListingDraft> drafts = listingDraftRepository.findByUserIdOrderByUpdatedAtDesc(userId);
         log.info("Found {} draft listings for user {}", drafts.size(), userId);
 
-        // Map to response
         return drafts.stream()
-                .map(listing -> {
-                    com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(userId);
-                    com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-
-                    // Get media
-                    List<com.smartrent.dto.response.MediaResponse> mediaResponses =
-                            mediaRepository.findByListing_ListingIdAndStatusOrderBySortOrderAsc(
-                                    listing.getListingId(),
-                                    Media.MediaStatus.ACTIVE
-                            ).stream()
-                                    .map(mediaMapper::toResponse)
-                                    .collect(Collectors.toList());
-
-                    return listingMapper.toResponseForOwner(
-                            listing,
-                            user,
-                            mediaResponses,
-                            addressResponse,
-                            null, // No payment info for drafts
-                            null, // No statistics for drafts
-                            null, // No verification notes
-                            null  // No rejection reason
-                    );
-                })
+                .map(this::mapDraftToResponse)
                 .collect(Collectors.toList());
     }
 
     @Override
-    @Transactional
-    public ListingResponse publishDraft(Long id, String userId) {
-        log.info("Publishing draft listing {} for user {}", id, userId);
+    @Transactional(readOnly = true)
+    public DraftListingResponse getDraftById(Long draftId, String userId) {
+        log.info("Getting draft listing {} for user {}", draftId, userId);
 
-        // Get listing and verify ownership
-        Listing listing = listingRepository.findById(id)
+        ListingDraft draft = listingDraftRepository.findByDraftIdAndUserId(draftId, userId)
                 .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND,
-                        "Listing not found with id: " + id));
+                        "Draft not found with id: " + draftId));
 
-        // Verify user is the owner
-        if (!listing.getUserId().equals(userId)) {
-            throw new AppException(DomainCode.UNAUTHORIZED,
-                    "You are not the owner of this listing");
-        }
-
-        // Verify it's a draft
-        if (!Boolean.TRUE.equals(listing.getIsDraft())) {
-            throw new AppException(DomainCode.BAD_REQUEST_ERROR,
-                    "Listing is not a draft");
-        }
-
-        // Validate required fields
-        validateListingForPublish(listing);
-
-        // Set as published
-        listing.setIsDraft(false);
-        listing.setPostDate(java.time.LocalDateTime.now());
-
-        if (listing.getExpiryDate() == null) {
-            // Set expiry date to 30 days from now if not set
-            listing.setExpiryDate(java.time.LocalDateTime.now().plusDays(
-                    listing.getDurationDays() != null ? listing.getDurationDays() : 30
-            ));
-        }
-
-        // Set default values if not set
-        if (listing.getPostSource() == null) {
-            listing.setPostSource(PostSource.QUOTA);
-        }
-
-        // Save listing
-        Listing savedListing = listingRepository.save(listing);
-
-        log.info("Draft listing {} published successfully", id);
-
-        // Build response
-        com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(userId);
-        com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(savedListing.getAddress());
-
-        return listingMapper.toResponse(savedListing, user, addressResponse);
+        return mapDraftToResponse(draft);
     }
 
     @Override
     @Transactional
-    public void deleteDraft(Long id, String userId) {
-        log.info("Deleting draft listing {} for user {}", id, userId);
+    public ListingCreationResponse publishDraft(Long draftId, ListingCreationRequest request, String userId) {
+        log.info("Publishing draft listing {} for user {}", draftId, userId);
 
-        // Get listing and verify ownership
-        Listing listing = listingRepository.findById(id)
+        // Get draft and verify ownership
+        ListingDraft draft = listingDraftRepository.findByDraftIdAndUserId(draftId, userId)
                 .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND,
-                        "Listing not found with id: " + id));
+                        "Draft not found with id: " + draftId));
 
-        // Verify user is the owner
-        if (!listing.getUserId().equals(userId)) {
-            throw new AppException(DomainCode.UNAUTHORIZED,
-                    "You are not the owner of this listing");
-        }
+        // Merge draft data with request (request takes precedence)
+        ListingCreationRequest mergedRequest = mergeDraftWithRequest(draft, request);
+        mergedRequest.setUserId(userId);
 
-        // Verify it's a draft
-        if (!Boolean.TRUE.equals(listing.getIsDraft())) {
-            throw new AppException(DomainCode.BAD_REQUEST_ERROR,
-                    "Only draft listings can be deleted. Published listings cannot be deleted.");
-        }
+        // Validate required fields
+        validateDraftForPublish(mergedRequest);
 
-        // Delete listing (cascade will delete related media, etc.)
-        listingRepository.delete(listing);
+        // Create the listing using the normal flow
+        ListingCreationResponse response = createListing(mergedRequest);
 
-        log.info("Draft listing {} deleted successfully", id);
+        // Delete the draft after successful publish
+        listingDraftRepository.delete(draft);
+        log.info("Draft {} deleted after successful publish, listing created with id: {}",
+                draftId, response.getListingId());
+
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public void deleteDraft(Long draftId, String userId) {
+        log.info("Deleting draft listing {} for user {}", draftId, userId);
+
+        // Get draft and verify ownership
+        ListingDraft draft = listingDraftRepository.findByDraftIdAndUserId(draftId, userId)
+                .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND,
+                        "Draft not found with id: " + draftId));
+
+        listingDraftRepository.delete(draft);
+        log.info("Draft listing {} deleted successfully", draftId);
     }
 
     /**
-     * Validate listing has all required fields before publishing
+     * Map ListingDraft entity to DraftListingResponse
      */
-    private void validateListingForPublish(Listing listing) {
+    private DraftListingResponse mapDraftToResponse(ListingDraft draft) {
+        Set<Long> amenityIds = null;
+        if (draft.getAmenityIds() != null && !draft.getAmenityIds().isEmpty()) {
+            amenityIds = java.util.Arrays.stream(draft.getAmenityIds().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .collect(Collectors.toSet());
+        }
+
+        Set<Long> mediaIds = null;
+        if (draft.getMediaIds() != null && !draft.getMediaIds().isEmpty()) {
+            mediaIds = java.util.Arrays.stream(draft.getMediaIds().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .collect(Collectors.toSet());
+        }
+
+        return DraftListingResponse.builder()
+                .draftId(draft.getDraftId())
+                .userId(draft.getUserId())
+                .title(draft.getTitle())
+                .description(draft.getDescription())
+                .listingType(draft.getListingType())
+                .vipType(draft.getVipType())
+                .categoryId(draft.getCategoryId())
+                .productType(draft.getProductType())
+                .price(draft.getPrice())
+                .priceUnit(draft.getPriceUnit())
+                .addressType(draft.getAddressType())
+                .provinceId(draft.getProvinceId())
+                .districtId(draft.getDistrictId())
+                .wardId(draft.getWardId())
+                .provinceCode(draft.getProvinceCode())
+                .wardCode(draft.getWardCode())
+                .street(draft.getStreet())
+                .streetId(draft.getStreetId())
+                .projectId(draft.getProjectId())
+                .latitude(draft.getLatitude())
+                .longitude(draft.getLongitude())
+                .area(draft.getArea())
+                .bedrooms(draft.getBedrooms())
+                .bathrooms(draft.getBathrooms())
+                .direction(draft.getDirection())
+                .furnishing(draft.getFurnishing())
+                .roomCapacity(draft.getRoomCapacity())
+                .waterPrice(draft.getWaterPrice())
+                .electricityPrice(draft.getElectricityPrice())
+                .internetPrice(draft.getInternetPrice())
+                .serviceFee(draft.getServiceFee())
+                .amenityIds(amenityIds)
+                .mediaIds(mediaIds)
+                .createdAt(draft.getCreatedAt())
+                .updatedAt(draft.getUpdatedAt())
+                .build();
+    }
+
+    /**
+     * Merge draft data with publish request (request takes precedence)
+     */
+    private ListingCreationRequest mergeDraftWithRequest(ListingDraft draft, ListingCreationRequest request) {
+        ListingCreationRequest merged = new ListingCreationRequest();
+
+        // Use request value if provided, otherwise use draft value
+        merged.setTitle(request.getTitle() != null ? request.getTitle() : draft.getTitle());
+        merged.setDescription(request.getDescription() != null ? request.getDescription() : draft.getDescription());
+        merged.setListingType(request.getListingType() != null ? request.getListingType() : draft.getListingType());
+        merged.setVipType(request.getVipType() != null ? request.getVipType() : draft.getVipType());
+        merged.setCategoryId(request.getCategoryId() != null ? request.getCategoryId() : draft.getCategoryId());
+        merged.setProductType(request.getProductType() != null ? request.getProductType() : draft.getProductType());
+        merged.setPrice(request.getPrice() != null ? request.getPrice() : draft.getPrice());
+        merged.setPriceUnit(request.getPriceUnit() != null ? request.getPriceUnit() : draft.getPriceUnit());
+        merged.setArea(request.getArea() != null ? request.getArea() : draft.getArea());
+        merged.setBedrooms(request.getBedrooms() != null ? request.getBedrooms() : draft.getBedrooms());
+        merged.setBathrooms(request.getBathrooms() != null ? request.getBathrooms() : draft.getBathrooms());
+        merged.setDirection(request.getDirection() != null ? request.getDirection() : draft.getDirection());
+        merged.setFurnishing(request.getFurnishing() != null ? request.getFurnishing() : draft.getFurnishing());
+        merged.setRoomCapacity(request.getRoomCapacity() != null ? request.getRoomCapacity() : draft.getRoomCapacity());
+        merged.setWaterPrice(request.getWaterPrice() != null ? request.getWaterPrice() : draft.getWaterPrice());
+        merged.setElectricityPrice(request.getElectricityPrice() != null ? request.getElectricityPrice() : draft.getElectricityPrice());
+        merged.setInternetPrice(request.getInternetPrice() != null ? request.getInternetPrice() : draft.getInternetPrice());
+        merged.setServiceFee(request.getServiceFee() != null ? request.getServiceFee() : draft.getServiceFee());
+
+        // Copy payment/quota related fields from request only
+        merged.setDurationDays(request.getDurationDays());
+        merged.setUseMembershipQuota(request.getUseMembershipQuota());
+        merged.setBenefitIds(request.getBenefitIds());
+        merged.setPaymentProvider(request.getPaymentProvider());
+
+        // Handle address - use request if provided, otherwise build from draft
+        if (request.getAddress() != null) {
+            merged.setAddress(request.getAddress());
+        } else if (draft.getAddressType() != null) {
+            AddressCreationRequest addressReq = new AddressCreationRequest();
+            if ("OLD".equals(draft.getAddressType())) {
+                LegacyAddressData legacy = new LegacyAddressData();
+                legacy.setProvinceId(draft.getProvinceId() != null ? draft.getProvinceId().intValue() : null);
+                legacy.setDistrictId(draft.getDistrictId() != null ? draft.getDistrictId().intValue() : null);
+                legacy.setWardId(draft.getWardId() != null ? draft.getWardId().intValue() : null);
+                legacy.setStreet(draft.getStreet());
+                addressReq.setLegacy(legacy);
+            } else if ("NEW".equals(draft.getAddressType())) {
+                NewAddressData newAddr = new NewAddressData();
+                newAddr.setProvinceCode(draft.getProvinceCode());
+                newAddr.setWardCode(draft.getWardCode());
+                newAddr.setStreet(draft.getStreet());
+                addressReq.setNewAddress(newAddr);
+            }
+            addressReq.setStreetId(draft.getStreetId() != null ? draft.getStreetId().intValue() : null);
+            addressReq.setProjectId(draft.getProjectId() != null ? draft.getProjectId().intValue() : null);
+            addressReq.setLatitude(draft.getLatitude() != null ? BigDecimal.valueOf(draft.getLatitude()) : null);
+            addressReq.setLongitude(draft.getLongitude() != null ? BigDecimal.valueOf(draft.getLongitude()) : null);
+            merged.setAddress(addressReq);
+        }
+
+        // Handle amenity IDs
+        if (request.getAmenityIds() != null) {
+            merged.setAmenityIds(request.getAmenityIds());
+        } else if (draft.getAmenityIds() != null && !draft.getAmenityIds().isEmpty()) {
+            merged.setAmenityIds(java.util.Arrays.stream(draft.getAmenityIds().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .collect(Collectors.toSet()));
+        }
+
+        // Handle media IDs
+        if (request.getMediaIds() != null) {
+            merged.setMediaIds(request.getMediaIds());
+        } else if (draft.getMediaIds() != null && !draft.getMediaIds().isEmpty()) {
+            merged.setMediaIds(java.util.Arrays.stream(draft.getMediaIds().split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::parseLong)
+                    .collect(Collectors.toSet()));
+        }
+
+        return merged;
+    }
+
+    /**
+     * Validate draft has all required fields before publishing
+     */
+    private void validateDraftForPublish(ListingCreationRequest request) {
         List<String> missingFields = new ArrayList<>();
 
-        if (listing.getTitle() == null || listing.getTitle().trim().isEmpty()) {
+        if (request.getTitle() == null || request.getTitle().trim().isEmpty()) {
             missingFields.add("title");
         }
-        if (listing.getDescription() == null || listing.getDescription().trim().isEmpty()) {
+        if (request.getDescription() == null || request.getDescription().trim().isEmpty()) {
             missingFields.add("description");
         }
-        if (listing.getListingType() == null) {
+        if (request.getListingType() == null) {
             missingFields.add("listingType");
         }
-        if (listing.getProductType() == null) {
+        if (request.getProductType() == null) {
             missingFields.add("productType");
         }
-        if (listing.getPrice() == null) {
+        if (request.getPrice() == null) {
             missingFields.add("price");
         }
-        if (listing.getPriceUnit() == null) {
+        if (request.getPriceUnit() == null) {
             missingFields.add("priceUnit");
         }
-        if (listing.getAddress() == null) {
+        if (request.getAddress() == null) {
             missingFields.add("address");
         }
-        if (listing.getCategoryId() == null) {
+        if (request.getCategoryId() == null) {
             missingFields.add("categoryId");
+        }
+
+        // Check vipType only if not using membership quota
+        if (!Boolean.TRUE.equals(request.getUseMembershipQuota()) &&
+            (request.getBenefitIds() == null || request.getBenefitIds().isEmpty())) {
+            if (request.getVipType() == null) {
+                missingFields.add("vipType");
+            }
         }
 
         if (!missingFields.isEmpty()) {
             throw new AppException(DomainCode.BAD_REQUEST_ERROR,
-                    "Cannot publish listing. Missing required fields: " + String.join(", ", missingFields));
+                    "Cannot publish draft. Missing required fields: " + String.join(", ", missingFields));
         }
     }
 }

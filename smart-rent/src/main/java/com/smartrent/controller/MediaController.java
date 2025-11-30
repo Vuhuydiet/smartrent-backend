@@ -9,6 +9,10 @@ import com.smartrent.dto.response.MediaResponse;
 import com.smartrent.service.media.MediaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -53,7 +57,7 @@ import java.util.List;
 )
 @RequiredArgsConstructor
 @Slf4j
-@SecurityRequirement(name = "bearer-jwt")
+@SecurityRequirement(name = "Bearer Authentication")
 public class MediaController {
 
     private final MediaService mediaService;
@@ -73,8 +77,73 @@ public class MediaController {
                     - URL expires in 30 minutes
                     - File size and type validation
                     - Ownership validation for listing association
-                    """
+                    """,
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Upload URL generation request",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = GenerateUploadUrlRequest.class),
+                            examples = @ExampleObject(
+                                    name = "Generate Upload URL Example",
+                                    value = """
+                                            {
+                                              "mediaType": "IMAGE",
+                                              "filename": "property-photo.jpg",
+                                              "contentType": "image/jpeg",
+                                              "fileSize": 2048576,
+                                              "listingId": 123,
+                                              "title": "Living Room",
+                                              "description": "Spacious living room with natural light",
+                                              "altText": "Living room photo",
+                                              "isPrimary": true,
+                                              "sortOrder": 1
+                                            }
+                                            """
+                            )
+                    )
+            )
     )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Upload URL generated successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Upload URL generated successfully. Please upload file within 30 minutes.",
+                                              "data": {
+                                                "mediaId": 456,
+                                                "uploadUrl": "https://r2.cloudflarestorage.com/bucket/media/...",
+                                                "expiresIn": 1800,
+                                                "storageKey": "media/user-123/456-property-photo.jpg",
+                                                "message": "Upload file to the provided URL using PUT method"
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request parameters",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Invalid or missing authentication",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - User does not own the listing",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
     public ResponseEntity<ApiResponse<GenerateUploadUrlResponse>> generateUploadUrl(
             @Valid @RequestBody GenerateUploadUrlRequest request,
             Authentication authentication) {
@@ -120,6 +189,61 @@ public class MediaController {
                     - sortOrder: Display order (default: 0)
                     """
     )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Media uploaded successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Media uploaded successfully. File is now active and accessible.",
+                                              "data": {
+                                                "mediaId": 456,
+                                                "listingId": 123,
+                                                "userId": "user-uuid-123",
+                                                "mediaType": "IMAGE",
+                                                "sourceType": "UPLOAD",
+                                                "status": "ACTIVE",
+                                                "url": "https://pub-xxx.r2.dev/media/user-123/456-property-photo.jpg",
+                                                "thumbnailUrl": null,
+                                                "title": "Living Room",
+                                                "description": "Spacious living room with natural light",
+                                                "altText": "Living room photo",
+                                                "isPrimary": true,
+                                                "sortOrder": 1,
+                                                "fileSize": 2048576,
+                                                "mimeType": "image/jpeg",
+                                                "originalFilename": "property-photo.jpg",
+                                                "durationSeconds": null,
+                                                "uploadConfirmed": true,
+                                                "createdAt": "2024-01-15T10:30:00",
+                                                "updatedAt": "2024-01-15T10:30:00"
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid file type or size",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Invalid or missing authentication",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - User does not own the listing",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
     public ResponseEntity<ApiResponse<MediaResponse>> uploadMedia(
             @Parameter(description = "Media file to upload", required = true)
             @RequestParam("file") MultipartFile file,
@@ -175,8 +299,85 @@ public class MediaController {
                     - Media status changed from PENDING to ACTIVE
                     - Public URL generated
                     - Media becomes accessible
-                    """
+                    """,
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Upload confirmation request",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ConfirmUploadRequest.class),
+                            examples = @ExampleObject(
+                                    name = "Confirm Upload Example",
+                                    value = """
+                                            {
+                                              "checksum": "abc123def456",
+                                              "contentType": "image/jpeg"
+                                            }
+                                            """
+                            )
+                    )
+            )
     )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Upload confirmed successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Upload confirmed successfully. Media is now active.",
+                                              "data": {
+                                                "mediaId": 456,
+                                                "listingId": 123,
+                                                "userId": "user-uuid-123",
+                                                "mediaType": "IMAGE",
+                                                "sourceType": "UPLOAD",
+                                                "status": "ACTIVE",
+                                                "url": "https://pub-xxx.r2.dev/media/user-123/456-property-photo.jpg",
+                                                "thumbnailUrl": null,
+                                                "title": "Living Room",
+                                                "description": "Spacious living room",
+                                                "altText": "Living room photo",
+                                                "isPrimary": true,
+                                                "sortOrder": 1,
+                                                "fileSize": 2048576,
+                                                "mimeType": "image/jpeg",
+                                                "originalFilename": "property-photo.jpg",
+                                                "durationSeconds": null,
+                                                "uploadConfirmed": true,
+                                                "createdAt": "2024-01-15T10:30:00",
+                                                "updatedAt": "2024-01-15T10:31:00"
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request or upload already confirmed",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Invalid or missing authentication",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - User does not own the media",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Media not found",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
     public ResponseEntity<ApiResponse<MediaResponse>> confirmUpload(
             @Parameter(description = "Media ID from upload URL response")
             @PathVariable Long mediaId,
@@ -209,6 +410,40 @@ public class MediaController {
                     **Note:** For external media (YouTube/TikTok), returns the original URL.
                     """
     )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Download URL generated successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Download URL generated successfully",
+                                              "data": "https://r2.cloudflarestorage.com/bucket/media/...?X-Amz-Signature=..."
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Invalid or missing authentication",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - User does not have access to this media",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Media not found",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
     public ResponseEntity<ApiResponse<String>> generateDownloadUrl(
             @Parameter(description = "Media ID")
             @PathVariable Long mediaId,
@@ -239,6 +474,40 @@ public class MediaController {
                     **Permission:** Only media owner can delete
                     """
     )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Media deleted successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Media deleted successfully",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Invalid or missing authentication",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - User does not own the media",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Media not found",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
     public ResponseEntity<ApiResponse<Void>> deleteMedia(
             @Parameter(description = "Media ID")
             @PathVariable Long mediaId,
@@ -268,8 +537,85 @@ public class MediaController {
                     - Automatic platform detection
                     - Embed code generation
                     - No file upload required
-                    """
+                    """,
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "External media request",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = SaveExternalMediaRequest.class),
+                            examples = @ExampleObject(
+                                    name = "YouTube Video Example",
+                                    value = """
+                                            {
+                                              "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                                              "listingId": 123,
+                                              "title": "Property Tour Video",
+                                              "description": "Virtual tour of the apartment",
+                                              "altText": "Property tour video",
+                                              "isPrimary": false,
+                                              "sortOrder": 5
+                                            }
+                                            """
+                            )
+                    )
+            )
     )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "External media saved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "External media saved successfully",
+                                              "data": {
+                                                "mediaId": 789,
+                                                "listingId": 123,
+                                                "userId": "user-uuid-123",
+                                                "mediaType": "VIDEO",
+                                                "sourceType": "YOUTUBE",
+                                                "status": "ACTIVE",
+                                                "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                                                "thumbnailUrl": "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+                                                "title": "Property Tour Video",
+                                                "description": "Virtual tour of the apartment",
+                                                "altText": "Property tour video",
+                                                "isPrimary": false,
+                                                "sortOrder": 5,
+                                                "fileSize": null,
+                                                "mimeType": null,
+                                                "originalFilename": null,
+                                                "durationSeconds": null,
+                                                "uploadConfirmed": true,
+                                                "createdAt": "2024-01-15T10:30:00",
+                                                "updatedAt": "2024-01-15T10:30:00"
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid URL or unsupported platform",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Invalid or missing authentication",
+                    content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "403",
+                    description = "Forbidden - User does not own the listing",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
     public ResponseEntity<ApiResponse<MediaResponse>> saveExternalMedia(
             @Valid @RequestBody SaveExternalMediaRequest request,
             Authentication authentication) {
@@ -297,6 +643,53 @@ public class MediaController {
                     - Ordered by sortOrder field
                     """
     )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Media retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Media retrieved successfully",
+                                              "data": [
+                                                {
+                                                  "mediaId": 456,
+                                                  "listingId": 123,
+                                                  "userId": "user-uuid-123",
+                                                  "mediaType": "IMAGE",
+                                                  "sourceType": "UPLOAD",
+                                                  "status": "ACTIVE",
+                                                  "url": "https://pub-xxx.r2.dev/media/...",
+                                                  "isPrimary": true,
+                                                  "sortOrder": 1
+                                                },
+                                                {
+                                                  "mediaId": 789,
+                                                  "listingId": 123,
+                                                  "userId": "user-uuid-123",
+                                                  "mediaType": "VIDEO",
+                                                  "sourceType": "YOUTUBE",
+                                                  "status": "ACTIVE",
+                                                  "url": "https://www.youtube.com/watch?v=...",
+                                                  "isPrimary": false,
+                                                  "sortOrder": 2
+                                                }
+                                              ]
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Listing not found",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
     public ResponseEntity<ApiResponse<List<MediaResponse>>> getListingMedia(
             @Parameter(description = "Listing ID")
             @PathVariable Long listingId) {
@@ -322,6 +715,43 @@ public class MediaController {
                     - Ordered by creation date (newest first)
                     """
     )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "User media retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Media retrieved successfully",
+                                              "data": [
+                                                {
+                                                  "mediaId": 456,
+                                                  "listingId": 123,
+                                                  "userId": "user-uuid-123",
+                                                  "mediaType": "IMAGE",
+                                                  "sourceType": "UPLOAD",
+                                                  "status": "ACTIVE",
+                                                  "url": "https://pub-xxx.r2.dev/media/...",
+                                                  "isPrimary": true,
+                                                  "sortOrder": 1,
+                                                  "createdAt": "2024-01-15T10:30:00"
+                                                }
+                                              ]
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - Invalid or missing authentication",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
     public ResponseEntity<ApiResponse<List<MediaResponse>>> getMyMedia(
             Authentication authentication) {
 
@@ -341,6 +771,51 @@ public class MediaController {
             summary = "Get media by ID",
             description = "Returns detailed information about a specific media item."
     )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Media retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Media retrieved successfully",
+                                              "data": {
+                                                "mediaId": 456,
+                                                "listingId": 123,
+                                                "userId": "user-uuid-123",
+                                                "mediaType": "IMAGE",
+                                                "sourceType": "UPLOAD",
+                                                "status": "ACTIVE",
+                                                "url": "https://pub-xxx.r2.dev/media/user-123/456-property-photo.jpg",
+                                                "thumbnailUrl": null,
+                                                "title": "Living Room",
+                                                "description": "Spacious living room with natural light",
+                                                "altText": "Living room photo",
+                                                "isPrimary": true,
+                                                "sortOrder": 1,
+                                                "fileSize": 2048576,
+                                                "mimeType": "image/jpeg",
+                                                "originalFilename": "property-photo.jpg",
+                                                "durationSeconds": null,
+                                                "uploadConfirmed": true,
+                                                "createdAt": "2024-01-15T10:30:00",
+                                                "updatedAt": "2024-01-15T10:30:00"
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Media not found",
+                    content = @Content(mediaType = "application/json")
+            )
+    })
     public ResponseEntity<ApiResponse<MediaResponse>> getMediaById(
             @Parameter(description = "Media ID")
             @PathVariable Long mediaId) {

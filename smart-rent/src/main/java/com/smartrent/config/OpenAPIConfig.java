@@ -458,6 +458,16 @@ public class OpenAPIConfig {
                 );
     }
 
+    /**
+     * Reusable OpenAPI customizer that adds security scheme to grouped APIs
+     */
+    private org.springdoc.core.customizers.OpenApiCustomizer securityCustomizer() {
+        return openApi -> {
+            openApi.components(buildComponents());
+            openApi.security(List.of(new SecurityRequirement().addList("Bearer Authentication")));
+        };
+    }
+
     @Bean
     public GroupedOpenApi publicApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
         return GroupedOpenApi.builder()
@@ -465,6 +475,7 @@ public class OpenAPIConfig {
                 .displayName("SmartRent Complete API")
                 .packagesToScan(packageToScan)
                 .pathsToMatch("/v1/**")
+                .addOpenApiCustomizer(securityCustomizer())
                 .build();
     }
 
@@ -475,6 +486,7 @@ public class OpenAPIConfig {
                 .displayName("Authentication & Verification")
                 .packagesToScan(packageToScan)
                 .pathsToMatch("/v1/auth/**", "/v1/verification/**")
+                .addOpenApiCustomizer(securityCustomizer())
                 .build();
     }
 
@@ -485,6 +497,7 @@ public class OpenAPIConfig {
                 .displayName("User Management")
                 .packagesToScan(packageToScan)
                 .pathsToMatch("/v1/users/**")
+                .addOpenApiCustomizer(securityCustomizer())
                 .build();
     }
 
@@ -495,6 +508,7 @@ public class OpenAPIConfig {
                 .displayName("Admin Management & Roles")
                 .packagesToScan(packageToScan)
                 .pathsToMatch("/v1/admins/**", "/v1/auth/admin/**", "/v1/roles/**")
+                .addOpenApiCustomizer(securityCustomizer())
                 .build();
     }
 
@@ -505,6 +519,7 @@ public class OpenAPIConfig {
                 .displayName("Admin - Listing Reports Management")
                 .packagesToScan(packageToScan)
                 .pathsToMatch("/v1/admin/reports/**")
+                .addOpenApiCustomizer(securityCustomizer())
                 .build();
     }
 
@@ -515,6 +530,7 @@ public class OpenAPIConfig {
                             .displayName("Property Listings")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/listings/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -525,6 +541,7 @@ public class OpenAPIConfig {
                             .displayName("Address Management")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/addresses/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -535,6 +552,7 @@ public class OpenAPIConfig {
                             .displayName("Media Management (R2 Storage)")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/media/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -552,6 +570,7 @@ public class OpenAPIConfig {
                                             "/v1/listings/*/price-statistics",
                                             "/v1/listings/recent-price-changes"
                             )
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -562,6 +581,7 @@ public class OpenAPIConfig {
                             .displayName("Membership Management")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/memberships/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -572,6 +592,7 @@ public class OpenAPIConfig {
                             .displayName("Push & Promotion")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/pushes/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -582,6 +603,7 @@ public class OpenAPIConfig {
                             .displayName("Saved Listings")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/saved-listings/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -592,6 +614,7 @@ public class OpenAPIConfig {
                             .displayName("VNPay Payments & Transactions")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/payments/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -602,6 +625,7 @@ public class OpenAPIConfig {
                             .displayName("Quota Management")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/quotas/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -612,6 +636,7 @@ public class OpenAPIConfig {
                             .displayName("VIP Tier Details")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/vip-tiers/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -622,6 +647,7 @@ public class OpenAPIConfig {
                             .displayName("Push Pricing Details")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/push-details/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -632,6 +658,7 @@ public class OpenAPIConfig {
                             .displayName("Phone Click Detail Tracking")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/phone-click-details/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -642,6 +669,7 @@ public class OpenAPIConfig {
                             .displayName("Category Management")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/categories/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 
@@ -652,6 +680,7 @@ public class OpenAPIConfig {
                             .displayName("Customer Support")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/support/**")
+                            .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
 }
