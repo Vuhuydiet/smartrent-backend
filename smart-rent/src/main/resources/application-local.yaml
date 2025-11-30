@@ -36,6 +36,7 @@ application:
         - "/webjars/**"
         - "/actuator/health"
         - "/actuator/**"
+        - "/debug/**"
         - "/v1/listings/**"
         - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
@@ -48,6 +49,7 @@ application:
         - "/v1/housing-predictor/**"
         - "/v1/support/contact"
         - "/v1/categories/**"
+        - "/v1/ai/listings/**"
         - "/v1/listings/reports/reasons"
       post:
         - "/v1/auth/**"
@@ -59,6 +61,7 @@ application:
         - "/v1/verification/**"
         - "/v1/listings/stats/provinces/**"
         - "/v1/listings/*/reports"
+        - "/v1/ai/listings/**"
 # Enable debug logging for authentication
 logging:
   level:
@@ -71,3 +74,10 @@ feign:
     config:
       smartrent-ai:
         url: http://localhost:8000
+
+# AI Service Configuration
+smartrent:
+  ai:
+    verification:
+      url: http://localhost:8000/ai/verify-listing
+      timeout-seconds: 90
