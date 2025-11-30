@@ -38,13 +38,22 @@ public class VerifyListingServiceImpl implements VerifyListingService {
 
         // Update verification status
         listing.setVerified(request.getVerified());
-        listing.setIsVerify(request.getVerified());
+        
+        // If approving (verified=true), keep isVerify=true to indicate it has been reviewed
+        // If rejecting (verified=false), set isVerify=false to mark as REJECTED status
+        if (Boolean.TRUE.equals(request.getVerified())) {
+            // Approved - keep isVerify=true (should already be true if it was in review)
+            listing.setIsVerify(true);
+        } else {
+            // Rejected - set isVerify=false to indicate rejection
+            listing.setIsVerify(false);
+        }
 
         // Save the updated listing
         Listing updatedListing = listingRepository.save(listing);
 
-        log.info("Successfully updated listing {} verification status to: {}",
-                listingId, request.getVerified());
+        log.info("Successfully updated listing {} verification status to: {}, isVerify: {}, reason: {}",
+                listingId, request.getVerified(), listing.getIsVerify(), request.getReason());
 
         // Build user and address responses
         com.smartrent.dto.response.UserCreationResponse user = userRepository.findById(updatedListing.getUserId())
