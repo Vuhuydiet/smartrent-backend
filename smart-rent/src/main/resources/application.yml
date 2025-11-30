@@ -380,6 +380,16 @@ otp:
     twilio:
       enabled: ${TWILIO_OTP_ENABLED:false}
       account-sid: ${TWILIO_ACCOUNT_SID:}
+
+# AI Service Configuration
+smarrent:
+  ai:
+    verification:
+      enabled: ${AI_VERIFICATION_ENABLED:true}
+      url: ${AI_VERIFICATION_URL:http://localhost:8000/ai/verify-listing}
+      timeout-seconds: ${AI_VERIFICATION_TIMEOUT:90}
+      max-retry-attempts: ${AI_VERIFICATION_MAX_RETRY:3}
+      retry-backoff-seconds: ${AI_VERIFICATION_RETRY_BACKOFF:2}
       auth-token: ${TWILIO_AUTH_TOKEN:}
       from-number: ${TWILIO_FROM_NUMBER:}
       message-template: "${TWILIO_MESSAGE_TEMPLATE:SmartRent - Your verification code is %s. Valid for 5 minutes. Do not share this code.}"
