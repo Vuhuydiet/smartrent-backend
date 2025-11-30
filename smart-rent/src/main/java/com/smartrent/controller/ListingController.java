@@ -689,7 +689,7 @@ public class ListingController {
 
             **Use Case 14: Owner - Listings đang chờ duyệt**
             ```json
-            {"userId": "user-123", "listingStatus": "IN_REVIEW", "sortBy": "createdAt", "sortDirection": "DESC"}
+            {"userId": "user-123", "listingStatus": "IN_REVIEW", "SortBy": "DEFAULT", "sortDirection": "DESC"}
             ```
 
             **Use Case 15: Owner - Listings bị từ chối**
@@ -928,7 +928,8 @@ public class ListingController {
                               "isDraft": true,
                               "page": 0,
                               "size": 20,
-                              "sortBy": "updatedAt",
+                              "
+                              ": "DEFAULT",
                               "sortDirection": "DESC"
                             }
                             """
@@ -943,7 +944,7 @@ public class ListingController {
                               "isDraft": false,
                               "page": 0,
                               "size": 20,
-                              "sortBy": "postDate",
+                              "sortBy": "DEFAULT",
                               "sortDirection": "DESC"
                             }
                             """
@@ -957,7 +958,7 @@ public class ListingController {
                               "verified": false,
                               "page": 0,
                               "size": 20,
-                              "sortBy": "createdAt",
+                              "SortBy": "DEFAULT",
                               "sortDirection": "ASC"
                             }
                             """
@@ -970,7 +971,7 @@ public class ListingController {
                               "expired": true,
                               "page": 0,
                               "size": 20,
-                              "sortBy": "updatedAt",
+                              "SortBy": "DEFAULT",
                               "sortDirection": "DESC"
                             }
                             """
@@ -994,7 +995,7 @@ public class ListingController {
                             {
                               "page": 0,
                               "size": 20,
-                              "sortBy": "createdAt",
+                              "SortBy": "DEFAULT",
                               "sortDirection": "DESC"
                             }
                             """
