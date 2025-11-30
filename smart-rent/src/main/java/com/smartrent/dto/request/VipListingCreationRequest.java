@@ -48,7 +48,7 @@ public class VipListingCreationRequest {
     Long categoryId;
 
     @NotNull(message = "Product type is required")
-    @Schema(description = "Product type", example = "APARTMENT", allowableValues = {"ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO"}, required = true)
+    @Schema(description = "Product type (loại bất động sản)", example = "APARTMENT", allowableValues = {"ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO"}, required = true)
     String productType;
 
     @NotNull(message = "Price is required")

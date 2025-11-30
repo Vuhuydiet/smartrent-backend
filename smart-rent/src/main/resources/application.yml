@@ -163,6 +163,7 @@ application:
         - "/v1/payments/ipn/**"
         - "/otp/**"
         - "/v1/listings/*/reports"
+        - "/v1/listings/search"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"

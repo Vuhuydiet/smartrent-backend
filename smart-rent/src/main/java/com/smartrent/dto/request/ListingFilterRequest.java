@@ -41,6 +41,11 @@ public class ListingFilterRequest {
     @Schema(description = "Filter by post status (ACTIVE, EXPIRED, PENDING, DRAFT, etc.)", example = "ACTIVE")
     String status;
 
+    @Schema(description = "Filter by listing status for owner view - EXPIRED, EXPIRING_SOON, DISPLAYING, IN_REVIEW, PENDING_PAYMENT, REJECTED, VERIFIED",
+            example = "DISPLAYING",
+            allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED"})
+    String listingStatus;
+
     // ============ LOCATION FILTERS ============
     @Schema(description = "Province ID (can be Integer or String for compatibility)", example = "1")
     String provinceId;
@@ -90,7 +95,7 @@ public class ListingFilterRequest {
     @Schema(description = "VIP type", example = "SILVER", allowableValues = {"NORMAL", "SILVER", "GOLD", "DIAMOND"})
     String vipType;
 
-    @Schema(description = "Product type", example = "APARTMENT", allowableValues = {"ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO"})
+    @Schema(description = "Product type (loại bất động sản) - Filter by property category", example = "APARTMENT", allowableValues = {"ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO"})
     String productType;
 
     // ============ PROPERTY SPECS FILTERS ============
@@ -150,9 +155,6 @@ public class ListingFilterRequest {
 
     @Schema(description = "Direction", allowableValues = {"NORTH", "SOUTH", "EAST", "WEST", "NORTHEAST", "NORTHWEST", "SOUTHEAST", "SOUTHWEST"})
     String direction;
-
-    @Schema(description = "Property type", allowableValues = {"APARTMENT", "HOUSE", "ROOM", "STUDIO", "OFFICE"})
-    String propertyType;
 
     @Schema(description = "Minimum room capacity")
     Integer minRoomCapacity;

@@ -1,5 +1,6 @@
 package com.smartrent.dto.request;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AccessLevel;
@@ -46,6 +47,7 @@ public class ListingCreationRequest {
 
     Long categoryId;
 
+    @Schema(description = "Product type (loại bất động sản)", example = "APARTMENT", allowableValues = {"ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO"})
     String productType;
 
     @DecimalMin(value = "0.0", inclusive = false)
@@ -68,8 +70,6 @@ public class ListingCreationRequest {
     String direction;
 
     String furnishing;
-
-    String propertyType;
 
     @Min(0)
     Integer roomCapacity;

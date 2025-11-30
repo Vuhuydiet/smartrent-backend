@@ -62,6 +62,7 @@ public class ListingResponseWithAdmin {
 
     Long categoryId;
 
+    @Schema(description = "Product type (loại bất động sản)", example = "APARTMENT", allowableValues = {"ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO"})
     String productType;
 
     BigDecimal price;
@@ -79,8 +80,6 @@ public class ListingResponseWithAdmin {
     String direction;
 
     String furnishing;
-
-    String propertyType;
 
     Integer roomCapacity;
 

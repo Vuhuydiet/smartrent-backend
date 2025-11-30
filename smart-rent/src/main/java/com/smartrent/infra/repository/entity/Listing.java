@@ -140,10 +140,6 @@ public class Listing {
     @Column(name = "furnishing")
     Furnishing furnishing;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "property_type")
-    PropertyType propertyType;
-
     @Column(name = "room_capacity")
     Integer roomCapacity;
 
@@ -234,10 +230,6 @@ public class Listing {
         FULLY_FURNISHED, SEMI_FURNISHED, UNFURNISHED
     }
 
-    public enum PropertyType {
-        APARTMENT, HOUSE, ROOM, STUDIO, OFFICE
-    }
-
     // Helper methods for VIP types
     public boolean isNormal() {
         return vipType == VipType.NORMAL;
@@ -293,5 +285,68 @@ public class Listing {
 
     public boolean isActive() {
         return !isExpiredListing() && (isAutoVerified() || isManuallyVerified());
+    }
+
+    /**
+     * Compute the current listing status for owner view
+     * @return ListingStatus enum value
+     */
+    public com.smartrent.enums.ListingStatus computeListingStatus() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+
+        // 1. EXPIRED - Listing has expired
+        if (this.expired != null && this.expired) {
+            return com.smartrent.enums.ListingStatus.EXPIRED;
+        }
+        if (this.expiryDate != null && this.expiryDate.isBefore(now)) {
+            return com.smartrent.enums.ListingStatus.EXPIRED;
+        }
+
+        // 2. PENDING_PAYMENT - Has transaction but not completed (check transactionId exists but listing not verified)
+        if (this.transactionId != null && !this.transactionId.isEmpty() &&
+            (this.verified == null || !this.verified) &&
+            (this.isVerify == null || !this.isVerify)) {
+            return com.smartrent.enums.ListingStatus.PENDING_PAYMENT;
+        }
+
+        // 3. IN_REVIEW - Pending verification (isVerify=true, verified=false)
+        if (this.isVerify != null && this.isVerify &&
+            (this.verified == null || !this.verified)) {
+            return com.smartrent.enums.ListingStatus.IN_REVIEW;
+        }
+
+        // 4. REJECTED - Not verified, not in review, not draft, has postDate
+        if ((this.verified == null || !this.verified) &&
+            (this.isVerify == null || !this.isVerify) &&
+            (this.isDraft == null || !this.isDraft) &&
+            this.postDate != null) {
+            return com.smartrent.enums.ListingStatus.REJECTED;
+        }
+
+        // 5. EXPIRING_SOON - Will expire within 7 days
+        if (this.expiryDate != null && this.verified != null && this.verified) {
+            long daysUntilExpiry = java.time.Duration.between(now, this.expiryDate).toDays();
+            if (daysUntilExpiry >= 0 && daysUntilExpiry <= 7) {
+                return com.smartrent.enums.ListingStatus.EXPIRING_SOON;
+            }
+        }
+
+        // 6. VERIFIED - Is verified
+        if (this.verified != null && this.verified) {
+            return com.smartrent.enums.ListingStatus.VERIFIED;
+        }
+
+        // 7. DISPLAYING - Is displaying (verified and not expired)
+        if (this.verified != null && this.verified &&
+            (this.expired == null || !this.expired) &&
+            (this.expiryDate == null || this.expiryDate.isAfter(now))) {
+            return com.smartrent.enums.ListingStatus.DISPLAYING;
+        }
+
+        // Default to VERIFIED if verified, otherwise IN_REVIEW
+        if (this.verified != null && this.verified) {
+            return com.smartrent.enums.ListingStatus.VERIFIED;
+        }
+        return com.smartrent.enums.ListingStatus.IN_REVIEW;
     }
 }
