@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Implementation of QuotaService
@@ -96,6 +97,79 @@ public class QuotaServiceImpl implements QuotaService {
             log.error("Failed to consume quota: {}", e.getMessage());
             return false;
         }
+    }
+
+    @Override
+    @Transactional
+    public boolean consumeQuotaByBenefitIds(String userId, Set<Long> benefitIds, BenefitType expectedBenefitType) {
+        log.info("Consuming quota from specific benefits {} for user {} with expected type {}",
+                benefitIds, userId, expectedBenefitType);
+
+        if (benefitIds == null || benefitIds.isEmpty()) {
+            log.warn("No benefit IDs provided for user {}", userId);
+            throw new IllegalArgumentException("Benefit IDs cannot be null or empty");
+        }
+
+        for (Long benefitId : benefitIds) {
+            UserMembershipBenefit benefit = getBenefitById(userId, benefitId);
+
+            // Validate benefit type matches expected type
+            if (benefit.getBenefitType() != expectedBenefitType) {
+                log.error("Benefit {} has type {} but expected {}", benefitId, benefit.getBenefitType(), expectedBenefitType);
+                throw new IllegalArgumentException(
+                        String.format("Benefit %d has type %s but expected %s",
+                                benefitId, benefit.getBenefitType(), expectedBenefitType));
+            }
+
+            // Check if benefit has available quota
+            if (!benefit.hasQuotaAvailable()) {
+                log.error("Benefit {} has no available quota", benefitId);
+                throw new IllegalStateException(
+                        String.format("Benefit %d has no available quota. Remaining: %d",
+                                benefitId, benefit.getQuantityRemaining()));
+            }
+
+            // Consume 1 quota from this benefit
+            try {
+                benefit.consumeQuota(1);
+                userBenefitRepository.save(benefit);
+                log.info("Successfully consumed 1 quota from benefit {} for user {}", benefitId, userId);
+            } catch (Exception e) {
+                log.error("Failed to consume quota from benefit {}: {}", benefitId, e.getMessage());
+                throw new IllegalStateException("Failed to consume quota from benefit " + benefitId + ": " + e.getMessage());
+            }
+        }
+
+        log.info("Successfully consumed quota from all {} benefits for user {}", benefitIds.size(), userId);
+        return true;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserMembershipBenefit getBenefitById(String userId, Long benefitId) {
+        log.debug("Getting benefit {} for user {}", benefitId, userId);
+
+        UserMembershipBenefit benefit = userBenefitRepository.findById(benefitId)
+                .orElseThrow(() -> {
+                    log.error("Benefit {} not found", benefitId);
+                    return new IllegalArgumentException("Benefit not found with ID: " + benefitId);
+                });
+
+        // Validate ownership
+        if (!benefit.getUserId().equals(userId)) {
+            log.error("Benefit {} does not belong to user {}", benefitId, userId);
+            throw new IllegalArgumentException(
+                    String.format("Benefit %d does not belong to user %s", benefitId, userId));
+        }
+
+        // Validate benefit is not expired
+        if (benefit.isExpired()) {
+            log.error("Benefit {} is expired", benefitId);
+            throw new IllegalStateException(
+                    String.format("Benefit %d is expired", benefitId));
+        }
+
+        return benefit;
     }
 
     @Override

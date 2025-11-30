@@ -1,20 +1,19 @@
 package com.smartrent.service.listing;
 
+import com.smartrent.dto.request.DraftListingRequest;
 import com.smartrent.dto.request.ListingCreationRequest;
-import com.smartrent.dto.request.ListingDraftUpdateRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
-import com.smartrent.dto.request.MyListingsFilterRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.AdminListingListResponse;
+import com.smartrent.dto.response.DraftListingResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseForOwner;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.OwnerListingListResponse;
-import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.dto.response.ProvinceListingStatsResponse;
 
 import java.util.List;
@@ -22,6 +21,15 @@ import java.util.Set;
 
 public interface ListingService {
     ListingCreationResponse createListing(ListingCreationRequest request);
+
+    /**
+     * Create a draft listing with all optional fields
+     * Used for auto-save functionality during listing creation
+     * Draft is stored in a separate table (listing_drafts) with all optional fields
+     * @param request Draft listing request (all fields optional)
+     * @return Draft listing response with draft ID
+     */
+    DraftListingResponse createDraftListing(DraftListingRequest request);
 
     /**
      * Create VIP or Premium listing with quota check and payment flow
@@ -114,15 +122,15 @@ public interface ListingService {
     /**
      * Update draft listing (auto-save)
      * Allows partial updates without validation
-     * Automatically sets isDraft=true and updates lastAutoSavedAt
+     * Draft is stored in a separate table (listing_drafts)
      *
-     * @param id Listing ID
+     * @param draftId Draft ID
      * @param request Draft update request (all fields optional)
      * @param userId User ID (owner) who is updating the draft
-     * @return Updated listing response
-     * @throws RuntimeException if listing not found or user is not the owner
+     * @return Updated draft listing response
+     * @throws RuntimeException if draft not found or user is not the owner
      */
-    ListingResponse updateDraft(Long id, ListingDraftUpdateRequest request, String userId);
+    DraftListingResponse updateDraft(Long draftId, DraftListingRequest request, String userId);
 
     /**
      * Get all draft listings for current user
@@ -131,27 +139,37 @@ public interface ListingService {
      * @param userId User ID (owner)
      * @return List of draft listings
      */
-    List<ListingResponseForOwner> getMyDrafts(String userId);
+    List<DraftListingResponse> getMyDrafts(String userId);
+
+    /**
+     * Get draft listing by ID
+     *
+     * @param draftId Draft ID
+     * @param userId User ID (owner)
+     * @return Draft listing response
+     * @throws RuntimeException if draft not found or user is not the owner
+     */
+    DraftListingResponse getDraftById(Long draftId, String userId);
 
     /**
      * Publish draft listing
-     * Validates all required fields and sets isDraft=false
-     * Sets postDate to current time
+     * Validates all required fields and creates a real listing
+     * The draft will be deleted after successful publish
      *
-     * @param id Listing ID
+     * @param draftId Draft ID
+     * @param request Additional request data for publishing (payment info, quota info, etc.)
      * @param userId User ID (owner) who is publishing the draft
-     * @return Published listing response
-     * @throws RuntimeException if listing not found, user is not the owner, or validation fails
+     * @return Listing creation response (may include payment URL if payment required)
+     * @throws RuntimeException if draft not found, user is not the owner, or validation fails
      */
-    ListingResponse publishDraft(Long id, String userId);
+    ListingCreationResponse publishDraft(Long draftId, ListingCreationRequest request, String userId);
 
     /**
      * Delete draft listing
-     * Only draft listings can be deleted by owner
      *
-     * @param id Listing ID
+     * @param draftId Draft ID
      * @param userId User ID (owner) who is deleting the draft
-     * @throws RuntimeException if listing not found, user is not the owner, or listing is not a draft
+     * @throws RuntimeException if draft not found or user is not the owner
      */
-    void deleteDraft(Long id, String userId);
+    void deleteDraft(Long draftId, String userId);
 }

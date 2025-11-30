@@ -283,16 +283,6 @@ INNER JOIN temp_listings l ON l.row_num = MOD(n.seq - 1, 200) + 1
 INNER JOIN temp_users u ON u.row_num = MOD(n.seq - 1, 200) + 1;
 
 -- =====================================================
--- PART 10: INSERT MEMBERSHIP PACKAGES (Base data)
--- =====================================================
-
-INSERT INTO membership_packages (package_code, package_name, package_level, duration_months, original_price, sale_price, discount_percentage, description, is_active, created_at, updated_at)
-VALUES
-    ('BASIC', 'Gói Cơ Bản', 'BASIC', 1, 500000, 450000, 10.00, 'Gói thành viên cơ bản với các tính năng thiết yếu', true, NOW(), NOW()),
-    ('STANDARD', 'Gói Tiêu Chuẩn', 'STANDARD', 1, 1000000, 900000, 10.00, 'Gói thành viên tiêu chuẩn với nhiều tính năng hơn', true, NOW(), NOW()),
-    ('ADVANCED', 'Gói Nâng Cao', 'ADVANCED', 1, 2000000, 1800000, 10.00, 'Gói thành viên nâng cao với đầy đủ tính năng', true, NOW(), NOW());
-
--- =====================================================
 -- PART 11: INSERT MEMBERSHIP PACKAGE BENEFITS
 -- =====================================================
 
