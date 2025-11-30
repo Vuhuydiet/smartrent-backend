@@ -513,6 +513,17 @@ public class OpenAPIConfig {
     }
 
     @Bean
+    public GroupedOpenApi adminListingManagementApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+        return GroupedOpenApi.builder()
+                .group("admin-listing-management")
+                .displayName("Admin Listing Management")
+                .packagesToScan(packageToScan)
+                .pathsToMatch("/v1/admin/listings/**")
+                .addOpenApiCustomizer(securityCustomizer())
+                .build();
+    }
+
+    @Bean
     public GroupedOpenApi adminReportsApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
         return GroupedOpenApi.builder()
                 .group("admin-reports")
