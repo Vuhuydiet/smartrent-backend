@@ -215,7 +215,7 @@ public class ListingFilterRequest {
     Integer size = 20;
 
     @Schema(description = "Sort by field", example = "postDate",
-            allowableValues = {"postDate", "price", "area", "createdAt", "updatedAt", "distance"})
+            allowableValues = {"DEFAULT", "PRICE_ASC", "PRICE_DESC", "NEWEST", "OLDEST"})
     String sortBy;
 
     @Schema(description = "Sort direction", example = "DESC", allowableValues = {"ASC", "DESC"})
