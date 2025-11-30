@@ -108,13 +108,6 @@ public class AddressCreationRequest {
      */
     Integer projectId;
 
-    /**
-     * Street number (backward compatibility)
-     * @deprecated Use legacy.streetNumber or newAddress.streetNumber instead
-     */
-    @Deprecated
-    String streetNumber;
-
     // ==================== COORDINATES ====================
 
     /**

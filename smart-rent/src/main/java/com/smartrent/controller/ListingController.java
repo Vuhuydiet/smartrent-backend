@@ -731,8 +731,8 @@ public class ListingController {
             ### 11. Phân trang và sắp xếp
             - `page`: số trang (bắt đầu từ 0)
             - `size`: kích thước trang (mặc định 20, tối đa 100)
-            - `sortBy`: postDate, price, area, distance, createdAt, updatedAt
-            - `sortDirection`: ASC, DESC (mặc định)
+            - `sortBy`: DEFAULT (VIP tier + postDate), PRICE_ASC (giá tăng dần), PRICE_DESC (giá giảm dần), NEWEST (mới nhất), OLDEST (cũ nhất)
+            - `sortDirection`: ASC, DESC (mặc định DESC)
 
             ## RESPONSE
             - Danh sách bài đăng có phân trang
@@ -751,7 +751,7 @@ public class ListingController {
 
             **Use Case 1: Màn hình chính - Tất cả bài đăng**
             ```json
-            {"verified": true, "excludeExpired": true, "page": 0, "size": 20, "sortBy": "postDate", "sortDirection": "DESC"}
+            {"verified": true, "excludeExpired": true, "page": 0, "size": 20, "sortBy": "DEFAULT", "sortDirection": "DESC"}
             ```
 
             **Use Case 2: Lọc căn hộ cho thuê tại Hà Nội**
@@ -761,7 +761,7 @@ public class ListingController {
 
             **Use Case 3: Tìm nhà giá 5-15 triệu/tháng, 2-3 phòng ngủ**
             ```json
-            {"provinceId": "1", "isLegacy": true, "minPrice": 5000000, "maxPrice": 15000000, "priceUnit": "MONTH", "minBedrooms": 2, "maxBedrooms": 3, "verified": true, "sortBy": "price"}
+            {"provinceId": "1", "isLegacy": true, "minPrice": 5000000, "maxPrice": 15000000, "priceUnit": "MONTH", "minBedrooms": 2, "maxBedrooms": 3, "verified": true, "sortBy": "PRICE_ASC"}
             ```
 
             **Use Case 4: Bài đăng đang giảm giá**
@@ -771,7 +771,7 @@ public class ListingController {
 
             **Use Case 5: Tìm nhà gần vị trí hiện tại (GPS)**
             ```json
-            {"latitude": 21.0285, "longitude": 105.8542, "radiusKm": 5.0, "verified": true, "sortBy": "distance"}
+            {"latitude": 21.0285, "longitude": 105.8542, "radiusKm": 5.0, "verified": true}
             ```
 
             **Use Case 6: Lọc theo tiện ích (điều hòa + WiFi + máy giặt)**
@@ -786,12 +786,12 @@ public class ListingController {
 
             **Use Case 8: Tin mới nhất (trong 7 ngày)**
             ```json
-            {"postedWithinDays": 7, "verified": true, "hasMedia": true, "sortBy": "postDate", "sortDirection": "DESC"}
+            {"postedWithinDays": 7, "verified": true, "hasMedia": true, "sortBy": "NEWEST", "sortDirection": "DESC"}
             ```
 
             **Use Case 9: Chỉ lấy bài VIP (GOLD/DIAMOND)**
             ```json
-            {"vipType": "GOLD", "verified": true, "sortBy": "postDate", "sortDirection": "DESC"}
+            {"vipType": "GOLD", "verified": true, "sortBy": "NEWEST", "sortDirection": "DESC"}
             ```
 
             **Use Case 10: Lọc đầy đủ - Căn hộ cao cấp**
@@ -811,12 +811,12 @@ public class ListingController {
 
             **Use Case 13: Owner - Listings sắp hết hạn**
             ```json
-            {"userId": "user-123", "listingStatus": "EXPIRING_SOON", "sortBy": "expiryDate", "sortDirection": "ASC"}
+            {"userId": "user-123", "listingStatus": "EXPIRING_SOON", "sortBy": "DEFAULT", "sortDirection": "ASC"}
             ```
 
             **Use Case 14: Owner - Listings đang chờ duyệt**
             ```json
-            {"userId": "user-123", "listingStatus": "IN_REVIEW", "SortBy": "DEFAULT", "sortDirection": "DESC"}
+            {"userId": "user-123", "listingStatus": "IN_REVIEW", "sortBy": "DEFAULT", "sortDirection": "DESC"}
             ```
 
             **Use Case 15: Owner - Listings bị từ chối**
@@ -890,9 +890,10 @@ public class ListingController {
                               "ownerPhoneVerified": true,
                               "postedWithinDays": 7,
                               "updatedWithinDays": 3,
+                              "listingStatus": "DISPLAYING",
                               "page": 0,
                               "size": 20,
-                              "sortBy": "postDate",
+                              "sortBy": "DEFAULT",
                               "sortDirection": "DESC"
                             }
                             """
@@ -1016,204 +1017,6 @@ public class ListingController {
         // Service layer will automatically filter out drafts, shadow listings, and expired listings
         // when userId is not provided (public search)
         ListingListResponse response = listingService.searchListings(filter);
-        return ApiResponse.<ListingListResponse>builder().data(response).build();
-    }
-
-    @Deprecated
-    @PostMapping("/my-listings")
-    @Operation(
-        summary = "[DEPRECATED] Get current user's listings - Use /search instead",
-        description = """
-            **DEPRECATED - Use POST /v1/listings/search instead**
-
-            This endpoint is deprecated. Please migrate to the unified search API:
-
-            ```
-            POST /v1/listings/search
-            {
-              "userId": "your-user-id",  // Or omit - auto-filled from JWT if isDraft/isVerify present
-              "isDraft": true,           // Filter for drafts
-              "verified": true,          // Filter for verified
-              "page": 0,
-              "size": 20
-            }
-            ```
-
-            This endpoint still works but redirects internally to the unified search API.
-            """,
-        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = false,
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = MyListingsFilterRequest.class),
-                examples = {
-                    @ExampleObject(
-                        name = "My Draft Listings",
-                        summary = "Get all draft listings (incomplete/auto-saved)",
-                        value = """
-                            {
-                              "isDraft": true,
-                              "page": 0,
-                              "size": 20,
-                              "
-                              ": "DEFAULT",
-                              "sortDirection": "DESC"
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "My Active Listings",
-                        summary = "Get published, verified, non-expired listings",
-                        value = """
-                            {
-                              "verified": true,
-                              "expired": false,
-                              "isDraft": false,
-                              "page": 0,
-                              "size": 20,
-                              "sortBy": "DEFAULT",
-                              "sortDirection": "DESC"
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "Pending Verification",
-                        summary = "Get listings awaiting admin verification",
-                        value = """
-                            {
-                              "isVerify": true,
-                              "verified": false,
-                              "page": 0,
-                              "size": 20,
-                              "SortBy": "DEFAULT",
-                              "sortDirection": "ASC"
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "Expired Listings",
-                        summary = "Get expired listings needing renewal",
-                        value = """
-                            {
-                              "expired": true,
-                              "page": 0,
-                              "size": 20,
-                              "SortBy": "DEFAULT",
-                              "sortDirection": "DESC"
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "Premium Listings Only",
-                        summary = "Get my GOLD and DIAMOND tier listings",
-                        value = """
-                            {
-                              "vipType": "GOLD",
-                              "expired": false,
-                              "page": 0,
-                              "size": 20
-                            }
-                            """
-                    ),
-                    @ExampleObject(
-                        name = "All My Listings",
-                        summary = "Get all my listings without filters",
-                        value = """
-                            {
-                              "page": 0,
-                              "size": 20,
-                              "SortBy": "DEFAULT",
-                              "sortDirection": "DESC"
-                            }
-                            """
-                    )
-                }
-            )
-        ),
-        responses = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "200",
-                description = "User's listings with pagination",
-                content = @Content(
-                    mediaType = "application/json",
-                    schema = @Schema(implementation = ApiResponse.class),
-                    examples = @ExampleObject(
-                        name = "My Listings Response",
-                        value = """
-                            {
-                              "code": "999999",
-                              "message": null,
-                              "data": {
-                                "listings": [
-                                  {
-                                    "listingId": 123,
-                                    "title": "Căn hộ 2PN của tôi",
-                                    "userId": "user-123",
-                                    "price": 12000000,
-                                    "priceUnit": "MONTH",
-                                    "verified": true,
-                                    "isVerify": false,
-                                    "expired": false,
-                                    "isDraft": false,
-                                    "vipType": "SILVER",
-                                    "listingType": "RENT"
-                                  },
-                                  {
-                                    "listingId": 124,
-                                    "title": "Draft - Nhà mới chưa hoàn thành",
-                                    "userId": "user-123",
-                                    "verified": false,
-                                    "isVerify": false,
-                                    "expired": false,
-                                    "isDraft": true,
-                                    "vipType": "NORMAL"
-                                  }
-                                ],
-                                "totalCount": 8,
-                                "currentPage": 0,
-                                "pageSize": 20,
-                                "totalPages": 1,
-                                "recommendations": [],
-                                "filterCriteria": {
-                                  "page": 0,
-                                  "size": 20
-                                }
-                              }
-                            }
-                            """
-                    )
-                )
-            )
-        }
-    )
-    public ApiResponse<ListingListResponse> getMyListings(
-            @RequestBody(required = false) MyListingsFilterRequest filter,
-            Authentication authentication) {
-
-        // Redirect to unified search API
-        String userId = authentication != null ? authentication.getName() : null;
-
-        if (filter == null) {
-            filter = MyListingsFilterRequest.builder().build();
-        }
-
-        // Convert MyListingsFilterRequest to unified ListingFilterRequest
-        ListingFilterRequest unifiedFilter = ListingFilterRequest.builder()
-                .userId(userId)
-                .verified(filter.getVerified())
-                .isVerify(filter.getIsVerify())
-                .expired(filter.getExpired())
-                .isDraft(filter.getIsDraft())
-                .vipType(filter.getVipType())
-                .listingType(filter.getListingType())
-                .page(filter.getPage())
-                .size(filter.getSize())
-                .sortBy(filter.getSortBy())
-                .sortDirection(filter.getSortDirection())
-                .excludeExpired(false) // Don't auto-exclude for my listings
-                .build();
-
-        ListingListResponse response = listingService.searchListings(unifiedFilter);
         return ApiResponse.<ListingListResponse>builder().data(response).build();
     }
 
@@ -2265,9 +2068,9 @@ public class ListingController {
 
     /**
      * Get my listings with owner-specific information (Owner only)
-     * GET /v1/listings/my-listings
+     * POST /v1/listings/my-listings
      */
-    @GetMapping("/my-listings")
+    @PostMapping("/my-listings")
     @Operation(
         summary = "Get my listings with owner-specific information (Owner only)",
         description = """
@@ -2291,16 +2094,37 @@ public class ListingController {
 
             User authentication is required via JWT token.
             """,
-        parameters = {
-            @Parameter(name = "page", description = "Page number (0-indexed)", example = "0"),
-            @Parameter(name = "size", description = "Page size (max 100)", example = "20"),
-            @Parameter(name = "sortBy", description = "Sort field (postDate, price, area, createdAt, updatedAt)", example = "postDate"),
-            @Parameter(name = "sortDirection", description = "Sort direction (ASC, DESC)", example = "DESC"),
-            @Parameter(name = "verified", description = "Filter by verification status (true/false)"),
-            @Parameter(name = "expired", description = "Filter by expiry status (true/false)"),
-            @Parameter(name = "isDraft", description = "Filter by draft status (true/false)"),
-            @Parameter(name = "vipType", description = "Filter by VIP type (NORMAL, SILVER, GOLD, DIAMOND)")
-        },
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ListingFilterRequest.class),
+                examples = @ExampleObject(
+                    name = "Comprehensive Filter Example",
+                    summary = "Example showing all available filter options (use any combination)",
+                    value = """
+                        {
+                          "page": 0,
+                          "size": 20,
+                          "sortBy": "DEFAULT",
+                          "listingStatus": "EXPIRING_SOON",
+                          "sortDirection": "DESC",
+                          "verified": true,
+                          "expired": false,
+                          "isDraft": false,
+                          "isVerify": true,
+                          "vipType": "GOLD",
+                          "categoryId": 1,
+                          "provinceId": "79",
+                          "minPrice": 1000000,
+                          "maxPrice": 50000000,
+                          "minArea": 20,
+                          "maxArea": 100
+                        }
+                        """
+                )
+            )
+        ),
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
@@ -2403,7 +2227,7 @@ public class ListingController {
             )
         }
     )
-    public ApiResponse<OwnerListingListResponse> getMyListings(@Valid ListingFilterRequest filter) {
+    public ApiResponse<OwnerListingListResponse> getMyListings(@Valid @RequestBody ListingFilterRequest filter) {
         String userId = extractUserId();
         OwnerListingListResponse response = listingService.getMyListings(filter, userId);
         return ApiResponse.<OwnerListingListResponse>builder().data(response).build();
@@ -2411,9 +2235,9 @@ public class ListingController {
 
     /**
      * Get all listings for admin with pagination and filters (Admin only)
-     * GET /v1/listings/admin/list
+     * POST /v1/listings/admin/list
      */
-    @GetMapping("/admin/list")
+    @PostMapping("/admin/list")
     @Operation(
         summary = "Get all listings for admin with pagination (Admin only)",
         description = """
@@ -2432,19 +2256,46 @@ public class ListingController {
             - Analytics and reporting
             """,
         parameters = {
-            @Parameter(name = "X-Admin-Id", description = "Admin ID from authentication header", required = true),
-            @Parameter(name = "page", description = "Page number (0-indexed)", example = "0"),
-            @Parameter(name = "size", description = "Page size (max 100)", example = "20"),
-            @Parameter(name = "sortBy", description = "Sort field (postDate, price, area, createdAt, updatedAt)", example = "postDate"),
-            @Parameter(name = "sortDirection", description = "Sort direction (ASC, DESC)", example = "DESC"),
-            @Parameter(name = "categoryId", description = "Filter by category ID", example = "1"),
-            @Parameter(name = "provinceId", description = "Filter by province ID (old structure)", example = "79"),
-            @Parameter(name = "provinceCode", description = "Filter by province code (new structure)", example = "79"),
-            @Parameter(name = "vipType", description = "Filter by VIP type (NORMAL, SILVER, GOLD, DIAMOND)"),
-            @Parameter(name = "verified", description = "Filter by verification status (true/false)"),
-            @Parameter(name = "expired", description = "Filter by expiry status (true/false)"),
-            @Parameter(name = "isDraft", description = "Filter by draft status (true/false)")
+            @Parameter(name = "X-Admin-Id", description = "Admin ID from authentication header", required = true)
         },
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = ListingFilterRequest.class),
+                examples = @ExampleObject(
+                    name = "Comprehensive Filter Example",
+                    summary = "Example showing all available filter options for admin (use any combination)",
+                    value = """
+                        {
+                          "page": 0,
+                          "size": 20,
+                          "sortBy": "DEFAULT",
+                          "listingStatus": "EXPIRING_SOON",
+                          "sortDirection": "DESC",
+                          "verified": true,
+                          "isVerify": false,
+                          "expired": false,
+                          "isDraft": false,
+                          "vipType": "GOLD",
+                          "categoryId": 1,
+                          "provinceId": "79",
+                          "districtId": 5,
+                          "wardId": "123",
+                          "userId": "user-uuid-123",
+                          "listingType": "RENT",
+                          "productType": "APARTMENT",
+                          "minPrice": 1000000,
+                          "maxPrice": 50000000,
+                          "minArea": 20,
+                          "maxArea": 200,
+                          "minBedrooms": 1,
+                          "maxBedrooms": 5
+                        }
+                        """
+                )
+            )
+        ),
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
@@ -2517,7 +2368,7 @@ public class ListingController {
     )
     public ApiResponse<AdminListingListResponse> getAllListingsForAdmin(
             @RequestHeader("X-Admin-Id") String adminId,
-            @Valid ListingFilterRequest filter) {
+            @Valid @RequestBody ListingFilterRequest filter) {
         AdminListingListResponse response = listingService.getAllListingsForAdmin(filter, adminId);
         return ApiResponse.<AdminListingListResponse>builder().data(response).build();
     }
