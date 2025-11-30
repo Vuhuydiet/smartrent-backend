@@ -32,7 +32,7 @@ public class AiListingMapperImpl implements AiListingMapper {
                 .description(listing.getDescription())
                 .price(listing.getPrice())
                 .address(getAddressString(listing))
-                .propertyType(convertPropertyType(listing.getPropertyType()))
+                .propertyType(convertProductType(listing.getProductType()))
                 .area(listing.getArea() != null ? listing.getArea().doubleValue() : null)
                 .amenities(convertAmenities(listing.getAmenities()))
                 .images(buildImages(listing.getMedia()))
@@ -55,29 +55,29 @@ public class AiListingMapperImpl implements AiListingMapper {
         return address != null ? address : "Address not available";
     }
 
-    private HousingPropertyType convertPropertyType(Listing.PropertyType propertyType) {
-        if (propertyType == null) {
+    private HousingPropertyType convertProductType(Listing.ProductType productType) {
+        if (productType == null) {
             return null;
         }
 
         try {
-            // Map Listing.PropertyType to HousingPropertyType
-            return switch (propertyType) {
+            // Map Listing.ProductType to HousingPropertyType
+            return switch (productType) {
                 case APARTMENT -> HousingPropertyType.APARTMENT;
                 case HOUSE -> HousingPropertyType.HOUSE;
                 case ROOM -> HousingPropertyType.ROOM;
                 case STUDIO -> HousingPropertyType.STUDIO;
                 case OFFICE -> {
-                    log.debug("Mapping OFFICE property type to APARTMENT for AI verification");
+                    log.debug("Mapping OFFICE product type to APARTMENT for AI verification");
                     yield HousingPropertyType.APARTMENT;
                 }
                 default -> {
-                    log.warn("Unknown property type: {}, defaulting to APARTMENT", propertyType);
+                    log.warn("Unknown product type: {}, defaulting to APARTMENT", productType);
                     yield HousingPropertyType.APARTMENT;
                 }
             };
         } catch (Exception e) {
-            log.warn("Error converting property type {}: {}", propertyType, e.getMessage());
+            log.warn("Error converting product type {}: {}", productType, e.getMessage());
             return HousingPropertyType.APARTMENT;
         }
     }
