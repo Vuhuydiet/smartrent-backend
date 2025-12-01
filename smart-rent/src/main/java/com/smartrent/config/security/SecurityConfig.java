@@ -91,21 +91,24 @@ public class SecurityConfig {
     CorsConfiguration config = new CorsConfiguration();
 
     // Add additional origins if specified (comma-separated)
-    if (additionalOrigins != null && !additionalOrigins.isBlank()) {
-      if (additionalOrigins.equals("*")) {
-        config.setAllowedOriginPatterns(List.of("*"));
-        config.setAllowCredentials(false);
-      } else {
-        List<String> allowedOrigins = new ArrayList<>();
-        allowedOrigins.add(clientUrl);
-        allowedOrigins.addAll(Arrays.asList(additionalOrigins.split(",")));
-        config.setAllowedOrigins(allowedOrigins);
-        config.setAllowCredentials(true);
-      }
-    } else {
-      config.setAllowedOrigins(List.of(clientUrl));
-      config.setAllowCredentials(true);
-    }
+//    if (additionalOrigins != null && !additionalOrigins.isBlank()) {
+//      if (additionalOrigins.equals("*")) {
+//        config.setAllowedOriginPatterns(List.of("*"));
+//        config.setAllowCredentials(false);
+//      } else {
+//        List<String> allowedOrigins = new ArrayList<>();
+//        allowedOrigins.add(clientUrl);
+//        allowedOrigins.addAll(Arrays.asList(additionalOrigins.split(",")));
+//        config.setAllowedOrigins(allowedOrigins);
+//        config.setAllowCredentials(true);
+//      }
+//    } else {
+//      config.setAllowedOrigins(List.of(clientUrl));
+//      config.setAllowCredentials(true);
+//    }
+
+    config.setAllowedOrigins(List.of("*"));
+    config.setAllowCredentials(false);
 
     config.setAllowedHeaders(List.of("*"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
