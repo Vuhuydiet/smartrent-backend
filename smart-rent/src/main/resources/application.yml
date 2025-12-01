@@ -130,7 +130,7 @@ spring:
         "[locationCache]": 24h
 
 application:
-  client-url: "${CLIENT_URL:http://localhost:3000}"
+  client-url: "*"
   admin:
     contact-phone-number: "${ADMIN_CONTACT_PHONE}"
   authorize-ignored:
