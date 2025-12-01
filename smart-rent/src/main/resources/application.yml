@@ -131,6 +131,8 @@ spring:
 
 application:
   client-url: "*"
+  cors:
+    allowed-origins: "*"
   admin:
     contact-phone-number: "${ADMIN_CONTACT_PHONE}"
   authorize-ignored:
