@@ -238,7 +238,7 @@ open:
     version: "v1.0.0"
     description: "API for SmartRent Application"
     server:
-      url: "http://localhost:8080"
+      url: "https://dev.smartrent-api.vuhuydiet.xyz"
       description: "Local Server."
     group:
       package-to-scan: "com.smartrent.controller"
