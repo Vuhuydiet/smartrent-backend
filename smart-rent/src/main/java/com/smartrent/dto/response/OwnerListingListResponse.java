@@ -29,7 +29,7 @@ public class OwnerListingListResponse {
     @Schema(description = "Total number of listings matching the filter criteria", example = "25")
     Long totalCount;
 
-    @Schema(description = "Current page number (zero-based)", example = "0")
+    @Schema(description = "Current page number (one-based)", example = "1")
     Integer currentPage;
 
     @Schema(description = "Page size", example = "20")

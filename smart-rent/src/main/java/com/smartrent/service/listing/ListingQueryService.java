@@ -85,7 +85,8 @@ public class ListingQueryService {
         Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
 
         // Ensure valid page and size values
-        int page = Math.max(filter.getPage(), 0);
+        // Convert from 1-based (frontend) to 0-based (Spring Data)
+        int page = Math.max(filter.getPage() - 1, 0);
         int size = Math.min(Math.max(filter.getSize(), 1), 100);
 
         return PageRequest.of(page, size, sort);

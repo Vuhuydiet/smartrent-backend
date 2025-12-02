@@ -36,9 +36,9 @@ public class MyListingsFilterRequest {
     @Schema(description = "Listing type filter", allowableValues = {"RENT", "SALE", "SHARE"})
     String listingType;
 
-    @Schema(description = "Page number (zero-based)", example = "0", defaultValue = "0")
+    @Schema(description = "Page number (one-based)", example = "1", defaultValue = "1")
     @Builder.Default
-    Integer page = 0;
+    Integer page = 1;
 
     @Schema(description = "Page size", example = "20", defaultValue = "20")
     @Builder.Default
