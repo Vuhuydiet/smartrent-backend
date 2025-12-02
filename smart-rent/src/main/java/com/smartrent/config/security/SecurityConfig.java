@@ -22,8 +22,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -90,25 +88,9 @@ public class SecurityConfig {
       @Value("${application.cors.allowed-origins:}") String additionalOrigins) {
     CorsConfiguration config = new CorsConfiguration();
 
-    // Add additional origins if specified (comma-separated)
-    if (additionalOrigins != null && !additionalOrigins.isBlank()) {
-      if (additionalOrigins.equals("*")) {
-        config.setAllowedOriginPatterns(List.of("*"));
-        config.setAllowCredentials(false);
-      } else {
-        List<String> allowedOrigins = new ArrayList<>();
-        allowedOrigins.add(clientUrl);
-        allowedOrigins.addAll(Arrays.asList(additionalOrigins.split(",")));
-        config.setAllowedOrigins(allowedOrigins);
-        config.setAllowCredentials(true);
-      }
-    } else {
-      config.setAllowedOrigins(List.of(clientUrl));
-      config.setAllowCredentials(true);
-    }
-
-//    config.setAllowedOrigins(List.of("*"));
-//    config.setAllowCredentials(false);
+    // Hard-coded to accept all origins
+    config.setAllowedOriginPatterns(List.of("*"));
+    config.setAllowCredentials(false);
 
     config.setAllowedHeaders(List.of("*"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
