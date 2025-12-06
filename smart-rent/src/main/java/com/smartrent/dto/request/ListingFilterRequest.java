@@ -46,6 +46,9 @@ public class ListingFilterRequest {
             allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED"})
     String listingStatus;
 
+    @Schema(description = "Internal flag to indicate this is an admin request (set by backend, not by frontend)", hidden = true)
+    Boolean isAdminRequest;
+
     // ============ LOCATION FILTERS ============
     @Schema(description = "Province ID (can be Integer or String for compatibility)", example = "1")
     String provinceId;
