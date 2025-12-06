@@ -27,48 +27,25 @@ ORDER BY listing_id
 LIMIT 200;
 
 -- =====================================================
--- PART 13: INSERT 200 USER MEMBERSHIP BENEFITS
+-- PART 13: INSERT USER MEMBERSHIP BENEFITS
+-- Each user_membership gets all benefits from their membership_package
 -- =====================================================
 
-DROP TEMPORARY TABLE IF EXISTS temp_memberships;
-SET @m_row := 0;
-CREATE TEMPORARY TABLE temp_memberships AS
-SELECT user_membership_id, (@m_row := @m_row + 1) AS row_num
-FROM user_memberships
-ORDER BY user_membership_id
-LIMIT 200;
-
-DROP TEMPORARY TABLE IF EXISTS temp_benefits;
-SET @b_row := 0;
-CREATE TEMPORARY TABLE temp_benefits AS
-SELECT benefit_id, (@b_row := @b_row + 1) AS row_num
-FROM membership_package_benefits
-ORDER BY benefit_id;
-
-SET @row13 := 0;
 INSERT INTO user_membership_benefits (user_membership_id, benefit_id, user_id, benefit_type, granted_at, expires_at, total_quantity, quantity_used, status, created_at, updated_at)
 SELECT
-    m.user_membership_id,
-    b.benefit_id,
-    u.user_id,
-    ELT(MOD(n.seq, 4) + 1, 'POST_SILVER', 'POST_GOLD', 'PUSH', 'AUTO_APPROVE'),
-    DATE_SUB(NOW(), INTERVAL MOD(n.seq, 60) DAY),
-    DATE_ADD(DATE_SUB(NOW(), INTERVAL MOD(n.seq, 60) DAY), INTERVAL 30 DAY),
-    (10 + MOD(n.seq, 20)),
-    MOD(n.seq, 5),
-    ELT(MOD(n.seq, 3) + 1, 'ACTIVE', 'ACTIVE', 'EXPIRED'),
-    DATE_SUB(NOW(), INTERVAL MOD(n.seq, 60) DAY),
-    DATE_SUB(NOW(), INTERVAL MOD(n.seq, 60) DAY)
-FROM (
-    SELECT (@row13 := @row13 + 1) AS seq
-    FROM (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t1,
-         (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t2,
-         (SELECT 0 UNION ALL SELECT 1) t3
-    LIMIT 200
-) n
-INNER JOIN temp_memberships m ON m.row_num = MOD(n.seq - 1, 200) + 1
-INNER JOIN temp_benefits b ON b.row_num = MOD(n.seq, 6) + 1
-INNER JOIN temp_users u ON u.row_num = MOD(n.seq - 1, 200) + 1;
+    um.user_membership_id,
+    mpb.benefit_id,
+    um.user_id,
+    mpb.benefit_type,
+    um.start_date,
+    DATE_ADD(NOW(), INTERVAL 30 DAY),
+    mpb.quantity_per_month,
+    0,
+    'ACTIVE',
+    um.created_at,
+    um.updated_at
+FROM user_memberships um
+INNER JOIN membership_package_benefits mpb ON mpb.membership_id = um.membership_id;
 
 -- =====================================================
 -- PART 14: INSERT VIP TIER DETAILS (Base data - 4 tiers)

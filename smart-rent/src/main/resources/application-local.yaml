@@ -83,3 +83,14 @@ smartrent:
     verification:
       url: http://localhost:8000/ai/verify-listing
       timeout-seconds: 90
+
+open:
+  api:
+    title: "SmartRent API"
+    version: "v1.0.0"
+    description: "API for SmartRent Application"
+    server:
+      url: "http://localhost:8080"
+      description: "Local Server."
+    group:
+      package-to-scan: "com.smartrent.controller"

@@ -108,8 +108,16 @@ public class GoogleAuthenticationServiceImpl implements OutboundAuthenticationSe
                 .email(userInfo.getEmail())
                 .firstName(StringUtils.isEmpty(userInfo.getFamilyName()) ? DEFAULT_FIRST_NAME : userInfo.getFamilyName())
                 .lastName(StringUtils.isEmpty(userInfo.getGivenName()) ? DEFAULT_LAST_NAME : userInfo.getGivenName())
+                .avatarUrl(userInfo.getPicture())
                 .build());
           });
+
+      // Update avatar URL if user exists but avatar has changed (e.g., user updated their Google profile picture)
+      if (user.getAvatarUrl() == null && StringUtils.isNotEmpty(userInfo.getPicture())) {
+        user.setAvatarUrl(userInfo.getPicture());
+        user = userRepository.save(user);
+        log.info("Updated avatar URL for existing Google OAuth user: {}", user.getEmail());
+      }
 
       GetUserResponse userResponse = userMapper.mapFromUserEntityToGetUserResponse(user);
 

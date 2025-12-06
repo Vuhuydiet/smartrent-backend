@@ -40,6 +40,7 @@ public class UserMapperImpl implements UserMapper {
         .phoneNumber(userCreationRequest.getPhoneNumber())
         .contactPhoneNumber(userCreationRequest.getContactPhoneNumber())
         .contactPhoneVerified(false) // New users start with unverified contact phone
+        .avatarUrl(userCreationRequest.getAvatarUrl())
         .build();
   }
 
@@ -56,6 +57,7 @@ public class UserMapperImpl implements UserMapper {
         .phoneNumber(user.getPhoneNumber())
         .contactPhoneNumber(user.getContactPhoneNumber())
         .contactPhoneVerified(user.getContactPhoneVerified())
+        .avatarUrl(user.getAvatarUrl())
         .build();
   }
 
@@ -72,6 +74,7 @@ public class UserMapperImpl implements UserMapper {
         .phoneNumber(user.getPhoneNumber())
         .contactPhoneNumber(user.getContactPhoneNumber())
         .contactPhoneVerified(user.getContactPhoneVerified())
+        .avatarUrl(user.getAvatarUrl())
         .build();
   }
 }

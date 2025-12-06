@@ -38,33 +38,12 @@ public class VerifyListingServiceImpl implements VerifyListingService {
 
         // Update verification status
         listing.setVerified(request.getVerified());
-
+        
         // If approving (verified=true), keep isVerify=true to indicate it has been reviewed
         // If rejecting (verified=false), set isVerify=false to mark as REJECTED status
         if (Boolean.TRUE.equals(request.getVerified())) {
             // Approved - keep isVerify=true (should already be true if it was in review)
             listing.setIsVerify(true);
-
-            // Calculate expiryDate based on approval time and postDate
-            // If approval time > postDate (user's chosen time), use approval time + durationDays
-            // Otherwise, use postDate + durationDays
-            java.time.LocalDateTime approvalTime = java.time.LocalDateTime.now();
-            java.time.LocalDateTime postDate = listing.getPostDate();
-            Integer durationDays = listing.getDurationDays() != null ? listing.getDurationDays() : 30;
-
-            if (postDate != null && approvalTime.isAfter(postDate)) {
-                // Approval time is after user's chosen postDate
-                // Use approval time as base for expiry calculation
-                listing.setExpiryDate(approvalTime.plusDays(durationDays));
-                log.info("Listing {} approved after postDate. ExpiryDate calculated from approval time: {} + {} days = {}",
-                        listingId, approvalTime, durationDays, listing.getExpiryDate());
-            } else {
-                // Use postDate as base for expiry calculation
-                java.time.LocalDateTime baseDate = postDate != null ? postDate : approvalTime;
-                listing.setExpiryDate(baseDate.plusDays(durationDays));
-                log.info("Listing {} approved. ExpiryDate calculated from postDate: {} + {} days = {}",
-                        listingId, baseDate, durationDays, listing.getExpiryDate());
-            }
         } else {
             // Rejected - set isVerify=false to indicate rejection
             listing.setIsVerify(false);

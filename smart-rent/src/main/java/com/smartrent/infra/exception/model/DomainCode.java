@@ -69,6 +69,7 @@ public enum DomainCode {
   INVALID_FILE_TYPE("8001", HttpStatus.BAD_REQUEST, "Invalid file type: %s"),
   FILE_UPLOAD_ERROR("8002", HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload file: %s"),
   FILE_READ_ERROR("8003", HttpStatus.BAD_REQUEST, "Failed to read file: %s"),
+  FILE_TOO_LARGE("8004", HttpStatus.BAD_REQUEST, "File size exceeds maximum allowed: %s"),
   //    External Service Error 9xxx
   EXTERNAL_SERVICE_ERROR("9001", HttpStatus.SERVICE_UNAVAILABLE, "External service error"),
   TOO_MANY_REQUESTS("9002", HttpStatus.TOO_MANY_REQUESTS, "Too many requests to external service"),

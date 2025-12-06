@@ -80,4 +80,10 @@ public class GetUserResponse implements Serializable {
       example = "true"
   )
   Boolean contactPhoneVerified;
+
+  @Schema(
+      description = "URL of the user's profile picture",
+      example = "https://lh3.googleusercontent.com/a/example"
+  )
+  String avatarUrl;
 }

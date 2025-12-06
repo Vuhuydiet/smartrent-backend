@@ -33,7 +33,6 @@ public class ListingMapperImpl implements ListingMapper {
                 .title(req.getTitle())
                 .description(req.getDescription())
                 .userId(req.getUserId())
-                .postDate(req.getPostDate() != null ? req.getPostDate() : java.time.LocalDateTime.now())
                 .expiryDate(req.getExpiryDate())
                 .listingType(req.getListingType() != null ? Listing.ListingType.valueOf(req.getListingType()) : null)
                 .verified(req.getVerified() != null ? req.getVerified() : false)

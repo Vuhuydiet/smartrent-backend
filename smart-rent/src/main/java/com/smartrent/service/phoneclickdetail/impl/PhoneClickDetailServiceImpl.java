@@ -1,9 +1,11 @@
 package com.smartrent.service.phoneclickdetail.impl;
 
 import com.smartrent.dto.request.PhoneClickRequest;
+import com.smartrent.dto.response.ListingClickInfo;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PhoneClickResponse;
 import com.smartrent.dto.response.PhoneClickStatsResponse;
+import com.smartrent.dto.response.UserPhoneClickDetailResponse;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.PhoneClickDetailRepository;
 import com.smartrent.infra.repository.UserRepository;
@@ -21,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -231,6 +234,151 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<UserPhoneClickDetailResponse> getUsersWithClickedListings(Long listingId, int page, int size) {
+        log.info("Getting users with clicked listings for listing {} - page: {}, size: {}", listingId, page, size);
+
+        // Verify listing exists
+        listingRepository.findById(listingId)
+                .orElseThrow(() -> new RuntimeException("Listing not found with ID: " + listingId));
+
+        // Validate pagination parameters
+        if (page < 1) {
+            throw new RuntimeException("Page number must be greater than 0");
+        }
+        if (size <= 0) {
+            throw new RuntimeException("Page size must be greater than 0");
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        // Get distinct user IDs who clicked on this listing (paginated)
+        Page<String> userIdsPage = phoneClickDetailRepository.findDistinctUserIdsByListingId(listingId, pageable);
+
+        // For each user, get their details and all listings they clicked on
+        List<UserPhoneClickDetailResponse> responses = new ArrayList<>();
+        for (String userId : userIdsPage.getContent()) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user == null) {
+                continue;
+            }
+
+            // Get all phone clicks for this user on this listing
+            List<PhoneClickDetail> userClicks = phoneClickDetailRepository.findByListingIdAndUserId(listingId, userId);
+
+            // Build listing click info list
+            List<ListingClickInfo> clickedListings = userClicks.stream()
+                    .map(click -> ListingClickInfo.builder()
+                            .listingId(click.getListing().getListingId())
+                            .listingTitle(click.getListing().getTitle())
+                            .clickedAt(click.getClickedAt())
+                            .clickCount(1) // Each record represents one click
+                            .build())
+                    .collect(Collectors.toList());
+
+            // Build user response
+            UserPhoneClickDetailResponse userResponse = UserPhoneClickDetailResponse.builder()
+                    .userId(user.getUserId())
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .email(user.getEmail())
+                    .contactPhone(user.getContactPhoneNumber())
+                    .contactPhoneVerified(user.getContactPhoneVerified())
+                    .avatarUrl(user.getAvatarUrl())
+                    .totalListingsClicked(clickedListings.size())
+                    .clickedListings(clickedListings)
+                    .build();
+
+            responses.add(userResponse);
+        }
+
+        return PageResponse.<UserPhoneClickDetailResponse>builder()
+                .page(page)
+                .size(userIdsPage.getSize())
+                .totalPages(userIdsPage.getTotalPages())
+                .totalElements(userIdsPage.getTotalElements())
+                .data(responses)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<UserPhoneClickDetailResponse> getUsersWhoClickedOnMyListings(String ownerId, int page, int size) {
+        log.info("Getting users who clicked on listings owned by user {} - page: {}, size: {}", ownerId, page, size);
+
+        // Verify user exists
+        userRepository.findById(ownerId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + ownerId));
+
+        // Validate pagination parameters
+        if (page < 1) {
+            throw new RuntimeException("Page number must be greater than 0");
+        }
+        if (size <= 0) {
+            throw new RuntimeException("Page size must be greater than 0");
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        // Get distinct user IDs who clicked on any of the owner's listings (paginated)
+        Page<String> userIdsPage = phoneClickDetailRepository.findDistinctUserIdsByListingOwnerId(ownerId, pageable);
+
+        // For each user, get their details and all owner's listings they clicked on
+        List<UserPhoneClickDetailResponse> responses = new ArrayList<>();
+        for (String clickingUserId : userIdsPage.getContent()) {
+            User user = userRepository.findById(clickingUserId).orElse(null);
+            if (user == null) {
+                continue;
+            }
+
+            // Get all phone clicks by this user on the owner's listings
+            List<PhoneClickDetail> userClicks = phoneClickDetailRepository.findByListingOwnerIdAndClickingUserId(ownerId, clickingUserId);
+
+            // Group clicks by listing and build listing click info list
+            List<ListingClickInfo> clickedListings = userClicks.stream()
+                    .collect(Collectors.groupingBy(click -> click.getListing().getListingId()))
+                    .entrySet().stream()
+                    .map(entry -> {
+                        List<PhoneClickDetail> clicks = entry.getValue();
+                        PhoneClickDetail firstClick = clicks.get(0);
+                        return ListingClickInfo.builder()
+                                .listingId(firstClick.getListing().getListingId())
+                                .listingTitle(firstClick.getListing().getTitle())
+                                .clickedAt(clicks.stream()
+                                        .map(PhoneClickDetail::getClickedAt)
+                                        .max(java.time.LocalDateTime::compareTo)
+                                        .orElse(firstClick.getClickedAt()))
+                                .clickCount(clicks.size())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+
+            // Build user response
+            UserPhoneClickDetailResponse userResponse = UserPhoneClickDetailResponse.builder()
+                    .userId(user.getUserId())
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .email(user.getEmail())
+                    .contactPhone(user.getContactPhoneNumber())
+                    .contactPhoneVerified(user.getContactPhoneVerified())
+                    .avatarUrl(user.getAvatarUrl())
+                    .totalListingsClicked(clickedListings.size())
+                    .clickedListings(clickedListings)
+                    .build();
+
+            responses.add(userResponse);
+        }
+
+        return PageResponse.<UserPhoneClickDetailResponse>builder()
+                .page(page)
+                .size(userIdsPage.getSize())
+                .totalPages(userIdsPage.getTotalPages())
+                .totalElements(userIdsPage.getTotalElements())
+                .data(responses)
+                .build();
+    }
+
     /**
      * Map PhoneClickDetail entity to PhoneClickResponse DTO
      */
@@ -248,6 +396,7 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
                 .userEmail(user.getEmail())
                 .userContactPhone(user.getContactPhoneNumber())
                 .userContactPhoneVerified(user.getContactPhoneVerified())
+                .userAvatarUrl(user.getAvatarUrl())
                 .clickedAt(phoneClickDetail.getClickedAt())
                 .ipAddress(phoneClickDetail.getIpAddress())
                 .build();

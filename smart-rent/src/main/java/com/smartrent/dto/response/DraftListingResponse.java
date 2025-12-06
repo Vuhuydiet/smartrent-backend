@@ -122,12 +122,12 @@ public class DraftListingResponse {
     @Schema(description = "Service fee")
     String serviceFee;
 
-    // Related entities
-    @Schema(description = "Amenities")
-    Set<AmenityResponse> amenities;
+    // Related IDs
+    @Schema(description = "Amenity IDs")
+    Set<Long> amenityIds;
 
-    @Schema(description = "Media")
-    Set<MediaResponse> media;
+    @Schema(description = "Media IDs")
+    Set<Long> mediaIds;
 
     // Timestamps
     @Schema(description = "Created at")
