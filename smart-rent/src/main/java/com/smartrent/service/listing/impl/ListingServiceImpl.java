@@ -25,6 +25,7 @@ import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AddressRepository;
 import com.smartrent.infra.repository.AddressMetadataRepository;
 import com.smartrent.infra.repository.AdminRepository;
+import com.smartrent.infra.repository.AmenityRepository;
 import com.smartrent.infra.repository.LegacyProvinceRepository;
 import com.smartrent.infra.repository.ListingDraftRepository;
 import com.smartrent.infra.repository.ListingRepository;
@@ -71,6 +72,7 @@ public class ListingServiceImpl implements ListingService {
     ListingRepository listingRepository;
     ListingDraftRepository listingDraftRepository;
     MediaRepository mediaRepository;
+    AmenityRepository amenityRepository;
     AddressRepository addressRepository;
     AddressMetadataRepository addressMetadataRepository;
     AdminRepository adminRepository;
@@ -127,6 +129,12 @@ public class ListingServiceImpl implements ListingService {
         if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
             linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
             log.info("Linked {} media items to listing {}", request.getMediaIds().size(), saved.getListingId());
+        }
+
+        // Link amenities to listing if provided (within same transaction)
+        if (request.getAmenityIds() != null && !request.getAmenityIds().isEmpty()) {
+            linkAmenitiesToListing(saved, request.getAmenityIds());
+            log.info("Linked {} amenities to listing {}", request.getAmenityIds().size(), saved.getListingId());
         }
 
         // Check if this is a listing with duration days requiring payment
@@ -270,6 +278,12 @@ public class ListingServiceImpl implements ListingService {
             log.info("Linked {} media items to listing {}", request.getMediaIds().size(), saved.getListingId());
         }
 
+        // Link amenities to listing if provided (within same transaction)
+        if (request.getAmenityIds() != null && !request.getAmenityIds().isEmpty()) {
+            linkAmenitiesToListing(saved, request.getAmenityIds());
+            log.info("Linked {} amenities to listing {}", request.getAmenityIds().size(), saved.getListingId());
+        }
+
         // If Diamond, create shadow NORMAL listing
         if ("DIAMOND".equalsIgnoreCase(vipType)) {
             createShadowListing(saved);
@@ -325,6 +339,12 @@ public class ListingServiceImpl implements ListingService {
                 if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
                     linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
                     log.info("Linked {} media items to VIP listing {}", request.getMediaIds().size(), saved.getListingId());
+                }
+
+                // Link amenities to listing if provided (within same transaction)
+                if (request.getAmenityIds() != null && !request.getAmenityIds().isEmpty()) {
+                    linkAmenitiesToListing(saved, request.getAmenityIds());
+                    log.info("Linked {} amenities to VIP listing {}", request.getAmenityIds().size(), saved.getListingId());
                 }
 
                 // If Diamond, create shadow NORMAL listing
@@ -684,6 +704,51 @@ public class ListingServiceImpl implements ListingService {
     }
 
     /**
+     * Helper method to link amenities to a listing.
+     * Ensures data integrity by validating:
+     * - Amenities exist
+     * - Amenities are active
+     *
+     * This operation is part of the listing creation transaction,
+     * ensuring atomicity and consistency.
+     *
+     * @param listing the listing to attach amenities to
+     * @param amenityIds set of amenity IDs to link
+     * @throws AppException if validation fails
+     */
+    private void linkAmenitiesToListing(Listing listing, Set<Long> amenityIds) {
+        if (amenityIds == null || amenityIds.isEmpty()) {
+            return;
+        }
+
+        log.info("Linking {} amenities to listing {}",
+                amenityIds.size(), listing.getListingId());
+
+        List<Amenity> amenities = new ArrayList<>();
+        for (Long amenityId : amenityIds) {
+            // Fetch amenity
+            Amenity amenity = amenityRepository.findById(amenityId)
+                    .orElseThrow(() -> new AppException(DomainCode.RESOURCE_NOT_FOUND,
+                            "Amenity not found with ID: " + amenityId));
+
+            // Validate amenity is active
+            if (!Boolean.TRUE.equals(amenity.getIsActive())) {
+                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                        "Amenity " + amenityId + " is not active");
+            }
+
+            amenities.add(amenity);
+            log.debug("Amenity {} will be linked to listing {}", amenityId, listing.getListingId());
+        }
+
+        // Set amenities to listing - JPA will handle the join table
+        listing.setAmenities(amenities);
+
+        log.info("Successfully linked {} amenities to listing {}",
+                amenities.size(), listing.getListingId());
+    }
+
+    /**
      * Helper method to build UserCreationResponse from userId
      * @param userId User ID
      * @return UserCreationResponse or null if user not found
@@ -807,6 +872,11 @@ public class ListingServiceImpl implements ListingService {
                 linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
             }
 
+            // Link amenities if provided
+            if (request.getAmenityIds() != null && !request.getAmenityIds().isEmpty()) {
+                linkAmenitiesToListing(saved, request.getAmenityIds());
+            }
+
             // Remove from cache
             listingRequestCacheService.removeNormalListingRequest(transactionId);
 
@@ -851,6 +921,11 @@ public class ListingServiceImpl implements ListingService {
             // Link media if provided
             if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
                 linkMediaToListing(savedVipListing, request.getMediaIds(), request.getUserId());
+            }
+
+            // Link amenities if provided
+            if (request.getAmenityIds() != null && !request.getAmenityIds().isEmpty()) {
+                linkAmenitiesToListing(savedVipListing, request.getAmenityIds());
             }
 
             // Create shadow listing for DIAMOND tier
