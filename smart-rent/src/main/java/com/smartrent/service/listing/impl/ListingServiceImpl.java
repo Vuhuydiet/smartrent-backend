@@ -81,6 +81,7 @@ public class ListingServiceImpl implements ListingService {
     ProvinceRepository provinceRepository;
     ListingMapper listingMapper;
     com.smartrent.mapper.MediaMapper mediaMapper;
+    com.smartrent.mapper.AmenityMapper amenityMapper;
     com.smartrent.mapper.AddressMapper addressMapper;
     com.smartrent.mapper.UserMapper userMapper;
     LocationPricingService locationPricingService;
@@ -1768,22 +1769,36 @@ public class ListingServiceImpl implements ListingService {
      * Map ListingDraft entity to DraftListingResponse
      */
     private DraftListingResponse mapDraftToResponse(ListingDraft draft) {
-        Set<Long> amenityIds = null;
+        Set<com.smartrent.dto.response.AmenityResponse> amenities = null;
         if (draft.getAmenityIds() != null && !draft.getAmenityIds().isEmpty()) {
-            amenityIds = java.util.Arrays.stream(draft.getAmenityIds().split(","))
+            Set<Long> amenityIds = java.util.Arrays.stream(draft.getAmenityIds().split(","))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
                     .map(Long::parseLong)
                     .collect(Collectors.toSet());
+
+            if (!amenityIds.isEmpty()) {
+                List<Amenity> amenityEntities = amenityRepository.findAllById(amenityIds);
+                amenities = amenityEntities.stream()
+                        .map(amenityMapper::toResponse)
+                        .collect(Collectors.toSet());
+            }
         }
 
-        Set<Long> mediaIds = null;
+        Set<com.smartrent.dto.response.MediaResponse> media = null;
         if (draft.getMediaIds() != null && !draft.getMediaIds().isEmpty()) {
-            mediaIds = java.util.Arrays.stream(draft.getMediaIds().split(","))
+            Set<Long> mediaIds = java.util.Arrays.stream(draft.getMediaIds().split(","))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
                     .map(Long::parseLong)
                     .collect(Collectors.toSet());
+
+            if (!mediaIds.isEmpty()) {
+                List<Media> mediaEntities = mediaRepository.findAllById(mediaIds);
+                media = mediaEntities.stream()
+                        .map(mediaMapper::toResponse)
+                        .collect(Collectors.toSet());
+            }
         }
 
         return DraftListingResponse.builder()
@@ -1818,8 +1833,8 @@ public class ListingServiceImpl implements ListingService {
                 .electricityPrice(draft.getElectricityPrice())
                 .internetPrice(draft.getInternetPrice())
                 .serviceFee(draft.getServiceFee())
-                .amenityIds(amenityIds)
-                .mediaIds(mediaIds)
+                .amenities(amenities)
+                .media(media)
                 .createdAt(draft.getCreatedAt())
                 .updatedAt(draft.getUpdatedAt())
                 .build();
