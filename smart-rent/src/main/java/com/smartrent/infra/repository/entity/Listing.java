@@ -51,6 +51,7 @@ public class Listing {
     String userId;
 
     @Column(name = "post_date")
+    @CreationTimestamp
     LocalDateTime postDate;
 
     @Column(name = "expiry_date")

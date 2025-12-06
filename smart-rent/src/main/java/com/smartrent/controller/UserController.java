@@ -2,6 +2,7 @@ package com.smartrent.controller;
 
 import com.smartrent.dto.request.UpdateContactPhoneRequest;
 import com.smartrent.dto.request.UserCreationRequest;
+import com.smartrent.dto.request.UserProfileUpdateRequest;
 import com.smartrent.dto.request.UserUpdateRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.GetUserResponse;
@@ -24,6 +25,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/v1/users")
@@ -83,7 +85,10 @@ public class UserController {
                           "firstName": "John",
                           "lastName": "Doe",
                           "idDocument": "ID123456789",
-                          "taxNumber": "TAX987654321"
+                          "taxNumber": "TAX987654321",
+                          "contactPhoneNumber": "0912345678",
+                          "contactPhoneVerified": false,
+                          "avatarUrl": null
                         }
                       }
                       """
@@ -159,7 +164,10 @@ public class UserController {
                           "firstName": "John",
                           "lastName": "Doe",
                           "idDocument": "ID123456789",
-                          "taxNumber": "TAX987654321"
+                          "taxNumber": "TAX987654321",
+                          "contactPhoneNumber": "0912345678",
+                          "contactPhoneVerified": true,
+                          "avatarUrl": "https://lh3.googleusercontent.com/a/example"
                         }
                       }
                       """
@@ -245,7 +253,10 @@ public class UserController {
                               "firstName": "John",
                               "lastName": "Doe",
                               "idDocument": "ID123456789",
-                              "taxNumber": "TAX987654321"
+                              "taxNumber": "TAX987654321",
+                              "contactPhoneNumber": "0912345678",
+                              "contactPhoneVerified": true,
+                              "avatarUrl": "https://lh3.googleusercontent.com/a/example"
                             },
                             {
                               "userId": "user-223e4567-e89b-12d3-a456-426614174001",
@@ -255,7 +266,10 @@ public class UserController {
                               "firstName": "Jane",
                               "lastName": "Smith",
                               "idDocument": "ID987654321",
-                              "taxNumber": "TAX123456789"
+                              "taxNumber": "TAX123456789",
+                              "contactPhoneNumber": "0987654321",
+                              "contactPhoneVerified": false,
+                              "avatarUrl": null
                             }
                           ]
                         }
@@ -390,6 +404,162 @@ public class UserController {
         .build();
   }
 
+  @PatchMapping(value = "/profile", consumes = {"multipart/form-data"})
+  @Operation(
+      summary = "Update user profile",
+      description = """
+          Updates the authenticated user's profile information including avatar.
+
+          **Use Case:**
+          - User wants to update their profile details (name, contact info, avatar, etc.)
+          - User uploads a new profile picture (file will be uploaded to S3 storage)
+
+          **Behavior:**
+          - Requires authentication (user must be logged in)
+          - Only updates fields that are provided (null fields are ignored)
+          - Avatar file is uploaded to S3 and the URL is stored
+          - Validates Vietnam phone number format if contactPhoneNumber is provided
+          - Resets phone verification status if contactPhoneNumber is updated
+          - Validates uniqueness of idDocument and taxNumber if provided
+          - Avatar file must be image (jpeg, png, webp) and max 5MB
+
+          **Returns:**
+          - Updated user profile with avatar URL
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication")
+  )
+  @ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "200",
+          description = "Profile updated successfully",
+          content = @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = ApiResponse.class),
+              examples = @ExampleObject(
+                  name = "Success Response",
+                  value = """
+                      {
+                        "code": "999999",
+                        "message": null,
+                        "data": {
+                          "userId": "user-123",
+                          "phoneCode": "+84",
+                          "phoneNumber": "912345678",
+                          "email": "john.doe@example.com",
+                          "firstName": "John",
+                          "lastName": "Doe",
+                          "idDocument": "ID123456789",
+                          "taxNumber": "TAX987654321",
+                          "contactPhoneNumber": "0912345678",
+                          "contactPhoneVerified": false,
+                          "avatarUrl": "https://cdn.example.com/avatars/user-123/abc123.jpg"
+                        }
+                      }
+                      """
+              )
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "400",
+          description = "Invalid request data",
+          content = @Content(
+              mediaType = "application/json",
+              examples = {
+                  @ExampleObject(
+                      name = "Validation Error",
+                      value = """
+                          {
+                            "code": "2005",
+                            "message": "Invalid contact phone number format",
+                            "data": null
+                          }
+                          """
+                  ),
+                  @ExampleObject(
+                      name = "Invalid File Type",
+                      value = """
+                          {
+                            "code": "8001",
+                            "message": "Invalid avatar file type. Allowed: image/jpeg, image/png, image/webp",
+                            "data": null
+                          }
+                          """
+                  ),
+                  @ExampleObject(
+                      name = "File Too Large",
+                      value = """
+                          {
+                            "code": "8004",
+                            "message": "Avatar file size must not exceed 5MB",
+                            "data": null
+                          }
+                          """
+                  )
+              }
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "401",
+          description = "Unauthorized - User not authenticated"
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "404",
+          description = "User not found"
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "409",
+          description = "Conflict - ID document or tax number already exists",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  name = "Conflict Error",
+                  value = """
+                      {
+                        "code": "3003",
+                        "message": "ID document already exists",
+                        "data": null
+                      }
+                      """
+              )
+          )
+      )
+  })
+  public ApiResponse<GetUserResponse> updateUserProfile(
+      @Parameter(description = "User's first name")
+      @RequestParam(value = "firstName", required = false) String firstName,
+
+      @Parameter(description = "User's last name")
+      @RequestParam(value = "lastName", required = false) String lastName,
+
+      @Parameter(description = "User's identification document number")
+      @RequestParam(value = "idDocument", required = false) String idDocument,
+
+      @Parameter(description = "User's tax identification number")
+      @RequestParam(value = "taxNumber", required = false) String taxNumber,
+
+      @Parameter(description = "Vietnam contact phone number (format: 09xxxxxxxx, 03xxxxxxxx, etc.)")
+      @RequestParam(value = "contactPhoneNumber", required = false) String contactPhoneNumber,
+
+      @Parameter(description = "Avatar image file (max 5MB, allowed: jpeg, png, webp)")
+      @RequestPart(value = "avatar", required = false) MultipartFile avatarFile
+  ) {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String userId = authentication.getName();
+
+    UserProfileUpdateRequest request = UserProfileUpdateRequest.builder()
+        .firstName(firstName)
+        .lastName(lastName)
+        .idDocument(idDocument)
+        .taxNumber(taxNumber)
+        .contactPhoneNumber(contactPhoneNumber)
+        .build();
+
+    GetUserResponse response = userService.updateUserProfile(userId, request, avatarFile);
+    return ApiResponse.<GetUserResponse>builder()
+        .data(response)
+        .build();
+  }
+
   @PutMapping("/{userId}")
   @Operation(
       summary = "Update user (Admin operation)",
@@ -411,13 +581,16 @@ public class UserController {
                         "message": null,
                         "data": {
                           "userId": "user-123",
+                          "phoneCode": "+1",
+                          "phoneNumber": "1234567890",
                           "email": "updated@example.com",
                           "firstName": "John",
                           "lastName": "Doe",
                           "idDocument": "ID123456789",
                           "taxNumber": "TAX987654321",
-                          "isVerified": true,
-                          "contactPhoneNumber": "0912345678"
+                          "contactPhoneNumber": "0912345678",
+                          "contactPhoneVerified": true,
+                          "avatarUrl": "https://example.com/avatar.jpg"
                         }
                       }
                       """

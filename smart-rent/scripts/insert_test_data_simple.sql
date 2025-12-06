@@ -13,7 +13,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- =====================================================
 
 SET @row1 := 0;
-INSERT INTO users (user_id, first_name, last_name, email, phone_code, phone_number, password, is_verified, created_at, updated_at)
+INSERT INTO users (user_id, first_name, last_name, email, phone_code, phone_number, password, is_verified, avatar_url, created_at, updated_at)
 SELECT
     UUID(),
     CONCAT('Văn ', CHAR(65 + MOD(seq - 1, 26))),
@@ -23,6 +23,7 @@ SELECT
     CONCAT('9', MOD(seq, 4), LPAD(seq, 8, '0')),
     '$2a$12$5EeWd/K8iKLk1UOw0AkfLOuzwIcA.uSx2nQhqvstoQUckLiXOgiim',
     true,
+    'https://res.cloudinary.com/daartoyul/image/upload/v1734086974/x2u01mgrywiu6nmbq4su.jpg',
     DATE_SUB(NOW(), INTERVAL MOD(seq, 90) DAY),
     DATE_SUB(NOW(), INTERVAL MOD(seq, 90) DAY)
 FROM (
@@ -86,7 +87,7 @@ LIMIT 200;
 -- =====================================================
 
 SET @row3 := 0;
-INSERT INTO listings (title, description, user_id, listing_type, verified, is_verify, expired, vip_type, post_source, category_id, product_type, price, price_unit, address_id, area, bedrooms, bathrooms, direction, furnishing, property_type, room_capacity, expiry_date, post_date)
+INSERT INTO listings (title, description, user_id, listing_type, verified, is_verify, expired, vip_type, post_source, category_id, product_type, price, price_unit, address_id, area, bedrooms, bathrooms, direction, furnishing, room_capacity, expiry_date, post_date)
 SELECT
     CONCAT(
         ELT(MOD(n.seq, 5) + 1, 'Căn hộ cao cấp', 'Phòng trọ sinh viên', 'Nhà nguyên căn', 'Studio hiện đại', 'Văn phòng cho thuê'),
@@ -110,7 +111,6 @@ SELECT
     MOD(n.seq, 3) + 1,
     ELT(MOD(n.seq, 8) + 1, 'NORTH', 'SOUTH', 'EAST', 'WEST', 'NORTHEAST', 'NORTHWEST', 'SOUTHEAST', 'SOUTHWEST'),
     ELT(MOD(n.seq, 3) + 1, 'FULLY_FURNISHED', 'SEMI_FURNISHED', 'UNFURNISHED'),
-    ELT(MOD(n.seq, 5) + 1, 'APARTMENT', 'ROOM', 'HOUSE', 'STUDIO', 'OFFICE'),
     MOD(n.seq, 8) + 2,
     DATE_ADD(NOW(), INTERVAL 30 DAY),
     DATE_SUB(NOW(), INTERVAL MOD(n.seq, 30) DAY)
@@ -288,42 +288,42 @@ INNER JOIN temp_users u ON u.row_num = MOD(n.seq - 1, 200) + 1;
 
 INSERT INTO membership_package_benefits (membership_id, benefit_type, benefit_name_display, quantity_per_month, created_at)
 SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'BASIC' LIMIT 1),
+    (SELECT membership_id FROM membership_packages WHERE package_code = 'BASIC_1M' LIMIT 1),
     'POST_SILVER',
     'Đăng 10 tin bạc',
     10,
     NOW()
 UNION ALL
 SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'BASIC' LIMIT 1),
+    (SELECT membership_id FROM membership_packages WHERE package_code = 'BASIC_1M' LIMIT 1),
     'PUSH',
     '5 lượt đẩy tin',
     5,
     NOW()
 UNION ALL
 SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'STANDARD' LIMIT 1),
+    (SELECT membership_id FROM membership_packages WHERE package_code = 'STANDARD_1M' LIMIT 1),
     'POST_SILVER',
     'Đăng 20 tin bạc',
     20,
     NOW()
 UNION ALL
 SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'STANDARD' LIMIT 1),
+    (SELECT membership_id FROM membership_packages WHERE package_code = 'STANDARD_1M' LIMIT 1),
     'POST_GOLD',
     'Đăng 5 tin vàng',
     5,
     NOW()
 UNION ALL
 SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'ADVANCED' LIMIT 1),
+    (SELECT membership_id FROM membership_packages WHERE package_code = 'ADVANCED_1M' LIMIT 1),
     'POST_GOLD',
     'Đăng 10 tin vàng',
     10,
     NOW()
 UNION ALL
 SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'ADVANCED' LIMIT 1),
+    (SELECT membership_id FROM membership_packages WHERE package_code = 'ADVANCED_1M' LIMIT 1),
     'PUSH',
     '20 lượt đẩy tin',
     20,

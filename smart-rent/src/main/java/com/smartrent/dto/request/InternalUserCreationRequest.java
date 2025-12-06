@@ -86,4 +86,10 @@ public class InternalUserCreationRequest {
       example = "0912345678"
   )
   String contactPhoneNumber;
+
+  @Schema(
+      description = "URL of the user's profile picture (e.g., from Google OAuth)",
+      example = "https://lh3.googleusercontent.com/a/example"
+  )
+  String avatarUrl;
 }

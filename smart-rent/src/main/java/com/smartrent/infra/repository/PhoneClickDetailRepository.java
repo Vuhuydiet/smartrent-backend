@@ -108,5 +108,46 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
             @Param("ownerId") String ownerId,
             @Param("titleKeyword") String titleKeyword,
             Pageable pageable);
+
+    /**
+     * Get distinct user IDs who clicked on a specific listing's phone number (paginated)
+     */
+    @Query("SELECT DISTINCT pc.user.userId FROM phone_clicks pc " +
+           "WHERE pc.listing.listingId = :listingId")
+    Page<String> findDistinctUserIdsByListingId(@Param("listingId") Long listingId, Pageable pageable);
+
+    /**
+     * Get all phone clicks for a specific listing by a specific user
+     */
+    @Query("SELECT pc FROM phone_clicks pc " +
+           "WHERE pc.listing.listingId = :listingId AND pc.user.userId = :userId " +
+           "ORDER BY pc.clickedAt DESC")
+    List<PhoneClickDetail> findByListingIdAndUserId(
+            @Param("listingId") Long listingId,
+            @Param("userId") String userId);
+
+    /**
+     * Count distinct users who clicked on a specific listing
+     */
+    @Query("SELECT COUNT(DISTINCT pc.user.userId) FROM phone_clicks pc " +
+           "WHERE pc.listing.listingId = :listingId")
+    long countDistinctUsersForListing(@Param("listingId") Long listingId);
+
+    /**
+     * Get distinct user IDs who clicked on any listing owned by a specific user (paginated)
+     */
+    @Query("SELECT DISTINCT pc.user.userId FROM phone_clicks pc " +
+           "WHERE pc.listing.userId = :ownerId")
+    Page<String> findDistinctUserIdsByListingOwnerId(@Param("ownerId") String ownerId, Pageable pageable);
+
+    /**
+     * Get all phone clicks for listings owned by a specific user, filtered by clicking user
+     */
+    @Query("SELECT pc FROM phone_clicks pc " +
+           "WHERE pc.listing.userId = :ownerId AND pc.user.userId = :clickingUserId " +
+           "ORDER BY pc.clickedAt DESC")
+    List<PhoneClickDetail> findByListingOwnerIdAndClickingUserId(
+            @Param("ownerId") String ownerId,
+            @Param("clickingUserId") String clickingUserId);
 }
 

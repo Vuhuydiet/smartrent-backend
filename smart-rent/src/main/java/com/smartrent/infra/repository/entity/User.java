@@ -48,4 +48,7 @@ public class User extends AbstractUser{
   @Column(name = "contact_phone_verified")
   Boolean contactPhoneVerified;
 
+  @Column(name = "avatar_url")
+  String avatarUrl;
+
 }
