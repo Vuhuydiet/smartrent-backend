@@ -542,7 +542,8 @@ public class ListingController {
                                   "firstName": "Nguyen",
                                   "lastName": "Van A",
                                   "contactPhoneNumber": "0912345678",
-                                  "contactPhoneVerified": true
+                                  "contactPhoneVerified": true,
+                                  "avatarUrl": "https://lh3.googleusercontent.com/a/example"
                                 },
                                 "postDate": "2025-09-01T10:00:00",
                                 "expiryDate": "2025-12-31T23:59:59",
@@ -985,7 +986,8 @@ public class ListingController {
                                       "lastName": "Van B",
                                       "email": "owner@example.com",
                                       "contactPhoneNumber": "0987654321",
-                                      "contactPhoneVerified": true
+                                      "contactPhoneVerified": true,
+                                      "avatarUrl": "https://lh3.googleusercontent.com/a/example"
                                     },
                                     "price": 12000000,
                                     "priceUnit": "MONTH",
@@ -1112,7 +1114,8 @@ public class ListingController {
                                     "lastName": "Van C",
                                     "email": "user1@example.com",
                                     "contactPhoneNumber": "0901234567",
-                                    "contactPhoneVerified": true
+                                    "contactPhoneVerified": true,
+                                    "avatarUrl": "https://lh3.googleusercontent.com/a/example"
                                   },
                                   "postDate": "2025-09-01T10:00:00",
                                   "expiryDate": "2025-12-31T23:59:59",
@@ -1191,7 +1194,8 @@ public class ListingController {
                                     "lastName": "Thi D",
                                     "email": "user2@example.com",
                                     "contactPhoneNumber": "0909876543",
-                                    "contactPhoneVerified": true
+                                    "contactPhoneVerified": true,
+                                    "avatarUrl": null
                                   },
                                   "postDate": "2025-09-05T14:30:00",
                                   "expiryDate": "2025-12-31T23:59:59",
@@ -2016,7 +2020,8 @@ public class ListingController {
                                   "firstName": "John",
                                   "lastName": "Doe",
                                   "contactPhoneNumber": "0912345678",
-                                  "contactPhoneVerified": true
+                                  "contactPhoneVerified": true,
+                                  "avatarUrl": "https://lh3.googleusercontent.com/a/example"
                                 },
                                 "postDate": "2025-01-15T10:30:00",
                                 "expiryDate": "2025-02-14T10:30:00",
@@ -2208,7 +2213,8 @@ public class ListingController {
                                       "lastName": "Doe",
                                       "email": "owner@example.com",
                                       "contactPhoneNumber": "0912345678",
-                                      "contactPhoneVerified": true
+                                      "contactPhoneVerified": true,
+                                      "avatarUrl": "https://lh3.googleusercontent.com/a/example"
                                     },
                                     "verified": true,
                                     "vipType": "GOLD",
@@ -2428,8 +2434,6 @@ public class ListingController {
     public ApiResponse<AdminListingListResponse> getAllListingsForAdmin(
             @RequestHeader("X-Admin-Id") String adminId,
             @Valid @RequestBody ListingFilterRequest filter) {
-        // Mark this as an admin request so the specification doesn't apply public filters
-        filter.setIsAdminRequest(true);
         AdminListingListResponse response = listingService.getAllListingsForAdmin(filter, adminId);
         return ApiResponse.<AdminListingListResponse>builder().data(response).build();
     }

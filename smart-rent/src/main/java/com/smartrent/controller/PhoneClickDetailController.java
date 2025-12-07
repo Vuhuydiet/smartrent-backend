@@ -5,6 +5,7 @@ import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PhoneClickResponse;
 import com.smartrent.dto.response.PhoneClickStatsResponse;
+import com.smartrent.dto.response.UserPhoneClickDetailResponse;
 import com.smartrent.service.phoneclickdetail.PhoneClickDetailService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -91,16 +92,65 @@ public class PhoneClickDetailController {
                     description = "Phone click tracked successfully",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Success",
+                                              "data": {
+                                                "id": 1,
+                                                "listingId": 123,
+                                                "listingTitle": "Beautiful 2BR Apartment in District 1",
+                                                "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                                "userFirstName": "John",
+                                                "userLastName": "Doe",
+                                                "userEmail": "john.doe@example.com",
+                                                "userContactPhone": "0912345678",
+                                                "userContactPhoneVerified": true,
+                                                "userAvatarUrl": "https://lh3.googleusercontent.com/a/example",
+                                                "clickedAt": "2024-01-15T10:30:00",
+                                                "ipAddress": "192.168.1.1"
+                                              }
+                                            }
+                                            """
+                            )
                     )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
+                    description = "Unauthorized - User not authenticated",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Unauthorized Error",
+                                    value = """
+                                            {
+                                              "code": "401001",
+                                              "message": "Unauthorized - User not authenticated",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "404",
-                    description = "Listing not found"
+                    description = "Listing not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Not Found Error",
+                                    value = """
+                                            {
+                                              "code": "404001",
+                                              "message": "Listing not found",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     public ApiResponse<PhoneClickResponse> trackPhoneClick(
@@ -148,16 +198,73 @@ public class PhoneClickDetailController {
                     description = "Successfully retrieved phone clicks",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Success",
+                                              "data": {
+                                                "page": 1,
+                                                "size": 10,
+                                                "totalElements": 25,
+                                                "totalPages": 3,
+                                                "data": [
+                                                  {
+                                                    "id": 1,
+                                                    "listingId": 123,
+                                                    "listingTitle": "Beautiful 2BR Apartment in District 1",
+                                                    "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                                    "userFirstName": "John",
+                                                    "userLastName": "Doe",
+                                                    "userEmail": "john.doe@example.com",
+                                                    "userContactPhone": "0912345678",
+                                                    "userContactPhoneVerified": true,
+                                                    "userAvatarUrl": "https://lh3.googleusercontent.com/a/example",
+                                                    "clickedAt": "2024-01-15T10:30:00",
+                                                    "ipAddress": "192.168.1.1"
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                            """
+                            )
                     )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
+                    description = "Unauthorized - User not authenticated",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Unauthorized Error",
+                                    value = """
+                                            {
+                                              "code": "401001",
+                                              "message": "Unauthorized - User not authenticated",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "404",
-                    description = "Listing not found"
+                    description = "Listing not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Not Found Error",
+                                    value = """
+                                            {
+                                              "code": "404001",
+                                              "message": "Listing not found",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     public ApiResponse<PageResponse<PhoneClickResponse>> getPhoneClicksByListing(
@@ -173,6 +280,116 @@ public class PhoneClickDetailController {
         PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksByListing(listingId, page, size);
 
         return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
+                .code("999999")
+                .data(responses)
+                .build();
+    }
+
+    @GetMapping("/listing/{listingId}/users")
+    @Operation(
+            summary = "Get user details who clicked on listing's phone number",
+            description = """
+                    Get all users who clicked on a specific listing's phone number (paginated).
+                    Each user detail contains a list of listings they have clicked on phone numbers.
+
+                    **Use Case:**
+                    - Renter views listing management page
+                    - See which users are interested in the listing with their click history
+                    """,
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Successfully retrieved user details with clicked listings",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Success",
+                                              "data": {
+                                                "page": 1,
+                                                "size": 10,
+                                                "totalElements": 5,
+                                                "totalPages": 1,
+                                                "data": [
+                                                  {
+                                                    "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                                    "firstName": "John",
+                                                    "lastName": "Doe",
+                                                    "email": "john.doe@example.com",
+                                                    "contactPhone": "0912345678",
+                                                    "contactPhoneVerified": true,
+                                                    "avatarUrl": "https://example.com/avatar.jpg",
+                                                    "totalListingsClicked": 2,
+                                                    "clickedListings": [
+                                                      {
+                                                        "listingId": 123,
+                                                        "listingTitle": "Beautiful 2BR Apartment",
+                                                        "clickedAt": "2024-01-15T10:30:00",
+                                                        "clickCount": 3
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - User not authenticated",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Unauthorized Error",
+                                    value = """
+                                            {
+                                              "code": "401001",
+                                              "message": "Unauthorized - User not authenticated",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Listing not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Not Found Error",
+                                    value = """
+                                            {
+                                              "code": "404001",
+                                              "message": "Listing not found",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
+    public ApiResponse<PageResponse<UserPhoneClickDetailResponse>> getUsersWithClickedListings(
+            @Parameter(description = "Listing ID", example = "123")
+            @PathVariable Long listingId,
+            @Parameter(description = "Page number (1-indexed)", example = "1")
+            @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Number of items per page", example = "10")
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        log.info("Getting users with clicked listings for listing {} - page: {}, size: {}", listingId, page, size);
+
+        PageResponse<UserPhoneClickDetailResponse> responses = phoneClickDetailService.getUsersWithClickedListings(listingId, page, size);
+
+        return ApiResponse.<PageResponse<UserPhoneClickDetailResponse>>builder()
                 .code("999999")
                 .data(responses)
                 .build();
@@ -196,12 +413,56 @@ public class PhoneClickDetailController {
                     description = "Successfully retrieved user's phone clicks",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Success",
+                                              "data": {
+                                                "page": 1,
+                                                "size": 10,
+                                                "totalElements": 15,
+                                                "totalPages": 2,
+                                                "data": [
+                                                  {
+                                                    "id": 1,
+                                                    "listingId": 123,
+                                                    "listingTitle": "Beautiful 2BR Apartment in District 1",
+                                                    "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                                    "userFirstName": "John",
+                                                    "userLastName": "Doe",
+                                                    "userEmail": "john.doe@example.com",
+                                                    "userContactPhone": "0912345678",
+                                                    "userContactPhoneVerified": true,
+                                                    "userAvatarUrl": "https://lh3.googleusercontent.com/a/example",
+                                                    "clickedAt": "2024-01-15T10:30:00",
+                                                    "ipAddress": "192.168.1.1"
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                            """
+                            )
                     )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
+                    description = "Unauthorized - User not authenticated",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Unauthorized Error",
+                                    value = """
+                                            {
+                                              "code": "401001",
+                                              "message": "Unauthorized - User not authenticated",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     public ApiResponse<PageResponse<PhoneClickResponse>> getMyPhoneClicks(
@@ -243,16 +504,56 @@ public class PhoneClickDetailController {
                     description = "Successfully retrieved statistics",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Success",
+                                              "data": {
+                                                "listingId": 123,
+                                                "totalClicks": 25,
+                                                "uniqueUsers": 18
+                                              }
+                                            }
+                                            """
+                            )
                     )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
+                    description = "Unauthorized - User not authenticated",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Unauthorized Error",
+                                    value = """
+                                            {
+                                              "code": "401001",
+                                              "message": "Unauthorized - User not authenticated",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "404",
-                    description = "Listing not found"
+                    description = "Listing not found",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Not Found Error",
+                                    value = """
+                                            {
+                                              "code": "404001",
+                                              "message": "Listing not found",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     public ApiResponse<PhoneClickStatsResponse> getPhoneClickStats(
@@ -289,12 +590,56 @@ public class PhoneClickDetailController {
                     description = "Successfully retrieved phone clicks for owner's listings",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Success",
+                                              "data": {
+                                                "page": 1,
+                                                "size": 10,
+                                                "totalElements": 50,
+                                                "totalPages": 5,
+                                                "data": [
+                                                  {
+                                                    "id": 1,
+                                                    "listingId": 123,
+                                                    "listingTitle": "Beautiful 2BR Apartment in District 1",
+                                                    "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                                    "userFirstName": "John",
+                                                    "userLastName": "Doe",
+                                                    "userEmail": "john.doe@example.com",
+                                                    "userContactPhone": "0912345678",
+                                                    "userContactPhoneVerified": true,
+                                                    "userAvatarUrl": "https://lh3.googleusercontent.com/a/example",
+                                                    "clickedAt": "2024-01-15T10:30:00",
+                                                    "ipAddress": "192.168.1.1"
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                            """
+                            )
                     )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
+                    description = "Unauthorized - User not authenticated",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Unauthorized Error",
+                                    value = """
+                                            {
+                                              "code": "401001",
+                                              "message": "Unauthorized - User not authenticated",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     public ApiResponse<PageResponse<PhoneClickResponse>> getPhoneClicksForMyListings(
@@ -312,6 +657,109 @@ public class PhoneClickDetailController {
         PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksForOwnerListings(userId, page, size);
 
         return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
+                .code("999999")
+                .data(responses)
+                .build();
+    }
+
+    @GetMapping("/my-listings/users")
+    @Operation(
+            summary = "Get users who clicked on my listings",
+            description = """
+                    Get all users who clicked on phone numbers in any of the authenticated user's listings (paginated).
+                    Each user detail contains a list of the owner's listings they have clicked on.
+
+                    **Use Case:**
+                    - Renter views listing management dashboard
+                    - See all users who showed interest in any of their listings
+                    - Click on a user to see which specific listings they were interested in
+                    - Contact interested users
+                    """,
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Successfully retrieved users who clicked on owner's listings",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Success",
+                                              "data": {
+                                                "page": 1,
+                                                "size": 10,
+                                                "totalElements": 25,
+                                                "totalPages": 3,
+                                                "data": [
+                                                  {
+                                                    "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                                    "firstName": "John",
+                                                    "lastName": "Doe",
+                                                    "email": "john.doe@example.com",
+                                                    "contactPhone": "0912345678",
+                                                    "contactPhoneVerified": true,
+                                                    "avatarUrl": null,
+                                                    "totalListingsClicked": 3,
+                                                    "clickedListings": [
+                                                      {
+                                                        "listingId": 123,
+                                                        "listingTitle": "Beautiful 2BR Apartment in District 1",
+                                                        "clickedAt": "2024-01-15T10:30:00",
+                                                        "clickCount": 2
+                                                      },
+                                                      {
+                                                        "listingId": 456,
+                                                        "listingTitle": "Cozy Studio near City Center",
+                                                        "clickedAt": "2024-01-14T15:45:00",
+                                                        "clickCount": 1
+                                                      }
+                                                    ]
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - User not authenticated",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Unauthorized Error",
+                                    value = """
+                                            {
+                                              "code": "401001",
+                                              "message": "Unauthorized - User not authenticated",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
+    public ApiResponse<PageResponse<UserPhoneClickDetailResponse>> getUsersWhoClickedOnMyListings(
+            @Parameter(description = "Page number (1-indexed)", example = "1")
+            @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Number of items per page", example = "10")
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        // Get authenticated user ID from JWT token
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
+        log.info("Getting users who clicked on listings owned by user {} - page: {}, size: {}", userId, page, size);
+
+        PageResponse<UserPhoneClickDetailResponse> responses = phoneClickDetailService.getUsersWhoClickedOnMyListings(userId, page, size);
+
+        return ApiResponse.<PageResponse<UserPhoneClickDetailResponse>>builder()
                 .code("999999")
                 .data(responses)
                 .build();
@@ -341,16 +789,73 @@ public class PhoneClickDetailController {
                     description = "Successfully retrieved search results",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Success",
+                                              "data": {
+                                                "page": 1,
+                                                "size": 10,
+                                                "totalElements": 8,
+                                                "totalPages": 1,
+                                                "data": [
+                                                  {
+                                                    "id": 1,
+                                                    "listingId": 123,
+                                                    "listingTitle": "Beautiful 2BR Apartment in District 1",
+                                                    "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                                    "userFirstName": "John",
+                                                    "userLastName": "Doe",
+                                                    "userEmail": "john.doe@example.com",
+                                                    "userContactPhone": "0912345678",
+                                                    "userContactPhoneVerified": true,
+                                                    "userAvatarUrl": "https://lh3.googleusercontent.com/a/example",
+                                                    "clickedAt": "2024-01-15T10:30:00",
+                                                    "ipAddress": "192.168.1.1"
+                                                  }
+                                                ]
+                                              }
+                                            }
+                                            """
+                            )
                     )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "400",
-                    description = "Bad request - Invalid parameters"
+                    description = "Bad request - Invalid parameters",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Bad Request Error",
+                                    value = """
+                                            {
+                                              "code": "400001",
+                                              "message": "Invalid parameters",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
+                    description = "Unauthorized - User not authenticated",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Unauthorized Error",
+                                    value = """
+                                            {
+                                              "code": "401001",
+                                              "message": "Unauthorized - User not authenticated",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     public ApiResponse<PageResponse<PhoneClickResponse>> searchPhoneClicksByListingTitle(

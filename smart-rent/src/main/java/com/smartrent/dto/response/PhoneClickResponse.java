@@ -49,6 +49,9 @@ public class PhoneClickResponse {
     @Schema(description = "Whether user's contact phone is verified", example = "true")
     Boolean userContactPhoneVerified;
 
+    @Schema(description = "User's avatar URL", example = "https://lh3.googleusercontent.com/a/example")
+    String userAvatarUrl;
+
     @Schema(description = "When the phone number was clicked", example = "2024-01-15T10:30:00")
     LocalDateTime clickedAt;
 

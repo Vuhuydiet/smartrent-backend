@@ -38,7 +38,7 @@ public class VerifyListingServiceImpl implements VerifyListingService {
 
         // Update verification status
         listing.setVerified(request.getVerified());
-
+        
         // If approving (verified=true), keep isVerify=true to indicate it has been reviewed
         // If rejecting (verified=false), set isVerify=false to mark as REJECTED status
         if (Boolean.TRUE.equals(request.getVerified())) {

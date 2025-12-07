@@ -21,9 +21,9 @@ public class SavedListingRequest {
 
     @NotNull(message = "Listing ID is required")
     @Schema(
-        description = "ID of the listing to save/favorite",
-        example = "123",
-        required = true
+            description = "ID of the listing to save/favorite",
+            example = "123",
+            required = true
     )
     Long listingId;
 }

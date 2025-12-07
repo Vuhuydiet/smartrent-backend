@@ -45,7 +45,28 @@ import java.util.Map;
 @RequestMapping("/v1/payments")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-@Tag(name = "Payment", description = "Payment management APIs")
+@Tag(name = "Payment", description = """
+        APIs for payment management and transaction processing.
+
+        **Features:**
+        - Process payments via multiple providers (VNPay, etc.)
+        - Handle Instant Payment Notifications (IPN)
+        - Query transaction status and history
+        - Refund and cancel payments
+
+        **Payment Flow:**
+        1. User initiates payment (via membership, listing, or push APIs)
+        2. System creates transaction and returns payment URL
+        3. User completes payment on provider's page
+        4. Provider sends IPN to /ipn/{provider}
+        5. System processes IPN and triggers business logic
+        6. Frontend can verify status via /transactions/{txnRef}
+
+        **Transaction Types:**
+        - MEMBERSHIP_PURCHASE: Membership package purchase
+        - POST_FEE: Listing creation fee (Normal or VIP)
+        - PUSH_FEE: Push listing fee
+        """)
 public class PaymentController {
 
     PaymentService paymentService;
@@ -57,9 +78,46 @@ public class PaymentController {
     // Generic Payment Endpoints (Provider-agnostic)
 
     @PostMapping("/ipn/{provider}")
-    @Operation(summary = "Payment IPN endpoint", description = "Handle Instant Payment Notification from any provider")
+    @Operation(
+            summary = "Payment IPN endpoint",
+            description = """
+                    Handle Instant Payment Notification (IPN) from payment providers.
+
+                    **This endpoint is called by payment providers, not by frontend.**
+
+                    **Behavior:**
+                    1. Validates signature from payment provider
+                    2. Updates transaction status in database
+                    3. Triggers business logic completion (membership activation, listing creation, etc.)
+                    4. Returns response code to provider
+
+                    **Response Codes:**
+                    - RspCode=00: Success
+                    - RspCode=01: Failure
+                    - RspCode=99: Error
+                    """
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "IPN processed",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            mediaType = "text/plain",
+                            examples = {
+                                    @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                            name = "Success",
+                                            value = "RspCode=00&Message=OK"
+                                    ),
+                                    @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                            name = "Failure",
+                                            value = "RspCode=01&Message=FAIL"
+                                    )
+                            }
+                    )
+            )
+    })
     public ResponseEntity<String> handlePaymentIPN(
-            @Parameter(description = "Payment provider") @PathVariable PaymentProvider provider,
+            @Parameter(description = "Payment provider (e.g., VNPAY)", example = "VNPAY") @PathVariable PaymentProvider provider,
             @RequestParam Map<String, String> params,
             HttpServletRequest httpRequest) {
 
@@ -96,11 +154,56 @@ public class PaymentController {
     }
 
     @PostMapping("/refund/{transactionRef}")
-    @Operation(summary = "Refund payment", description = "Refund a payment")
+    @Operation(
+            summary = "Refund payment",
+            description = """
+                    Refund a completed payment.
+
+                    **Requirements:**
+                    - Transaction must exist and be in COMPLETED status
+                    - Refund amount must not exceed original amount
+                    - Admin authentication required
+
+                    **Note:** Partial refunds may be supported depending on the payment provider.
+                    """,
+            security = @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Payment refunded successfully",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            mediaType = "application/json",
+                            schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ApiResponse.class),
+                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Payment refunded successfully",
+                                              "data": {
+                                                "transactionRef": "TXN123456",
+                                                "success": true,
+                                                "signatureValid": true
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Transaction not found"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid refund request (e.g., amount exceeds original)"
+            )
+    })
     public ApiResponse<PaymentCallbackResponse> refundPayment(
-            @Parameter(description = "Transaction reference") @PathVariable String transactionRef,
-            @Parameter(description = "Refund amount") @RequestParam String amount,
-            @Parameter(description = "Refund reason") @RequestParam String reason) {
+            @Parameter(description = "Transaction reference", example = "TXN123456") @PathVariable String transactionRef,
+            @Parameter(description = "Refund amount in VND", example = "100000") @RequestParam String amount,
+            @Parameter(description = "Refund reason", example = "Customer request") @RequestParam String reason) {
 
         log.info("Refunding payment: {} with amount: {}", transactionRef, amount);
 
@@ -128,7 +231,30 @@ public class PaymentController {
     }
 
     @GetMapping("/providers")
-    @Operation(summary = "Get available payment providers", description = "Get list of available payment providers")
+    @Operation(
+            summary = "Get available payment providers",
+            description = "Get list of available payment providers configured in the system"
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Providers retrieved successfully",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            mediaType = "application/json",
+                            schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ApiResponse.class),
+                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Available providers retrieved successfully",
+                                              "data": ["VNPAY"]
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
     public ApiResponse<List<PaymentProvider>> getAvailableProviders() {
         try {
             List<PaymentProvider> providers = paymentService.getAvailableProviders();
@@ -259,10 +385,63 @@ public class PaymentController {
     }
 
     @PostMapping("/cancel/{transactionRef}")
-    @Operation(summary = "Cancel payment", description = "Cancel a pending payment")
+    @Operation(
+            summary = "Cancel payment",
+            description = """
+                    Cancel a pending payment.
+
+                    **Requirements:**
+                    - Transaction must exist and be in PENDING status
+                    - Only the user who created the transaction can cancel it
+
+                    **Note:** Completed transactions cannot be cancelled. Use refund instead.
+                    """,
+            security = @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Payment cancelled successfully",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            mediaType = "application/json",
+                            schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ApiResponse.class),
+                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Payment cancelled successfully",
+                                              "data": true
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "Cannot cancel payment (e.g., already completed)",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            mediaType = "application/json",
+                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                    name = "Error Response",
+                                    value = """
+                                            {
+                                              "code": "400001",
+                                              "message": "Failed to cancel payment",
+                                              "data": false
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "404",
+                    description = "Transaction not found"
+            )
+    })
     public ApiResponse<Boolean> cancelPayment(
-            @Parameter(description = "Transaction reference") @PathVariable String transactionRef,
-            @Parameter(description = "Cancellation reason") @RequestParam String reason) {
+            @Parameter(description = "Transaction reference", example = "TXN123456") @PathVariable String transactionRef,
+            @Parameter(description = "Cancellation reason", example = "User changed mind") @RequestParam String reason) {
 
         log.info("Cancelling payment: {} with reason: {}", transactionRef, reason);
 
@@ -294,19 +473,72 @@ public class PaymentController {
     }
 
     @GetMapping("/transactions/{txnRef}")
-    @Operation(summary = "Query transaction", description = "Query transaction status and details by transaction reference")
+    @Operation(
+            summary = "Query transaction",
+            description = """
+                    Query transaction status and details by transaction reference.
+
+                    **Use Cases:**
+                    - Frontend polling after payment redirect
+                    - Checking payment status before proceeding
+                    - Displaying transaction details to user
+
+                    **Returns:**
+                    - Transaction status (PENDING, COMPLETED, FAILED, CANCELLED, REFUNDED)
+                    - Transaction type (MEMBERSHIP_PURCHASE, POST_FEE, PUSH_FEE)
+                    - Amount and currency
+                    - Created and updated timestamps
+                    """,
+            security = @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    )
     @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
-                    description = "Transaction found"
+                    description = "Transaction found",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            mediaType = "application/json",
+                            schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ApiResponse.class),
+                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Transaction queried successfully",
+                                              "data": {
+                                                "transactionRef": "TXN123456",
+                                                "status": "COMPLETED",
+                                                "type": "MEMBERSHIP_PURCHASE",
+                                                "amount": 100000,
+                                                "currency": "VND",
+                                                "provider": "VNPAY",
+                                                "createdAt": "2024-01-15T10:30:00",
+                                                "updatedAt": "2024-01-15T10:35:00"
+                                              }
+                                            }
+                                            """
+                            )
+                    )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "404",
-                    description = "Transaction not found"
+                    description = "Transaction not found",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            mediaType = "application/json",
+                            examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                    name = "Not Found Response",
+                                    value = """
+                                            {
+                                              "code": "404001",
+                                              "message": "Transaction not found",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
             )
     })
     public ApiResponse<TransactionResponse> queryTransaction(
-            @Parameter(description = "Transaction reference") @PathVariable String txnRef) {
+            @Parameter(description = "Transaction reference", example = "TXN123456") @PathVariable String txnRef) {
 
         log.info("Querying transaction: {}", txnRef);
 
@@ -329,9 +561,50 @@ public class PaymentController {
     }
 
     @GetMapping("/exists/{transactionRef}")
-    @Operation(summary = "Check transaction existence", description = "Check if transaction reference exists")
+    @Operation(
+            summary = "Check transaction existence",
+            description = """
+                    Check if a transaction reference exists in the system.
+
+                    **Use Cases:**
+                    - Validate transaction reference before processing
+                    - Check for duplicate transaction references
+                    """
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Check completed",
+                    content = @io.swagger.v3.oas.annotations.media.Content(
+                            mediaType = "application/json",
+                            schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ApiResponse.class),
+                            examples = {
+                                    @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                            name = "Exists",
+                                            value = """
+                                                    {
+                                                      "code": "999999",
+                                                      "message": "Transaction existence checked",
+                                                      "data": true
+                                                    }
+                                                    """
+                                    ),
+                                    @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                            name = "Does Not Exist",
+                                            value = """
+                                                    {
+                                                      "code": "999999",
+                                                      "message": "Transaction existence checked",
+                                                      "data": false
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
+    })
     public ApiResponse<Boolean> checkTransactionExists(
-            @Parameter(description = "Transaction reference") @PathVariable String transactionRef) {
+            @Parameter(description = "Transaction reference to check", example = "TXN123456") @PathVariable String transactionRef) {
 
         try {
             boolean exists = paymentService.transactionRefExists(transactionRef);

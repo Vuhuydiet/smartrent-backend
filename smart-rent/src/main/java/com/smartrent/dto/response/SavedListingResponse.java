@@ -21,32 +21,32 @@ import java.time.LocalDateTime;
 public class SavedListingResponse {
 
     @Schema(
-        description = "User ID who saved the listing",
-        example = "550e8400-e29b-41d4-a716-446655440000"
+            description = "User ID who saved the listing",
+            example = "550e8400-e29b-41d4-a716-446655440000"
     )
     String userId;
 
     @Schema(
-        description = "ID of the saved listing",
-        example = "123"
+            description = "ID of the saved listing",
+            example = "123"
     )
     Long listingId;
 
     @Schema(
-        description = "Timestamp when the listing was saved",
-        example = "2024-12-06T10:30:00"
+            description = "Timestamp when the listing was saved",
+            example = "2024-12-06T10:30:00"
     )
     LocalDateTime createdAt;
 
     @Schema(
-        description = "Timestamp when the saved listing was last updated",
-        example = "2024-12-06T10:30:00"
+            description = "Timestamp when the saved listing was last updated",
+            example = "2024-12-06T10:30:00"
     )
     LocalDateTime updatedAt;
 
     @Schema(
-        description = "Full listing details (optional - included when retrieving saved listings with details)",
-        implementation = ListingResponse.class
+            description = "Full listing details (optional - included when retrieving saved listings with details)",
+            implementation = ListingResponse.class
     )
     ListingResponse listing;
 }
