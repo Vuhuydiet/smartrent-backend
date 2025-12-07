@@ -74,7 +74,7 @@ public class SavedListingServiceImpl implements SavedListingService {
         List<SavedListing> savedListings = savedListingRepository.findByUserIdOrderByCreatedAtDesc(userId);
 
         return savedListings.stream()
-                .map(savedListingMapper::toResponse)
+                .map(savedListingMapper::toResponseWithListing)
                 .collect(Collectors.toList());
     }
 
@@ -85,12 +85,10 @@ public class SavedListingServiceImpl implements SavedListingService {
         log.info("Getting saved listings for user {} with pagination - page: {}, size: {}", userId, page, size);
 
         Pageable pageable = PageRequest.of(page - 1, size);
-        Page<SavedListing> savedListingPage = savedListingRepository.findAll(pageable);
+        Page<SavedListing> savedListingPage = savedListingRepository.findByUserIdWithDetails(userId, pageable);
 
-        // Filter by userId
         List<SavedListingResponse> savedListingResponses = savedListingPage.getContent().stream()
-                .filter(sl -> sl.getId().getUserId().equals(userId))
-                .map(savedListingMapper::toResponse)
+                .map(savedListingMapper::toResponseWithListing)
                 .collect(Collectors.toList());
 
         log.info("Successfully retrieved {} saved listings", savedListingResponses.size());
