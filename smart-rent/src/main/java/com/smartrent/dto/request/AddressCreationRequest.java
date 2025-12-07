@@ -1,30 +1,37 @@
 package com.smartrent.dto.request;
 
 import com.smartrent.infra.repository.entity.AddressMetadata;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 
 /**
- * DTO for creating a new address
- * Supports both nested structure (legacy/new) and flat structure (backward compatibility)
+ * DTO for creating a new address using nested structure
  *
- * Nested structure example:
+ * Legacy structure example (63 provinces, 3-tier):
  * {
- *   "legacy": { "provinceId": 1, "districtId": 5, "wardId": 20, "street": "Nguyen Trai" },
+ *   "legacy": {
+ *     "provinceId": 1,
+ *     "districtId": 5,
+ *     "wardId": 20,
+ *     "street": "Nguyen Trai"
+ *   },
  *   "latitude": 21.0285,
  *   "longitude": 105.8542
  * }
  *
- * OR
- *
+ * New structure example (34 provinces, 2-tier):
  * {
- *   "new": { "provinceCode": "01", "wardCode": "00004", "street": "Nguyen Trai" },
+ *   "newAddress": {
+ *     "provinceCode": "01",
+ *     "wardCode": "00004",
+ *     "street": "Nguyen Trai"
+ *   },
  *   "latitude": 21.0285,
  *   "longitude": 105.8542
  * }
@@ -35,15 +42,15 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@Schema(description = "Address creation request with nested structure")
 public class AddressCreationRequest {
-
-    // ==================== NESTED STRUCTURE (PREFERRED) ====================
 
     /**
      * Legacy address data (63 provinces, 3-tier structure)
      * Use this for old address format
      */
     @Valid
+    @Schema(description = "Legacy address data (63 provinces, 3-tier: province/district/ward)")
     LegacyAddressData legacy;
 
     /**
@@ -51,61 +58,14 @@ public class AddressCreationRequest {
      * Use this for new address format
      */
     @Valid
+    @Schema(description = "New address data (34 provinces, 2-tier: province/ward)")
     NewAddressData newAddress;
 
-    // ==================== FLAT STRUCTURE (BACKWARD COMPATIBILITY) ====================
-
     /**
-     * Address type - for backward compatibility
-     * Will be auto-detected from legacy/new fields if not provided
+     * Project/Building/Complex ID (optional)
+     * Reference to a specific building or complex
      */
-    AddressMetadata.AddressType addressType;
-
-    /**
-     * Province ID for old structure (backward compatibility)
-     * @deprecated Use legacy.provinceId instead
-     */
-    @Deprecated
-    Integer provinceId;
-
-    /**
-     * District ID for old structure (backward compatibility)
-     * @deprecated Use legacy.districtId instead
-     */
-    @Deprecated
-    Integer districtId;
-
-    /**
-     * Ward ID for old structure (backward compatibility)
-     * @deprecated Use legacy.wardId instead
-     */
-    @Deprecated
-    Integer wardId;
-
-    /**
-     * Province code for new structure (backward compatibility)
-     * @deprecated Use newAddress.provinceCode instead
-     */
-    @Deprecated
-    String newProvinceCode;
-
-    /**
-     * Ward code for new structure (backward compatibility)
-     * @deprecated Use newAddress.wardCode instead
-     */
-    @Deprecated
-    String newWardCode;
-
-    /**
-     * Street ID (backward compatibility)
-     * @deprecated Use legacy.street or newAddress.street instead
-     */
-    @Deprecated
-    Integer streetId;
-
-    /**
-     * Project/Location ID (optional)
-     */
+    @Schema(description = "Project/building/complex ID (optional)", example = "1")
     Integer projectId;
 
     // ==================== COORDINATES ====================
@@ -116,6 +76,7 @@ public class AddressCreationRequest {
      */
     @DecimalMin(value = "8.0", message = "Latitude must be at least 8.0")
     @DecimalMax(value = "23.5", message = "Latitude must be at most 23.5")
+    @Schema(description = "Latitude coordinate (Vietnam: 8.0 to 23.5)", example = "21.0285")
     BigDecimal latitude;
 
     /**
@@ -124,6 +85,7 @@ public class AddressCreationRequest {
      */
     @DecimalMin(value = "102.0", message = "Longitude must be at least 102.0")
     @DecimalMax(value = "110.0", message = "Longitude must be at most 110.0")
+    @Schema(description = "Longitude coordinate (Vietnam: 102.0 to 110.0)", example = "105.8542")
     BigDecimal longitude;
 
     // ==================== HELPER METHODS ====================
@@ -132,104 +94,72 @@ public class AddressCreationRequest {
      * Check if using legacy (old) address structure
      */
     public boolean isLegacyStructure() {
-        // Check nested structure first
-        if (legacy != null && legacy.isValid()) {
-            return true;
-        }
-        // Fallback to flat structure for backward compatibility
-        if (addressType == AddressMetadata.AddressType.OLD) {
-            return true;
-        }
-        // Auto-detect from flat fields
-        return provinceId != null && districtId != null && wardId != null;
+        return legacy != null && legacy.isValid();
     }
 
     /**
      * Check if using new address structure
      */
     public boolean isNewStructure() {
-        // Check nested structure first
-        if (newAddress != null && newAddress.isValid()) {
-            return true;
-        }
-        // Fallback to flat structure for backward compatibility
-        if (addressType == AddressMetadata.AddressType.NEW) {
-            return true;
-        }
-        // Auto-detect from flat fields
-        return newProvinceCode != null && !newProvinceCode.isEmpty() &&
-               newWardCode != null && !newWardCode.isEmpty();
+        return newAddress != null && newAddress.isValid();
     }
 
     /**
-     * Get the effective address type (auto-detect if not set)
+     * Get the effective address type (auto-detect from structure)
      */
     public AddressMetadata.AddressType getEffectiveAddressType() {
-        if (addressType != null) {
-            return addressType;
+        if (isLegacyStructure()) {
+            return AddressMetadata.AddressType.OLD;
+        } else if (isNewStructure()) {
+            return AddressMetadata.AddressType.NEW;
         }
-        return isLegacyStructure() ? AddressMetadata.AddressType.OLD : AddressMetadata.AddressType.NEW;
+        throw new IllegalStateException("Address structure not specified. Provide either 'legacy' or 'newAddress'");
     }
 
     /**
      * Validate that required fields are present
      */
     public boolean hasRequiredFields() {
-        // Check nested structure
-        if (legacy != null && legacy.isValid()) {
-            return true;
-        }
-        if (newAddress != null && newAddress.isValid()) {
-            return true;
-        }
-
-        // Fallback to flat structure for backward compatibility
-        if (isLegacyStructure()) {
-            return provinceId != null && districtId != null && wardId != null;
-        } else if (isNewStructure()) {
-            return newProvinceCode != null && !newProvinceCode.isEmpty() &&
-                   newWardCode != null && !newWardCode.isEmpty();
-        }
-        return false;
+        return isLegacyStructure() || isNewStructure();
     }
 
     /**
-     * Get legacy province ID (from nested or flat structure)
+     * Get legacy province ID
      */
     public Integer getLegacyProvinceId() {
-        return legacy != null ? legacy.getProvinceId() : provinceId;
+        return legacy != null ? legacy.getProvinceId() : null;
     }
 
     /**
-     * Get legacy district ID (from nested or flat structure)
+     * Get legacy district ID
      */
     public Integer getLegacyDistrictId() {
-        return legacy != null ? legacy.getDistrictId() : districtId;
+        return legacy != null ? legacy.getDistrictId() : null;
     }
 
     /**
-     * Get legacy ward ID (from nested or flat structure)
+     * Get legacy ward ID
      */
     public Integer getLegacyWardId() {
-        return legacy != null ? legacy.getWardId() : wardId;
+        return legacy != null ? legacy.getWardId() : null;
     }
 
     /**
-     * Get new province code (from nested or flat structure)
+     * Get new province code
      */
     public String getNewProvinceCodeValue() {
-        return newAddress != null ? newAddress.getProvinceCode() : newProvinceCode;
+        return newAddress != null ? newAddress.getProvinceCode() : null;
     }
 
     /**
-     * Get new ward code (from nested or flat structure)
+     * Get new ward code
      */
     public String getNewWardCodeValue() {
-        return newAddress != null ? newAddress.getWardCode() : newWardCode;
+        return newAddress != null ? newAddress.getWardCode() : null;
     }
 
     /**
-     * Get street (from nested or flat structure)
+     * Get street name
      */
     public String getStreet() {
         if (legacy != null && legacy.getStreet() != null) {

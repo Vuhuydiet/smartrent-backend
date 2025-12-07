@@ -26,7 +26,6 @@ public class AddressCreationServiceImpl implements AddressCreationService {
     private final LegacyWardRepository legacyWardRepository;
     private final ProvinceRepository provinceRepository;
     private final WardRepository wardRepository;
-    private final StreetRepository streetRepository;
     private final ProjectRepository projectRepository;
 
     @Override
@@ -51,30 +50,30 @@ public class AddressCreationServiceImpl implements AddressCreationService {
                 .projectId(request.getProjectId());
 
         // Populate legacy or new address components
-        if (request.isLegacyStructure()) {
-            // Populate legacy components
-            addressBuilder
-                    .legacyProvinceId(request.getLegacyProvinceId())
-                    .legacyDistrictId(request.getLegacyDistrictId())
-                    .legacyWardId(request.getLegacyWardId())
-                    .legacyStreet(request.getStreet());
 
-            // Build formatted address string
-            String fullAddress = buildOldAddressString(request);
-            addressBuilder.fullAddress(fullAddress);
-            log.info("Built legacy address: {}", fullAddress);
-        } else {
-            // Populate new components
-            addressBuilder
-                    .newProvinceCode(request.getNewProvinceCodeValue())
-                    .newWardCode(request.getNewWardCodeValue())
-                    .newStreet(request.getStreet());
+        // Populate legacy components
+        addressBuilder
+                .legacyProvinceId(request.getLegacyProvinceId())
+                .legacyDistrictId(request.getLegacyDistrictId())
+                .legacyWardId(request.getLegacyWardId())
+                .legacyStreet(request.getStreet());
 
-            // Build formatted address string
-            String fullNewAddress = buildNewAddressString(request);
-            addressBuilder.fullNewAddress(fullNewAddress);
-            log.info("Built new address: {}", fullNewAddress);
-        }
+        // Build formatted address string
+        String fullAddress = buildOldAddressString(request);
+        addressBuilder.fullAddress(fullAddress);
+        log.info("Built legacy address: {}", fullAddress);
+
+        // Populate new components
+        addressBuilder
+                .newProvinceCode(request.getNewProvinceCodeValue())
+                .newWardCode(request.getNewWardCodeValue())
+                .newStreet(request.getStreet());
+
+        // Build formatted address string
+        String fullNewAddress = buildNewAddressString(request);
+        addressBuilder.fullNewAddress(fullNewAddress);
+        log.info("Built new address: {}", fullNewAddress);
+
 
         // Save address
         Address address = addressBuilder.build();
@@ -100,21 +99,10 @@ public class AddressCreationServiceImpl implements AddressCreationService {
     public String buildOldAddressString(AddressCreationRequest request) {
         StringBuilder sb = new StringBuilder();
 
-
-        // Add street from nested structure or streetId from flat structure
+        // Add street from nested structure
         String street = request.getStreet();
         if (street != null && !street.isEmpty()) {
-            // Street provided directly in nested structure
             sb.append(street).append(", ");
-        } else if (request.getStreetId() != null) {
-            // Street ID provided in flat structure
-            Street streetEntity = streetRepository.findById(request.getStreetId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Street not found with ID: " + request.getStreetId()));
-
-            if (streetEntity.getPrefix() != null && !streetEntity.getPrefix().isEmpty()) {
-                sb.append(streetEntity.getPrefix()).append(" ");
-            }
-            sb.append(streetEntity.getName()).append(", ");
         } else if (request.getProjectId() != null) {
             // Project provided
             Project project = projectRepository.findById(request.getProjectId())
@@ -122,7 +110,7 @@ public class AddressCreationServiceImpl implements AddressCreationService {
             sb.append(project.getName()).append(", ");
         }
 
-        // Add ward (use helper method for nested/flat compatibility)
+        // Add ward
         Integer wardId = request.getLegacyWardId();
         if (wardId != null) {
             LegacyWard ward = legacyWardRepository.findById(wardId)
@@ -134,7 +122,7 @@ public class AddressCreationServiceImpl implements AddressCreationService {
             sb.append(ward.getName()).append(", ");
         }
 
-        // Add district (use helper method for nested/flat compatibility)
+        // Add district
         Integer districtId = request.getLegacyDistrictId();
         if (districtId != null) {
             District district = legacyDistrictRepository.findById(districtId)
@@ -146,7 +134,7 @@ public class AddressCreationServiceImpl implements AddressCreationService {
             sb.append(district.getName()).append(", ");
         }
 
-        // Add province (use helper method for nested/flat compatibility)
+        // Add province
         Integer provinceId = request.getLegacyProvinceId();
         if (provinceId != null) {
             LegacyProvince province = legacyProvinceRepository.findById(provinceId)
@@ -161,21 +149,10 @@ public class AddressCreationServiceImpl implements AddressCreationService {
     public String buildNewAddressString(AddressCreationRequest request) {
         StringBuilder sb = new StringBuilder();
 
-
-        // Add street from nested structure or streetId from flat structure
+        // Add street from nested structure
         String street = request.getStreet();
         if (street != null && !street.isEmpty()) {
-            // Street provided directly in nested structure
             sb.append(street).append(", ");
-        } else if (request.getStreetId() != null) {
-            // Street ID provided in flat structure
-            Street streetEntity = streetRepository.findById(request.getStreetId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Street not found with ID: " + request.getStreetId()));
-
-            if (streetEntity.getPrefix() != null && !streetEntity.getPrefix().isEmpty()) {
-                sb.append(streetEntity.getPrefix()).append(" ");
-            }
-            sb.append(streetEntity.getName()).append(", ");
         } else if (request.getProjectId() != null) {
             // Project provided
             Project project = projectRepository.findById(request.getProjectId())
@@ -183,7 +160,7 @@ public class AddressCreationServiceImpl implements AddressCreationService {
             sb.append(project.getName()).append(", ");
         }
 
-        // Add ward (use helper method for nested/flat compatibility)
+        // Add ward
         String wardCode = request.getNewWardCodeValue();
         if (wardCode != null && !wardCode.isEmpty()) {
             Ward ward = wardRepository.findByCode(wardCode)
@@ -191,7 +168,7 @@ public class AddressCreationServiceImpl implements AddressCreationService {
             sb.append(ward.getName()).append(", ");
         }
 
-        // Add province (use helper method for nested/flat compatibility)
+        // Add province
         String provinceCode = request.getNewProvinceCodeValue();
         if (provinceCode != null && !provinceCode.isEmpty()) {
             Province province = provinceRepository.findByCode(provinceCode)
@@ -207,16 +184,13 @@ public class AddressCreationServiceImpl implements AddressCreationService {
         AddressMetadata.AddressMetadataBuilder builder = AddressMetadata.builder()
                 .address(address)
                 .addressType(request.getEffectiveAddressType())
-                .streetId(request.getStreetId())
                 .projectId(request.getProjectId());
 
         if (request.isLegacyStructure()) {
-            // Use helper methods to get values from nested or flat structure
             builder.provinceId(request.getLegacyProvinceId())
                     .districtId(request.getLegacyDistrictId())
                     .wardId(request.getLegacyWardId());
         } else {
-            // Use helper methods to get values from nested or flat structure
             builder.newProvinceCode(request.getNewProvinceCodeValue())
                     .newWardCode(request.getNewWardCodeValue());
         }
@@ -226,38 +200,28 @@ public class AddressCreationServiceImpl implements AddressCreationService {
 
     @Override
     public void validateAddressRequest(AddressCreationRequest request) {
-        // Address type will be auto-detected if not provided, so we don't require it
-        // Just validate that we have required fields for the detected type
-
+        // Validate that required fields are present
         if (!request.hasRequiredFields()) {
-            // Determine which structure is being used
-            boolean hasLegacyData = request.getLegacy() != null ||
-                    (request.getProvinceId() != null || request.getDistrictId() != null || request.getWardId() != null);
-            boolean hasNewData = request.getNewAddress() != null ||
-                    (request.getNewProvinceCode() != null || request.getNewWardCode() != null);
+            boolean hasLegacyData = request.getLegacy() != null;
+            boolean hasNewData = request.getNewAddress() != null;
 
             if (hasLegacyData) {
                 throw new IllegalArgumentException(
                         "For legacy address structure, provinceId, districtId, and wardId are required. " +
-                        "Nested format: {\"legacy\": {\"provinceId\": 1, \"districtId\": 5, \"wardId\": 20}} " +
-                        "or flat format: {\"addressType\": \"OLD\", \"provinceId\": 1, \"districtId\": 5, \"wardId\": 20}");
+                        "Format: {\"legacy\": {\"provinceId\": 1, \"districtId\": 5, \"wardId\": 20, \"street\": \"Nguyen Trai\"}}");
             } else if (hasNewData) {
                 throw new IllegalArgumentException(
                         "For new address structure, provinceCode and wardCode are required. " +
-                        "Nested format: {\"new\": {\"provinceCode\": \"01\", \"wardCode\": \"00004\"}} " +
-                        "or flat format: {\"addressType\": \"NEW\", \"newProvinceCode\": \"01\", \"newWardCode\": \"00004\"}");
+                        "Format: {\"newAddress\": {\"provinceCode\": \"01\", \"wardCode\": \"00004\", \"street\": \"Nguyen Trai\"}}");
             } else {
                 throw new IllegalArgumentException(
-                        "Address data is required. Provide either legacy (provinceId/districtId/wardId) or new (provinceCode/wardCode) address structure");
+                        "Address data is required. Provide either 'legacy' or 'newAddress' object with required fields.");
             }
         }
 
         // Validate that at least street or project is provided (optional but recommended)
-        // This is just a warning, not an error
-        if (request.getStreetId() == null &&
-            request.getProjectId() == null &&
-            request.getStreet() == null) {
-            log.warn("No street, streetId, or project was provided for address creation");
+        if (request.getProjectId() == null && request.getStreet() == null) {
+            log.warn("No street or project was provided for address creation");
         }
 
         // Validate coordinates if provided

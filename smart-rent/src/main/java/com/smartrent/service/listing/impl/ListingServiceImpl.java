@@ -649,7 +649,6 @@ public class ListingServiceImpl implements ListingService {
      * @throws IllegalArgumentException if validation fails
      */
     private Address createAddress(com.smartrent.dto.request.AddressCreationRequest addressRequest) {
-        log.info("Creating address for listing - Type: {}", addressRequest.getAddressType());
         return addressCreationService.createAddress(addressRequest);
     }
 
@@ -1040,8 +1039,6 @@ public class ListingServiceImpl implements ListingService {
                 draft.setWardCode(addressReq.getNewAddress().getWardCode());
                 draft.setStreet(addressReq.getNewAddress().getStreet());
             }
-            draft.setStreetId(addressReq.getStreetId() != null
-                    ? addressReq.getStreetId().longValue() : null);
             draft.setProjectId(addressReq.getProjectId() != null
                     ? addressReq.getProjectId().longValue() : null);
             draft.setLatitude(addressReq.getLatitude() != null
@@ -1725,9 +1722,7 @@ public class ListingServiceImpl implements ListingService {
                 draft.setWardCode(addressReq.getNewAddress().getWardCode());
                 draft.setStreet(addressReq.getNewAddress().getStreet());
             }
-            if (addressReq.getStreetId() != null) {
-                draft.setStreetId(addressReq.getStreetId().longValue());
-            }
+
             if (addressReq.getProjectId() != null) {
                 draft.setProjectId(addressReq.getProjectId().longValue());
             }
@@ -2002,7 +1997,6 @@ public class ListingServiceImpl implements ListingService {
                 newAddr.setStreet(draft.getStreet());
                 addressReq.setNewAddress(newAddr);
             }
-            addressReq.setStreetId(draft.getStreetId() != null ? draft.getStreetId().intValue() : null);
             addressReq.setProjectId(draft.getProjectId() != null ? draft.getProjectId().intValue() : null);
             addressReq.setLatitude(draft.getLatitude() != null ? BigDecimal.valueOf(draft.getLatitude()) : null);
             addressReq.setLongitude(draft.getLongitude() != null ? BigDecimal.valueOf(draft.getLongitude()) : null);
