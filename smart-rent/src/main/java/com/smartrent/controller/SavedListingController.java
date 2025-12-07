@@ -250,81 +250,81 @@ public class SavedListingController {
                                                 "data": [
                                                   {
                                                     "userId": "550e8400-e29b-41d4-a716-446655440000",
-                                                                                                                          "listingId": 123,
-                                                                                                                          "createdAt": "2024-12-06T10:30:00",
-                                                                                                                          "updatedAt": "2024-12-06T10:30:00",
-                                                                                                                          "listing": {
-                                                                                                                            "listingId": 123,
-                                                                                                                            "title": "Cho thuê căn hộ 2PN Q7 view đẹp",
-                                                                                                                            "description": "Căn hộ mới, full nội thất, gần trường học",
-                                                                                                                            "user": {
-                                                                                                                              "userId": "owner-123",
-                                                                                                                              "username": "john_doe",
-                                                                                                                              "email": "john@example.com",
-                                                                                                                              "firstName": "John",
-                                                                                                                              "lastName": "Doe",
-                                                                                                                              "phoneNumber": "0901234567"
-                                                                                                                            },
-                                                                                                                            "ownerContactPhoneNumber": "0901234567",
-                                                                                                                            "ownerContactPhoneVerified": true,
-                                                                                                                            "ownerZaloLink": "https://zalo.me/0901234567",
-                                                                                                                            "contactAvailable": true,
-                                                                                                                            "postDate": "2024-12-01T08:00:00",
-                                                                                                                            "expiryDate": "2024-12-31T23:59:59",
-                                                                                                                            "listingType": "RENT",
-                                                                                                                            "verified": true,
-                                                                                                                            "isVerify": true,
-                                                                                                                            "expired": false,
-                                                                                                                            "isDraft": false,
-                                                                                                                            "listingStatus": "DISPLAYING",
-                                                                                                                            "vipType": "GOLD",
-                                                                                                                            "categoryId": 1,
-                                                                                                                            "productType": "APARTMENT",
-                                                                                                                            "price": 15000000,
-                                                                                                                            "priceUnit": "MONTH",
-                                                                                                                            "address": {
-                                                                                                                              "addressId": 456,
-                                                                                                                              "street": "123 Nguyễn Văn Linh",
-                                                                                                                              "legacy": {
-                                                                                                                                "wardName": "Phường Tân Phú",
-                                                                                                                                "districtName": "Quận 7",
-                                                                                                                                "provinceName": "Hồ Chí Minh"
-                                                                                                                              }
-                                                                                                                            },
-                                                                                                                            "area": 75.5,
-                                                                                                                            "bedrooms": 2,
-                                                                                                                            "bathrooms": 2,
-                                                                                                                            "direction": "EAST",
-                                                                                                                            "furnishing": "FULLY_FURNISHED",
-                                                                                                                            "roomCapacity": 4,
-                                                                                                                            "waterPrice": "20000 VND/người/tháng",
-                                                                                                                            "electricityPrice": "3500 VND/kWh",
-                                                                                                                            "internetPrice": "Miễn phí",
-                                                                                                                            "serviceFee": "100000 VND/tháng",
-                                                                                                                            "amenities": [
-                                                                                                                              {
-                                                                                                                                "amenityId": 1,
-                                                                                                                                "name": "Wifi",
-                                                                                                                                "icon": "wifi"
-                                                                                                                              },
-                                                                                                                              {
-                                                                                                                                "amenityId": 2,
-                                                                                                                                "name": "Điều hòa",
-                                                                                                                                "icon": "ac"
-                                                                                                                              }
-                                                                                                                            ],
-                                                                                                                            "media": [
-                                                                                                                              {
-                                                                                                                                "mediaId": 1,
-                                                                                                                                "url": "https://example.com/image1.jpg",
-                                                                                                                                "mediaType": "IMAGE",
-                                                                                                                                "isPrimary": true,
-                                                                                                                                "sortOrder": 0
-                                                                                                                              }
-                                                                                                                            ],
-                                                                                                                            "createdAt": "2024-12-01T08:00:00",
-                                                                                                                            "updatedAt": "2024-12-01T08:00:00"
-                                                                                                                          }
+                                                    "listingId": 123,
+                                                      "createdAt": "2024-12-06T10:30:00",
+                                                      "updatedAt": "2024-12-06T10:30:00",
+                                                      "listing": {
+                                                        "listingId": 123,
+                                                        "title": "Cho thuê căn hộ 2PN Q7 view đẹp",
+                                                        "description": "Căn hộ mới, full nội thất, gần trường học",
+                                                        "user": {
+                                                          "userId": "owner-123",
+                                                          "username": "john_doe",
+                                                          "email": "john@example.com",
+                                                          "firstName": "John",
+                                                          "lastName": "Doe",
+                                                          "phoneNumber": "0901234567"
+                                                        },
+                                                        "ownerContactPhoneNumber": "0901234567",
+                                                        "ownerContactPhoneVerified": true,
+                                                        "ownerZaloLink": "https://zalo.me/0901234567",
+                                                        "contactAvailable": true,
+                                                        "postDate": "2024-12-01T08:00:00",
+                                                        "expiryDate": "2024-12-31T23:59:59",
+                                                        "listingType": "RENT",
+                                                        "verified": true,
+                                                        "isVerify": true,
+                                                        "expired": false,
+                                                        "isDraft": false,
+                                                        "listingStatus": "DISPLAYING",
+                                                        "vipType": "GOLD",
+                                                        "categoryId": 1,
+                                                        "productType": "APARTMENT",
+                                                        "price": 15000000,
+                                                        "priceUnit": "MONTH",
+                                                        "address": {
+                                                          "addressId": 456,
+                                                          "street": "123 Nguyễn Văn Linh",
+                                                          "legacy": {
+                                                            "wardName": "Phường Tân Phú",
+                                                            "districtName": "Quận 7",
+                                                            "provinceName": "Hồ Chí Minh"
+                                                          }
+                                                        },
+                                                        "area": 75.5,
+                                                        "bedrooms": 2,
+                                                        "bathrooms": 2,
+                                                        "direction": "EAST",
+                                                        "furnishing": "FULLY_FURNISHED",
+                                                        "roomCapacity": 4,
+                                                        "waterPrice": "20000 VND/người/tháng",
+                                                        "electricityPrice": "3500 VND/kWh",
+                                                        "internetPrice": "Miễn phí",
+                                                        "serviceFee": "100000 VND/tháng",
+                                                        "amenities": [
+                                                          {
+                                                            "amenityId": 1,
+                                                            "name": "Wifi",
+                                                            "icon": "wifi"
+                                                          },
+                                                          {
+                                                            "amenityId": 2,
+                                                            "name": "Điều hòa",
+                                                            "icon": "ac"
+                                                          }
+                                                        ],
+                                                        "media": [
+                                                          {
+                                                            "mediaId": 1,
+                                                            "url": "https://example.com/image1.jpg",
+                                                            "mediaType": "IMAGE",
+                                                            "isPrimary": true,
+                                                            "sortOrder": 0
+                                                          }
+                                                        ],
+                                                        "createdAt": "2024-12-01T08:00:00",
+                                                        "updatedAt": "2024-12-01T08:00:00"
+                                                      }
                                                   }
                                                 ]
                                               }
