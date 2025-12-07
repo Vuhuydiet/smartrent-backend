@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Schema(description = "Saved listing response containing the saved listing details and associated listing information")
+@Schema(description = "Saved listing response containing the saved listing details and full associated listing information")
 public class SavedListingResponse {
 
     @Schema(
@@ -33,20 +33,22 @@ public class SavedListingResponse {
     Long listingId;
 
     @Schema(
-            description = "Timestamp when the listing was saved",
+            description = "Timestamp when the listing was saved by the user",
             example = "2024-12-06T10:30:00"
     )
     LocalDateTime createdAt;
 
     @Schema(
-            description = "Timestamp when the saved listing was last updated",
+            description = "Timestamp when the saved listing record was last updated",
             example = "2024-12-06T10:30:00"
     )
     LocalDateTime updatedAt;
 
     @Schema(
-            description = "Full listing details (optional - included when retrieving saved listings with details)",
-            implementation = ListingResponse.class
+            description = "Full listing details including title, description, price, address, media, amenities, and owner information. " +
+                          "This field is now always populated when retrieving saved listings.",
+            implementation = ListingResponse.class,
+            requiredMode = Schema.RequiredMode.REQUIRED
     )
     ListingResponse listing;
 }

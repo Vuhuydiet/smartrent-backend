@@ -1801,6 +1801,9 @@ public class ListingServiceImpl implements ListingService {
             }
         }
 
+        // Build AddressResponse from draft address fields
+        com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponseFromDraft(draft);
+
         return DraftListingResponse.builder()
                 .draftId(draft.getDraftId())
                 .userId(draft.getUserId())
@@ -1812,17 +1815,7 @@ public class ListingServiceImpl implements ListingService {
                 .productType(draft.getProductType())
                 .price(draft.getPrice())
                 .priceUnit(draft.getPriceUnit())
-                .addressType(draft.getAddressType())
-                .provinceId(draft.getProvinceId())
-                .districtId(draft.getDistrictId())
-                .wardId(draft.getWardId())
-                .provinceCode(draft.getProvinceCode())
-                .wardCode(draft.getWardCode())
-                .street(draft.getStreet())
-                .streetId(draft.getStreetId())
-                .projectId(draft.getProjectId())
-                .latitude(draft.getLatitude())
-                .longitude(draft.getLongitude())
+                .address(addressResponse)
                 .area(draft.getArea())
                 .bedrooms(draft.getBedrooms())
                 .bathrooms(draft.getBathrooms())
@@ -1838,6 +1831,62 @@ public class ListingServiceImpl implements ListingService {
                 .createdAt(draft.getCreatedAt())
                 .updatedAt(draft.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * Build AddressResponse from ListingDraft address fields
+     */
+    private com.smartrent.dto.response.AddressResponse buildAddressResponseFromDraft(ListingDraft draft) {
+        // If no address data, return null
+        if (draft.getAddressType() == null) {
+            return null;
+        }
+
+        com.smartrent.dto.response.AddressResponse.AddressResponseBuilder builder =
+                com.smartrent.dto.response.AddressResponse.builder();
+
+        // Set common fields
+        if (draft.getLatitude() != null && draft.getLongitude() != null) {
+            builder.latitude(java.math.BigDecimal.valueOf(draft.getLatitude()))
+                   .longitude(java.math.BigDecimal.valueOf(draft.getLongitude()));
+        }
+
+        // Set address type
+        if ("OLD".equals(draft.getAddressType())) {
+            builder.addressType(com.smartrent.infra.repository.entity.AddressMetadata.AddressType.OLD);
+
+            // Set legacy fields
+            if (draft.getProvinceId() != null) {
+                builder.legacyProvinceId(draft.getProvinceId().intValue());
+            }
+            if (draft.getDistrictId() != null) {
+                builder.legacyDistrictId(draft.getDistrictId().intValue());
+            }
+            if (draft.getWardId() != null) {
+                builder.legacyWardId(draft.getWardId().intValue());
+            }
+            builder.legacyStreet(draft.getStreet());
+
+        } else if ("NEW".equals(draft.getAddressType())) {
+            builder.addressType(com.smartrent.infra.repository.entity.AddressMetadata.AddressType.NEW);
+
+            // Set new fields
+            builder.newProvinceCode(draft.getProvinceCode())
+                   .newWardCode(draft.getWardCode())
+                   .newStreet(draft.getStreet());
+        }
+
+        // Set project ID if present
+        if (draft.getProjectId() != null) {
+            builder.projectId(draft.getProjectId().intValue());
+        }
+
+        // Set street ID if present
+        if (draft.getStreetId() != null) {
+            builder.streetId(draft.getStreetId().intValue());
+        }
+
+        return builder.build();
     }
 
     /**

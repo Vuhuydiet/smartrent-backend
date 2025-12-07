@@ -93,7 +93,8 @@ public class SavedListingController {
                                                 "createdAt": "2024-12-06T10:30:00",
                                                 "updatedAt": "2024-12-06T10:30:00",
                                                 "listing": null
-                                              }
+                                              },
+                                              "note": "The 'listing' field is null when saving a listing. Full listing details are returned when retrieving saved listings via GET /my-saved"
                                             }
                                             """
                             )
