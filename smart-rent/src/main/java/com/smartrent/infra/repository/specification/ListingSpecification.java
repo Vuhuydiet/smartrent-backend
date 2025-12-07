@@ -43,14 +43,20 @@ public class ListingSpecification {
             // Draft status filter
             if (filter.getIsDraft() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("isDraft"), filter.getIsDraft()));
-            } else if (filter.getUserId() == null) {
-                // For public search (userId null), exclude drafts by default
+            } else if (filter.getUserId() == null && !Boolean.TRUE.equals(filter.getIsAdminRequest())) {
+                // For public search (userId null AND not admin), exclude drafts by default
+                // Admin requests can see drafts if they want to
                 predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
             }
 
             // Verified filter
             if (filter.getVerified() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("verified"), filter.getVerified()));
+            } else if (filter.getUserId() == null && !Boolean.TRUE.equals(filter.getIsAdminRequest())) {
+                // For public search (userId null AND not admin), only show verified listings
+                // This ensures unverified/pending/rejected listings are NOT visible to public users
+                // Admin requests (isAdminRequest=true) can see ALL listings regardless of verification status
+                predicates.add(criteriaBuilder.equal(root.get("verified"), true));
             }
 
             // Verification pending filter
