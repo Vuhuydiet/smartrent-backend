@@ -1,5 +1,6 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.request.CategoryStatsRequest;
 import com.smartrent.dto.request.DraftListingRequest;
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
@@ -1740,6 +1741,129 @@ public class ListingController {
             @Valid @RequestBody ProvinceStatsRequest request) {
         List<ProvinceListingStatsResponse> stats = listingService.getProvinceStats(request);
         return ApiResponse.<List<ProvinceListingStatsResponse>>builder()
+                .data(stats)
+                .build();
+    }
+
+    /**
+     * Get listing statistics by categories (for home screen)
+     * POST /v1/listings/stats/categories
+     * PUBLIC API - NO authentication required
+     */
+    @PostMapping("/stats/categories")
+    @Operation(
+        summary = "Lấy thống kê bài đăng theo categories (API công khai)",
+        description = """
+            API công khai để lấy thống kê số lượng bài đăng theo danh sách categories.
+            Trả về số lượng tổng, đã verify, và VIP cho mỗi category.
+
+            **Use cases:**
+            - Home screen: Hiển thị số lượng bài đăng cho mỗi loại BĐS
+            - Category page: Hiển thị tổng số bài đăng trong category
+            - Search filters: Hiển thị số lượng kết quả cho mỗi category
+
+            **Public API** - Không cần authentication
+            """,
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "Category statistics request với danh sách category IDs",
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = CategoryStatsRequest.class),
+                examples = {
+                    @ExampleObject(
+                        name = "1. All categories",
+                        summary = "Lấy thống kê cho tất cả loại BĐS",
+                        value = """
+                            {
+                              "categoryIds": [1, 2, 3, 4, 5],
+                              "verifiedOnly": false
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "2. Top categories (verified only)",
+                        summary = "Chỉ đếm bài đã verify",
+                        value = """
+                            {
+                              "categoryIds": [1, 2, 3],
+                              "verifiedOnly": true
+                            }
+                            """
+                    )
+                }
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Thống kê thành công",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Category Statistics Response",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": [
+                                {
+                                  "categoryId": 1,
+                                  "categoryName": "Căn hộ/Chung cư",
+                                  "categorySlug": "can-ho-chung-cu",
+                                  "categoryIcon": "apartment",
+                                  "totalListings": 3450,
+                                  "verifiedListings": 2890,
+                                  "vipListings": 1023
+                                },
+                                {
+                                  "categoryId": 2,
+                                  "categoryName": "Nhà nguyên căn",
+                                  "categorySlug": "nha-nguyen-can",
+                                  "categoryIcon": "house",
+                                  "totalListings": 2180,
+                                  "verifiedListings": 1750,
+                                  "vipListings": 567
+                                },
+                                {
+                                  "categoryId": 3,
+                                  "categoryName": "Phòng trọ",
+                                  "categorySlug": "phong-tro",
+                                  "categoryIcon": "room",
+                                  "totalListings": 5670,
+                                  "verifiedListings": 4320,
+                                  "vipListings": 892
+                                },
+                                {
+                                  "categoryId": 4,
+                                  "categoryName": "Văn phòng",
+                                  "categorySlug": "van-phong",
+                                  "categoryIcon": "office",
+                                  "totalListings": 890,
+                                  "verifiedListings": 720,
+                                  "vipListings": 234
+                                },
+                                {
+                                  "categoryId": 5,
+                                  "categoryName": "Mặt bằng kinh doanh",
+                                  "categorySlug": "mat-bang-kinh-doanh",
+                                  "categoryIcon": "store",
+                                  "totalListings": 1230,
+                                  "verifiedListings": 980,
+                                  "vipListings": 345
+                                }
+                              ]
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<List<CategoryListingStatsResponse>> getCategoryStats(
+            @Valid @RequestBody CategoryStatsRequest request) {
+        List<CategoryListingStatsResponse> stats = listingService.getCategoryStats(request);
+        return ApiResponse.<List<CategoryListingStatsResponse>>builder()
                 .data(stats)
                 .build();
     }

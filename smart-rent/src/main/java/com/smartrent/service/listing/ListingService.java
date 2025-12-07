@@ -1,5 +1,6 @@
 package com.smartrent.service.listing;
 
+import com.smartrent.dto.request.CategoryStatsRequest;
 import com.smartrent.dto.request.DraftListingRequest;
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
@@ -7,6 +8,7 @@ import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.AdminListingListResponse;
+import com.smartrent.dto.response.CategoryListingStatsResponse;
 import com.smartrent.dto.response.DraftListingResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingListResponse;
@@ -82,6 +84,14 @@ public interface ListingService {
      * @return List of province statistics
      */
     List<ProvinceListingStatsResponse> getProvinceStats(ProvinceStatsRequest request);
+
+    /**
+     * Get listing statistics by categories (for home screen)
+     * Returns statistics for each category including total listings, verified, and VIP counts
+     * @param request Category statistics request (categoryIds)
+     * @return List of category statistics
+     */
+    List<CategoryListingStatsResponse> getCategoryStats(CategoryStatsRequest request);
 
     /**
      * Get my listing detail with owner-specific information (Owner only)

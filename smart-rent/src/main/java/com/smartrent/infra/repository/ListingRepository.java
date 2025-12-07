@@ -221,4 +221,23 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         GROUP BY am.newProvinceCode
     """)
     List<Object[]> getListingStatsByProvinceCodes(@Param("provinceCodes") List<String> provinceCodes);
+
+    /**
+     * Get listing statistics grouped by category
+     * Returns: categoryId, totalCount, verifiedCount, vipCount
+     */
+    @Query("""
+        SELECT
+            l.categoryId,
+            COUNT(l.listingId),
+            SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
+        FROM listings l
+        WHERE l.categoryId IN :categoryIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.expired = false
+        GROUP BY l.categoryId
+    """)
+    List<Object[]> getListingStatsByCategoryIds(@Param("categoryIds") List<Long> categoryIds);
 }
