@@ -126,7 +126,7 @@ public class ListingController {
               "longitude": 105.8542
             }
             ```
-         
+
             **Required Fields for Standard Listing:**
             - title, description
             - listingType (RENT/SALE/SHARE)
@@ -386,8 +386,8 @@ public class ListingController {
                             """
                     ),
                     @ExampleObject(
-                        name = "Complete Draft",
-                        summary = "Save draft with all data",
+                        name = "Complete Draft (Legacy Address)",
+                        summary = "Save draft with all data using legacy address structure (63 provinces, 3-tier)",
                         value = """
                             {
                               "title": "Căn hộ cao cấp 3 phòng ngủ",
@@ -416,6 +416,39 @@ public class ListingController {
                               "roomCapacity": 6,
                               "amenityIds": [1, 2, 3, 4, 5],
                               "mediaIds": [201, 202, 203]
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Complete Draft (New Address)",
+                        summary = "Save draft with all data using new address structure (34 provinces, 2-tier)",
+                        value = """
+                            {
+                              "title": "Căn hộ hiện đại 2 phòng ngủ",
+                              "description": "Căn hộ hiện đại tại trung tâm thành phố",
+                              "listingType": "RENT",
+                              "vipType": "SILVER",
+                              "categoryId": 1,
+                              "productType": "APARTMENT",
+                              "price": 15000000,
+                              "priceUnit": "MONTH",
+                              "address": {
+                                "newAddress": {
+                                  "provinceCode": "79",
+                                  "wardCode": "27001",
+                                  "street": "Nguyễn Văn Linh"
+                                },
+                                "latitude": 10.7412,
+                                "longitude": 106.7220
+                              },
+                              "area": 85.0,
+                              "bedrooms": 2,
+                              "bathrooms": 2,
+                              "direction": "EAST",
+                              "furnishing": "SEMI_FURNISHED",
+                              "roomCapacity": 4,
+                              "amenityIds": [1, 2, 3],
+                              "mediaIds": [301, 302]
                             }
                             """
                     )

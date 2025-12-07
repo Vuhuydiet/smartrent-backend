@@ -2,6 +2,7 @@ package com.smartrent.mapper.impl;
 
 import com.smartrent.dto.response.*;
 import com.smartrent.infra.repository.entity.*;
+import com.smartrent.infra.repository.*;
 import com.smartrent.mapper.AddressMapper;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,14 @@ import org.springframework.stereotype.Component;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AddressMapperImpl implements AddressMapper {
 
+    LegacyProvinceRepository legacyProvinceRepository;
+    LegacyDistrictRepository legacyDistrictRepository;
+    LegacyWardRepository legacyWardRepository;
+    ProvinceRepository provinceRepository;
+    WardRepository wardRepository;
+    ProjectRepository projectRepository;
+    StreetRepository streetRepository;
+
     // ==================== ADDRESS ENTITY MAPPING ====================
 
     @Override
@@ -25,14 +34,62 @@ public class AddressMapperImpl implements AddressMapper {
             return null;
         }
 
-        return AddressResponse.builder()
+        AddressResponse.AddressResponseBuilder builder = AddressResponse.builder()
                 .addressId(address.getAddressId())
                 .fullAddress(address.getFullAddress())
                 .fullNewAddress(address.getFullNewAddress())
                 .latitude(address.getLatitude())
                 .longitude(address.getLongitude())
-                // Note: Metadata fields should be populated from AddressMetadata if needed
-                .build();
+                .addressType(address.getAddressType());
+
+        // Map legacy address components (Old structure: 63 provinces, 3-tier)
+        if (address.getLegacyProvinceId() != null) {
+            builder.legacyProvinceId(address.getLegacyProvinceId());
+            legacyProvinceRepository.findById(address.getLegacyProvinceId())
+                    .ifPresent(province -> builder.legacyProvinceName(province.getName()));
+        }
+
+        if (address.getLegacyDistrictId() != null) {
+            builder.legacyDistrictId(address.getLegacyDistrictId());
+            legacyDistrictRepository.findById(address.getLegacyDistrictId())
+                    .ifPresent(district -> builder.legacyDistrictName(district.getName()));
+        }
+
+        if (address.getLegacyWardId() != null) {
+            builder.legacyWardId(address.getLegacyWardId());
+            legacyWardRepository.findById(address.getLegacyWardId())
+                    .ifPresent(ward -> builder.legacyWardName(ward.getName()));
+        }
+
+        if (address.getLegacyStreet() != null) {
+            builder.legacyStreet(address.getLegacyStreet());
+        }
+
+        // Map new address components (New structure: 34 provinces, 2-tier)
+        if (address.getNewProvinceCode() != null) {
+            builder.newProvinceCode(address.getNewProvinceCode());
+            provinceRepository.findByCode(address.getNewProvinceCode())
+                    .ifPresent(province -> builder.newProvinceName(province.getName()));
+        }
+
+        if (address.getNewWardCode() != null) {
+            builder.newWardCode(address.getNewWardCode());
+            wardRepository.findByCode(address.getNewWardCode())
+                    .ifPresent(ward -> builder.newWardName(ward.getName()));
+        }
+
+        if (address.getNewStreet() != null) {
+            builder.newStreet(address.getNewStreet());
+        }
+
+        // Map project if available
+        if (address.getProjectId() != null) {
+            builder.projectId(address.getProjectId());
+            projectRepository.findById(address.getProjectId())
+                    .ifPresent(project -> builder.projectName(project.getName()));
+        }
+
+        return builder.build();
     }
 
     // ==================== LEGACY STRUCTURE MAPPINGS ====================
