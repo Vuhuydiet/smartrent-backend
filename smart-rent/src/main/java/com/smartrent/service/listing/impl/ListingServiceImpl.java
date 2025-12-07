@@ -2,6 +2,7 @@ package com.smartrent.service.listing.impl;
 
 import com.smartrent.constants.PricingConstants;
 import com.smartrent.dto.request.AddressCreationRequest;
+import com.smartrent.dto.request.CategoryStatsRequest;
 import com.smartrent.dto.request.DraftListingRequest;
 import com.smartrent.dto.request.LegacyAddressData;
 import com.smartrent.dto.request.ListingCreationRequest;
@@ -11,6 +12,7 @@ import com.smartrent.dto.request.NewAddressData;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
+import com.smartrent.dto.response.CategoryListingStatsResponse;
 import com.smartrent.dto.response.DraftListingResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingListResponse;
@@ -26,6 +28,7 @@ import com.smartrent.infra.repository.AddressRepository;
 import com.smartrent.infra.repository.AddressMetadataRepository;
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.AmenityRepository;
+import com.smartrent.infra.repository.CategoryRepository;
 import com.smartrent.infra.repository.LegacyProvinceRepository;
 import com.smartrent.infra.repository.ListingDraftRepository;
 import com.smartrent.infra.repository.ListingRepository;
@@ -73,6 +76,7 @@ public class ListingServiceImpl implements ListingService {
     ListingDraftRepository listingDraftRepository;
     MediaRepository mediaRepository;
     AmenityRepository amenityRepository;
+    CategoryRepository categoryRepository;
     AddressRepository addressRepository;
     AddressMetadataRepository addressMetadataRepository;
     AdminRepository adminRepository;
@@ -1267,6 +1271,64 @@ public class ListingServiceImpl implements ListingService {
         }
 
         log.info("Province stats retrieved successfully - {} results", results.size());
+        return results;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CategoryListingStatsResponse> getCategoryStats(CategoryStatsRequest request) {
+        log.info("Getting category stats - categoryIds: {}, verifiedOnly: {}",
+                request.getCategoryIds(), request.getVerifiedOnly());
+
+        // Validate request - must have categoryIds
+        if (request.getCategoryIds() == null || request.getCategoryIds().isEmpty()) {
+            log.warn("Category stats request missing categoryIds");
+            return Collections.emptyList();
+        }
+
+        List<CategoryListingStatsResponse> results = new ArrayList<>();
+
+        // Get stats from repository
+        List<Object[]> statsData = listingRepository.getListingStatsByCategoryIds(request.getCategoryIds());
+
+        // Map to response objects
+        for (Object[] row : statsData) {
+            Long categoryId = (Long) row[0];
+            Long totalCount = (Long) row[1];
+            Long verifiedCount = (Long) row[2];
+            Long vipCount = (Long) row[3];
+
+            // Get category details
+            Category category = categoryRepository.findById(categoryId).orElse(null);
+            if (category == null) {
+                log.warn("Category not found: {}", categoryId);
+                continue;
+            }
+
+            // Filter if verifiedOnly is requested
+            if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
+                continue;
+            }
+
+            results.add(CategoryListingStatsResponse.builder()
+                    .categoryId(categoryId)
+                    .categoryName(category.getName())
+                    .categorySlug(category.getSlug())
+                    .categoryIcon(category.getIcon())
+                    .totalListings(totalCount)
+                    .verifiedListings(verifiedCount)
+                    .vipListings(vipCount)
+                    .build());
+        }
+
+        // Sort results to match input order
+        results.sort((a, b) -> {
+            int indexA = request.getCategoryIds().indexOf(a.getCategoryId());
+            int indexB = request.getCategoryIds().indexOf(b.getCategoryId());
+            return Integer.compare(indexA, indexB);
+        });
+
+        log.info("Category stats retrieved successfully - {} results", results.size());
         return results;
     }
 
