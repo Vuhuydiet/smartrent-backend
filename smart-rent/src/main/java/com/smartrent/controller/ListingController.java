@@ -2375,6 +2375,8 @@ public class ListingController {
     public ApiResponse<AdminListingListResponse> getAllListingsForAdmin(
             @RequestHeader("X-Admin-Id") String adminId,
             @Valid @RequestBody ListingFilterRequest filter) {
+        // Mark this as an admin request so the specification doesn't apply public filters
+        filter.setIsAdminRequest(true);
         AdminListingListResponse response = listingService.getAllListingsForAdmin(filter, adminId);
         return ApiResponse.<AdminListingListResponse>builder().data(response).build();
     }
