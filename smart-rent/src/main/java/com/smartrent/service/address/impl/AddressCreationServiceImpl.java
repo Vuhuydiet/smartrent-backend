@@ -186,14 +186,12 @@ public class AddressCreationServiceImpl implements AddressCreationService {
                 .addressType(request.getEffectiveAddressType())
                 .projectId(request.getProjectId());
 
-        if (request.isLegacyStructure()) {
-            builder.provinceId(request.getLegacyProvinceId())
-                    .districtId(request.getLegacyDistrictId())
-                    .wardId(request.getLegacyWardId());
-        } else {
-            builder.newProvinceCode(request.getNewProvinceCodeValue())
-                    .newWardCode(request.getNewWardCodeValue());
-        }
+        builder.provinceId(request.getLegacyProvinceId())
+                .districtId(request.getLegacyDistrictId())
+                .wardId(request.getLegacyWardId());
+
+        builder.newProvinceCode(request.getNewProvinceCodeValue())
+                .newWardCode(request.getNewWardCodeValue());
 
         return builder.build();
     }
