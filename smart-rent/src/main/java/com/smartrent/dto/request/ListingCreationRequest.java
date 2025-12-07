@@ -35,6 +35,9 @@ public class ListingCreationRequest {
 
     String description;
 
+    @Schema(description = "Post date - when the listing should be published. If not provided, defaults to current time.")
+    LocalDateTime postDate;
+
     LocalDateTime expiryDate;
 
     String listingType;
