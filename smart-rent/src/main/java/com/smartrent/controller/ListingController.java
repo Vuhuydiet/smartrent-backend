@@ -435,13 +435,72 @@ public class ListingController {
                               "code": "999999",
                               "message": null,
                               "data": {
-                                "listingId": 123,
-                                "status": "DRAFT"
+                                "draftId": 456,
+                                "userId": "user-uuid-123",
+                                "title": "Căn hộ 2 phòng ngủ ấm cúng",
+                                "description": "Căn hộ rộng rãi với đầy đủ tiện nghi",
+                                "listingType": "RENT",
+                                "vipType": "NORMAL",
+                                "categoryId": 10,
+                                "productType": "APARTMENT",
+                                "price": 5000000,
+                                "priceUnit": "MONTH",
+                                "addressType": "NEW",
+                                "provinceCode": "79",
+                                "wardCode": "27001",
+                                "street": "Nguyễn Văn Linh",
+                                "streetId": null,
+                                "projectId": null,
+                                "latitude": 10.7412,
+                                "longitude": 106.7220,
+                                "area": 75.5,
+                                "bedrooms": 2,
+                                "bathrooms": 2,
+                                "direction": "SOUTH",
+                                "furnishing": "FULLY_FURNISHED",
+                                "roomCapacity": 4,
+                                "waterPrice": "FREE",
+                                "electricityPrice": "3500",
+                                "internetPrice": "INCLUDED",
+                                "serviceFee": "100000",
+                                "amenities": [
+                                  {
+                                    "amenityId": 1,
+                                    "name": "Wifi",
+                                    "icon": "wifi"
+                                  },
+                                  {
+                                    "amenityId": 2,
+                                    "name": "Parking",
+                                    "icon": "parking"
+                                  }
+                                ],
+                                "media": [
+                                  {
+                                    "mediaId": 201,
+                                    "url": "https://pub-xxx.r2.dev/media/...",
+                                    "mediaType": "IMAGE",
+                                    "isPrimary": true,
+                                    "sortOrder": 1
+                                  }
+                                ],
+                                "createdAt": "2024-01-15T10:30:00",
+                                "updatedAt": "2024-01-15T10:30:00"
                               }
                             }
                             """
                     )
                 )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Invalid request data",
+                content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "401",
+                description = "Unauthorized - Invalid or missing authentication",
+                content = @Content(mediaType = "application/json")
             )
         }
     )
@@ -2396,6 +2455,96 @@ public class ListingController {
             """,
         parameters = {
             @Parameter(name = "draftId", description = "Draft ID", required = true, example = "123")
+        },
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "Partial draft data to update (all fields optional)",
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = DraftListingRequest.class),
+                examples = @ExampleObject(
+                    name = "Partial Update Example",
+                    summary = "Update only specific fields",
+                    value = """
+                        {
+                          "title": "Updated title",
+                          "price": 6000000,
+                          "bedrooms": 3
+                        }
+                        """
+                )
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Draft updated successfully",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Updated Draft Response",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "draftId": 456,
+                                "userId": "user-uuid-123",
+                                "title": "Updated title",
+                                "description": "Căn hộ rộng rãi với đầy đủ tiện nghi",
+                                "listingType": "RENT",
+                                "vipType": "NORMAL",
+                                "categoryId": 10,
+                                "productType": "APARTMENT",
+                                "price": 6000000,
+                                "priceUnit": "MONTH",
+                                "addressType": "NEW",
+                                "provinceCode": "79",
+                                "wardCode": "27001",
+                                "street": "Nguyễn Văn Linh",
+                                "latitude": 10.7412,
+                                "longitude": 106.7220,
+                                "area": 75.5,
+                                "bedrooms": 3,
+                                "bathrooms": 2,
+                                "direction": "SOUTH",
+                                "furnishing": "FULLY_FURNISHED",
+                                "roomCapacity": 4,
+                                "amenities": [
+                                  {
+                                    "amenityId": 1,
+                                    "name": "Wifi",
+                                    "icon": "wifi"
+                                  }
+                                ],
+                                "media": [
+                                  {
+                                    "mediaId": 201,
+                                    "url": "https://pub-xxx.r2.dev/media/...",
+                                    "mediaType": "IMAGE",
+                                    "isPrimary": true,
+                                    "sortOrder": 1
+                                  }
+                                ],
+                                "createdAt": "2024-01-15T10:30:00",
+                                "updatedAt": "2024-01-15T10:35:00"
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Draft not found",
+                content = @Content(mediaType = "application/json")
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "403",
+                description = "Forbidden - User does not own this draft",
+                content = @Content(mediaType = "application/json")
+            )
         }
     )
     public ApiResponse<DraftListingResponse> updateDraft(
@@ -2428,12 +2577,155 @@ public class ListingController {
                 description = "Successfully retrieved draft listing",
                 content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = ApiResponse.class)
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Draft Detail Response",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "draftId": 456,
+                                "userId": "user-uuid-123",
+                                "title": "Căn hộ 2 phòng ngủ ấm cúng",
+                                "description": "Căn hộ rộng rãi với đầy đủ tiện nghi, view đẹp",
+                                "listingType": "RENT",
+                                "vipType": "NORMAL",
+                                "categoryId": 10,
+                                "productType": "APARTMENT",
+                                "price": 5000000,
+                                "priceUnit": "MONTH",
+                                "addressType": "NEW",
+                                "provinceCode": "79",
+                                "wardCode": "27001",
+                                "street": "Nguyễn Văn Linh",
+                                "streetId": null,
+                                "projectId": null,
+                                "latitude": 10.7412,
+                                "longitude": 106.7220,
+                                "area": 75.5,
+                                "bedrooms": 2,
+                                "bathrooms": 2,
+                                "direction": "SOUTH",
+                                "furnishing": "FULLY_FURNISHED",
+                                "roomCapacity": 4,
+                                "waterPrice": "FREE",
+                                "electricityPrice": "3500",
+                                "internetPrice": "INCLUDED",
+                                "serviceFee": "100000",
+                                "amenities": [
+                                  {
+                                    "amenityId": 1,
+                                    "name": "Wifi",
+                                    "icon": "wifi",
+                                    "description": "Free high-speed internet",
+                                    "category": "BASIC",
+                                    "isActive": true
+                                  },
+                                  {
+                                    "amenityId": 2,
+                                    "name": "Parking",
+                                    "icon": "parking",
+                                    "description": "Free parking space",
+                                    "category": "BASIC",
+                                    "isActive": true
+                                  },
+                                  {
+                                    "amenityId": 3,
+                                    "name": "Air Conditioning",
+                                    "icon": "ac",
+                                    "description": "Air conditioning in all rooms",
+                                    "category": "BASIC",
+                                    "isActive": true
+                                  }
+                                ],
+                                "media": [
+                                  {
+                                    "mediaId": 201,
+                                    "listingId": null,
+                                    "userId": "user-uuid-123",
+                                    "mediaType": "IMAGE",
+                                    "sourceType": "UPLOAD",
+                                    "status": "ACTIVE",
+                                    "url": "https://pub-xxx.r2.dev/media/user-123/201-living-room.jpg",
+                                    "thumbnailUrl": null,
+                                    "title": "Living Room",
+                                    "description": "Spacious living room",
+                                    "altText": "Living room photo",
+                                    "isPrimary": true,
+                                    "sortOrder": 1,
+                                    "fileSize": 2048576,
+                                    "mimeType": "image/jpeg",
+                                    "originalFilename": "living-room.jpg",
+                                    "durationSeconds": null,
+                                    "uploadConfirmed": true,
+                                    "createdAt": "2024-01-15T10:25:00",
+                                    "updatedAt": "2024-01-15T10:25:00"
+                                  },
+                                  {
+                                    "mediaId": 202,
+                                    "listingId": null,
+                                    "userId": "user-uuid-123",
+                                    "mediaType": "IMAGE",
+                                    "sourceType": "UPLOAD",
+                                    "status": "ACTIVE",
+                                    "url": "https://pub-xxx.r2.dev/media/user-123/202-bedroom.jpg",
+                                    "thumbnailUrl": null,
+                                    "title": "Bedroom",
+                                    "description": "Master bedroom",
+                                    "altText": "Bedroom photo",
+                                    "isPrimary": false,
+                                    "sortOrder": 2,
+                                    "fileSize": 1875432,
+                                    "mimeType": "image/jpeg",
+                                    "originalFilename": "bedroom.jpg",
+                                    "durationSeconds": null,
+                                    "uploadConfirmed": true,
+                                    "createdAt": "2024-01-15T10:26:00",
+                                    "updatedAt": "2024-01-15T10:26:00"
+                                  }
+                                ],
+                                "createdAt": "2024-01-15T10:20:00",
+                                "updatedAt": "2024-01-15T10:30:00"
+                              }
+                            }
+                            """
+                    )
                 )
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "404",
-                description = "Draft not found"
+                description = "Draft not found",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Not Found",
+                        value = """
+                            {
+                              "code": "404001",
+                              "message": "Draft not found",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "403",
+                description = "Forbidden - User does not own this draft",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Forbidden",
+                        value = """
+                            {
+                              "code": "403001",
+                              "message": "You do not have permission to view this draft",
+                              "data": null
+                            }
+                            """
+                    )
+                )
             )
         }
     )
@@ -2455,6 +2747,14 @@ public class ListingController {
             Returns drafts sorted by last updated time (newest first).
 
             **Use case**: Display list of drafts for user to continue editing
+
+            **Response includes**:
+            - Complete draft information with all fields
+            - Full amenities array with complete amenity objects
+            - Full media array with complete MediaResponse objects
+            - All address and location details
+            - Pricing and utility cost information
+            - Property specifications (area, bedrooms, bathrooms, etc.)
             """,
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -2464,20 +2764,241 @@ public class ListingController {
                     mediaType = "application/json",
                     schema = @Schema(implementation = List.class),
                     examples = @ExampleObject(
-                        name = "Draft Listings Example",
+                        name = "Draft Listings Response",
                         value = """
                             {
                               "code": "999999",
                               "message": null,
                               "data": [
                                 {
-                                  "draftId": 123,
-                                  "title": "Căn hộ 2PN Q7",
-                                  "description": "Chưa hoàn thiện mô tả...",
-                                  "price": 5000000,
+                                  "draftId": 456,
+                                  "userId": "user-uuid-123",
+                                  "title": "Căn hộ 2 phòng ngủ ấm cúng tại Quận 7",
+                                  "description": "Căn hộ 2PN rộng rãi, thoáng mát, full nội thất cao cấp. Gần trường học, siêu thị và công viên.",
+                                  "listingType": "RENT",
+                                  "propertyType": "APARTMENT",
+                                  "area": 75.5,
+                                  "price": 12000000,
                                   "priceUnit": "MONTH",
-                                  "updatedAt": "2025-11-29T10:30:00",
-                                  "mediaIds": [1, 2, 3]
+                                  "deposit": 24000000,
+                                  "bedrooms": 2,
+                                  "bathrooms": 2,
+                                  "direction": "EAST",
+                                  "furnishing": "FULL",
+                                  "roomCapacity": 4,
+                                  "numberOfFloors": 15,
+                                  "availableFrom": "2024-02-01",
+                                  "legalStatus": "RED_BOOK",
+                                  "addressType": "SPECIFIC",
+                                  "provinceCode": "79",
+                                  "provinceName": "Thành phố Hồ Chí Minh",
+                                  "districtCode": "783",
+                                  "districtName": "Quận 7",
+                                  "wardCode": "27541",
+                                  "wardName": "Phường Tân Phú",
+                                  "street": "123 Nguyễn Hữu Thọ",
+                                  "houseNumber": "123",
+                                  "latitude": 10.732157,
+                                  "longitude": 106.719838,
+                                  "waterPrice": 15000,
+                                  "waterPriceUnit": "CUBIC_METER",
+                                  "electricityPrice": 3500,
+                                  "electricityPriceUnit": "KWH",
+                                  "internetPrice": 200000,
+                                  "internetPriceUnit": "MONTH",
+                                  "serviceFee": 500000,
+                                  "serviceFeeUnit": "MONTH",
+                                  "allowPets": true,
+                                  "videoLink": "https://www.youtube.com/watch?v=example123",
+                                  "amenities": [
+                                    {
+                                      "amenityId": 1,
+                                      "amenityName": "Điều hòa",
+                                      "amenityNameEn": "Air Conditioning",
+                                      "category": "CONVENIENCE",
+                                      "icon": "ac_unit"
+                                    },
+                                    {
+                                      "amenityId": 5,
+                                      "amenityName": "Hồ bơi",
+                                      "amenityNameEn": "Swimming Pool",
+                                      "category": "FACILITY",
+                                      "icon": "pool"
+                                    },
+                                    {
+                                      "amenityId": 12,
+                                      "amenityName": "An ninh 24/7",
+                                      "amenityNameEn": "24/7 Security",
+                                      "category": "SECURITY",
+                                      "icon": "security"
+                                    }
+                                  ],
+                                  "media": [
+                                    {
+                                      "mediaId": 201,
+                                      "listingId": null,
+                                      "userId": "user-uuid-123",
+                                      "mediaType": "IMAGE",
+                                      "sourceType": "UPLOAD",
+                                      "url": "https://pub-xxx.r2.dev/media/user-123/201-living-room.jpg",
+                                      "fileSize": 2048576,
+                                      "mimeType": "image/jpeg",
+                                      "width": 1920,
+                                      "height": 1080,
+                                      "displayOrder": 1,
+                                      "caption": "Phòng khách rộng rãi",
+                                      "thumbnailUrl": "https://pub-xxx.r2.dev/media/user-123/thumb_201-living-room.jpg",
+                                      "uploadedAt": "2024-01-15T09:00:00",
+                                      "metadata": null,
+                                      "processingStatus": "COMPLETED",
+                                      "externalVideoId": null,
+                                      "externalPlatform": null,
+                                      "embedUrl": null,
+                                      "videoDuration": null,
+                                      "videoTitle": null,
+                                      "videoDescription": null,
+                                      "originalFileName": "living-room-photo.jpg",
+                                      "storagePath": "user-123/201-living-room.jpg",
+                                      "cdnUrl": "https://cdn.smartrent.com/media/201-living-room.jpg"
+                                    },
+                                    {
+                                      "mediaId": 202,
+                                      "listingId": null,
+                                      "userId": "user-uuid-123",
+                                      "mediaType": "IMAGE",
+                                      "sourceType": "UPLOAD",
+                                      "url": "https://pub-xxx.r2.dev/media/user-123/202-bedroom.jpg",
+                                      "fileSize": 1876432,
+                                      "mimeType": "image/jpeg",
+                                      "width": 1920,
+                                      "height": 1080,
+                                      "displayOrder": 2,
+                                      "caption": "Phòng ngủ master",
+                                      "thumbnailUrl": "https://pub-xxx.r2.dev/media/user-123/thumb_202-bedroom.jpg",
+                                      "uploadedAt": "2024-01-15T09:05:00",
+                                      "metadata": null,
+                                      "processingStatus": "COMPLETED",
+                                      "externalVideoId": null,
+                                      "externalPlatform": null,
+                                      "embedUrl": null,
+                                      "videoDuration": null,
+                                      "videoTitle": null,
+                                      "videoDescription": null,
+                                      "originalFileName": "bedroom-photo.jpg",
+                                      "storagePath": "user-123/202-bedroom.jpg",
+                                      "cdnUrl": "https://cdn.smartrent.com/media/202-bedroom.jpg"
+                                    },
+                                    {
+                                      "mediaId": 203,
+                                      "listingId": null,
+                                      "userId": "user-uuid-123",
+                                      "mediaType": "VIDEO",
+                                      "sourceType": "YOUTUBE",
+                                      "url": "https://www.youtube.com/watch?v=example123",
+                                      "fileSize": null,
+                                      "mimeType": null,
+                                      "width": null,
+                                      "height": null,
+                                      "displayOrder": 3,
+                                      "caption": "Video tour căn hộ",
+                                      "thumbnailUrl": "https://i.ytimg.com/vi/example123/maxresdefault.jpg",
+                                      "uploadedAt": "2024-01-15T09:10:00",
+                                      "metadata": null,
+                                      "processingStatus": "COMPLETED",
+                                      "externalVideoId": "example123",
+                                      "externalPlatform": "YOUTUBE",
+                                      "embedUrl": "https://www.youtube.com/embed/example123",
+                                      "videoDuration": 180,
+                                      "videoTitle": "Căn hộ 2PN Quận 7 - Full nội thất",
+                                      "videoDescription": "Video giới thiệu chi tiết căn hộ",
+                                      "originalFileName": null,
+                                      "storagePath": null,
+                                      "cdnUrl": null
+                                    }
+                                  ],
+                                  "createdAt": "2024-01-15T10:30:00",
+                                  "updatedAt": "2024-01-20T15:45:00"
+                                },
+                                {
+                                  "draftId": 789,
+                                  "userId": "user-uuid-123",
+                                  "title": "Nhà phố 3 tầng mặt tiền đường lớn",
+                                  "description": "Nhà phố mới xây, thiết kế hiện đại, phù hợp kinh doanh hoặc ở",
+                                  "listingType": "SELL",
+                                  "propertyType": "HOUSE",
+                                  "area": 120.0,
+                                  "price": 8500000000,
+                                  "priceUnit": "TOTAL",
+                                  "deposit": null,
+                                  "bedrooms": 4,
+                                  "bathrooms": 3,
+                                  "direction": "SOUTH",
+                                  "furnishing": "BASIC",
+                                  "roomCapacity": null,
+                                  "numberOfFloors": 3,
+                                  "availableFrom": null,
+                                  "legalStatus": "PINK_BOOK",
+                                  "addressType": "APPROXIMATE",
+                                  "provinceCode": "79",
+                                  "provinceName": "Thành phố Hồ Chí Minh",
+                                  "districtCode": "769",
+                                  "districtName": "Quận 1",
+                                  "wardCode": "27127",
+                                  "wardName": "Phường Bến Nghé",
+                                  "street": "Đường Lê Lợi",
+                                  "houseNumber": null,
+                                  "latitude": 10.768432,
+                                  "longitude": 106.698854,
+                                  "waterPrice": null,
+                                  "waterPriceUnit": null,
+                                  "electricityPrice": null,
+                                  "electricityPriceUnit": null,
+                                  "internetPrice": null,
+                                  "internetPriceUnit": null,
+                                  "serviceFee": null,
+                                  "serviceFeeUnit": null,
+                                  "allowPets": null,
+                                  "videoLink": null,
+                                  "amenities": [
+                                    {
+                                      "amenityId": 8,
+                                      "amenityName": "Chỗ đậu xe",
+                                      "amenityNameEn": "Parking",
+                                      "category": "CONVENIENCE",
+                                      "icon": "local_parking"
+                                    }
+                                  ],
+                                  "media": [
+                                    {
+                                      "mediaId": 301,
+                                      "listingId": null,
+                                      "userId": "user-uuid-123",
+                                      "mediaType": "IMAGE",
+                                      "sourceType": "UPLOAD",
+                                      "url": "https://pub-xxx.r2.dev/media/user-123/301-front-view.jpg",
+                                      "fileSize": 3145728,
+                                      "mimeType": "image/jpeg",
+                                      "width": 2560,
+                                      "height": 1440,
+                                      "displayOrder": 1,
+                                      "caption": "Mặt tiền nhà",
+                                      "thumbnailUrl": "https://pub-xxx.r2.dev/media/user-123/thumb_301-front-view.jpg",
+                                      "uploadedAt": "2024-01-18T14:20:00",
+                                      "metadata": null,
+                                      "processingStatus": "COMPLETED",
+                                      "externalVideoId": null,
+                                      "externalPlatform": null,
+                                      "embedUrl": null,
+                                      "videoDuration": null,
+                                      "videoTitle": null,
+                                      "videoDescription": null,
+                                      "originalFileName": "house-front.jpg",
+                                      "storagePath": "user-123/301-front-view.jpg",
+                                      "cdnUrl": "https://cdn.smartrent.com/media/301-front-view.jpg"
+                                    }
+                                  ],
+                                  "createdAt": "2024-01-18T14:00:00",
+                                  "updatedAt": "2024-01-18T16:30:00"
                                 }
                               ]
                             }
