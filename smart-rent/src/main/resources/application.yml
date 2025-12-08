@@ -155,6 +155,7 @@ application:
         - "/v1/memberships/packages/**"
         - "/v1/vip-tiers/**"
         - "/v1/push-details/**"
+        - "/v1/categories/**"
         - "/v1/support/contact"
         - "/v1/listings/reports/reasons"
       post:
