@@ -130,7 +130,7 @@ spring:
         "[locationCache]": 24h
 
 application:
-  client-url: "*"
+  client-url: "https://smartrent-fe.vercel.app"
   cors:
     allowed-origins: "*"
   admin:
