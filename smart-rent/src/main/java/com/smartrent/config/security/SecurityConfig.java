@@ -88,9 +88,15 @@ public class SecurityConfig {
       @Value("${application.cors.allowed-origins:}") String additionalOrigins) {
     CorsConfiguration config = new CorsConfiguration();
 
-    // Hard-coded to accept all origins
-    config.setAllowedOriginPatterns(List.of("*"));
-    config.setAllowCredentials(false);
+    // Allow credentials for OAuth flows (Google login, etc.)
+    config.setAllowCredentials(true);
+
+    // Set specific allowed origins (required when allowCredentials is true)
+    config.setAllowedOrigins(List.of(
+        clientUrl,
+        "http://localhost:3000",
+        "http://localhost:8080"
+    ));
 
     config.setAllowedHeaders(List.of("*"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
@@ -98,7 +104,8 @@ public class SecurityConfig {
         "Content-Disposition",
         "X-Suggested-Filename",
         "Content-Length",
-        "Content-Type"
+        "Content-Type",
+        "Access-Control-Allow-Credentials"
     ));
 
     // Cache preflight for 2 hours to reduce OPTIONS requests
