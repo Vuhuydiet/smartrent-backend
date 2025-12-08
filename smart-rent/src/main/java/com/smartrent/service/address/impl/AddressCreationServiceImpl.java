@@ -49,30 +49,32 @@ public class AddressCreationServiceImpl implements AddressCreationService {
                 .addressType(addressType)
                 .projectId(request.getProjectId());
 
-        // Populate legacy or new address components
+        // Populate legacy address components (if provided)
+        if (request.isLegacyStructure()) {
+            addressBuilder
+                    .legacyProvinceId(request.getLegacyProvinceId())
+                    .legacyDistrictId(request.getLegacyDistrictId())
+                    .legacyWardId(request.getLegacyWardId())
+                    .legacyStreet(request.getLegacy().getStreet());
 
-        // Populate legacy components
-        addressBuilder
-                .legacyProvinceId(request.getLegacyProvinceId())
-                .legacyDistrictId(request.getLegacyDistrictId())
-                .legacyWardId(request.getLegacyWardId())
-                .legacyStreet(request.getStreet());
+            // Build formatted legacy address string
+            String fullAddress = buildOldAddressString(request);
+            addressBuilder.fullAddress(fullAddress);
+            log.info("Built legacy address: {}", fullAddress);
+        }
 
-        // Build formatted address string
-        String fullAddress = buildOldAddressString(request);
-        addressBuilder.fullAddress(fullAddress);
-        log.info("Built legacy address: {}", fullAddress);
+        // Populate new address components (if provided)
+        if (request.isNewStructure()) {
+            addressBuilder
+                    .newProvinceCode(request.getNewProvinceCodeValue())
+                    .newWardCode(request.getNewWardCodeValue())
+                    .newStreet(request.getNewAddress().getStreet());
 
-        // Populate new components
-        addressBuilder
-                .newProvinceCode(request.getNewProvinceCodeValue())
-                .newWardCode(request.getNewWardCodeValue())
-                .newStreet(request.getStreet());
-
-        // Build formatted address string
-        String fullNewAddress = buildNewAddressString(request);
-        addressBuilder.fullNewAddress(fullNewAddress);
-        log.info("Built new address: {}", fullNewAddress);
+            // Build formatted new address string
+            String fullNewAddress = buildNewAddressString(request);
+            addressBuilder.fullNewAddress(fullNewAddress);
+            log.info("Built new address: {}", fullNewAddress);
+        }
 
 
         // Save address
