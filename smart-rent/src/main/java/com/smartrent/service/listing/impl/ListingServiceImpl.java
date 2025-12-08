@@ -1021,24 +1021,42 @@ public class ListingServiceImpl implements ListingService {
                 .serviceFee(request.getServiceFee())
                 .build();
 
-        // Extract address fields if provided
+        // Extract address fields if provided (support BOTH legacy AND new structures)
         if (request.getAddress() != null) {
             var addressReq = request.getAddress();
-            if (addressReq.getLegacy() != null) {
-                draft.setAddressType("OLD");
+
+            // Extract legacy address data if provided
+            if (addressReq.getLegacy() != null && addressReq.getLegacy().isValid()) {
                 draft.setProvinceId(addressReq.getLegacy().getProvinceId() != null
                         ? addressReq.getLegacy().getProvinceId().longValue() : null);
                 draft.setDistrictId(addressReq.getLegacy().getDistrictId() != null
                         ? addressReq.getLegacy().getDistrictId().longValue() : null);
                 draft.setWardId(addressReq.getLegacy().getWardId() != null
                         ? addressReq.getLegacy().getWardId().longValue() : null);
-                draft.setStreet(addressReq.getLegacy().getStreet());
-            } else if (addressReq.getNewAddress() != null) {
-                draft.setAddressType("NEW");
+            }
+
+            // Extract new address data if provided
+            if (addressReq.getNewAddress() != null && addressReq.getNewAddress().isValid()) {
                 draft.setProvinceCode(addressReq.getNewAddress().getProvinceCode());
                 draft.setWardCode(addressReq.getNewAddress().getWardCode());
-                draft.setStreet(addressReq.getNewAddress().getStreet());
             }
+
+            // Set street (priority: legacy > new if both provided)
+            String streetToStore = null;
+            if (addressReq.getLegacy() != null && addressReq.getLegacy().getStreet() != null) {
+                streetToStore = addressReq.getLegacy().getStreet();
+            } else if (addressReq.getNewAddress() != null && addressReq.getNewAddress().getStreet() != null) {
+                streetToStore = addressReq.getNewAddress().getStreet();
+            }
+            draft.setStreet(streetToStore);
+
+            // Set address type (priority: legacy > new if both provided)
+            if (addressReq.isLegacyStructure()) {
+                draft.setAddressType("OLD");
+            } else if (addressReq.isNewStructure()) {
+                draft.setAddressType("NEW");
+            }
+
             draft.setProjectId(addressReq.getProjectId() != null
                     ? addressReq.getProjectId().longValue() : null);
             draft.setLatitude(addressReq.getLatitude() != null
