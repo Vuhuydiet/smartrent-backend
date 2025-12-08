@@ -30,14 +30,34 @@ public class VNPayConfig {
     private String url;
 
     /**
+     * VNPay Payment URL (alternative property name)
+     */
+    private String paymentUrl;
+
+    /**
+     * VNPay Query URL
+     */
+    private String queryUrl;
+
+    /**
      * Return URL after payment (success/failure)
      */
     private String returnUrl;
 
     /**
+     * IPN (Instant Payment Notification) URL
+     */
+    private String ipnUrl;
+
+    /**
      * VNPay API Version
      */
     private String version = "2.1.0";
+
+    /**
+     * Secure hash type (e.g., SHA512)
+     */
+    private String secureHashType = "SHA512";
 
     /**
      * Command for payment creation
