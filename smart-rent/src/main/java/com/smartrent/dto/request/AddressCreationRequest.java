@@ -13,6 +13,9 @@ import java.math.BigDecimal;
 /**
  * DTO for creating a new address using nested structure
  *
+ * You can provide EITHER legacy OR new address structure, or BOTH.
+ * If both are provided, both will be saved to the database.
+ *
  * Legacy structure example (63 provinces, 3-tier):
  * {
  *   "legacy": {
@@ -32,6 +35,14 @@ import java.math.BigDecimal;
  *     "wardCode": "00004",
  *     "street": "Nguyen Trai"
  *   },
+ *   "latitude": 21.0285,
+ *   "longitude": 105.8542
+ * }
+ *
+ * Both structures example:
+ * {
+ *   "legacy": { "provinceId": 1, "districtId": 5, "wardId": 20, "street": "Nguyen Trai" },
+ *   "newAddress": { "provinceCode": "01", "wardCode": "00004", "street": "Nguyen Trai" },
  *   "latitude": 21.0285,
  *   "longitude": 105.8542
  * }
@@ -106,14 +117,19 @@ public class AddressCreationRequest {
 
     /**
      * Get the effective address type (auto-detect from structure)
+     * If both legacy and new structures are provided, prioritizes legacy (OLD) for addressType.
+     * Note: Both structures will still be saved to the database if provided.
      */
     public AddressMetadata.AddressType getEffectiveAddressType() {
-        if (isLegacyStructure()) {
-            return AddressMetadata.AddressType.OLD;
-        } else if (isNewStructure()) {
-            return AddressMetadata.AddressType.NEW;
+        boolean hasLegacy = isLegacyStructure();
+        boolean hasNew = isNewStructure();
+
+        if (!hasLegacy && !hasNew) {
+            throw new IllegalStateException("Address structure not specified. Provide either 'legacy' or 'newAddress'");
         }
-        throw new IllegalStateException("Address structure not specified. Provide either 'legacy' or 'newAddress'");
+
+        // Priority: Legacy (OLD) > New (NEW) when both are provided
+        return hasLegacy ? AddressMetadata.AddressType.OLD : AddressMetadata.AddressType.NEW;
     }
 
     /**

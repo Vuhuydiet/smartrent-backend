@@ -167,6 +167,7 @@ application:
         - "/v1/listings/*/reports"
         - "/v1/listings/search"
         - "/v1/listings/stats/provinces"
+        - "/v1/listings/stats/categories"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"

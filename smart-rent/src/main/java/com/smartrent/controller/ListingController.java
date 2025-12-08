@@ -451,6 +451,45 @@ public class ListingController {
                               "mediaIds": [301, 302]
                             }
                             """
+                    ),
+                    @ExampleObject(
+                        name = "Complete Draft (Both Addresses)",
+                        summary = "Save draft with BOTH legacy AND new address structures - both will be saved to database",
+                        value = """
+                            {
+                              "title": "Nhà mặt tiền 3 tầng",
+                              "description": "Nhà mặt tiền đường lớn, kinh doanh tốt",
+                              "listingType": "SALE",
+                              "vipType": "GOLD",
+                              "categoryId": 2,
+                              "productType": "HOUSE",
+                              "price": 8500000000,
+                              "priceUnit": "TOTAL",
+                              "address": {
+                                "legacy": {
+                                  "provinceId": 1,
+                                  "districtId": 5,
+                                  "wardId": 20,
+                                  "street": "Lê Văn Sỹ"
+                                },
+                                "newAddress": {
+                                  "provinceCode": "79",
+                                  "wardCode": "27004",
+                                  "street": "Lê Văn Sỹ"
+                                },
+                                "latitude": 10.7994,
+                                "longitude": 106.6711
+                              },
+                              "area": 180.0,
+                              "bedrooms": 5,
+                              "bathrooms": 4,
+                              "direction": "EAST",
+                              "furnishing": "BASIC",
+                              "roomCapacity": 8,
+                              "amenityIds": [1, 2, 5, 8],
+                              "mediaIds": [401, 402, 403, 404]
+                            }
+                            """
                     )
                 }
             )
