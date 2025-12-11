@@ -136,7 +136,7 @@ public class AiListingVerificationController {
                               }
                             ],
                             "verification_timestamp": "2025-11-26T00:18:27.330088",
-                            "model_used": "gemini-2.5-pro",
+                            "model_used": "gemini-2.5-flash",
                             "processing_time_seconds": 18.97
                           }
                         }
@@ -186,11 +186,11 @@ public class AiListingVerificationController {
     })
     public ResponseEntity<ApiResponse<AiListingVerificationResponse>> verifyListing(
             @Valid @RequestBody AiListingVerificationRequest request) {
-        
+
         log.info("Received AI verification request for listing: {}", request.getTitle());
-        
+
         AiListingVerificationResponse response = aiListingVerificationService.verifyListing(request);
-        
+
         return ResponseEntity.ok(ApiResponse.<AiListingVerificationResponse>builder()
                 .message("Listing verification completed successfully")
                 .data(response)
@@ -249,9 +249,9 @@ public class AiListingVerificationController {
     })
     public ResponseEntity<ApiResponse<AiListingVerificationResponse>> verifyListingById(
             @PathVariable Long listingId) {
-        
+
         log.info("Received AI verification request for listing ID: {}", listingId);
-        
+
         // Note: This would require injecting ListingService to fetch the listing
         // For now, we'll leave this as a placeholder for future implementation
         throw new UnsupportedOperationException("Verify by listing ID not yet implemented");
@@ -287,7 +287,7 @@ public class AiListingVerificationController {
     })
     public ResponseEntity<ApiResponse<Object>> getServiceStatus() {
         boolean isAvailable = aiListingVerificationService.isServiceAvailable();
-        
+
         return ResponseEntity.ok(ApiResponse.builder()
                 .message("AI service status retrieved successfully")
                 .data(new Object() {

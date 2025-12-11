@@ -60,7 +60,7 @@ public class AiListingVerificationResponse {
     private LocalDateTime verificationTimestamp;
 
     @JsonProperty("model_used")
-    @Schema(description = "AI model used for verification", example = "gemini-2.5-pro")
+    @Schema(description = "AI model used for verification", example = "gemini-2.5-flash")
     private String modelUsed;
 
     @JsonProperty("processing_time_seconds")
