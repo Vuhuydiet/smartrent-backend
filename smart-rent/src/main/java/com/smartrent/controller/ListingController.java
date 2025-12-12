@@ -5,7 +5,6 @@ import com.smartrent.dto.request.DraftListingRequest;
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
-import com.smartrent.dto.request.MyListingsFilterRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.*;
@@ -963,7 +962,6 @@ public class ListingController {
             required = false,
             content = @Content(
                 mediaType = "application/json",
-                schema = @Schema(implementation = ListingFilterRequest.class),
                 examples = {
                     @ExampleObject(
                         name = "Request Example - Đầy đủ tất cả filter",
@@ -2360,7 +2358,6 @@ public class ListingController {
             required = false,
             content = @Content(
                 mediaType = "application/json",
-                schema = @Schema(implementation = ListingFilterRequest.class),
                 examples = @ExampleObject(
                     name = "Comprehensive Filter Example",
                     summary = "Example showing all available filter options (use any combination)",
@@ -2525,7 +2522,6 @@ public class ListingController {
             required = false,
             content = @Content(
                 mediaType = "application/json",
-                schema = @Schema(implementation = ListingFilterRequest.class),
                 examples = @ExampleObject(
                     name = "Comprehensive Filter Example",
                     summary = "Example showing all available filter options for admin (use any combination)",

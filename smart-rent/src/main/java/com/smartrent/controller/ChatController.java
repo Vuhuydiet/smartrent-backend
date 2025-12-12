@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/v1/chat")
-@Tag(name = "Chat", description = "AI-powered chat for property listing search")
+@RequestMapping("/v1/ai/chat")
+@Tag(name = "AI", description = "AI-powered chat for property listing search")
 @RequiredArgsConstructor
 public class ChatController {
 
