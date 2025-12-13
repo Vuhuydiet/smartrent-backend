@@ -90,8 +90,13 @@ public class ListingDraft {
     String wardCode;
 
     // Common address fields
+    // Legacy street (for old address structure with 63 provinces)
     @Column(name = "street", length = 255)
     String street;
+
+    // New street (for new address structure with 34 provinces)
+    @Column(name = "new_street", length = 255)
+    String newStreet;
 
     @Column(name = "street_id")
     Long streetId;
