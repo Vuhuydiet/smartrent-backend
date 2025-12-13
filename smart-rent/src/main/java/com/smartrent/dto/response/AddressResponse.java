@@ -82,17 +82,5 @@ public class AddressResponse {
     @Schema(description = "Tên đường (cấu trúc mới)", example = "Nguyễn Trãi")
     String newStreet;
 
-    // ==================== METADATA CHUNG ====================
-    @Schema(description = "ID đường phố", example = "1")
-    Integer streetId;
-
-    @Schema(description = "Tên đường (Deprecated - sử dụng legacyStreet hoặc newStreet)", deprecated = true)
-    String streetName;
-
-    @Schema(description = "ID dự án/tòa nhà/khu phức hợp (tùy chọn)", example = "1")
-    Integer projectId;
-
-    @Schema(description = "Tên dự án/tòa nhà", example = "Vinhomes Central Park")
-    String projectName;
 }
 

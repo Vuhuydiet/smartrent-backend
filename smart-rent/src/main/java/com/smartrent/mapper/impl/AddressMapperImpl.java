@@ -82,12 +82,6 @@ public class AddressMapperImpl implements AddressMapper {
             builder.newStreet(address.getNewStreet());
         }
 
-        // Map project if available
-        if (address.getProjectId() != null) {
-            builder.projectId(address.getProjectId());
-            projectRepository.findById(address.getProjectId())
-                    .ifPresent(project -> builder.projectName(project.getName()));
-        }
 
         return builder.build();
     }

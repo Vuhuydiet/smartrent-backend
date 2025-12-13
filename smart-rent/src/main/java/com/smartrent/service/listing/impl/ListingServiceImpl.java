@@ -30,10 +30,14 @@ import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.AmenityRepository;
 import com.smartrent.infra.repository.CategoryRepository;
 import com.smartrent.infra.repository.LegacyProvinceRepository;
+import com.smartrent.infra.repository.LegacyDistrictRepository;
+import com.smartrent.infra.repository.LegacyWardRepository;
 import com.smartrent.infra.repository.ListingDraftRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.ProvinceRepository;
+import com.smartrent.infra.repository.WardRepository;
+import com.smartrent.infra.repository.ProjectRepository;
 import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.VipTierDetailRepository;
@@ -82,7 +86,11 @@ public class ListingServiceImpl implements ListingService {
     AdminRepository adminRepository;
     UserRepository userRepository;
     LegacyProvinceRepository legacyProvinceRepository;
+    LegacyDistrictRepository legacyDistrictRepository;
+    LegacyWardRepository legacyWardRepository;
     ProvinceRepository provinceRepository;
+    WardRepository wardRepository;
+    ProjectRepository projectRepository;
     ListingMapper listingMapper;
     com.smartrent.mapper.MediaMapper mediaMapper;
     com.smartrent.mapper.AmenityMapper amenityMapper;
@@ -1022,10 +1030,11 @@ public class ListingServiceImpl implements ListingService {
                 .build();
 
         // Extract address fields if provided (support BOTH legacy AND new structures)
+        // ALWAYS save both structures if both are provided (like Listing does with Address entity)
         if (request.getAddress() != null) {
             var addressReq = request.getAddress();
 
-            // Extract legacy address data if provided
+            // ALWAYS extract and save legacy address data if provided
             if (addressReq.getLegacy() != null && addressReq.getLegacy().isValid()) {
                 draft.setProvinceId(addressReq.getLegacy().getProvinceId() != null
                         ? addressReq.getLegacy().getProvinceId().longValue() : null);
@@ -1035,22 +1044,22 @@ public class ListingServiceImpl implements ListingService {
                         ? addressReq.getLegacy().getWardId().longValue() : null);
             }
 
-            // Extract new address data if provided
+            // ALWAYS extract and save new address data if provided
             if (addressReq.getNewAddress() != null && addressReq.getNewAddress().isValid()) {
                 draft.setProvinceCode(addressReq.getNewAddress().getProvinceCode());
                 draft.setWardCode(addressReq.getNewAddress().getWardCode());
             }
 
-            // Set street (priority: legacy > new if both provided)
-            String streetToStore = null;
+            // ALWAYS save both legacy and new street fields separately if provided
             if (addressReq.getLegacy() != null && addressReq.getLegacy().getStreet() != null) {
-                streetToStore = addressReq.getLegacy().getStreet();
-            } else if (addressReq.getNewAddress() != null && addressReq.getNewAddress().getStreet() != null) {
-                streetToStore = addressReq.getNewAddress().getStreet();
+                draft.setStreet(addressReq.getLegacy().getStreet());
             }
-            draft.setStreet(streetToStore);
+            if (addressReq.getNewAddress() != null && addressReq.getNewAddress().getStreet() != null) {
+                draft.setNewStreet(addressReq.getNewAddress().getStreet());
+            }
 
-            // Set address type (priority: legacy > new if both provided)
+            // Set address type to indicate which structure is primary (priority: legacy > new if both provided)
+            // Note: Both structures are still saved, addressType only indicates which one is primary
             if (addressReq.isLegacyStructure()) {
                 draft.setAddressType("OLD");
             } else if (addressReq.isNewStructure()) {
@@ -1722,23 +1731,41 @@ public class ListingServiceImpl implements ListingService {
             draft.setServiceFee(request.getServiceFee());
         }
 
-        // Update address if provided
+        // Update address if provided (support BOTH legacy AND new structures)
+        // ALWAYS save both structures if both are provided (like Listing does with Address entity)
         if (request.getAddress() != null) {
             var addressReq = request.getAddress();
-            if (addressReq.getLegacy() != null) {
-                draft.setAddressType("OLD");
+
+            // ALWAYS update and save legacy address data if provided
+            if (addressReq.getLegacy() != null && addressReq.getLegacy().isValid()) {
                 draft.setProvinceId(addressReq.getLegacy().getProvinceId() != null
                         ? addressReq.getLegacy().getProvinceId().longValue() : null);
                 draft.setDistrictId(addressReq.getLegacy().getDistrictId() != null
                         ? addressReq.getLegacy().getDistrictId().longValue() : null);
                 draft.setWardId(addressReq.getLegacy().getWardId() != null
                         ? addressReq.getLegacy().getWardId().longValue() : null);
-                draft.setStreet(addressReq.getLegacy().getStreet());
-            } else if (addressReq.getNewAddress() != null) {
-                draft.setAddressType("NEW");
+            }
+
+            // ALWAYS update and save new address data if provided
+            if (addressReq.getNewAddress() != null && addressReq.getNewAddress().isValid()) {
                 draft.setProvinceCode(addressReq.getNewAddress().getProvinceCode());
                 draft.setWardCode(addressReq.getNewAddress().getWardCode());
-                draft.setStreet(addressReq.getNewAddress().getStreet());
+            }
+
+            // ALWAYS update both legacy and new street fields separately if provided
+            if (addressReq.getLegacy() != null && addressReq.getLegacy().getStreet() != null) {
+                draft.setStreet(addressReq.getLegacy().getStreet());
+            }
+            if (addressReq.getNewAddress() != null && addressReq.getNewAddress().getStreet() != null) {
+                draft.setNewStreet(addressReq.getNewAddress().getStreet());
+            }
+
+            // Set address type to indicate which structure is primary (priority: legacy > new if both provided)
+            // Note: Both structures are still saved, addressType only indicates which one is primary
+            if (addressReq.isLegacyStructure()) {
+                draft.setAddressType("OLD");
+            } else if (addressReq.isNewStructure()) {
+                draft.setAddressType("NEW");
             }
 
             if (addressReq.getProjectId() != null) {
@@ -1926,39 +1953,68 @@ public class ListingServiceImpl implements ListingService {
                    .longitude(java.math.BigDecimal.valueOf(draft.getLongitude()));
         }
 
-        // Set address type
+        // Set address type based on which structure was marked as primary
         if ("OLD".equals(draft.getAddressType())) {
             builder.addressType(com.smartrent.infra.repository.entity.AddressMetadata.AddressType.OLD);
-
-            // Set legacy fields
-            if (draft.getProvinceId() != null) {
-                builder.legacyProvinceId(draft.getProvinceId().intValue());
-            }
-            if (draft.getDistrictId() != null) {
-                builder.legacyDistrictId(draft.getDistrictId().intValue());
-            }
-            if (draft.getWardId() != null) {
-                builder.legacyWardId(draft.getWardId().intValue());
-            }
-            builder.legacyStreet(draft.getStreet());
-
         } else if ("NEW".equals(draft.getAddressType())) {
             builder.addressType(com.smartrent.infra.repository.entity.AddressMetadata.AddressType.NEW);
-
-            // Set new fields
-            builder.newProvinceCode(draft.getProvinceCode())
-                   .newWardCode(draft.getWardCode())
-                   .newStreet(draft.getStreet());
         }
 
-        // Set project ID if present
-        if (draft.getProjectId() != null) {
-            builder.projectId(draft.getProjectId().intValue());
+        // ALWAYS populate legacy fields if they exist (regardless of addressType)
+        // This ensures both structures are returned when both are provided
+        if (draft.getProvinceId() != null) {
+            builder.legacyProvinceId(draft.getProvinceId().intValue());
+            // Fetch and populate province name
+            legacyProvinceRepository.findById(draft.getProvinceId().intValue())
+                    .ifPresent(province -> builder.legacyProvinceName(province.getName()));
+        }
+        if (draft.getDistrictId() != null) {
+            builder.legacyDistrictId(draft.getDistrictId().intValue());
+            // Fetch and populate district name
+            legacyDistrictRepository.findById(draft.getDistrictId().intValue())
+                    .ifPresent(district -> builder.legacyDistrictName(district.getName()));
+        }
+        if (draft.getWardId() != null) {
+            builder.legacyWardId(draft.getWardId().intValue());
+            // Fetch and populate ward name
+            legacyWardRepository.findById(draft.getWardId().intValue())
+                    .ifPresent(ward -> builder.legacyWardName(ward.getName()));
         }
 
-        // Set street ID if present
-        if (draft.getStreetId() != null) {
-            builder.streetId(draft.getStreetId().intValue());
+        // ALWAYS populate new address fields if they exist (regardless of addressType)
+        // This ensures both structures are returned when both are provided
+        if (draft.getProvinceCode() != null) {
+            builder.newProvinceCode(draft.getProvinceCode());
+            // Fetch and populate province name
+            provinceRepository.findByCode(draft.getProvinceCode())
+                    .ifPresent(province -> builder.newProvinceName(province.getName()));
+        }
+        if (draft.getWardCode() != null) {
+            builder.newWardCode(draft.getWardCode());
+            // Fetch and populate ward name
+            wardRepository.findByCode(draft.getWardCode())
+                    .ifPresent(ward -> builder.newWardName(ward.getName()));
+        }
+
+        // ALWAYS populate both street fields if they exist (regardless of addressType)
+        // This ensures both structures are returned when both are provided
+        if (draft.getStreet() != null) {
+            builder.legacyStreet(draft.getStreet());
+        }
+        if (draft.getNewStreet() != null) {
+            builder.newStreet(draft.getNewStreet());
+        }
+
+        // Build fullAddress from legacy structure if exists
+        if (draft.getProvinceId() != null || draft.getDistrictId() != null || draft.getWardId() != null) {
+            String fullAddress = buildLegacyFullAddressFromDraft(draft);
+            builder.fullAddress(fullAddress);
+        }
+
+        // Build fullNewAddress from new structure if exists
+        if (draft.getProvinceCode() != null || draft.getWardCode() != null) {
+            String fullNewAddress = buildNewFullAddressFromDraft(draft);
+            builder.fullNewAddress(fullNewAddress);
         }
 
         return builder.build();
@@ -2089,5 +2145,81 @@ public class ListingServiceImpl implements ListingService {
             throw new AppException(DomainCode.BAD_REQUEST_ERROR,
                     "Cannot publish draft. Missing required fields: " + String.join(", ", missingFields));
         }
+    }
+
+    /**
+     * Build legacy full address string from ListingDraft
+     * Format: [Street/Project], [Ward Type] [Ward Name], [District Type] [District Name], [Province Name]
+     */
+    private String buildLegacyFullAddressFromDraft(ListingDraft draft) {
+        StringBuilder sb = new StringBuilder();
+
+        // Add street or project name
+        if (draft.getStreet() != null && !draft.getStreet().isEmpty()) {
+            sb.append(draft.getStreet()).append(", ");
+        } else if (draft.getProjectId() != null) {
+            projectRepository.findById(draft.getProjectId().intValue())
+                    .ifPresent(project -> sb.append(project.getName()).append(", "));
+        }
+
+        // Add ward
+        if (draft.getWardId() != null) {
+            legacyWardRepository.findById(draft.getWardId().intValue())
+                    .ifPresent(ward -> {
+                        if (ward.getType() != null && !ward.getType().isEmpty()) {
+                            sb.append(ward.getType()).append(" ");
+                        }
+                        sb.append(ward.getName()).append(", ");
+                    });
+        }
+
+        // Add district
+        if (draft.getDistrictId() != null) {
+            legacyDistrictRepository.findById(draft.getDistrictId().intValue())
+                    .ifPresent(district -> {
+                        if (district.getType() != null && !district.getType().isEmpty()) {
+                            sb.append(district.getType()).append(" ");
+                        }
+                        sb.append(district.getName()).append(", ");
+                    });
+        }
+
+        // Add province
+        if (draft.getProvinceId() != null) {
+            legacyProvinceRepository.findById(draft.getProvinceId().intValue())
+                    .ifPresent(province -> sb.append(province.getName()));
+        }
+
+        return sb.toString().trim();
+    }
+
+    /**
+     * Build new full address string from ListingDraft
+     * Format: [Street/Project], [Ward Name], [Province Name]
+     */
+    private String buildNewFullAddressFromDraft(ListingDraft draft) {
+        StringBuilder sb = new StringBuilder();
+
+        // Add street or project name
+        if (draft.getNewStreet() != null && !draft.getNewStreet().isEmpty()) {
+            sb.append(draft.getNewStreet()).append(", ");
+        } else if (draft.getProjectId() != null) {
+            projectRepository.findById(draft.getProjectId().intValue())
+                    .ifPresent(project -> sb.append(project.getName()).append(", "));
+        }
+
+        // Add ward
+        if (draft.getWardCode() != null && !draft.getWardCode().isEmpty()) {
+            wardRepository.findByCode(draft.getWardCode())
+                    .ifPresent(ward -> sb.append(ward.getName()).append(", "));
+        }
+
+        // Add province
+        if (draft.getProvinceCode() != null && !draft.getProvinceCode().isEmpty()) {
+            provinceRepository.findByCode(draft.getProvinceCode())
+                    .ifPresent(province -> sb.append(province.getName()));
+        }
+
+        return sb.toString().trim();
     }
 }
