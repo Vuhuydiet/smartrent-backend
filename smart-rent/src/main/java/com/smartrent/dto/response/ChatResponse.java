@@ -26,6 +26,9 @@ public class ChatResponse {
   @Schema(description = "Additional metadata about the response")
   Map<String, Object> metadata;
 
+  @Schema(description = "Listing search results if the AI performed a property search")
+  Map<String, Object> listings;
+
   @Getter
   @Setter
   @Builder

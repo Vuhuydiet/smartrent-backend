@@ -55,7 +55,37 @@ public class ChatController {
                   schema = @Schema(implementation = ChatResponse.class),
                   examples = @ExampleObject(
                       name = "Success",
-                      value = "{ \"code\": \"999999\", \"message\": \"Operation completed successfully\", \"data\": { \"message\": { \"role\": \"assistant\", \"content\": \"I found several 2-bedroom apartments in Hanoi within your budget...\" }, \"metadata\": { \"model\": \"gemini-2.0-flash-exp\" } } }"
+                      value = """
+                          {
+                            "code": "999999",
+                            "message": "Operation completed successfully",
+                            "data": {
+                              "message": {
+                                "role": "assistant",
+                                "content": "Tôi đã tìm thấy 15 căn hộ 2 phòng ngủ tại Hà Nội phù hợp với ngân sách của bạn..."
+                              },
+                              "metadata": {
+                                "model": "gemini-2.0-flash",
+                                "tools_used": ["search_listings"]
+                              },
+                              "listings": {
+                                "listings": [
+                                  {
+                                    "listingId": 123,
+                                    "title": "Căn hộ 2PN view đẹp Q. Đống Đa",
+                                    "price": 5000000,
+                                    "area": 78.5,
+                                    "bedrooms": 2,
+                                    "address": {...}
+                                  }
+                                ],
+                                "totalCount": 15,
+                                "currentPage": 1,
+                                "pageSize": 20
+                              }
+                            }
+                          }
+                          """
                   )
               )
           ),
