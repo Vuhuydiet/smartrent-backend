@@ -330,22 +330,19 @@ public class Listing {
             }
         }
 
-        // 6. VERIFIED - Is verified
-        if (this.verified != null && this.verified) {
-            return com.smartrent.enums.ListingStatus.VERIFIED;
-        }
-
-        // 7. DISPLAYING - Is displaying (verified and not expired)
+        // 6. DISPLAYING - Is displaying (verified, not expired, has time remaining > 7 days)
         if (this.verified != null && this.verified &&
             (this.expired == null || !this.expired) &&
             (this.expiryDate == null || this.expiryDate.isAfter(now))) {
             return com.smartrent.enums.ListingStatus.DISPLAYING;
         }
 
-        // Default to VERIFIED if verified, otherwise IN_REVIEW
+        // 7. VERIFIED - Is verified (fallback for verified listings without expiry info)
         if (this.verified != null && this.verified) {
             return com.smartrent.enums.ListingStatus.VERIFIED;
         }
+
+        // Default to IN_REVIEW if not verified
         return com.smartrent.enums.ListingStatus.IN_REVIEW;
     }
 }
