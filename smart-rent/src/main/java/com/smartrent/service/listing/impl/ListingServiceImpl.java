@@ -583,16 +583,48 @@ public class ListingServiceImpl implements ListingService {
         // Update fields from request (null-safe for partial update)
         if (request.getTitle() != null) existing.setTitle(request.getTitle());
         if (request.getDescription() != null) existing.setDescription(request.getDescription());
+        if (request.getPostDate() != null) existing.setPostDate(request.getPostDate());
         if (request.getExpiryDate() != null) existing.setExpiryDate(request.getExpiryDate());
+        if (request.getListingType() != null) existing.setListingType(Listing.ListingType.valueOf(request.getListingType()));
         if (request.getVerified() != null) existing.setVerified(request.getVerified());
         if (request.getIsVerify() != null) existing.setIsVerify(request.getIsVerify());
         if (request.getExpired() != null) existing.setExpired(request.getExpired());
+        if (request.getVipType() != null) existing.setVipType(Listing.VipType.valueOf(request.getVipType()));
+        if (request.getCategoryId() != null) existing.setCategoryId(request.getCategoryId());
+        if (request.getProductType() != null) existing.setProductType(Listing.ProductType.valueOf(request.getProductType()));
         if (request.getPrice() != null) existing.setPrice(request.getPrice());
+        if (request.getPriceUnit() != null) existing.setPriceUnit(Listing.PriceUnit.valueOf(request.getPriceUnit()));
         if (request.getArea() != null) existing.setArea(request.getArea());
         if (request.getBedrooms() != null) existing.setBedrooms(request.getBedrooms());
         if (request.getBathrooms() != null) existing.setBathrooms(request.getBathrooms());
+        if (request.getDirection() != null) existing.setDirection(Listing.Direction.valueOf(request.getDirection()));
+        if (request.getFurnishing() != null) existing.setFurnishing(Listing.Furnishing.valueOf(request.getFurnishing()));
         if (request.getRoomCapacity() != null) existing.setRoomCapacity(request.getRoomCapacity());
-        // ...add more fields as needed, null-safe
+        if (request.getWaterPrice() != null) existing.setWaterPrice(request.getWaterPrice());
+        if (request.getElectricityPrice() != null) existing.setElectricityPrice(request.getElectricityPrice());
+        if (request.getInternetPrice() != null) existing.setInternetPrice(request.getInternetPrice());
+        if (request.getServiceFee() != null) existing.setServiceFee(request.getServiceFee());
+
+        // Handle media update if provided
+        if (request.getMediaIds() != null) {
+            log.info("Updating media for listing {}: {} media items", id, request.getMediaIds().size());
+
+            // Unlink existing media (set listing to null)
+            List<Media> existingMedia = mediaRepository.findByListing_ListingIdAndStatusOrderBySortOrderAsc(
+                    id, Media.MediaStatus.ACTIVE);
+            for (Media media : existingMedia) {
+                media.setListing(null);
+                mediaRepository.save(media);
+                log.debug("Unlinked media {} from listing {}", media.getMediaId(), id);
+            }
+
+            // Link new media if provided (empty set will just unlink all)
+            if (!request.getMediaIds().isEmpty()) {
+                linkMediaToListing(existing, request.getMediaIds(), existing.getUserId());
+                log.info("Linked {} new media items to listing {}", request.getMediaIds().size(), id);
+            }
+        }
+
         Listing saved = listingRepository.save(existing);
         com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(saved.getUserId());
         com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(saved.getAddress());

@@ -31,8 +31,11 @@ public class ListingRequest {
     String description;
 
     @NotNull
-    @Schema(description = "User ID", example = "1", required = true)
-    Long userId;
+    @Schema(description = "User ID", example = "user-uuid-123", required = true)
+    String userId;
+
+    @Schema(description = "Post date - when the listing should be published")
+    LocalDateTime postDate;
 
     @Schema(description = "Expiry date of the listing")
     LocalDateTime expiryDate;
@@ -91,5 +94,26 @@ public class ListingRequest {
     @Min(0)
     Integer roomCapacity;
 
+    @Schema(description = "Water price (e.g., '20,000 VND/person' or 'Included')")
+    String waterPrice;
+
+    @Schema(description = "Electricity price (e.g., '3,500 VND/kWh' or 'Included')")
+    String electricityPrice;
+
+    @Schema(description = "Internet price (e.g., '100,000 VND/month' or 'Free')")
+    String internetPrice;
+
+    @Schema(description = "Service fee (e.g., '500,000 VND/month' or 'None')")
+    String serviceFee;
+
     Set<Long> amenityIds;
+
+    /**
+     * List of media IDs to attach to this listing
+     * Media must be already uploaded and belong to the same user
+     * Optional: If not provided, media will not be updated
+     * If provided (even as empty set), will replace all existing media
+     */
+    @Schema(description = "List of media IDs to attach to this listing")
+    Set<Long> mediaIds;
 }
