@@ -26,9 +26,10 @@ public class ChatController {
 
   @PostMapping
   @Operation(
-      summary = "Chat with AI assistant",
-      description = "Send conversation messages to AI assistant to search and find property listings. " +
-                    "The AI can understand natural language queries and search for properties based on user requirements.",
+      summary = "Trò chuyện với trợ lý AI bất động sản",
+      description = "Gửi tin nhắn hội thoại đến trợ lý AI để tìm kiếm và khám phá bất động sản cho thuê. " +
+                    "AI hiểu ngôn ngữ tự nhiên (tiếng Việt) và tự động tìm kiếm bất động sản dựa trên yêu cầu của bạn. " +
+                    "AI sẽ phân tích kết quả và chọn ra tối đa 5 bất động sản phù hợp nhất để giới thiệu.",
       requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
           required = true,
           content = @Content(
@@ -36,12 +37,12 @@ public class ChatController {
               schema = @Schema(implementation = ChatRequest.class),
               examples = {
                   @ExampleObject(
-                      name = "Simple search query",
-                      value = "{ \"messages\": [ { \"role\": \"user\", \"content\": \"I'm looking for a 2-bedroom apartment in Hanoi with a budget around $1000/month\" } ] }"
+                      name = "Tìm kiếm đơn giản",
+                      value = "{ \"messages\": [ { \"role\": \"user\", \"content\": \"Tôi cần tìm căn hộ 2 phòng ngủ ở Hà Nội, giá khoảng 10 triệu/tháng\" } ] }"
                   ),
                   @ExampleObject(
-                      name = "Multi-turn conversation",
-                      value = "{ \"messages\": [ { \"role\": \"user\", \"content\": \"I need an apartment in Ho Chi Minh City\" }, { \"role\": \"assistant\", \"content\": \"I'd be happy to help you find an apartment in Ho Chi Minh City. Could you tell me more about your preferences?\" }, { \"role\": \"user\", \"content\": \"I need 1 bedroom, budget is $600-800, and I prefer District 1\" } ] }"
+                      name = "Hội thoại nhiều lượt",
+                      value = "{ \"messages\": [ { \"role\": \"user\", \"content\": \"Tìm giúp tôi căn hộ ở Quận 1\" }, { \"role\": \"assistant\", \"content\": \"Tôi sẽ giúp bạn tìm căn hộ ở Quận 1. Bạn có thể cho tôi biết thêm về ngân sách và số phòng ngủ mong muốn không?\" }, { \"role\": \"user\", \"content\": \"Cần 1 phòng ngủ, giá từ 6-8 triệu\" } ] }"
                   )
               }
           )
@@ -49,12 +50,12 @@ public class ChatController {
       responses = {
           @io.swagger.v3.oas.annotations.responses.ApiResponse(
               responseCode = "200",
-              description = "Successful response",
+              description = "Phản hồi thành công với danh sách bất động sản được AI lựa chọn",
               content = @Content(
                   mediaType = "application/json",
                   schema = @Schema(implementation = ChatResponse.class),
                   examples = @ExampleObject(
-                      name = "Success",
+                      name = "Thành công - AI trả về 5 BĐS phù hợp nhất",
                       value = """
                           {
                             "code": "999999",
@@ -62,21 +63,43 @@ public class ChatController {
                             "data": {
                               "message": {
                                 "role": "assistant",
-                                "content": "Tôi đã tìm thấy 15 căn hộ 2 phòng ngủ tại Hà Nội phù hợp với ngân sách của bạn..."
+                                "content": "Tôi đã tìm thấy 15 căn hộ 2 phòng ngủ tại Hà Nội và đã chọn ra 5 căn phù hợp nhất với yêu cầu của bạn:\n\n1. **Listing ID: 123** - Căn hộ 2PN view đẹp Q. Đống Đa - 10 triệu/tháng, 78m². Căn này có giá tốt và view đẹp.\n\n2. **Mã tin: 456** - Chung cư cao cấp 2PN Cầu Giấy - 12 triệu/tháng, 85m². Đầy đủ nội thất, gần trường học.\n\n3. **Listing ID: 789** - Căn hộ hiện đại 2PN Ba Đình - 11 triệu/tháng, 80m². Vị trí trung tâm, gần công viên.\n\nTôi đã chọn những căn này vì chúng phù hợp với ngân sách 10 triệu của bạn, có đầy đủ 2 phòng ngủ và ở vị trí thuận tiện."
                               },
                               "metadata": {
                                 "model": "gemini-2.0-flash",
-                                "tools_used": ["search_listings"]
+                                "tools_used": ["search_listings"],
+                                "totalCount": 15,
+                                "selectedFromTotal": 5
                               },
                               "listings": {
                                 "listings": [
                                   {
                                     "listingId": 123,
                                     "title": "Căn hộ 2PN view đẹp Q. Đống Đa",
-                                    "price": 5000000,
+                                    "price": 10000000,
                                     "area": 78.5,
                                     "bedrooms": 2,
-                                    "address": {...}
+                                    "bathrooms": 2,
+                                    "address": {
+                                      "street": "Đường Láng",
+                                      "ward": "Láng Thượng",
+                                      "district": "Đống Đa",
+                                      "province": "Hà Nội"
+                                    }
+                                  },
+                                  {
+                                    "listingId": 456,
+                                    "title": "Chung cư cao cấp 2PN Cầu Giấy",
+                                    "price": 12000000,
+                                    "area": 85.0,
+                                    "bedrooms": 2,
+                                    "bathrooms": 2,
+                                    "address": {
+                                      "street": "Trần Thái Tông",
+                                      "ward": "Dịch Vọng",
+                                      "district": "Cầu Giấy",
+                                      "province": "Hà Nội"
+                                    }
                                   }
                                 ],
                                 "totalCount": 15,
