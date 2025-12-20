@@ -435,12 +435,14 @@ public class ListingServiceImpl implements ListingService {
     }
 
     private Listing buildListingFromVipRequest(VipListingCreationRequest request, Address address) {
+        Listing.VipType vipType = Listing.VipType.valueOf(request.getVipType());
         return Listing.builder()
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .userId(request.getUserId())
                 .listingType(Listing.ListingType.valueOf(request.getListingType()))
-                .vipType(Listing.VipType.valueOf(request.getVipType()))
+                .vipType(vipType)
+                .vipTypeSortOrder(Listing.getVipTypeSortOrder(vipType))
                 .categoryId(request.getCategoryId())
                 .productType(Listing.ProductType.valueOf(request.getProductType()))
                 .price(request.getPrice())
@@ -453,7 +455,7 @@ public class ListingServiceImpl implements ListingService {
                 .furnishing(request.getFurnishing() != null ? Listing.Furnishing.valueOf(request.getFurnishing()) : null)
                 .roomCapacity(request.getRoomCapacity())
                 .verified(false)
-                .isVerify(false)
+                .isVerify(true)
                 .expired(false)
                 .build();
     }
@@ -467,6 +469,7 @@ public class ListingServiceImpl implements ListingService {
                 .userId(premiumListing.getUserId())
                 .listingType(premiumListing.getListingType())
                 .vipType(Listing.VipType.NORMAL) // Shadow is always NORMAL
+                .vipTypeSortOrder(Listing.getVipTypeSortOrder(Listing.VipType.NORMAL)) // NORMAL = 4
                 .categoryId(premiumListing.getCategoryId())
                 .productType(premiumListing.getProductType())
                 .price(premiumListing.getPrice())

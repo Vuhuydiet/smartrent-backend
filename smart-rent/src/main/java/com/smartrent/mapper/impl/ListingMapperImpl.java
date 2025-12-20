@@ -29,6 +29,7 @@ public class ListingMapperImpl implements ListingMapper {
     private final MediaMapper mediaMapper;
     @Override
     public Listing toEntity(ListingCreationRequest req) {
+        Listing.VipType vipType = req.getVipType() != null ? Listing.VipType.valueOf(req.getVipType()) : null;
         return Listing.builder()
                 .title(req.getTitle())
                 .description(req.getDescription())
@@ -37,9 +38,10 @@ public class ListingMapperImpl implements ListingMapper {
                 .expiryDate(req.getExpiryDate())
                 .listingType(req.getListingType() != null ? Listing.ListingType.valueOf(req.getListingType()) : null)
                 .verified(req.getVerified() != null ? req.getVerified() : false)
-                .isVerify(req.getIsVerify() != null ? req.getIsVerify() : false)
+                .isVerify(req.getIsVerify() != null ? req.getIsVerify() : true)
                 .expired(req.getExpired() != null ? req.getExpired() : false)
-                .vipType(req.getVipType() != null ? Listing.VipType.valueOf(req.getVipType()) : null)
+                .vipType(vipType)
+                .vipTypeSortOrder(Listing.getVipTypeSortOrder(vipType))
                 .categoryId(req.getCategoryId())
                 .productType(req.getProductType() != null ? Listing.ProductType.valueOf(req.getProductType()) : null)
                 .price(req.getPrice())

@@ -94,24 +94,42 @@ public class ListingQueryService {
 
     /**
      * Build Sort object from sort field and direction
+     * DEFAULT SORTING: All listings are always sorted by:
+     * 1. vipTypeSortOrder ASC (DIAMOND=1, GOLD=2, SILVER=3, NORMAL=4)
+     * 2. updatedAt DESC (newest first within each VIP tier)
+     *
+     * User can specify additional sorting criteria which will be applied AFTER the default sorting
      *
      * @param sortBy Sort field name (postDate, price, area, createdAt, updatedAt)
      * @param sortDirection Sort direction (ASC or DESC)
      * @return Sort object for JPA query
      */
     private Sort buildSort(String sortBy, String sortDirection) {
-        String sortField = sortBy != null ? sortBy : "postDate";
-        Sort.Direction direction = "ASC".equalsIgnoreCase(sortDirection)
-                ? Sort.Direction.ASC
-                : Sort.Direction.DESC;
+        // Default sorting: vipTypeSortOrder ASC, then updatedAt DESC
+        Sort defaultSort = Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                .and(Sort.by(Sort.Direction.DESC, "updatedAt"));
 
-        // Map sortBy field to entity field
-        return switch (sortField) {
-            case "price" -> Sort.by(direction, "price");
-            case "area" -> Sort.by(direction, "area");
-            case "createdAt" -> Sort.by(direction, "createdAt");
-            case "updatedAt" -> Sort.by(direction, "updatedAt");
-            default -> Sort.by(direction, "postDate");
-        };
+        // If user specifies custom sorting, apply it after default sorting
+        if (sortBy != null && !sortBy.isEmpty()) {
+            Sort.Direction direction = "ASC".equalsIgnoreCase(sortDirection)
+                    ? Sort.Direction.ASC
+                    : Sort.Direction.DESC;
+
+            Sort userSort = switch (sortBy) {
+                case "price" -> Sort.by(direction, "price");
+                case "area" -> Sort.by(direction, "area");
+                case "createdAt" -> Sort.by(direction, "createdAt");
+                case "updatedAt" -> Sort.by(direction, "updatedAt");
+                case "postDate" -> Sort.by(direction, "postDate");
+                default -> null;
+            };
+
+            // Apply user sort only if it's different from default sort fields
+            if (userSort != null && !sortBy.equals("vipTypeSortOrder")) {
+                return defaultSort.and(userSort);
+            }
+        }
+
+        return defaultSort;
     }
 }
