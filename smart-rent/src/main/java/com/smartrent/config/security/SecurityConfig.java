@@ -49,6 +49,9 @@ public class SecurityConfig {
         ? securityProperties.getMethods().getPost().toArray(new String[0])
         : new String[0];
 
+    log.debug("Loaded GET patterns: {}", java.util.Arrays.toString(getPatterns));
+    log.debug("Loaded POST patterns: {}", java.util.Arrays.toString(postPatterns));
+
     http.authorizeHttpRequests(configurer -> {
       configurer
           // Configure public POST endpoints from YAML
@@ -72,7 +75,41 @@ public class SecurityConfig {
         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
     );
 
+    // Configure OAuth2 resource server with custom bearer token resolver
+    // that skips JWT processing for public endpoints
     http.oauth2ResourceServer(configurer -> configurer
+        .bearerTokenResolver(request -> {
+          // Skip JWT processing for public endpoints - return null to skip authentication
+          String path = request.getRequestURI();
+          String method = request.getMethod();
+
+          // Check if this is a public GET endpoint
+          if ("GET".equalsIgnoreCase(method)) {
+            for (String pattern : getPatterns) {
+              if (pathMatches(path, pattern)) {
+                log.debug("Skipping JWT for public GET endpoint: {}", path);
+                return null;
+              }
+            }
+          }
+
+          // Check if this is a public POST endpoint
+          if ("POST".equalsIgnoreCase(method)) {
+            for (String pattern : postPatterns) {
+              if (pathMatches(path, pattern)) {
+                log.debug("Skipping JWT for public POST endpoint: {}", path);
+                return null;
+              }
+            }
+          }
+
+          // For other requests, extract the bearer token normally
+          String authorization = request.getHeader("Authorization");
+          if (authorization != null && authorization.startsWith("Bearer ")) {
+            return authorization.substring(7);
+          }
+          return null;
+        })
         .jwt(jwtConfigurer -> jwtConfigurer
             .decoder(decoder)
             .jwtAuthenticationConverter(jwtAuthenticationConverter()))
@@ -80,6 +117,18 @@ public class SecurityConfig {
     );
 
     return http.build();
+  }
+
+  /**
+   * Simple path matching that supports ** and * wildcards
+   */
+  private boolean pathMatches(String path, String pattern) {
+    // Convert pattern to regex
+    String regex = pattern
+        .replace("**", "@@DOUBLE_STAR@@")
+        .replace("*", "[^/]*")
+        .replace("@@DOUBLE_STAR@@", ".*");
+    return path.matches(regex);
   }
 
   @Bean

@@ -282,54 +282,8 @@ FROM (
 INNER JOIN temp_listings l ON l.row_num = MOD(n.seq - 1, 200) + 1
 INNER JOIN temp_users u ON u.row_num = MOD(n.seq - 1, 200) + 1;
 
--- =====================================================
--- PART 11: INSERT MEMBERSHIP PACKAGE BENEFITS
--- =====================================================
-
-INSERT INTO membership_package_benefits (membership_id, benefit_type, benefit_name_display, quantity_per_month, created_at)
-SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'BASIC_1M' LIMIT 1),
-    'POST_SILVER',
-    'Đăng 10 tin bạc',
-    10,
-    NOW()
-UNION ALL
-SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'BASIC_1M' LIMIT 1),
-    'PUSH',
-    '5 lượt đẩy tin',
-    5,
-    NOW()
-UNION ALL
-SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'STANDARD_1M' LIMIT 1),
-    'POST_SILVER',
-    'Đăng 20 tin bạc',
-    20,
-    NOW()
-UNION ALL
-SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'STANDARD_1M' LIMIT 1),
-    'POST_GOLD',
-    'Đăng 5 tin vàng',
-    5,
-    NOW()
-UNION ALL
-SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'ADVANCED_1M' LIMIT 1),
-    'POST_GOLD',
-    'Đăng 10 tin vàng',
-    10,
-    NOW()
-UNION ALL
-SELECT
-    (SELECT membership_id FROM membership_packages WHERE package_code = 'ADVANCED_1M' LIMIT 1),
-    'PUSH',
-    '20 lượt đẩy tin',
-    20,
-    NOW();
-
 -- Create temporary table for membership packages
+-- NOTE: Membership package benefits are already inserted by V13 migration
 DROP TEMPORARY TABLE IF EXISTS temp_packages;
 SET @p_row := 0;
 CREATE TEMPORARY TABLE temp_packages AS
@@ -366,4 +320,4 @@ INNER JOIN temp_packages p ON p.row_num = MOD(n.seq, 3) + 1;
 -- Enable foreign key checks
 SET FOREIGN_KEY_CHECKS = 1;
 
-SELECT 'Part 8-12 completed: Push History, Listing Reports, Membership Packages, Benefits, User Memberships' as status;
+SELECT 'Part 8-12 completed: Push History, Listing Reports, User Memberships (Membership Packages and Benefits are inserted by V13 migration)' as status;
