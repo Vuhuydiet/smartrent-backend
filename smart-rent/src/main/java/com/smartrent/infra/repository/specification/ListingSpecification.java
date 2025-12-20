@@ -671,4 +671,80 @@ public class ListingSpecification {
                 criteriaBuilder.isTrue(root.get("verified"));
         };
     }
+
+    /**
+     * Build specification for querying listings within map bounds (bounding box)
+     * Used for displaying listings on interactive maps
+     *
+     * @param neLat North-East latitude (top-right corner)
+     * @param neLng North-East longitude (top-right corner)
+     * @param swLat South-West latitude (bottom-left corner)
+     * @param swLng South-West longitude (bottom-left corner)
+     * @param verifiedOnly Only return verified listings
+     * @param categoryId Optional category filter
+     * @param vipType Optional VIP type filter (NORMAL, SILVER, GOLD, DIAMOND)
+     * @return Specification for map bounds query
+     */
+    public static Specification<Listing> withinMapBounds(
+            BigDecimal neLat,
+            BigDecimal neLng,
+            BigDecimal swLat,
+            BigDecimal swLng,
+            Boolean verifiedOnly,
+            Long categoryId,
+            String vipType) {
+
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            // Join with Address table to access latitude and longitude
+            Join<Listing, Address> addressJoin = root.join("address", JoinType.INNER);
+
+            // Bounding box filter: latitude and longitude must be within bounds
+            // Latitude: swLat <= latitude <= neLat
+            // Longitude: swLng <= longitude <= neLng
+            predicates.add(criteriaBuilder.between(
+                addressJoin.get("latitude"),
+                swLat.doubleValue(),
+                neLat.doubleValue()
+            ));
+
+            predicates.add(criteriaBuilder.between(
+                addressJoin.get("longitude"),
+                swLng.doubleValue(),
+                neLng.doubleValue()
+            ));
+
+            // Exclude drafts - only show published listings on map
+            predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
+
+            // Verified filter
+            if (Boolean.TRUE.equals(verifiedOnly)) {
+                predicates.add(criteriaBuilder.equal(root.get("verified"), true));
+            } else {
+                // By default, only show verified listings on public map
+                predicates.add(criteriaBuilder.equal(root.get("verified"), true));
+            }
+
+            // Exclude expired listings
+            predicates.add(criteriaBuilder.equal(root.get("expired"), false));
+
+            // Optional category filter
+            if (categoryId != null) {
+                predicates.add(criteriaBuilder.equal(root.get("categoryId"), categoryId));
+            }
+
+//            // Optional VIP type filter
+//            if (vipType != null && !vipType.isEmpty()) {
+//                try {
+//                    Listing.VipType vipTypeEnum = Listing.VipType.valueOf(vipType.toUpperCase());
+//                    predicates.add(criteriaBuilder.equal(root.get("vipType"), vipTypeEnum));
+//                } catch (IllegalArgumentException e) {
+//                    // Invalid vip type, skip filter
+//                }
+//            }
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+    }
 }

@@ -169,6 +169,7 @@ application:
         - "/v1/listings/search"
         - "/v1/listings/stats/provinces"
         - "/v1/listings/stats/categories"
+        - "/v1/listings/map-bounds"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
