@@ -1,6 +1,8 @@
 -- =====================================================
 -- COMPREHENSIVE TEST DATA INSERTION SCRIPT - PART 2
--- Remaining tables: User Membership Benefits, VIP Tiers, Push Details, Push Schedule, Media, Pricing History
+-- Remaining tables: User Membership Benefits, Push Schedule, Media, Pricing History
+-- NOTE: VIP Tier Details and Push Details are already inserted by V18 migration
+-- NOTE: Membership Package Benefits are already inserted by V13 migration
 -- Run this AFTER insert_test_data_simple.sql
 -- =====================================================
 
@@ -47,33 +49,14 @@ SELECT
 FROM user_memberships um
 INNER JOIN membership_package_benefits mpb ON mpb.membership_id = um.membership_id;
 
--- =====================================================
--- PART 14: INSERT VIP TIER DETAILS (Base data - 4 tiers)
--- =====================================================
-
-INSERT IGNORE INTO vip_tier_details (tier_code, tier_name, tier_name_en, tier_level, price_per_day, price_10_days, price_15_days, price_30_days, max_images, max_videos, has_badge, badge_name, badge_color, auto_approve, no_ads, priority_display, has_shadow_listing, description, is_active, display_order, created_at, updated_at)
-VALUES
-    ('NORMAL', 'Tin Thường', 'Normal', 1, 0, 0, 0, 0, 8, 1, false, NULL, NULL, false, false, false, false, 'Tin đăng thường', true, 1, NOW(), NOW()),
-    ('SILVER', 'Tin Bạc', 'Silver', 2, 50000, 450000, 650000, 1200000, 12, 2, true, 'Bạc', '#C0C0C0', false, false, true, false, 'Tin đăng bạc với ưu tiên hiển thị', true, 2, NOW(), NOW()),
-    ('GOLD', 'Tin Vàng', 'Gold', 3, 80000, 720000, 1050000, 1920000, 16, 3, true, 'Vàng', '#FFD700', true, true, true, true, 'Tin đăng vàng với nhiều tính năng', true, 3, NOW(), NOW()),
-    ('DIAMOND', 'Tin Kim Cương', 'Diamond', 4, 120000, 1080000, 1575000, 2880000, 20, 5, true, 'Kim Cương', '#B9F2FF', true, true, true, true, 'Tin đăng kim cương cao cấp nhất', true, 4, NOW(), NOW());
+-- NOTE: VIP tier details are already inserted by V18 migration
+-- NOTE: Push details are already inserted by V18 migration
 
 -- =====================================================
--- PART 15: INSERT PUSH DETAILS (Base data - 4 packages)
+-- PART 14: INSERT 200 PUSH SCHEDULES
 -- =====================================================
 
-INSERT IGNORE INTO push_details (detail_code, detail_name, detail_name_en, price_per_push, quantity, total_price, discount_percentage, description, is_active, display_order, created_at, updated_at)
-VALUES
-    ('SINGLE_PUSH', 'Đẩy tin đơn', 'Single Push', 10000, 1, 10000, 0.00, 'Đẩy tin 1 lần', true, 1, NOW(), NOW()),
-    ('PUSH_5', 'Gói 5 lượt đẩy', '5 Push Package', 10000, 5, 45000, 10.00, 'Gói 5 lượt đẩy tin tiết kiệm 10%', true, 2, NOW(), NOW()),
-    ('PUSH_10', 'Gói 10 lượt đẩy', '10 Push Package', 10000, 10, 80000, 20.00, 'Gói 10 lượt đẩy tin tiết kiệm 20%', true, 3, NOW(), NOW()),
-    ('PUSH_20', 'Gói 20 lượt đẩy', '20 Push Package', 10000, 20, 140000, 30.00, 'Gói 20 lượt đẩy tin tiết kiệm 30%', true, 4, NOW(), NOW());
-
--- =====================================================
--- PART 16: INSERT 200 PUSH SCHEDULES
--- =====================================================
-
-SET @row16 := 0;
+SET @row14 := 0;
 INSERT INTO push_schedule (listing_id, user_id, scheduled_time, source, total_pushes, used_pushes, status, created_at, updated_at)
 SELECT
     l.listing_id,
@@ -86,7 +69,7 @@ SELECT
     DATE_SUB(NOW(), INTERVAL MOD(n.seq, 30) DAY),
     DATE_SUB(NOW(), INTERVAL MOD(n.seq, 30) DAY)
 FROM (
-    SELECT (@row16 := @row16 + 1) AS seq
+    SELECT (@row14 := @row14 + 1) AS seq
     FROM (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t1,
          (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t2,
          (SELECT 0 UNION ALL SELECT 1) t3
@@ -96,10 +79,10 @@ INNER JOIN temp_listings l ON l.row_num = MOD(n.seq - 1, 200) + 1
 INNER JOIN temp_users u ON u.row_num = MOD(n.seq - 1, 200) + 1;
 
 -- =====================================================
--- PART 17: INSERT 200 MEDIA RECORDS
+-- PART 15: INSERT 200 MEDIA RECORDS
 -- =====================================================
 
-SET @row17 := 0;
+SET @row15 := 0;
 INSERT INTO media (listing_id, user_id, media_type, source_type, status, storage_key, url, original_filename, mime_type, file_size, is_primary, sort_order, upload_confirmed, created_at, updated_at)
 SELECT
     l.listing_id,
@@ -118,7 +101,7 @@ SELECT
     DATE_SUB(NOW(), INTERVAL MOD(n.seq, 60) DAY),
     DATE_SUB(NOW(), INTERVAL MOD(n.seq, 60) DAY)
 FROM (
-    SELECT (@row17 := @row17 + 1) AS seq
+    SELECT (@row15 := @row15 + 1) AS seq
     FROM (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t1,
          (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t2,
          (SELECT 0 UNION ALL SELECT 1) t3
@@ -128,10 +111,10 @@ INNER JOIN temp_listings l ON l.row_num = MOD(n.seq - 1, 200) + 1
 INNER JOIN temp_users u ON u.row_num = MOD(n.seq - 1, 200) + 1;
 
 -- =====================================================
--- PART 18: INSERT 200 PRICING HISTORY RECORDS
+-- PART 16: INSERT 200 PRICING HISTORY RECORDS
 -- =====================================================
 
-SET @row18 := 0;
+SET @row16 := 0;
 INSERT INTO pricing_histories (listing_id, old_price, new_price, old_price_unit, new_price_unit, change_type, change_percentage, change_amount, is_current, changed_at)
 SELECT
     l.listing_id,
@@ -150,7 +133,7 @@ SELECT
     (MOD(n.seq, 5) = 0),
     DATE_SUB(NOW(), INTERVAL MOD(n.seq, 90) DAY)
 FROM (
-    SELECT (@row18 := @row18 + 1) AS seq
+    SELECT (@row16 := @row16 + 1) AS seq
     FROM (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t1,
          (SELECT 0 UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t2,
          (SELECT 0 UNION ALL SELECT 1) t3
@@ -165,7 +148,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- VERIFICATION QUERIES
 -- =====================================================
 
-SELECT 'Part 13-18 completed: User Membership Benefits, VIP Tiers, Push Details, Push Schedule, Media, Pricing History' as status;
+SELECT 'Part 13-16 completed: User Membership Benefits, Push Schedule, Media, Pricing History' as status;
 
 -- Count all inserted records
 SELECT 'Users' as entity, COUNT(*) as count FROM users
@@ -205,7 +188,7 @@ UNION ALL
 SELECT 'Pricing Histories', COUNT(*) FROM pricing_histories;
 
 SELECT '=== DATA INSERTION COMPLETE ===' as message;
-SELECT 'Total Dynamic Records: 2800' as summary_1;
-SELECT 'Total Config Records: 17' as summary_2;
-SELECT 'Grand Total: 2817+ records' as summary_3;
+SELECT 'Total Dynamic Records: 2600' as summary_1;
+SELECT 'NOTE: VIP Tier Details (4) and Push Details (4) are inserted by V18 migration' as summary_2;
+SELECT 'NOTE: Membership Packages (3) and Benefits (9) are inserted by V13 migration' as summary_3;
 

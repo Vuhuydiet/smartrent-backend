@@ -395,7 +395,9 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             vnpParams.put("vnp_OrderType", vnpayConfig.getOrderType() != null ? vnpayConfig.getOrderType() : "other");
             vnpParams.put("vnp_Locale", vnpayConfig.getLocale() != null ? vnpayConfig.getLocale() : VNP_LOCALE_VN);
 
-            // Return URL
+            // Return URL (for user redirect after payment)
+            // After payment, VNPAY redirects user to this URL with payment result parameters
+            // Frontend should then call GET /v1/payments/callback/VNPAY with those parameters
             String returnUrl = request.getReturnUrl() != null ? request.getReturnUrl() : vnpayConfig.getReturnUrl();
             vnpParams.put("vnp_ReturnUrl", returnUrl);
 

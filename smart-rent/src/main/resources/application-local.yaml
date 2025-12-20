@@ -51,6 +51,8 @@ application:
         - "/v1/categories/**"
         - "/v1/ai/listings/**"
         - "/v1/listings/reports/reasons"
+        - "/v1/payments/ipn/**"
+        - "/v1/payments/callback/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"

@@ -77,79 +77,140 @@ public class PaymentController {
 
     // Generic Payment Endpoints (Provider-agnostic)
 
-    @PostMapping("/ipn/{provider}")
+    @GetMapping("/callback/{provider}")
     @Operation(
-            summary = "Payment IPN endpoint",
+            summary = "Payment callback endpoint (for frontend)",
             description = """
-                    Handle Instant Payment Notification (IPN) from payment providers.
+                    Process payment result after user is redirected back from payment provider.
 
-                    **This endpoint is called by payment providers, not by frontend.**
+                    **This is a PUBLIC endpoint - no authentication required.**
 
-                    **Behavior:**
-                    1. Validates signature from payment provider
-                    2. Updates transaction status in database
-                    3. Triggers business logic completion (membership activation, listing creation, etc.)
-                    4. Returns response code to provider
+                    **Use Case:**
+                    After user completes payment on VNPAY, they are redirected to frontend with query parameters.
+                    Frontend should call this endpoint with those same parameters to update transaction status.
 
-                    **Response Codes:**
-                    - RspCode=00: Success
-                    - RspCode=01: Failure
-                    - RspCode=99: Error
+                    **Flow:**
+                    1. User pays on VNPAY
+                    2. VNPAY redirects to: `{frontend}/payment/result?vnp_TxnRef=xxx&vnp_ResponseCode=00&...`
+                    3. Frontend calls: `GET /v1/payments/callback/VNPAY?vnp_TxnRef=xxx&vnp_ResponseCode=00&...`
+                    4. Backend validates signature, updates transaction, triggers business logic
+                    5. Frontend displays result to user
+
+                    **Note:** This achieves the same result as IPN but is initiated by frontend instead of VNPAY server.
                     """
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
-                    description = "IPN processed",
+                    description = "Payment callback processed",
                     content = @io.swagger.v3.oas.annotations.media.Content(
-                            mediaType = "text/plain",
+                            mediaType = "application/json",
+                            schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = ApiResponse.class),
                             examples = {
                                     @io.swagger.v3.oas.annotations.media.ExampleObject(
                                             name = "Success",
-                                            value = "RspCode=00&Message=OK"
+                                            value = """
+                                                    {
+                                                      "code": "200000",
+                                                      "message": "Payment completed successfully",
+                                                      "data": {
+                                                        "transactionRef": "d1171b46-02ce-4d68-98b5-f1f3aeca9c5a",
+                                                        "providerTransactionId": "15356501",
+                                                        "status": "COMPLETED",
+                                                        "success": true,
+                                                        "signatureValid": true,
+                                                        "message": "Payment successful"
+                                                      }
+                                                    }
+                                                    """
                                     ),
                                     @io.swagger.v3.oas.annotations.media.ExampleObject(
-                                            name = "Failure",
-                                            value = "RspCode=01&Message=FAIL"
+                                            name = "Failed Payment",
+                                            value = """
+                                                    {
+                                                      "code": "400000",
+                                                      "message": "Payment failed",
+                                                      "data": {
+                                                        "transactionRef": "d1171b46-02ce-4d68-98b5-f1f3aeca9c5a",
+                                                        "status": "FAILED",
+                                                        "success": false,
+                                                        "signatureValid": true,
+                                                        "message": "User cancelled payment"
+                                                      }
+                                                    }
+                                                    """
+                                    ),
+                                    @io.swagger.v3.oas.annotations.media.ExampleObject(
+                                            name = "Invalid Signature",
+                                            value = """
+                                                    {
+                                                      "code": "400001",
+                                                      "message": "Invalid signature",
+                                                      "data": {
+                                                        "success": false,
+                                                        "signatureValid": false,
+                                                        "message": "Signature validation failed"
+                                                      }
+                                                    }
+                                                    """
                                     )
                             }
                     )
             )
     })
-    public ResponseEntity<String> handlePaymentIPN(
+    public ApiResponse<PaymentCallbackResponse> handlePaymentCallback(
             @Parameter(description = "Payment provider (e.g., VNPAY)", example = "VNPAY") @PathVariable PaymentProvider provider,
-            @RequestParam Map<String, String> params,
+            @Parameter(description = "All query parameters from payment provider redirect") @RequestParam Map<String, String> params,
             HttpServletRequest httpRequest) {
 
-        log.info("Handling IPN for provider: {}", provider);
+        log.info("Processing payment callback for provider: {} with params: {}", provider, params.keySet());
 
         try {
-            PaymentCallbackRequest ipnRequest = PaymentCallbackRequest.builder()
+            PaymentCallbackRequest callbackRequest = PaymentCallbackRequest.builder()
                     .provider(provider)
                     .params(params)
                     .build();
-            PaymentCallbackResponse response = paymentService.processIPN(ipnRequest, httpRequest);
+            PaymentCallbackResponse response = paymentService.processIPN(callbackRequest, httpRequest);
 
             // If payment was successful, trigger business logic completion
             if (response.getSignatureValid() && response.getSuccess() && response.getTransactionRef() != null) {
                 try {
                     triggerBusinessLogicCompletion(response.getTransactionRef());
+                    log.info("Business logic triggered for transaction: {}", response.getTransactionRef());
                 } catch (Exception e) {
                     log.error("Error triggering business logic completion for transaction: {}",
                             response.getTransactionRef(), e);
-                    // Don't fail the IPN response - transaction is already updated
+                    // Don't fail the response - transaction is already updated
                 }
             }
 
-            if (response.getSignatureValid() && response.getSuccess()) {
-                return ResponseEntity.ok("RspCode=00&Message=OK");
+            // Return appropriate response based on result
+            if (!response.getSignatureValid()) {
+                return ApiResponse.<PaymentCallbackResponse>builder()
+                        .code("400001")
+                        .message("Invalid signature")
+                        .data(response)
+                        .build();
+            } else if (response.getSuccess()) {
+                return ApiResponse.<PaymentCallbackResponse>builder()
+                        .code("200000")
+                        .message("Payment completed successfully")
+                        .data(response)
+                        .build();
             } else {
-                return ResponseEntity.ok("RspCode=01&Message=FAIL");
+                return ApiResponse.<PaymentCallbackResponse>builder()
+                        .code("400000")
+                        .message("Payment failed: " + response.getMessage())
+                        .data(response)
+                        .build();
             }
 
         } catch (Exception e) {
-            log.error("Error processing IPN for provider: {}", provider, e);
-            return ResponseEntity.ok("RspCode=99&Message=ERROR");
+            log.error("Error processing payment callback for provider: {}", provider, e);
+            return ApiResponse.<PaymentCallbackResponse>builder()
+                    .code("500000")
+                    .message("Error processing payment callback: " + e.getMessage())
+                    .build();
         }
     }
 
