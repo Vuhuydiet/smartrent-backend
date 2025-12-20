@@ -8,6 +8,7 @@ import com.smartrent.dto.request.LegacyAddressData;
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.request.MapBoundsRequest;
 import com.smartrent.dto.request.NewAddressData;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
@@ -2256,5 +2257,62 @@ public class ListingServiceImpl implements ListingService {
         }
 
         return sb.toString().trim();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.smartrent.dto.response.MapListingsResponse getListingsByMapBounds(
+            MapBoundsRequest request) {
+        log.info("Getting listings by map bounds - NE: ({}, {}), SW: ({}, {}), zoom: {}, limit: {}",
+                request.getNeLat(), request.getNeLng(), request.getSwLat(), request.getSwLng(),
+                request.getZoom(), request.getLimit());
+
+        // Query listings within map bounds using ListingQueryService
+        Page<Listing> page = listingQueryService.queryByMapBounds(
+                request.getNeLat(),
+                request.getNeLng(),
+                request.getSwLat(),
+                request.getSwLng(),
+                request.getLimit() != null ? request.getLimit() : 100,
+                request.getVerifiedOnly(),
+                request.getCategoryId(),
+                request.getVipType()
+        );
+
+        // Convert to response DTOs
+        List<ListingResponse> listings = page.getContent().stream()
+                .map(listing -> {
+                    com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
+                    com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
+                    ListingResponse response = listingMapper.toResponse(listing, user, addressResponse);
+                    populateOwnerZaloInfo(response, listing.getUserId());
+                    return response;
+                })
+                .collect(Collectors.toList());
+
+        // Build bounds info
+        com.smartrent.dto.response.MapListingsResponse.MapBoundsInfo boundsInfo =
+                com.smartrent.dto.response.MapListingsResponse.MapBoundsInfo.builder()
+                        .neLat(request.getNeLat())
+                        .neLng(request.getNeLng())
+                        .swLat(request.getSwLat())
+                        .swLng(request.getSwLng())
+                        .zoom(request.getZoom())
+                        .build();
+
+        // Build response
+        com.smartrent.dto.response.MapListingsResponse response =
+                com.smartrent.dto.response.MapListingsResponse.builder()
+                        .listings(listings)
+                        .totalCount(page.getTotalElements())
+                        .returnedCount(listings.size())
+                        .hasMore(page.getTotalElements() > listings.size())
+                        .bounds(boundsInfo)
+                        .build();
+
+        log.info("Map bounds query returned {} listings out of {} total",
+                listings.size(), page.getTotalElements());
+
+        return response;
     }
 }
