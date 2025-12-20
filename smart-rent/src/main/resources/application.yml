@@ -158,12 +158,12 @@ application:
         - "/v1/categories/**"
         - "/v1/support/contact"
         - "/v1/listings/reports/reasons"
+        - "/v1/payments/callback/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
         - "/v1/admins"
         - "/v1/verification/**"
-        - "/v1/payments/ipn/**"
         - "/otp/**"
         - "/v1/listings/*/reports"
         - "/v1/listings/search"
