@@ -5,6 +5,7 @@ import com.smartrent.dto.request.DraftListingRequest;
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.request.MapBoundsRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.*;
@@ -1152,6 +1153,233 @@ public class ListingController {
         // when userId is not provided (public search)
         ListingListResponse response = listingService.searchListings(filter);
         return ApiResponse.<ListingListResponse>builder().data(response).build();
+    }
+
+    @PostMapping("/map-bounds")
+    @Operation(
+        summary = "[PUBLIC API] Get listings within map bounds for interactive map display",
+        description = """
+            **PUBLIC API - Không cần authentication**
+
+            API để lấy danh sách bài đăng trong vùng hiển thị trên bản đồ (map bounds).
+            Được thiết kế cho tính năng bản đồ tương tác (interactive map).
+
+            ## TỌA ĐỘ VÀ ZOOM
+
+            - `neLat`, `neLng`: Vĩ độ và kinh độ góc Đông Bắc
+            - `swLat`, `swLng`: Vĩ độ và kinh độ góc Tây Nam
+            - `zoom`: Mức zoom hiện tại của bản đồ (1-22)
+              - Zoom thấp (1-10): View toàn quốc/vùng
+              - Zoom trung bình (11-15): View tỉnh/quận
+              - Zoom cao (16-22): View phố/khu vực nhỏ
+
+            ## CÁC THAM SỐ BỔ SUNG
+
+            - `limit`: Giới hạn số lượng kết quả (mặc định 100, tối đa 500)
+            - `verifiedOnly`: Chỉ lấy bài đã verify (mặc định false)
+            - `categoryId`: Lọc theo loại BĐS (tùy chọn)
+            - `vipType`: Lọc theo VIP tier (tùy chọn)
+
+
+            ## RESPONSE
+
+            - `listings`: Danh sách bài đăng trong vùng
+            - `totalCount`: Tổng số bài đăng tìm thấy
+            - `returnedCount`: Số bài thực tế trả về (có thể < totalCount do limit)
+            - `hasMore`: Có nhiều bài hơn không (totalCount > returnedCount)
+            - `bounds`: Thông tin vùng đã query (echo lại request)
+
+       
+            ## LƯU Ý
+            - **Tự động loại trừ**: Bài nháp, bài shadow, bài hết hạn
+            - **Performance**: Limit cao (>300) có thể ảnh hưởng hiệu năng
+            - **Tọa độ hợp lệ**: neLat > swLat, neLng > swLng
+            """,
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = MapBoundsRequest.class),
+                examples = {
+                    @ExampleObject(
+                        name = "Basic Map Bounds",
+                        summary = "Vùng bản đồ cơ bản - TP.HCM trung tâm",
+                        value = """
+                            {
+                              "neLat": 10.823,
+                              "neLng": 106.701,
+                              "swLat": 10.705,
+                              "swLng": 106.590,
+                              "zoom": 14,
+                              "limit": 100
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Verified Only",
+                        summary = "Chỉ lấy bài đã verify trong vùng",
+                        value = """
+                            {
+                              "neLat": 10.823,
+                              "neLng": 106.701,
+                              "swLat": 10.705,
+                              "swLng": 106.590,
+                              "zoom": 14,
+                              "limit": 100,
+                              "verifiedOnly": true
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "With Filters",
+                        summary = "Lọc theo category và VIP type",
+                        value = """
+                            {
+                              "neLat": 10.823,
+                              "neLng": 106.701,
+                              "swLat": 10.705,
+                              "swLng": 106.590,
+                              "zoom": 14,
+                              "limit": 150,
+                              "verifiedOnly": true,
+                              "categoryId": 1,
+                              "vipType": "GOLD"
+                            }
+                            """
+                    )
+                }
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved listings within map bounds",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = ApiResponse.class),
+                    examples = @ExampleObject(
+                        name = "Map Listings Response",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "listings": [
+                                  {
+                                    "listingId": 123,
+                                    "title": "Căn hộ 2PN cao cấp Quận 1",
+                                    "description": "Căn hộ đẹp view thành phố",
+                                    "user": {
+                                      "userId": "user-abc-123",
+                                      "firstName": "Nguyen",
+                                      "lastName": "Van A",
+                                      "contactPhoneNumber": "0987654321",
+                                      "contactPhoneVerified": true
+                                    },
+                                    "price": 15000000,
+                                    "priceUnit": "MONTH",
+                                    "address": {
+                                      "addressId": 456,
+                                      "fullAddress": "123 Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP.HCM",
+                                      "latitude": 10.7769,
+                                      "longitude": 106.7009,
+                                      "legacyProvinceName": "Thành Phố Hồ Chí Minh",
+                                      "legacyDistrictName": "Quận 1",
+                                      "legacyWardName": "Phường Bến Nghé"
+                                    },
+                                    "area": 85.0,
+                                    "bedrooms": 2,
+                                    "bathrooms": 2,
+                                    "vipType": "GOLD",
+                                    "listingType": "RENT",
+                                    "productType": "APARTMENT",
+                                    "verified": true,
+                                    "postDate": "2025-12-15T10:00:00",
+                                    "media": [
+                                      {
+                                        "mediaId": 1,
+                                        "url": "https://storage.example.com/image1.jpg",
+                                        "isPrimary": true
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "listingId": 456,
+                                    "title": "Penthouse DIAMOND Landmark 81",
+                                    "description": "Penthouse siêu sang",
+                                    "user": {
+                                      "userId": "user-xyz-456",
+                                      "firstName": "Tran",
+                                      "lastName": "Thi B",
+                                      "contactPhoneNumber": "0912345678",
+                                      "contactPhoneVerified": true
+                                    },
+                                    "price": 100000000,
+                                    "priceUnit": "MONTH",
+                                    "address": {
+                                      "addressId": 789,
+                                      "fullAddress": "720A Đường Tân Cảng, Phường 25, Quận Bình Thạnh, TP.HCM",
+                                      "latitude": 10.7941,
+                                      "longitude": 106.7218,
+                                      "legacyProvinceName": "Thành Phố Hồ Chí Minh",
+                                      "legacyDistrictName": "Quận Bình Thạnh"
+                                    },
+                                    "area": 500.0,
+                                    "bedrooms": 5,
+                                    "bathrooms": 5,
+                                    "vipType": "DIAMOND",
+                                    "listingType": "RENT",
+                                    "productType": "PENTHOUSE",
+                                    "verified": true,
+                                    "postDate": "2025-12-18T14:30:00",
+                                    "media": [
+                                      {
+                                        "mediaId": 10,
+                                        "url": "https://storage.example.com/penthouse1.jpg",
+                                        "isPrimary": true
+                                      }
+                                    ]
+                                  }
+                                ],
+                                "totalCount": 235,
+                                "returnedCount": 100,
+                                "hasMore": true,
+                                "bounds": {
+                                  "neLat": 10.823,
+                                  "neLng": 106.701,
+                                  "swLat": 10.705,
+                                  "swLng": 106.590,
+                                  "zoom": 14
+                                }
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Invalid request - invalid coordinates or parameters",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Invalid Coordinates",
+                        value = """
+                            {
+                              "code": "400001",
+                              "message": "Invalid coordinates: neLat must be greater than swLat",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public ApiResponse<MapListingsResponse> getListingsByMapBounds(
+            @Valid @RequestBody MapBoundsRequest request) {
+        MapListingsResponse response = listingService.getListingsByMapBounds(request);
+        return ApiResponse.<MapListingsResponse>builder().data(response).build();
     }
 
     @GetMapping

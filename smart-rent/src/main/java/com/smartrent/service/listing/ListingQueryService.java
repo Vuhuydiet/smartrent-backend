@@ -132,4 +132,47 @@ public class ListingQueryService {
 
         return defaultSort;
     }
+
+    /**
+     * Query listings within map bounds (bounding box)
+     * Used for displaying listings on interactive maps
+     *
+     * @param neLat North-East latitude
+     * @param neLng North-East longitude
+     * @param swLat South-West latitude
+     * @param swLng South-West longitude
+     * @param limit Maximum number of results
+     * @param verifiedOnly Only return verified listings
+     * @param categoryId Optional category filter
+     * @param vipType Optional VIP type filter
+     * @return List of listings within bounds, sorted by default (VIP type then updatedAt)
+     */
+    public Page<Listing> queryByMapBounds(
+            java.math.BigDecimal neLat,
+            java.math.BigDecimal neLng,
+            java.math.BigDecimal swLat,
+            java.math.BigDecimal swLng,
+            Integer limit,
+            Boolean verifiedOnly,
+            Long categoryId,
+            String vipType) {
+
+        log.debug("Querying listings by map bounds - NE: ({}, {}), SW: ({}, {}), limit: {}",
+                neLat, neLng, swLat, swLng, limit);
+
+        // Build specification for map bounds query
+        Specification<Listing> spec = ListingSpecification.withinMapBounds(
+                neLat, neLng, swLat, swLng, verifiedOnly, categoryId, vipType);
+
+        // Create pageable with limit (no default sorting)
+        int safeLimit = Math.min(Math.max(limit, 1), 500); // Max 500 for map queries
+        Pageable pageable = PageRequest.of(0, safeLimit);
+
+        // Execute query
+        Page<Listing> results = listingRepository.findAll(spec, pageable);
+
+        log.debug("Map bounds query returned {} results", results.getNumberOfElements());
+
+        return results;
+    }
 }

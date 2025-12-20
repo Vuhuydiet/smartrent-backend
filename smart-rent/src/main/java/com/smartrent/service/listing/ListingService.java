@@ -182,4 +182,14 @@ public interface ListingService {
      * @throws RuntimeException if draft not found or user is not the owner
      */
     void deleteDraft(Long draftId, String userId);
+
+    /**
+     * Get listings within map bounds (bounding box)
+     * Used for displaying listings on interactive maps
+     *
+     * @param request Map bounds request with coordinates and filters
+     * @return List of listings within the bounds, sorted by VIP type and updatedAt
+     */
+    com.smartrent.dto.response.MapListingsResponse getListingsByMapBounds(
+            com.smartrent.dto.request.MapBoundsRequest request);
 }
