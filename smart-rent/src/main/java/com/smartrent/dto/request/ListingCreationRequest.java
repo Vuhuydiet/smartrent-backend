@@ -42,8 +42,13 @@ public class ListingCreationRequest {
 
     String listingType;
 
+    @Schema(description = "Admin verification status - automatically set by system. Do not send this field.", hidden = true)
     Boolean verified;
+
+    @Schema(description = "Pending verification flag - automatically defaults to true (IN_REVIEW status). Do not send this field.", hidden = true)
     Boolean isVerify;
+
+    @Schema(description = "Expiry flag - automatically managed by system. Do not send this field.", hidden = true)
     Boolean expired;
 
     /**

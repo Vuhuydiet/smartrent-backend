@@ -79,6 +79,10 @@ public class Listing {
     VipType vipType = VipType.NORMAL;
 
     @Builder.Default
+    @Column(name = "vip_type_sort_order", nullable = false)
+    Integer vipTypeSortOrder = 4; // NORMAL=4, SILVER=3, GOLD=2, DIAMOND=1
+
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "post_source")
     PostSource postSource = PostSource.QUOTA;
@@ -244,6 +248,22 @@ public class Listing {
 
     public boolean isDiamond() {
         return vipType == VipType.DIAMOND;
+    }
+
+    /**
+     * Get sort order value for VipType
+     * DIAMOND=1 (highest priority), GOLD=2, SILVER=3, NORMAL=4 (lowest priority)
+     */
+    public static Integer getVipTypeSortOrder(VipType vipType) {
+        if (vipType == null) {
+            return 4; // Default to NORMAL
+        }
+        return switch (vipType) {
+            case DIAMOND -> 1;
+            case GOLD -> 2;
+            case SILVER -> 3;
+            case NORMAL -> 4;
+        };
     }
 
     // Helper methods for shadow listings
