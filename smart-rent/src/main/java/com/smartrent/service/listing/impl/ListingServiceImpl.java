@@ -590,8 +590,9 @@ public class ListingServiceImpl implements ListingService {
         if (request.getPostDate() != null) existing.setPostDate(request.getPostDate());
         if (request.getExpiryDate() != null) existing.setExpiryDate(request.getExpiryDate());
         if (request.getListingType() != null) existing.setListingType(Listing.ListingType.valueOf(request.getListingType()));
-        if (request.getVerified() != null) existing.setVerified(request.getVerified());
-        if (request.getIsVerify() != null) existing.setIsVerify(request.getIsVerify());
+        // Verification status can only be changed by admin via admin APIs
+        // if (request.getVerified() != null) existing.setVerified(request.getVerified());
+        // if (request.getIsVerify() != null) existing.setIsVerify(request.getIsVerify());
         if (request.getExpired() != null) existing.setExpired(request.getExpired());
         if (request.getVipType() != null) existing.setVipType(Listing.VipType.valueOf(request.getVipType()));
         if (request.getCategoryId() != null) existing.setCategoryId(request.getCategoryId());

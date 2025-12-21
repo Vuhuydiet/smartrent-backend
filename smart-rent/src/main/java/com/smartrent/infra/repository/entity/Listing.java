@@ -67,7 +67,7 @@ public class Listing {
 
     @Builder.Default
     @Column(name = "is_verify", nullable = false)
-    Boolean isVerify = false;
+    Boolean isVerify = true;
 
     @Builder.Default
     @Column(name = "expired", nullable = false)
