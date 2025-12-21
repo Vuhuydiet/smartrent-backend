@@ -39,15 +39,15 @@ Call the appropriate payment endpoint based on the payment type:
 
 ### For Membership Purchase
 ```typescript
-const response = await fetch(`${API_URL}/v1/memberships/purchase`, {
+const response = await fetch(`${API_URL}/v1/memberships/initiate-purchase`, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${accessToken}`
   },
   body: JSON.stringify({
-    packageId: 'package-uuid',
-    provider: 'VNPAY'
+    membershipId: 2, // Long type - membership package ID
+    paymentProvider: 'VNPAY'
   })
 });
 
@@ -57,21 +57,22 @@ const result = await response.json();
 
 ### For Push Purchase
 ```typescript
-const response = await fetch(`${API_URL}/v1/push/purchase`, {
+const response = await fetch(`${API_URL}/v1/pushes/push`, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${accessToken}`
   },
   body: JSON.stringify({
-    listingId: 'listing-uuid',
-    pushDetailId: 'push-detail-uuid',
-    provider: 'VNPAY'
+    listingId: 123, // Long type - listing ID
+    useMembershipQuota: false, // false = direct payment
+    paymentProvider: 'VNPAY'
   })
 });
 
 const result = await response.json();
-// result.data.paymentUrl contains the VNPAY payment URL
+// If payment required: result.data.paymentUrl contains the VNPAY payment URL
+// If quota used: result.data contains push confirmation
 ```
 
 ## Step 2: Redirect to VNPAY
