@@ -85,10 +85,17 @@ public class SecurityConfig {
 
           // Check if this is a public GET endpoint
           if ("GET".equalsIgnoreCase(method)) {
-            for (String pattern : getPatterns) {
-              if (pathMatches(path, pattern)) {
-                log.debug("Skipping JWT for public GET endpoint: {}", path);
-                return null;
+            // Exclude endpoints that always require authentication
+            if (path.contains("/my-") || path.contains("/draft/") ||
+                path.contains("/admin") || path.contains("/quota-check")) {
+              log.debug("Requiring JWT for protected endpoint: {}", path);
+              // Continue to extract bearer token below
+            } else {
+              for (String pattern : getPatterns) {
+                if (pathMatches(path, pattern)) {
+                  log.debug("Skipping JWT for public GET endpoint: {}", path);
+                  return null;
+                }
               }
             }
           }
