@@ -87,6 +87,10 @@ window.location.href = result.data.paymentUrl;
 
 After payment, VNPAY redirects the user back to your frontend at the configured return URL (e.g., `/payment/result`) with query parameters containing the payment result.
 
+### Important: Filtering VNPay Parameters
+
+When calling the backend callback endpoint, you should **only pass VNPay parameters** (those starting with `vnp_`). Any additional parameters in the URL (like `auth`, `returnUrl`, etc.) should be filtered out to ensure proper signature validation.
+
 ### Payment Result Page Component
 
 ```typescript
@@ -101,9 +105,16 @@ export default function PaymentResultPage() {
 
   useEffect(() => {
     const processPaymentResult = async () => {
-      // Get the full query string from the URL
-      const queryString = window.location.search;
-      
+      // Filter only VNPay parameters (starting with 'vnp_')
+      const vnpParams = new URLSearchParams();
+      searchParams.forEach((value, key) => {
+        if (key.startsWith('vnp_')) {
+          vnpParams.append(key, value);
+        }
+      });
+
+      const queryString = vnpParams.toString();
+
       if (!queryString) {
         setStatus('failed');
         setMessage('No payment parameters found');
@@ -111,13 +122,13 @@ export default function PaymentResultPage() {
       }
 
       try {
-        // Call the backend callback endpoint with the same query parameters
+        // Call the backend callback endpoint with only VNPay parameters
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/v1/payments/callback/VNPAY${queryString}`
+          `${process.env.NEXT_PUBLIC_API_URL}/v1/payments/callback/VNPAY?${queryString}`
         );
-        
+
         const result = await response.json();
-        
+
         if (result.code === '200000') {
           setStatus('success');
           setMessage('Payment completed successfully!');
@@ -132,7 +143,7 @@ export default function PaymentResultPage() {
     };
 
     processPaymentResult();
-  }, []);
+  }, [searchParams]);
 
   return (
     <div>
@@ -142,6 +153,18 @@ export default function PaymentResultPage() {
     </div>
   );
 }
+```
+
+### Alternative: Pass All Parameters (Backend Handles Filtering)
+
+The backend now automatically filters out non-VNPay parameters during signature validation. So you can also pass all parameters as-is:
+
+```typescript
+// Alternative approach - backend handles filtering
+const queryString = window.location.search;
+const response = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/v1/payments/callback/VNPAY${queryString}`
+);
 ```
 
 ## API Reference
@@ -193,3 +216,53 @@ export default function PaymentResultPage() {
 }
 ```
 
+## Troubleshooting
+
+### Invalid Signature Error
+
+If you receive an "Invalid signature" error, check the following:
+
+1. **Non-VNPay Parameters**: Ensure you're not passing non-VNPay parameters (like `auth`, `returnUrl`, etc.) to the callback endpoint. The backend filters these out automatically, but it's best practice to only send `vnp_*` parameters.
+
+2. **URL Encoding**: The backend handles URL decoding automatically. Do not manually encode/decode the parameters before sending them.
+
+3. **Hash Secret**: Verify that the `VNPAY_HASH_SECRET` environment variable matches the secret provided by VNPay.
+
+4. **Parameter Tampering**: Ensure the query parameters from VNPay redirect are passed exactly as received without modification.
+
+### VNPay Parameters Reference
+
+The following parameters are sent by VNPay in the callback:
+
+| Parameter | Description |
+|-----------|-------------|
+| `vnp_Amount` | Payment amount (in VND × 100) |
+| `vnp_BankCode` | Bank code used for payment |
+| `vnp_BankTranNo` | Bank transaction number |
+| `vnp_CardType` | Card type (ATM, VISA, etc.) |
+| `vnp_OrderInfo` | Order description |
+| `vnp_PayDate` | Payment date (yyyyMMddHHmmss) |
+| `vnp_ResponseCode` | Response code (00 = success) |
+| `vnp_TmnCode` | Merchant terminal code |
+| `vnp_TransactionNo` | VNPay transaction number |
+| `vnp_TransactionStatus` | Transaction status (00 = success) |
+| `vnp_TxnRef` | Your transaction reference |
+| `vnp_SecureHash` | Signature for verification |
+
+### Response Codes
+
+| Code | Description |
+|------|-------------|
+| `00` | Success |
+| `07` | Deducted but suspected fraud |
+| `09` | Transaction failed: Card not registered for Internet Banking |
+| `10` | Transaction failed: Incorrect card info 3+ times |
+| `11` | Transaction failed: Payment timeout |
+| `12` | Transaction failed: Card locked |
+| `13` | Transaction failed: Incorrect OTP |
+| `24` | Transaction cancelled by user |
+| `51` | Transaction failed: Insufficient balance |
+| `65` | Transaction failed: Daily limit exceeded |
+| `75` | Bank under maintenance |
+| `79` | Transaction failed: Incorrect payment password |
+| `99` | Other errors |

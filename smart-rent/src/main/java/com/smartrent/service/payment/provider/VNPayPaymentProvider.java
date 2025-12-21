@@ -274,19 +274,30 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
     @Override
     public boolean validateSignature(Map<String, String> params, String signature) {
         try {
-            // Remove secure hash from params for validation
+            // Remove secure hash and non-VNPay params from validation
             Map<String, String> validationParams = new TreeMap<>(params);
             validationParams.remove("vnp_SecureHash");
             validationParams.remove("vnp_SecureHashType");
 
-            // Build hash data string
-            String hashData = buildHashData(validationParams);
+            // Remove non-VNPay parameters (they should not be included in signature)
+            validationParams.entrySet().removeIf(entry -> !entry.getKey().startsWith("vnp_"));
+
+            // Build hash data string (without URL encoding for callback validation)
+            String hashData = buildHashDataForCallback(validationParams);
+
+            log.debug("VNPay signature validation - Hash data: {}", hashData);
 
             // Generate signature
             String generatedSignature = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
 
+            log.debug("VNPay signature validation - Generated: {}, Received: {}", generatedSignature, signature);
+
             boolean isValid = generatedSignature.equalsIgnoreCase(signature);
-            log.debug("VNPay signature validation result: {}", isValid);
+
+            if (!isValid) {
+                log.warn("VNPay signature validation failed. Generated: {}, Received: {}",
+                        generatedSignature, signature);
+            }
 
             return isValid;
         } catch (Exception e) {
@@ -444,19 +455,36 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         }
     }
 
+    /**
+     * Build hash data for payment creation (WITH URL encoding)
+     * Used when creating payment URL to send to VNPay
+     */
     private String buildHashData(Map<String, String> params) {
         return params.entrySet().stream()
                 .filter(entry -> entry.getValue() != null && !entry.getValue().isEmpty())
                 .sorted(Map.Entry.comparingByKey())
                 .map(entry -> {
                     try {
-                        return URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8.toString()) + "=" 
+                        return URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8.toString()) + "="
                             + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8.toString());
                     } catch (UnsupportedEncodingException e) {
                         log.error("Error encoding hash parameter: {}", entry.getKey(), e);
                         return entry.getKey() + "=" + entry.getValue();
                     }
                 })
+                .collect(Collectors.joining("&"));
+    }
+
+    /**
+     * Build hash data for callback validation (WITHOUT URL encoding)
+     * Used when validating signature from VNPay callback
+     * The parameters are already decoded by Spring, so we use them as-is
+     */
+    private String buildHashDataForCallback(Map<String, String> params) {
+        return params.entrySet().stream()
+                .filter(entry -> entry.getValue() != null && !entry.getValue().isEmpty())
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
                 .collect(Collectors.joining("&"));
     }
 
@@ -579,7 +607,8 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             if (response.getVnp_TransactionType() != null) responseParams.put("vnp_TransactionType", response.getVnp_TransactionType());
             if (response.getVnp_TransactionStatus() != null) responseParams.put("vnp_TransactionStatus", response.getVnp_TransactionStatus());
 
-            String hashData = buildHashData(responseParams);
+            // Use callback method for query response (no URL encoding needed)
+            String hashData = buildHashDataForCallback(responseParams);
             String computedHash = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
 
             return computedHash.equalsIgnoreCase(receivedHash);
