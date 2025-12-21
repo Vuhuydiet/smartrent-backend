@@ -147,7 +147,7 @@ application:
         - "/webjars/**"
         - "/actuator/health"
         - "/actuator/**"
-        - "/v1/listings/**"
+        - "/v1/listings/**"                   # Public listings (except my-* and draft/* - checked in code)
         - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
         - "/v1/new-addresses/**"
@@ -157,7 +157,6 @@ application:
         - "/v1/push-details/**"
         - "/v1/categories/**"
         - "/v1/support/contact"
-        - "/v1/listings/reports/reasons"
         - "/v1/payments/callback/**"
       post:
         - "/v1/auth/**"

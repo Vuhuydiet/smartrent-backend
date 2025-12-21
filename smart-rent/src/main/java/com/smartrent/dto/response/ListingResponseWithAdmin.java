@@ -54,6 +54,12 @@ public class ListingResponseWithAdmin {
     Boolean expired;
 
     @Schema(
+        description = "Computed listing status based on verification state",
+        example = "IN_REVIEW",
+        allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED"})
+    String listingStatus;
+
+    @Schema(
         description = "VIP tier: NORMAL, SILVER, GOLD, DIAMOND",
         example = "SILVER",
         allowableValues = {"NORMAL", "SILVER", "GOLD", "DIAMOND"}
