@@ -121,99 +121,64 @@ public class ListingServiceImpl implements ListingService {
             return createListingWithMembershipQuota(request);
         }
 
-        // Create address first (within the same transaction)
-        Address address = createAddress(request.getAddress());
+        // For direct payment flow (useMembershipQuota=false), we need to:
+        // 1. Cache the request in Redis
+        // 2. Return payment URL
+        // 3. Create listing only after payment is completed
 
-        // Create listing and set the address
-        Listing listing = listingMapper.toEntity(request);
-        listing.setAddress(address);
-        listing.setPostSource(PostSource.DIRECT_PAYMENT);
-
-        // Set default values for required fields
-        if (listing.getExpired() == null) {
-            listing.setExpired(false);
+        // Validate duration days
+        Integer durationDays = request.getDurationDays() != null ? request.getDurationDays() : 30;
+        if (durationDays <= 0) {
+            throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                    "Duration days must be greater than 0");
         }
 
-        // Save listing to database first
-        Listing saved = listingRepository.save(listing);
-        log.info("Listing created successfully with id: {} and address id: {}",
-                saved.getListingId(), address.getAddressId());
+        // Get VIP tier to calculate price (default to NORMAL if not specified)
+        String vipType = request.getVipType() != null ? request.getVipType() : "NORMAL";
+        VipTierDetail vipTier = vipTierDetailRepository.findByTierCode(vipType)
+                .orElseThrow(() -> new AppException(DomainCode.RESOURCE_NOT_FOUND,
+                        "VIP tier not found: " + vipType));
 
-        // Link media to listing if provided (within same transaction)
-        if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
-            linkMediaToListing(saved, request.getMediaIds(), request.getUserId());
-            log.info("Linked {} media items to listing {}", request.getMediaIds().size(), saved.getListingId());
-        }
+        // Calculate price based on VIP tier and duration
+        java.math.BigDecimal amount = vipTier.getPriceForDuration(durationDays);
 
-        // Link amenities to listing if provided (within same transaction)
-        if (request.getAmenityIds() != null && !request.getAmenityIds().isEmpty()) {
-            linkAmenitiesToListing(saved, request.getAmenityIds());
-            log.info("Linked {} amenities to listing {}", request.getAmenityIds().size(), saved.getListingId());
-        }
+        // Create PENDING transaction (no listing yet - will be created after payment)
+        String transactionId = transactionService.createPostFeeTransaction(
+                request.getUserId(),
+                amount,
+                vipType,
+                durationDays,
+                request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+        );
 
-        // Check if this is a listing with duration days requiring payment
-        if (request.getDurationDays() != null) {
-            log.info("Listing requires payment - initiating payment flow for listing id: {}", saved.getListingId());
+        // Cache the listing request in Redis for payment callback (30 min TTL)
+        // The listing will be created from this cached request after payment completion
+        listingRequestCacheService.storeNormalListingRequest(transactionId, request);
+        log.info("Cached {} listing request for transaction: {} (listing will be created after payment)",
+                vipType, transactionId);
 
-            // Validate duration days
-            if (request.getDurationDays() <= 0) {
-                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
-                        "Duration days must be greater than 0");
-            }
+        // Generate payment URL using PaymentService
+        PaymentRequest paymentRequest = PaymentRequest.builder()
+                .transactionId(transactionId)
+                .provider(com.smartrent.enums.PaymentProvider.valueOf(
+                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
+                .amount(amount)
+                .currency(PricingConstants.DEFAULT_CURRENCY)
+                .orderInfo(vipType + " Listing - " + durationDays + " days: " + request.getTitle())
+                .build();
 
-            // Get VIP tier to calculate price (default to NORMAL if not specified)
-            String vipType = request.getVipType() != null ? request.getVipType() : "NORMAL";
-            VipTierDetail vipTier = vipTierDetailRepository.findByTierCode(vipType)
-                    .orElseThrow(() -> new AppException(DomainCode.RESOURCE_NOT_FOUND,
-                            "VIP tier not found: " + vipType));
+        PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
 
-            // Calculate price based on VIP tier and duration
-            java.math.BigDecimal amount = vipTier.getPriceForDuration(request.getDurationDays());
+        log.info("Payment URL generated for {} listing transaction: {}", vipType, transactionId);
 
-            // Create PENDING transaction linked to the listing
-            String transactionId = transactionService.createPostFeeTransaction(
-                    request.getUserId(),
-                    amount,
-                    vipType,
-                    request.getDurationDays(),
-                    request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
-            );
-
-            // Update listing with transaction ID
-            saved.setTransactionId(transactionId);
-            listingRepository.save(saved);
-
-            // Cache the listing ID in Redis for payment callback (30 min TTL)
-            listingRequestCacheService.storeNormalListingRequest(transactionId, request);
-            log.info("Cached {} listing request for transaction: {}, listingId: {}", vipType, transactionId, saved.getListingId());
-
-            // Generate payment URL using PaymentService
-            PaymentRequest paymentRequest = PaymentRequest.builder()
-                    .transactionId(transactionId)
-                    .provider(com.smartrent.enums.PaymentProvider.valueOf(
-                            request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
-                    .amount(amount)
-                    .currency(PricingConstants.DEFAULT_CURRENCY)
-                    .orderInfo(vipType + " Listing - " + request.getDurationDays() + " days: " + request.getTitle())
-                    .build();
-
-            PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
-
-            log.info("Payment URL generated for {} listing transaction: {}, listingId: {}", vipType, transactionId, saved.getListingId());
-
-            // Return payment response with listing ID
-            return ListingCreationResponse.builder()
-                    .listingId(saved.getListingId())
-                    .paymentRequired(true)
-                    .transactionId(transactionId)
-                    .amount(amount.longValue())
-                    .paymentUrl(paymentResponse.getPaymentUrl())
-                    .message("Payment required. Complete payment to activate listing.")
-                    .build();
-        }
-
-        // Return listing response (no payment required - this case shouldn't happen normally)
-        return listingMapper.toCreationResponse(saved);
+        // Return payment response (no listing ID yet - will be created after payment)
+        return ListingCreationResponse.builder()
+                .paymentRequired(true)
+                .transactionId(transactionId)
+                .amount(amount.longValue())
+                .paymentUrl(paymentResponse.getPaymentUrl())
+                .message("Payment required. Complete payment to create listing.")
+                .build();
     }
 
     /**
@@ -391,9 +356,9 @@ public class ListingServiceImpl implements ListingService {
                 request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
         );
 
-        // Store listing request data in transaction metadata (for later creation)
-        // For now, we'll need to pass the request data through the callback
-        // TODO: Consider storing request data in a temporary table or cache
+        // Cache the VIP listing request in Redis for payment callback (30 min TTL)
+        listingRequestCacheService.storeVipListingRequest(transactionId, request);
+        log.info("Cached VIP listing request for transaction: {}", transactionId);
 
         // Generate payment URL - pass transactionId to reuse existing transaction
         PaymentRequest paymentRequest = PaymentRequest.builder()
@@ -408,7 +373,15 @@ public class ListingServiceImpl implements ListingService {
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
 
         log.info("Payment URL generated for VIP listing transaction: {}", transactionId);
-        return paymentResponse;
+
+        // Return consistent response with payment info
+        return ListingCreationResponse.builder()
+                .paymentRequired(true)
+                .transactionId(transactionId)
+                .amount(amount.longValue())
+                .paymentUrl(paymentResponse.getPaymentUrl())
+                .message("Payment required. Complete payment to activate VIP listing.")
+                .build();
     }
 
     @Override
