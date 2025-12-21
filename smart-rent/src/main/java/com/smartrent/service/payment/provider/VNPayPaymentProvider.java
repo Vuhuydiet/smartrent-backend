@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -40,6 +41,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
     private final VNPayConnector vnpayConnector;
 
     private static final DateTimeFormatter VN_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String VNP_VERSION = "2.1.0";
     private static final String VNP_COMMAND = "pay";
     private static final String VNP_QUERY_COMMAND = "querydr";
@@ -74,7 +76,8 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         log.info("VNPay payment created successfully with txnRef: {}", transaction.getTransactionId());
 
         // Use current time for timestamps since @CreationTimestamp may not be populated yet
-        LocalDateTime now = LocalDateTime.now();
+        // Use Vietnam timezone for consistency with VNPay
+        LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
         Integer timeout = vnpayConfig.getTimeout() != null ? vnpayConfig.getTimeout() : 15;
 
         return PaymentResponse.builder()
@@ -405,13 +408,14 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             String ipAddress = getClientIpAddress(httpRequest);
             vnpParams.put("vnp_IpAddr", ipAddress);
 
-            // Create date
-            String createDate = LocalDateTime.now().format(VN_DATE_FORMATTER);
+            // Create date - MUST use Vietnam timezone for VNPay
+            LocalDateTime vietnamNow = LocalDateTime.now(VIETNAM_ZONE);
+            String createDate = vietnamNow.format(VN_DATE_FORMATTER);
             vnpParams.put("vnp_CreateDate", createDate);
 
             // Expire date (default 15 minutes)
             Integer timeout = vnpayConfig.getTimeout() != null ? vnpayConfig.getTimeout() : 15;
-            String expireDate = LocalDateTime.now().plusMinutes(timeout).format(VN_DATE_FORMATTER);
+            String expireDate = vietnamNow.plusMinutes(timeout).format(VN_DATE_FORMATTER);
             vnpParams.put("vnp_ExpireDate", expireDate);
 
             // Build hash data (BEFORE adding secure hash to params)
@@ -515,7 +519,8 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
 
     private VNPayQueryRequest buildVNPayQueryRequest(Transaction transaction) {
         String requestId = PaymentUtil.generateRandomString(8);
-        String createDate = LocalDateTime.now().format(VN_DATE_FORMATTER);
+        // MUST use Vietnam timezone for VNPay
+        String createDate = LocalDateTime.now(VIETNAM_ZONE).format(VN_DATE_FORMATTER);
         String ipAddress = "127.0.0.1"; // Default IP for query requests
 
         // Get transaction date from database
