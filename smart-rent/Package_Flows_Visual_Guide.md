@@ -70,7 +70,7 @@
        │
        │ User has quota available
        │
-       │ 2. POST /v1/listings/vip
+       │ 2. POST /v1/listings
        │    Body: { vipType: "SILVER", useMembershipQuota: true, durationDays: 30, ... }
        ↓
 ┌──────────────┐
@@ -98,9 +98,9 @@
 ┌──────────────┐
 │   Frontend   │
 └──────┬───────┘
-       │ 1. POST /v1/listings/vip
+       │ 1. POST /v1/listings
        │    Body: { vipType: "DIAMOND", useMembershipQuota: false, durationDays: 30,
-       │            paymentProvider: "VNPAY", returnUrl: "...", ... }
+       │            paymentProvider: "VNPAY", ... }
        ↓
 ┌──────────────┐
 │   Backend    │

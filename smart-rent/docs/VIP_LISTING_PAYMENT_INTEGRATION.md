@@ -17,7 +17,7 @@ When creating a VIP listing (SILVER, GOLD, DIAMOND), users have two options:
 └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
       │                   │                   │                   │
       │ 1. POST /v1/      │                   │                   │
-      │    listings/vip   │                   │                   │
+      │    listings       │                   │                   │
       │──────────────────▶│                   │                   │
       │                   │                   │                   │
       │ 2. Return         │                   │                   │
@@ -40,38 +40,46 @@ When creating a VIP listing (SILVER, GOLD, DIAMOND), users have two options:
       │◀──────────────────│                   │                   │
 ```
 
-## Step 1: Create VIP Listing
+## Step 1: Create Listing
 
 ### API Endpoint
 ```
-POST /v1/listings/vip
+POST /v1/listings
 Authorization: Bearer {accessToken}
 Content-Type: application/json
 ```
 
+> **Note:** The `/v1/listings/vip` endpoint is deprecated. Use `/v1/listings` for all listing types (NORMAL, SILVER, GOLD, DIAMOND).
+
 ### Request Body
 ```typescript
-interface VipListingCreationRequest {
+interface ListingCreationRequest {
   // Required fields
   title: string;                    // Listing title
+  description: string;              // Listing description
   listingType: 'RENT' | 'SALE' | 'SHARE';
-  vipType: 'SILVER' | 'GOLD' | 'DIAMOND';
+  vipType: 'NORMAL' | 'SILVER' | 'GOLD' | 'DIAMOND';
   categoryId: number;
   productType: 'ROOM' | 'APARTMENT' | 'HOUSE' | 'OFFICE' | 'STUDIO';
   price: number;
+  priceUnit: 'MONTH' | 'DAY' | 'YEAR';
   address: {
-    provinceId: number;
-    districtId: number;
-    wardId: number;
-    street: string;
-    houseNumber?: string;
+    legacy?: {                      // Use for old address system
+      provinceId: number;
+      districtId: number;
+      wardId: number;
+      street?: string;
+    };
+    newAddress?: {                  // Use for new address system
+      provinceCode: string;
+      wardCode: string;
+      street?: string;
+    };
     latitude?: number;
     longitude?: number;
   };
 
   // Optional fields
-  description?: string;
-  priceUnit?: 'MONTH' | 'DAY' | 'YEAR';
   area?: number;
   bedrooms?: number;
   bathrooms?: number;
@@ -83,6 +91,7 @@ interface VipListingCreationRequest {
 
   // Payment options
   useMembershipQuota?: boolean;     // true = use quota, false = direct payment
+  benefitIds?: number[];            // Required when useMembershipQuota=true (vipType inferred from benefit)
   durationDays?: number;            // 10, 15, or 30 days (default: 30)
   paymentProvider?: 'VNPAY';        // Payment provider (default: VNPAY)
 }
@@ -90,7 +99,7 @@ interface VipListingCreationRequest {
 
 ### Example Request
 ```typescript
-const response = await fetch(`${API_URL}/v1/listings/vip`, {
+const response = await fetch(`${API_URL}/v1/listings`, {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -106,11 +115,14 @@ const response = await fetch(`${API_URL}/v1/listings/vip`, {
     price: 15000000,
     priceUnit: 'MONTH',
     address: {
-      provinceId: 79,
-      districtId: 760,
-      wardId: 26734,
-      street: 'Nguyễn Văn Linh',
-      houseNumber: '123'
+      legacy: {
+        provinceId: 79,
+        districtId: 760,
+        wardId: 26734,
+        street: 'Nguyễn Văn Linh'
+      },
+      latitude: 10.7456,
+      longitude: 106.6789
     },
     area: 75.5,
     bedrooms: 2,

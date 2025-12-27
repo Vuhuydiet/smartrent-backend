@@ -1698,17 +1698,28 @@ public class ListingController {
     /**
      * Create VIP or Premium listing with quota check and payment flow
      * POST /v1/listings/vip
+     *
+     * @deprecated Use POST /v1/listings instead. This endpoint will be removed in a future version.
      */
+    @Deprecated
     @PostMapping("/vip")
     @Operation(
-        summary = "Create VIP or Premium listing",
+        summary = "[DEPRECATED] Create VIP or Premium listing - Use POST /v1/listings instead",
         description = """
+            ⚠️ **DEPRECATED**: This endpoint is deprecated. Please use `POST /v1/listings` instead.
+
+            The main `/v1/listings` endpoint now supports all listing types (NORMAL, SILVER, GOLD, DIAMOND)
+            with the same payment and quota functionality.
+
+            ---
+
             Creates a VIP or Premium listing with dual payment model:
             1. If useMembershipQuota=true and user has quota: Creates listing immediately using quota
             2. If useMembershipQuota=false or no quota: Returns payment URL. After payment completion, user will be redirected to frontend. Verify payment status using GET /v1/payments/transactions/{txnRef}.
 
             Premium listings automatically create a shadow NORMAL listing for double visibility.
             """,
+        deprecated = true,
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = @Content(

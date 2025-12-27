@@ -173,9 +173,9 @@ When access token expires, use refresh token to get new one.
 - `GET /v1/media/{mediaId}` - Get media details
 
 **Listing Operations (should require authentication):**
+- `POST /v1/listings` - Create listing (supports NORMAL, SILVER, GOLD, DIAMOND with payment/quota)
 - `PUT /v1/listings/{id}` - Update listing
 - `DELETE /v1/listings/{id}` - Delete listing
-- `POST /v1/listings/vip` - Create VIP listing
 - `GET /v1/listings/quota-check` - Check listing quota
 - `GET /v1/listings/{id}/admin` - Admin listing details
 
