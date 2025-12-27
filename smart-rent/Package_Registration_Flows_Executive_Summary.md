@@ -216,7 +216,7 @@ GET    /v1/memberships/quota/all             - Check all quotas
 ### Listing APIs
 
 ```
-POST   /v1/listings/vip                      - Create VIP listing
+POST   /v1/listings                          - Create listing (NORMAL/SILVER/GOLD/DIAMOND)
                                                (returns listing or payment URL)
 GET    /v1/listings/{id}                     - Get listing details
 ```

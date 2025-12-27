@@ -241,7 +241,7 @@ Step 1: User Checks Quota
 
 Step 2: User Creates VIP Listing
    ↓
-   POST /v1/listings/vip
+   POST /v1/listings
    Body: {
      "title": "Beautiful apartment",
      "vipType": "SILVER",
@@ -278,14 +278,13 @@ Step 2: User Creates VIP Listing
 
 Step 1: User Creates VIP Listing (No Quota)
    ↓
-   POST /v1/listings/vip
+   POST /v1/listings
    Body: {
      "title": "Beautiful apartment",
      "vipType": "DIAMOND",
      "useMembershipQuota": false,
      "durationDays": 30,
      "paymentProvider": "VNPAY",
-     "returnUrl": "https://app.com/payment/callback",
      ... (other listing fields)
    }
    ↓
@@ -953,19 +952,18 @@ Response: Map<String, QuotaStatusResponse>
 
 ### 2. Listing Endpoints
 
-#### Create VIP Listing
+#### Create Listing (supports all VIP types)
 ```http
-POST /v1/listings/vip
-Headers: user-id: {userId}
+POST /v1/listings
+Authorization: Bearer {accessToken}
 Body: {
   "title": "Beautiful apartment",
   "description": "...",
-  "vipType": "SILVER" | "GOLD" | "DIAMOND",
+  "vipType": "NORMAL" | "SILVER" | "GOLD" | "DIAMOND",
   "useMembershipQuota": true,
   "durationDays": 30,
   "paymentProvider": "VNPAY",
-  "returnUrl": "https://app.com/payment/callback",
-  "address": "...",
+  "address": { ... },
   "price": 5000000,
   ... (other listing fields)
 }
