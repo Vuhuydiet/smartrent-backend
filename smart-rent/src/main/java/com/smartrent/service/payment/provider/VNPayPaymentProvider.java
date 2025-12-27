@@ -21,7 +21,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
-import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -274,7 +273,8 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
 
     /**
      * Validate signature using raw query string from HttpServletRequest
-     * Following PHP approach: decode first, then re-encode with UTF-8
+     * VNPay calculates signature using the raw URL-encoded query string
+     * We must use the exact same raw values (not decode and re-encode)
      */
     private boolean validateSignatureFromRequest(HttpServletRequest request, String signature) {
         try {
@@ -292,24 +292,24 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                     hashSecret != null ? hashSecret.length() : 0,
                     hashSecret != null && hashSecret.length() >= 4 ? hashSecret.substring(0, 4) + "***" : "N/A");
 
-            // Parse query string - decode then re-encode (PHP approach)
+            // Parse query string - keep raw URL-encoded values (DO NOT decode)
+            // VNPay signature is calculated on the raw URL-encoded string
             Map<String, String> params = new TreeMap<>();
             String[] pairs = queryString.split("&");
             for (String pair : pairs) {
                 int idx = pair.indexOf("=");
                 if (idx > 0) {
                     String key = pair.substring(0, idx);
+                    // Keep the raw URL-encoded value as-is
                     String rawValue = idx < pair.length() - 1 ? pair.substring(idx + 1) : "";
-                    // Decode the value first
-                    String decodedValue = URLDecoder.decode(rawValue, StandardCharsets.UTF_8.toString());
                     // Only include VNPay parameters, exclude signature
                     if (key.startsWith("vnp_") && !key.equals("vnp_SecureHash") && !key.equals("vnp_SecureHashType")) {
-                        params.put(key, decodedValue);
+                        params.put(key, rawValue);
                     }
                 }
             }
 
-            // Build hash data by re-encoding with UTF-8 (PHP urlencode uses UTF-8)
+            // Build hash data using raw URL-encoded values (no re-encoding needed)
             StringBuilder hashData = new StringBuilder();
             boolean first = true;
             for (Map.Entry<String, String> entry : params.entrySet()) {
@@ -317,14 +317,14 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                     if (!first) {
                         hashData.append('&');
                     }
-                    hashData.append(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8.toString()));
+                    hashData.append(entry.getKey());
                     hashData.append('=');
-                    hashData.append(URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8.toString()));
+                    hashData.append(entry.getValue());
                     first = false;
                 }
             }
 
-            log.info("VNPay signature validation - Hash data (PHP style): {}", hashData);
+            log.info("VNPay signature validation - Hash data (raw): {}", hashData);
 
             // Generate signature
             String generatedSignature = PaymentUtil.hmacSHA512(hashSecret, hashData.toString());
