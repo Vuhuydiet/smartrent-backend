@@ -1,5 +1,6 @@
 package com.smartrent.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.smartrent.infra.repository.entity.AddressMetadata;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -103,14 +104,18 @@ public class AddressCreationRequest {
 
     /**
      * Check if using legacy (old) address structure
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public boolean isLegacyStructure() {
         return legacy != null && legacy.isValid();
     }
 
     /**
      * Check if using new address structure
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public boolean isNewStructure() {
         return newAddress != null && newAddress.isValid();
     }
@@ -119,7 +124,9 @@ public class AddressCreationRequest {
      * Get the effective address type (auto-detect from structure)
      * If both legacy and new structures are provided, prioritizes legacy (OLD) for addressType.
      * Note: Both structures will still be saved to the database if provided.
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public AddressMetadata.AddressType getEffectiveAddressType() {
         boolean hasLegacy = isLegacyStructure();
         boolean hasNew = isNewStructure();
@@ -134,49 +141,63 @@ public class AddressCreationRequest {
 
     /**
      * Validate that required fields are present
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public boolean hasRequiredFields() {
         return isLegacyStructure() || isNewStructure();
     }
 
     /**
      * Get legacy province ID
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public Integer getLegacyProvinceId() {
         return legacy != null ? legacy.getProvinceId() : null;
     }
 
     /**
      * Get legacy district ID
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public Integer getLegacyDistrictId() {
         return legacy != null ? legacy.getDistrictId() : null;
     }
 
     /**
      * Get legacy ward ID
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public Integer getLegacyWardId() {
         return legacy != null ? legacy.getWardId() : null;
     }
 
     /**
      * Get new province code
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public String getNewProvinceCodeValue() {
         return newAddress != null ? newAddress.getProvinceCode() : null;
     }
 
     /**
      * Get new ward code
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public String getNewWardCodeValue() {
         return newAddress != null ? newAddress.getWardCode() : null;
     }
 
     /**
      * Get street name
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public String getStreet() {
         if (legacy != null && legacy.getStreet() != null) {
             return legacy.getStreet();

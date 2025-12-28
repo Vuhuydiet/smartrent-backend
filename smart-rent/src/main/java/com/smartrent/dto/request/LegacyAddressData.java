@@ -1,5 +1,6 @@
 package com.smartrent.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -41,7 +42,9 @@ public class LegacyAddressData {
 
     /**
      * Check if all required fields are present
+     * @JsonIgnore prevents this method from being serialized/deserialized as a property
      */
+    @JsonIgnore
     public boolean isValid() {
         return provinceId != null && districtId != null && wardId != null;
     }
