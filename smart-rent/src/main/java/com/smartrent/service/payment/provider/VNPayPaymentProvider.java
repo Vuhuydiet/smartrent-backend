@@ -330,20 +330,62 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             }
 
             log.info("VNPay signature validation - Hash data (raw): {}", hashData);
+            log.info("VNPay signature validation - Hash data length: {}", hashData.length());
 
-            // Generate signature
+            // Generate signature with raw URL-encoded values
             String generatedSignature = PaymentUtil.hmacSHA512(hashSecret, hashData.toString());
 
             log.info("VNPay signature validation - Generated: {}, Received: {}", generatedSignature, signature);
 
-            boolean isValid = generatedSignature.equalsIgnoreCase(signature);
-
-            if (!isValid) {
-                log.warn("VNPay signature validation failed. Generated: {}, Received: {}",
-                        generatedSignature, signature);
+            // Check 1: Direct match with raw values
+            if (generatedSignature.equalsIgnoreCase(signature)) {
+                log.info("VNPay signature validation succeeded (raw match)");
+                return true;
             }
 
-            return isValid;
+            // Check 2: Try with + instead of %20 (VNPay sometimes uses + for spaces)
+            String hashDataWithPlus = hashData.toString().replace("%20", "+");
+            if (!hashDataWithPlus.equals(hashData.toString())) {
+                String altSignature1 = PaymentUtil.hmacSHA512(hashSecret, hashDataWithPlus);
+                log.info("Alternative signature (with +): {}", altSignature1);
+                if (altSignature1.equalsIgnoreCase(signature)) {
+                    log.info("VNPay signature validation succeeded (+ encoding)");
+                    return true;
+                }
+            }
+
+            // Check 3: Try with decoded values (actual spaces instead of %20 or +)
+            try {
+                String hashDataDecoded = java.net.URLDecoder.decode(hashData.toString(), "UTF-8");
+                if (!hashDataDecoded.equals(hashData.toString())) {
+                    String altSignature2 = PaymentUtil.hmacSHA512(hashSecret, hashDataDecoded);
+                    log.info("Alternative signature (decoded): {}", altSignature2);
+                    if (altSignature2.equalsIgnoreCase(signature)) {
+                        log.info("VNPay signature validation succeeded (decoded)");
+                        return true;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Error decoding hash data: {}", e.getMessage());
+            }
+
+            // Check 4: Try with %2B instead of + (some systems encode + as %2B)
+            String hashDataWith2B = hashData.toString().replace("+", "%2B");
+            if (!hashDataWith2B.equals(hashData.toString())) {
+                String altSignature3 = PaymentUtil.hmacSHA512(hashSecret, hashDataWith2B);
+                log.info("Alternative signature (with %2B): {}", altSignature3);
+                if (altSignature3.equalsIgnoreCase(signature)) {
+                    log.info("VNPay signature validation succeeded (%2B encoding)");
+                    return true;
+                }
+            }
+
+            log.warn("VNPay signature validation failed after all attempts!");
+            log.warn("Generated signature (raw): {}", generatedSignature);
+            log.warn("Received signature:        {}", signature);
+            log.warn("Hash data used: {}", hashData);
+
+            return false;
         } catch (Exception e) {
             log.error("Error validating VNPay signature from request", e);
             return false;
