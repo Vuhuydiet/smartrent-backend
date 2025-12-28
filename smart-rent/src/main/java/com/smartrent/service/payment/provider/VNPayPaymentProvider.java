@@ -592,12 +592,12 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
     }
 
     /**
-     * Remove Vietnamese diacritics (dấu) from a string.
-     * VNPay requires vnp_OrderInfo to be Vietnamese without diacritics.
-     * Example: "Căn hộ 2 phòng ngủ" -> "Can ho 2 phong ngu"
+     * Remove Vietnamese diacritics and special characters from a string.
+     * VNPay requires vnp_OrderInfo to contain only basic ASCII characters.
+     * Example: "Căn hộ 23m² - Phường Ngọc Hà!" -> "Can ho 23m2 - Phuong Ngoc Ha"
      *
      * @param input The input string with Vietnamese diacritics
-     * @return The string with diacritics removed
+     * @return The string with diacritics and special characters removed
      */
     private String removeVietnameseDiacritics(String input) {
         if (input == null) {
@@ -608,9 +608,29 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         // Remove all combining diacritical marks
         String withoutDiacritics = DIACRITICS_PATTERN.matcher(normalized).replaceAll("");
         // Handle special Vietnamese characters that don't decompose properly
-        return withoutDiacritics
+        String result = withoutDiacritics
                 .replace('đ', 'd')
                 .replace('Đ', 'D');
+
+        // Replace special characters that VNPay doesn't handle well
+        // Convert superscript numbers
+        result = result
+                .replace("\u00B2", "2")  // Superscript 2 (m²)
+                .replace("\u00B3", "3"); // Superscript 3 (m³)
+
+        // Replace dashes with hyphen
+        result = result
+                .replace("\u2013", "-")  // En dash
+                .replace("\u2014", "-"); // Em dash
+
+        // Remove any remaining non-ASCII characters (keep only printable ASCII)
+        // Allow: letters, digits, space, hyphen, colon, comma, period
+        result = result.replaceAll("[^a-zA-Z0-9 \\-:,.]", "");
+
+        // Clean up multiple spaces
+        result = result.replaceAll("\\s+", " ").trim();
+
+        return result;
     }
 
     private TransactionStatus mapVNPayResponseCodeToStatus(String responseCode) {

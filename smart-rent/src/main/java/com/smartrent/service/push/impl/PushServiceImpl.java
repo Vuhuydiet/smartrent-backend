@@ -117,13 +117,14 @@ public class PushServiceImpl implements PushService {
         );
 
         // Generate payment URL - pass transactionId to reuse existing transaction
+        // Use simple English orderInfo to avoid VNPay encoding issues
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId) // Reuse the transaction created above
                 .provider(PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(PricingConstants.PUSH_PER_TIME)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
-                .orderInfo("Push listing #" + request.getListingId())
+                .orderInfo("SmartRent Push Listing " + request.getListingId())
                 .build();
 
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);

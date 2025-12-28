@@ -158,13 +158,14 @@ public class ListingServiceImpl implements ListingService {
                 vipType, transactionId);
 
         // Generate payment URL using PaymentService
+        // Use simple English orderInfo to avoid VNPay encoding issues with Vietnamese/special chars
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId)
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(amount)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
-                .orderInfo(vipType + " Listing - " + durationDays + " days: " + request.getTitle())
+                .orderInfo("SmartRent " + vipType + " Listing " + durationDays + " days")
                 .build();
 
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
@@ -361,13 +362,14 @@ public class ListingServiceImpl implements ListingService {
         log.info("Cached VIP listing request for transaction: {}", transactionId);
 
         // Generate payment URL - pass transactionId to reuse existing transaction
+        // Use simple English orderInfo to avoid VNPay encoding issues with Vietnamese/special chars
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId) // Reuse the transaction created above
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(amount)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
-                .orderInfo("Post " + request.getVipType() + " listing: " + request.getTitle())
+                .orderInfo("SmartRent " + request.getVipType() + " Listing " + request.getDurationDays() + " days")
                 .build();
 
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
