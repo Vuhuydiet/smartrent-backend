@@ -23,10 +23,12 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -47,6 +49,9 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
     private static final String VNP_QUERY_COMMAND = "querydr";
     private static final String VNP_CURRENCY_CODE = "VND";
     private static final String VNP_LOCALE_VN = "vn";
+
+    // Pattern to match Vietnamese diacritical marks for removal
+    private static final Pattern DIACRITICS_PATTERN = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
 
     public VNPayPaymentProvider(PaymentRepository paymentRepository, VNPayConfig vnpayConfig, VNPayConnector vnpayConnector) {
         super(paymentRepository);
@@ -479,7 +484,9 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             vnpParams.put("vnp_Amount", String.valueOf(request.getAmount().multiply(new BigDecimal("100")).longValue()));
             vnpParams.put("vnp_CurrCode", VNP_CURRENCY_CODE);
             vnpParams.put("vnp_TxnRef", transaction.getTransactionId());
-            vnpParams.put("vnp_OrderInfo", request.getOrderInfo());
+            // VNPay requires vnp_OrderInfo to be Vietnamese WITHOUT diacritics (không dấu)
+            // and without special characters
+            vnpParams.put("vnp_OrderInfo", removeVietnameseDiacritics(request.getOrderInfo()));
             vnpParams.put("vnp_OrderType", vnpayConfig.getOrderType() != null ? vnpayConfig.getOrderType() : "other");
             vnpParams.put("vnp_Locale", vnpayConfig.getLocale() != null ? vnpayConfig.getLocale() : VNP_LOCALE_VN);
 
@@ -530,8 +537,13 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
     }
 
     /**
-     * Build hash data for payment creation (WITH URL encoding)
+     * Build hash data for payment creation (WITH URL encoding for VALUES only)
      * Used when creating payment URL to send to VNPay
+     *
+     * IMPORTANT: VNPay requires:
+     * 1. Keys are NOT URL encoded (vnp_Amount, not vnp%5FAmount)
+     * 2. Values ARE URL encoded with spaces as '+' (not %20)
+     * 3. Hash data format must match query string format exactly
      */
     private String buildHashData(Map<String, String> params) {
         return params.entrySet().stream()
@@ -539,7 +551,9 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                 .sorted(Map.Entry.comparingByKey())
                 .map(entry -> {
                     try {
-                        return URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8.toString()) + "="
+                        // Key is NOT encoded, only value is encoded
+                        // URLEncoder.encode uses '+' for spaces which is what VNPay expects
+                        return entry.getKey() + "="
                             + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8.toString());
                     } catch (UnsupportedEncodingException e) {
                         log.error("Error encoding hash parameter: {}", entry.getKey(), e);
@@ -575,6 +589,28 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                     }
                 })
                 .collect(Collectors.joining("&"));
+    }
+
+    /**
+     * Remove Vietnamese diacritics (dấu) from a string.
+     * VNPay requires vnp_OrderInfo to be Vietnamese without diacritics.
+     * Example: "Căn hộ 2 phòng ngủ" -> "Can ho 2 phong ngu"
+     *
+     * @param input The input string with Vietnamese diacritics
+     * @return The string with diacritics removed
+     */
+    private String removeVietnameseDiacritics(String input) {
+        if (input == null) {
+            return null;
+        }
+        // Normalize to NFD (decomposed form) - separates base characters from diacritical marks
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
+        // Remove all combining diacritical marks
+        String withoutDiacritics = DIACRITICS_PATTERN.matcher(normalized).replaceAll("");
+        // Handle special Vietnamese characters that don't decompose properly
+        return withoutDiacritics
+                .replace('đ', 'd')
+                .replace('Đ', 'D');
     }
 
     private TransactionStatus mapVNPayResponseCodeToStatus(String responseCode) {
