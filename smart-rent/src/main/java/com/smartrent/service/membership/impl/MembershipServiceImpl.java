@@ -273,13 +273,14 @@ public class MembershipServiceImpl implements MembershipService {
         );
 
         // Generate payment URL - pass transactionId to reuse existing transaction
+        // Use simple English orderInfo to avoid VNPay encoding issues
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId) // Reuse the transaction created above
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
                         request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
                 .amount(membershipPackage.getSalePrice())
                 .currency(PricingConstants.DEFAULT_CURRENCY)
-                .orderInfo("Membership: " + membershipPackage.getPackageName())
+                .orderInfo("SmartRent Membership " + membershipPackage.getPackageName())
                 .build();
 
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
