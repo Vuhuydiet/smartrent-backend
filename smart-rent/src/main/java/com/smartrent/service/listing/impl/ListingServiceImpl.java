@@ -118,68 +118,12 @@ public class ListingServiceImpl implements ListingService {
 
         // Check if user wants to use membership quota with specific benefit IDs
         if (Boolean.TRUE.equals(request.getUseMembershipQuota())) {
+            // This method will fall back to payment flow if quota is not available
             return createListingWithMembershipQuota(request);
         }
 
-        // For direct payment flow (useMembershipQuota=false), we need to:
-        // 1. Cache the request in Redis
-        // 2. Return payment URL
-        // 3. Create listing only after payment is completed
-
-        // Validate duration days
-        Integer durationDays = request.getDurationDays() != null ? request.getDurationDays() : 30;
-        if (durationDays <= 0) {
-            throw new AppException(DomainCode.BAD_REQUEST_ERROR,
-                    "Duration days must be greater than 0");
-        }
-
-        // Get VIP tier to calculate price (default to NORMAL if not specified)
-        String vipType = request.getVipType() != null ? request.getVipType() : "NORMAL";
-        VipTierDetail vipTier = vipTierDetailRepository.findByTierCode(vipType)
-                .orElseThrow(() -> new AppException(DomainCode.RESOURCE_NOT_FOUND,
-                        "VIP tier not found: " + vipType));
-
-        // Calculate price based on VIP tier and duration
-        java.math.BigDecimal amount = vipTier.getPriceForDuration(durationDays);
-
-        // Create PENDING transaction (no listing yet - will be created after payment)
-        String transactionId = transactionService.createPostFeeTransaction(
-                request.getUserId(),
-                amount,
-                vipType,
-                durationDays,
-                request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
-        );
-
-        // Cache the listing request in Redis for payment callback (30 min TTL)
-        // The listing will be created from this cached request after payment completion
-        listingRequestCacheService.storeNormalListingRequest(transactionId, request);
-        log.info("Cached {} listing request for transaction: {} (listing will be created after payment)",
-                vipType, transactionId);
-
-        // Generate payment URL using PaymentService
-        // Use simple English orderInfo to avoid VNPay encoding issues with Vietnamese/special chars
-        PaymentRequest paymentRequest = PaymentRequest.builder()
-                .transactionId(transactionId)
-                .provider(com.smartrent.enums.PaymentProvider.valueOf(
-                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
-                .amount(amount)
-                .currency(PricingConstants.DEFAULT_CURRENCY)
-                .orderInfo("SmartRent " + vipType + " Listing " + durationDays + " days")
-                .build();
-
-        PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
-
-        log.info("Payment URL generated for {} listing transaction: {}", vipType, transactionId);
-
-        // Return payment response (no listing ID yet - will be created after payment)
-        return ListingCreationResponse.builder()
-                .paymentRequired(true)
-                .transactionId(transactionId)
-                .amount(amount.longValue())
-                .paymentUrl(paymentResponse.getPaymentUrl())
-                .message("Payment required. Complete payment to create listing.")
-                .build();
+        // For direct payment flow (useMembershipQuota=false or null)
+        return createListingWithPayment(request);
     }
 
     /**
@@ -192,8 +136,10 @@ public class ListingServiceImpl implements ListingService {
 
         // Validate benefitIds are provided
         if (request.getBenefitIds() == null || request.getBenefitIds().isEmpty()) {
-            throw new AppException(DomainCode.BAD_REQUEST_ERROR,
-                    "benefitIds are required when useMembershipQuota is true");
+            log.warn("No benefitIds provided for user {} with useMembershipQuota=true, falling back to payment flow",
+                    request.getUserId());
+            // Fall back to payment flow when no benefitIds provided
+            return createListingWithPayment(request);
         }
 
         // Get the first benefit to determine the benefit type and infer vipType
@@ -202,21 +148,35 @@ public class ListingServiceImpl implements ListingService {
         try {
             firstBenefit = quotaService.getBenefitById(request.getUserId(), firstBenefitId);
         } catch (IllegalArgumentException e) {
-            throw new AppException(DomainCode.BENEFIT_NOT_FOUND, e.getMessage());
+            log.warn("Benefit not found for user {}: {}, falling back to payment flow",
+                    request.getUserId(), e.getMessage());
+            // Fall back to payment flow when benefit not found
+            return createListingWithPayment(request);
         } catch (IllegalStateException e) {
-            throw new AppException(DomainCode.BENEFIT_EXPIRED, e.getMessage());
+            log.warn("Benefit expired for user {}: {}, falling back to payment flow",
+                    request.getUserId(), e.getMessage());
+            // Fall back to payment flow when benefit expired
+            return createListingWithPayment(request);
         }
 
         BenefitType benefitType = firstBenefit.getBenefitType();
 
         // Validate benefit type is a posting type (POST_SILVER, POST_GOLD, POST_DIAMOND)
-        String vipType = switch (benefitType) {
-            case POST_SILVER -> "SILVER";
-            case POST_GOLD -> "GOLD";
-            case POST_DIAMOND -> "DIAMOND";
-            default -> throw new AppException(DomainCode.BENEFIT_TYPE_MISMATCH,
-                    "Benefit type " + benefitType + " cannot be used for creating listings. Only POST_SILVER, POST_GOLD, POST_DIAMOND are supported.");
-        };
+        String vipType;
+        try {
+            vipType = switch (benefitType) {
+                case POST_SILVER -> "SILVER";
+                case POST_GOLD -> "GOLD";
+                case POST_DIAMOND -> "DIAMOND";
+                default -> throw new AppException(DomainCode.BENEFIT_TYPE_MISMATCH,
+                        "Benefit type " + benefitType + " cannot be used for creating listings. Only POST_SILVER, POST_GOLD, POST_DIAMOND are supported.");
+            };
+        } catch (AppException e) {
+            log.warn("Invalid benefit type for user {}: {}, falling back to payment flow",
+                    request.getUserId(), e.getMessage());
+            // Fall back to payment flow when benefit type is invalid for listing creation
+            return createListingWithPayment(request);
+        }
 
         log.info("Inferred vipType {} from benefit type {}", vipType, benefitType);
 
@@ -224,9 +184,15 @@ public class ListingServiceImpl implements ListingService {
         try {
             quotaService.consumeQuotaByBenefitIds(request.getUserId(), request.getBenefitIds(), benefitType);
         } catch (IllegalArgumentException e) {
-            throw new AppException(DomainCode.BAD_REQUEST_ERROR, e.getMessage());
+            log.warn("Invalid benefit IDs for user {}: {}, falling back to payment flow",
+                    request.getUserId(), e.getMessage());
+            // Fall back to payment flow when benefit IDs are invalid
+            return createListingWithPayment(request);
         } catch (IllegalStateException e) {
-            throw new AppException(DomainCode.INSUFFICIENT_QUOTA, e.getMessage());
+            log.warn("Insufficient quota for user {}: {}, falling back to payment flow",
+                    request.getUserId(), e.getMessage());
+            // Fall back to payment flow when quota is insufficient
+            return createListingWithPayment(request);
         }
 
         // Set the inferred vipType on the request so the mapper uses it
@@ -270,6 +236,72 @@ public class ListingServiceImpl implements ListingService {
         }
 
         return listingMapper.toCreationResponse(saved);
+    }
+
+    /**
+     * Create listing with payment flow (fallback when quota is not available)
+     * This method handles the payment flow for listing creation when:
+     * - User doesn't have quota
+     * - User's quota is insufficient
+     * - User's benefits are expired or invalid
+     */
+    private ListingCreationResponse createListingWithPayment(ListingCreationRequest request) {
+        log.info("Creating listing with payment flow for user: {}", request.getUserId());
+
+        // Validate duration days
+        Integer durationDays = request.getDurationDays() != null ? request.getDurationDays() : 30;
+        if (durationDays <= 0) {
+            throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                    "Duration days must be greater than 0");
+        }
+
+        // Get VIP tier to calculate price (default to NORMAL if not specified)
+        String vipType = request.getVipType() != null ? request.getVipType() : "NORMAL";
+        VipTierDetail vipTier = vipTierDetailRepository.findByTierCode(vipType)
+                .orElseThrow(() -> new AppException(DomainCode.RESOURCE_NOT_FOUND,
+                        "VIP tier not found: " + vipType));
+
+        // Calculate price based on VIP tier and duration
+        BigDecimal amount = vipTier.getPriceForDuration(durationDays);
+
+        // Create PENDING transaction (no listing yet - will be created after payment)
+        String transactionId = transactionService.createPostFeeTransaction(
+                request.getUserId(),
+                amount,
+                vipType,
+                durationDays,
+                request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+        );
+
+        // Cache the listing request in Redis for payment callback (30 min TTL)
+        // The listing will be created from this cached request after payment completion
+        listingRequestCacheService.storeNormalListingRequest(transactionId, request);
+        log.info("Cached {} listing request for transaction: {} (listing will be created after payment)",
+                vipType, transactionId);
+
+        // Generate payment URL using PaymentService
+        // Use simple English orderInfo to avoid VNPay encoding issues with Vietnamese/special chars
+        PaymentRequest paymentRequest = PaymentRequest.builder()
+                .transactionId(transactionId)
+                .provider(com.smartrent.enums.PaymentProvider.valueOf(
+                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
+                .amount(amount)
+                .currency(PricingConstants.DEFAULT_CURRENCY)
+                .orderInfo("SmartRent " + vipType + " Listing " + durationDays + " days")
+                .build();
+
+        PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
+
+        log.info("Payment URL generated for {} listing transaction: {}", vipType, transactionId);
+
+        // Return payment response (no listing ID yet - will be created after payment)
+        return ListingCreationResponse.builder()
+                .paymentRequired(true)
+                .transactionId(transactionId)
+                .amount(amount.longValue())
+                .paymentUrl(paymentResponse.getPaymentUrl())
+                .message("Payment required. Complete payment to create listing.")
+                .build();
     }
 
     @Override
@@ -845,17 +877,24 @@ public class ListingServiceImpl implements ListingService {
      * Create listing from cache - checks both NORMAL and VIP caches
      */
     private ListingCreationResponse createListingFromCache(String transactionId) {
+        log.info("Checking cache for listing request - transactionId: {}", transactionId);
+
         // Try NORMAL listing first
-        if (listingRequestCacheService.normalListingRequestExists(transactionId)) {
+        boolean normalExists = listingRequestCacheService.normalListingRequestExists(transactionId);
+        log.info("NORMAL listing cache exists for {}: {}", transactionId, normalExists);
+        if (normalExists) {
             return createNormalListingFromCache(transactionId);
         }
 
         // Try VIP listing
-        if (listingRequestCacheService.vipListingRequestExists(transactionId)) {
+        boolean vipExists = listingRequestCacheService.vipListingRequestExists(transactionId);
+        log.info("VIP listing cache exists for {}: {}", transactionId, vipExists);
+        if (vipExists) {
             return createVipListingFromCache(transactionId);
         }
 
         // Cache expired or not found
+        log.error("Listing request NOT FOUND in cache for transaction: {}. Cache may have expired (30 min TTL).", transactionId);
         throw new AppException(DomainCode.LISTING_CREATION_CACHE_NOT_FOUND,
                 "Listing request not found in cache for transaction: " + transactionId +
                 ". Cache may have expired (30 min TTL). Please create listing again.");
@@ -984,11 +1023,15 @@ public class ListingServiceImpl implements ListingService {
         if (request.getListingType() == null || request.getListingType().isBlank()) {
             missingFields.add("listingType");
         }
-        // vipType is optional when using membership quota with benefitIds (will be inferred from benefit type)
-        boolean usingMembershipQuotaWithBenefits = Boolean.TRUE.equals(request.getUseMembershipQuota())
-                && request.getBenefitIds() != null
-                && !request.getBenefitIds().isEmpty();
-        if (!usingMembershipQuotaWithBenefits && (request.getVipType() == null || request.getVipType().isBlank())) {
+        // vipType is optional when:
+        // 1. Using membership quota with benefitIds (will be inferred from benefit type)
+        // 2. Using membership quota without benefitIds (will fall back to payment flow with default NORMAL)
+        // In both cases, the service layer will handle the vipType appropriately
+        boolean usingMembershipQuota = Boolean.TRUE.equals(request.getUseMembershipQuota());
+        boolean hasVipType = request.getVipType() != null && !request.getVipType().isBlank();
+
+        // vipType is required only when NOT using membership quota AND vipType is not provided
+        if (!usingMembershipQuota && !hasVipType) {
             missingFields.add("vipType");
         }
         if (request.getCategoryId() == null) {
