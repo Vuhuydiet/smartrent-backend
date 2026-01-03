@@ -18,11 +18,8 @@ import lombok.experimental.FieldDefaults;
 @Schema(description = "Recently viewed listing response")
 public class RecentlyViewedItemResponse {
 
-    @Schema(
-            description = "ID of the listing that was viewed",
-            example = "123"
-    )
-    Long listingId;
+    @Schema(description = "Full listing details that was viewed")
+    ListingResponse listing;
 
     @Schema(
             description = "Timestamp when the listing was viewed (epoch milliseconds)",

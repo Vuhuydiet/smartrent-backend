@@ -2,7 +2,9 @@ package com.smartrent.service.recentlyviewed.impl;
 
 import com.smartrent.dto.request.RecentlyViewedItemDto;
 import com.smartrent.dto.request.RecentlyViewedSyncRequest;
+import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.RecentlyViewedItemResponse;
+import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.recentlyviewed.RecentlyViewedService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +16,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -27,6 +31,7 @@ public class RecentlyViewedServiceImpl implements RecentlyViewedService {
     private static final long MAX_FUTURE_TIMESTAMP = System.currentTimeMillis() + (365L * 24 * 60 * 60 * 1000); // 1 year in future
 
     private final RedisTemplate<String, String> redisTemplate;
+    private final ListingService listingService;
 
     @Override
     public List<RecentlyViewedItemResponse> syncRecentlyViewed(RecentlyViewedSyncRequest request) {
@@ -92,11 +97,37 @@ public class RecentlyViewedServiceImpl implements RecentlyViewedService {
             return new ArrayList<>();
         }
 
+        // Extract listing IDs and their timestamps
+        Map<Long, Long> listingIdToTimestamp = listingsWithScores.stream()
+                .collect(Collectors.toMap(
+                        tuple -> Long.parseLong(tuple.getValue()),
+                        tuple -> tuple.getScore().longValue()
+                ));
+
+        // Fetch full listing details
+        Set<Long> listingIds = listingIdToTimestamp.keySet();
+        List<ListingResponse> listings = listingService.getListingsByIds(listingIds);
+
+        // Create a map for quick lookup
+        Map<Long, ListingResponse> listingMap = listings.stream()
+                .collect(Collectors.toMap(ListingResponse::getListingId, Function.identity()));
+
+        // Build response preserving the order from Redis (most recent first)
         List<RecentlyViewedItemResponse> result = listingsWithScores.stream()
-                .map(tuple -> RecentlyViewedItemResponse.builder()
-                        .listingId(Long.parseLong(tuple.getValue()))
-                        .viewedAt(tuple.getScore().longValue())
-                        .build())
+                .map(tuple -> {
+                    Long listingId = Long.parseLong(tuple.getValue());
+                    ListingResponse listing = listingMap.get(listingId);
+
+                    // Only include if listing exists and is accessible
+                    if (listing != null) {
+                        return RecentlyViewedItemResponse.builder()
+                                .listing(listing)
+                                .viewedAt(tuple.getScore().longValue())
+                                .build();
+                    }
+                    return null;
+                })
+                .filter(item -> item != null)
                 .collect(Collectors.toList());
 
         log.info("Retrieved {} recently viewed listings for user: {}", result.size(), userId);
