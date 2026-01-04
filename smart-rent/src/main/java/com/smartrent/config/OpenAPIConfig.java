@@ -129,6 +129,13 @@ public class OpenAPIConfig {
                 "- View saved listings via `/v1/saved-listings/my-saved`\n" +
                 "- Check if listing is saved via `/v1/saved-listings/check/{listingId}`\n\n" +
 
+                "## Recently Viewed\n" +
+                "Track user's recently viewed listings with Redis-based storage:\n" +
+                "- Sync client data with server via `/v1/recently-viewed/sync`\n" +
+                "- Get recently viewed items via `/v1/recently-viewed`\n" +
+                "- Stores up to 20 most recent items per user\n" +
+                "- Works across devices after login\n\n" +
+
                 "## Media Management (Cloudflare R2 Storage)\n" +
                 "SmartRent uses Cloudflare R2 for secure, scalable media storage with pre-signed URLs:\n" +
                 "- **Upload Flow (3 steps)**:\n" +
@@ -633,6 +640,17 @@ public class OpenAPIConfig {
                             .displayName("Saved Listings")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/saved-listings/**")
+                            .addOpenApiCustomizer(securityCustomizer())
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi recentlyViewedApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("recently-viewed")
+                            .displayName("Recently Viewed")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/recently-viewed/**")
                             .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
