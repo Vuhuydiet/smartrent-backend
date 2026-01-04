@@ -71,6 +71,18 @@ public class Transaction {
     @Column(name = "provider_transaction_id")
     String providerTransactionId;
 
+    /**
+     * For membership upgrade transactions, stores the ID of the membership being upgraded from
+     */
+    @Column(name = "previous_membership_id")
+    Long previousMembershipId;
+
+    /**
+     * For upgrade transactions, stores the discount amount applied
+     */
+    @Column(name = "discount_amount", precision = 15, scale = 0)
+    BigDecimal discountAmount;
+
     @OneToMany(mappedBy = "transaction", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<PushSchedule> pushSchedules;
 
@@ -133,6 +145,10 @@ public class Transaction {
 
     public boolean isWalletTopup() {
         return transactionType == TransactionType.WALLET_TOPUP;
+    }
+
+    public boolean isMembershipUpgrade() {
+        return transactionType == TransactionType.MEMBERSHIP_UPGRADE;
     }
 }
 

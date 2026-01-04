@@ -3,6 +3,7 @@ package com.smartrent.controller;
 import com.smartrent.dto.request.MembershipPackageCreateRequest;
 import com.smartrent.dto.request.MembershipPackageUpdateRequest;
 import com.smartrent.dto.request.MembershipPurchaseRequest;
+import com.smartrent.dto.request.MembershipUpgradeRequest;
 import com.smartrent.dto.response.*;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.service.membership.MembershipService;
@@ -539,6 +540,279 @@ public class MembershipController {
         membershipService.cancelMembership(userId, userMembershipId);
         return ApiResponse.<Void>builder()
                 .message("Membership cancelled successfully")
+                .build();
+    }
+
+    // =====================================================
+    // MEMBERSHIP UPGRADE ENDPOINTS
+    // =====================================================
+
+    @GetMapping("/available-upgrades")
+    @Operation(
+        summary = "Get all available upgrade packages",
+        description = "Returns all membership packages that the user can upgrade to. Only returns packages with higher tier than user's current membership. If user has no active membership, returns empty list.",
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved available upgrades",
+                content = @Content(
+                    mediaType = "application/json",
+                    array = @ArraySchema(schema = @Schema(implementation = MembershipUpgradePreviewResponse.class)),
+                    examples = @ExampleObject(
+                        name = "Success Response",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": [
+                                {
+                                  "currentMembershipId": 1,
+                                  "currentPackageName": "Basic Monthly",
+                                  "currentPackageLevel": "BASIC",
+                                  "daysRemaining": 15,
+                                  "targetMembershipId": 2,
+                                  "targetPackageName": "Standard Monthly",
+                                  "targetPackageLevel": "STANDARD",
+                                  "targetDurationDays": 30,
+                                  "targetPackagePrice": 299000,
+                                  "discountAmount": 50000,
+                                  "finalPrice": 249000,
+                                  "discountPercentage": 16.72,
+                                  "eligible": true
+                                },
+                                {
+                                  "currentMembershipId": 1,
+                                  "currentPackageName": "Basic Monthly",
+                                  "currentPackageLevel": "BASIC",
+                                  "daysRemaining": 15,
+                                  "targetMembershipId": 3,
+                                  "targetPackageName": "Premium Monthly",
+                                  "targetPackageLevel": "ADVANCED",
+                                  "targetDurationDays": 30,
+                                  "targetPackagePrice": 599000,
+                                  "discountAmount": 50000,
+                                  "finalPrice": 549000,
+                                  "discountPercentage": 8.35,
+                                  "eligible": true
+                                }
+                              ]
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    public ApiResponse<List<MembershipUpgradePreviewResponse>> getAvailableUpgrades() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
+        log.info("User {} requesting available upgrades", userId);
+        List<MembershipUpgradePreviewResponse> upgrades = membershipService.getAvailableUpgrades(userId);
+        return ApiResponse.<List<MembershipUpgradePreviewResponse>>builder()
+                .data(upgrades)
+                .build();
+    }
+
+    @GetMapping("/upgrade-preview/{targetMembershipId}")
+    @Operation(
+        summary = "Preview membership upgrade",
+        description = "Get a preview of upgrading to a higher tier membership package. Shows discount calculation based on remaining benefits and final price.",
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved upgrade preview",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = MembershipUpgradePreviewResponse.class),
+                    examples = @ExampleObject(
+                        name = "Success Response",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "currentMembershipId": 1,
+                                "currentPackageName": "Basic Monthly",
+                                "currentPackageLevel": "BASIC",
+                                "daysRemaining": 15,
+                                "targetMembershipId": 2,
+                                "targetPackageName": "Standard Monthly",
+                                "targetPackageLevel": "STANDARD",
+                                "targetDurationDays": 30,
+                                "targetPackagePrice": 299000,
+                                "discountAmount": 50000,
+                                "finalPrice": 249000,
+                                "discountPercentage": 16.72,
+                                "forfeitedBenefits": [
+                                  {
+                                    "benefitType": "POST_SILVER",
+                                    "benefitName": "VIP Silver Posts",
+                                    "totalQuantity": 5,
+                                    "usedQuantity": 2,
+                                    "remainingQuantity": 3,
+                                    "estimatedValue": 30000
+                                  }
+                                ],
+                                "newBenefits": [],
+                                "eligible": true,
+                                "ineligibilityReason": null
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Cannot upgrade - same level or downgrade attempt",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Ineligible Response",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "eligible": false,
+                                "ineligibilityReason": "Cannot downgrade membership. Target package must be higher tier than current package."
+                              }
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Target membership package not found"
+            )
+        }
+    )
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    public ApiResponse<MembershipUpgradePreviewResponse> getUpgradePreview(
+            @Parameter(description = "Target membership package ID to upgrade to", required = true)
+            @PathVariable Long targetMembershipId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
+        log.info("User {} requesting upgrade preview to package {}", userId, targetMembershipId);
+        MembershipUpgradePreviewResponse response = membershipService.getUpgradePreview(userId, targetMembershipId);
+        return ApiResponse.<MembershipUpgradePreviewResponse>builder()
+                .data(response)
+                .build();
+    }
+
+    @PostMapping("/initiate-upgrade")
+    @Operation(
+        summary = "Initiate membership upgrade",
+        description = "Initiate upgrade to a higher tier membership package. Returns payment URL if payment is required, or completes immediately if discount covers full price.",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = MembershipUpgradeRequest.class),
+                examples = @ExampleObject(
+                    name = "Upgrade Request",
+                    value = """
+                        {
+                          "targetMembershipId": 2,
+                          "paymentProvider": "VNPAY"
+                        }
+                        """
+                )
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Upgrade initiated successfully",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = MembershipUpgradeResponse.class),
+                    examples = {
+                        @ExampleObject(
+                            name = "Payment Required",
+                            value = """
+                                {
+                                  "code": "999999",
+                                  "message": null,
+                                  "data": {
+                                    "transactionRef": "abc123-def456",
+                                    "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/...",
+                                    "paymentProvider": "VNPAY",
+                                    "previousMembershipId": 1,
+                                    "newMembershipPackageId": 2,
+                                    "newPackageName": "Standard Monthly",
+                                    "newPackageLevel": "STANDARD",
+                                    "originalPrice": 299000,
+                                    "discountAmount": 50000,
+                                    "finalAmount": 249000,
+                                    "status": "PENDING_PAYMENT",
+                                    "message": "Please complete payment to finalize upgrade."
+                                  }
+                                }
+                                """
+                        ),
+                        @ExampleObject(
+                            name = "Free Upgrade (Discount covers full price)",
+                            value = """
+                                {
+                                  "code": "999999",
+                                  "message": null,
+                                  "data": {
+                                    "transactionRef": "abc123-def456",
+                                    "paymentUrl": null,
+                                    "paymentProvider": "VNPAY",
+                                    "previousMembershipId": 1,
+                                    "newMembershipPackageId": 2,
+                                    "newPackageName": "Standard Monthly",
+                                    "newPackageLevel": "STANDARD",
+                                    "originalPrice": 299000,
+                                    "discountAmount": 350000,
+                                    "finalAmount": 0,
+                                    "status": "COMPLETED",
+                                    "message": "Upgrade completed successfully. No payment required due to discount."
+                                  }
+                                }
+                                """
+                        )
+                    }
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Cannot upgrade - no active membership, same level, or downgrade attempt",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "No Active Membership",
+                        value = """
+                            {
+                              "code": "14001",
+                              "message": "No active membership found. Please purchase a membership first."
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Target membership package not found"
+            )
+        }
+    )
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    public ApiResponse<MembershipUpgradeResponse> initiateMembershipUpgrade(
+            @RequestBody @Valid MembershipUpgradeRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
+        log.info("User {} initiating upgrade to package {}", userId, request.getTargetMembershipId());
+        MembershipUpgradeResponse response = membershipService.initiateMembershipUpgrade(userId, request);
+        return ApiResponse.<MembershipUpgradeResponse>builder()
+                .data(response)
                 .build();
     }
 }

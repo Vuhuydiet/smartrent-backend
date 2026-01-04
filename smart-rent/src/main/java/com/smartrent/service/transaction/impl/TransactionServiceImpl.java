@@ -58,6 +58,34 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     @Transactional
+    public String createMembershipUpgradeTransaction(String userId, Long targetMembershipId, Long previousMembershipId,
+                                                      BigDecimal amount, BigDecimal discountAmount, String paymentProvider) {
+        log.info("Creating membership upgrade transaction for user: {}, from membership: {} to: {}",
+                userId, previousMembershipId, targetMembershipId);
+
+        Transaction transaction = Transaction.builder()
+                .transactionId(UUID.randomUUID().toString())
+                .userId(userId)
+                .transactionType(TransactionType.MEMBERSHIP_UPGRADE)
+                .amount(amount)
+                .referenceType(ReferenceType.MEMBERSHIP)
+                .referenceId(targetMembershipId.toString())
+                .previousMembershipId(previousMembershipId)
+                .discountAmount(discountAmount)
+                .status(TransactionStatus.PENDING)
+                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "VNPAY"))
+                .additionalInfo("Membership upgrade from ID " + previousMembershipId + " to package " + targetMembershipId +
+                        " with discount " + discountAmount)
+                .build();
+
+        transaction = transactionRepository.save(transaction);
+        log.info("Created membership upgrade transaction: {}", transaction.getTransactionId());
+
+        return transaction.getTransactionId();
+    }
+
+    @Override
+    @Transactional
     public String createPostFeeTransaction(String userId, BigDecimal amount, String vipType, int durationDays, String paymentProvider) {
         log.info("Creating post fee transaction for user: {}, vipType: {}, duration: {} days", userId, vipType, durationDays);
 

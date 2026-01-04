@@ -25,6 +25,20 @@ public interface TransactionService {
     String createMembershipTransaction(String userId, Long membershipId, BigDecimal amount, String paymentProvider);
 
     /**
+     * Create a membership upgrade transaction
+     *
+     * @param userId User ID
+     * @param targetMembershipId Target membership package ID to upgrade to
+     * @param previousMembershipId Current membership ID being upgraded from
+     * @param amount Payment amount (after discount)
+     * @param discountAmount Discount amount applied
+     * @param paymentProvider Payment provider (VNPAY, etc.)
+     * @return Transaction ID
+     */
+    String createMembershipUpgradeTransaction(String userId, Long targetMembershipId, Long previousMembershipId,
+                                               BigDecimal amount, BigDecimal discountAmount, String paymentProvider);
+
+    /**
      * Create a post fee transaction (pay-per-post)
      *
      * @param userId User ID
