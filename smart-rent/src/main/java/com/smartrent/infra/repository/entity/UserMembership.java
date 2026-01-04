@@ -56,6 +56,12 @@ public class UserMembership {
     @Column(name = "total_paid", nullable = false, precision = 15, scale = 0)
     BigDecimal totalPaid;
 
+    /**
+     * For upgraded memberships, stores the ID of the previous membership that was upgraded from
+     */
+    @Column(name = "upgraded_from_membership_id")
+    Long upgradedFromMembershipId;
+
     @OneToMany(mappedBy = "userMembership", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<UserMembershipBenefit> benefits;
 

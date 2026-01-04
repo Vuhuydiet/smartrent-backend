@@ -103,7 +103,15 @@ public enum DomainCode {
   INSUFFICIENT_QUOTA("13001", HttpStatus.BAD_REQUEST, "Insufficient quota: %s"),
   BENEFIT_NOT_FOUND("13002", HttpStatus.NOT_FOUND, "Membership benefit not found: %s"),
   BENEFIT_EXPIRED("13003", HttpStatus.BAD_REQUEST, "Membership benefit has expired: %s"),
-  BENEFIT_TYPE_MISMATCH("13004", HttpStatus.BAD_REQUEST, "Benefit type mismatch: %s")
+  BENEFIT_TYPE_MISMATCH("13004", HttpStatus.BAD_REQUEST, "Benefit type mismatch: %s"),
+  //    Membership Upgrade Error 14xxx
+  NO_ACTIVE_MEMBERSHIP("14001", HttpStatus.BAD_REQUEST, "No active membership found. Please purchase a membership first."),
+  CANNOT_DOWNGRADE_MEMBERSHIP("14002", HttpStatus.BAD_REQUEST, "Cannot downgrade membership. Target package must be higher tier than current package."),
+  SAME_MEMBERSHIP_LEVEL("14003", HttpStatus.BAD_REQUEST, "Target package is the same level as current membership."),
+  UPGRADE_ALREADY_IN_PROGRESS("14004", HttpStatus.CONFLICT, "An upgrade transaction is already in progress."),
+  MEMBERSHIP_UPGRADE_FAILED("14005", HttpStatus.INTERNAL_SERVER_ERROR, "Membership upgrade failed: %s"),
+  INVALID_UPGRADE_TARGET("14006", HttpStatus.BAD_REQUEST, "Invalid upgrade target: %s"),
+  ALREADY_HAS_ACTIVE_MEMBERSHIP("14007", HttpStatus.BAD_REQUEST, "You already have an active membership. Please use the upgrade feature to switch to a higher tier package.")
   ;
 
   private final String value;
