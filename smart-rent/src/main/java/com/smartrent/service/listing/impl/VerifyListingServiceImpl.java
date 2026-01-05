@@ -1,17 +1,21 @@
 package com.smartrent.service.listing.impl;
 
 import com.smartrent.dto.request.ListingStatusChangeRequest;
-import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.entity.Listing;
+import com.smartrent.infra.repository.entity.Admin;
+import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.service.listing.VerifyListingService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,10 +30,11 @@ public class VerifyListingServiceImpl implements VerifyListingService {
     com.smartrent.mapper.UserMapper userMapper;
     com.smartrent.mapper.AddressMapper addressMapper;
     com.smartrent.infra.repository.UserRepository userRepository;
+    AdminRepository adminRepository;
 
     @Override
     @Transactional
-    public ListingResponse changeListingStatus(Long listingId, ListingStatusChangeRequest request) {
+    public ListingResponseWithAdmin changeListingStatus(Long listingId, ListingStatusChangeRequest request) {
         log.info("Changing listing status for listing ID: {} to verified: {}", listingId, request.getVerified());
 
         // Find the listing
@@ -76,13 +81,30 @@ public class VerifyListingServiceImpl implements VerifyListingService {
         log.info("Successfully updated listing {} verification status to: {}, isVerify: {}, reason: {}",
                 listingId, request.getVerified(), listing.getIsVerify(), request.getReason());
 
-        // Build user and address responses
-        com.smartrent.dto.response.UserCreationResponse user = userRepository.findById(updatedListing.getUserId())
-                .map(userMapper::mapFromUserEntityToUserCreationResponse)
-                .orElse(null);
-        com.smartrent.dto.response.AddressResponse addressResponse =
-                updatedListing.getAddress() != null ? addressMapper.toResponse(updatedListing.getAddress()) : null;
+        // Get admin from SecurityContext
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String adminId = authentication.getName();
 
-        return listingMapper.toResponse(updatedListing, user, addressResponse);
+        Admin verifyingAdmin = adminRepository.findById(adminId)
+                .orElse(null);
+
+        if (verifyingAdmin != null) {
+            log.info("Listing {} verified by admin: {} ({})", listingId, adminId, verifyingAdmin.getEmail());
+        }
+
+        // Determine verification status
+        String verificationStatus;
+        if (updatedListing.getVerified()) {
+            verificationStatus = "APPROVED";
+        } else if (updatedListing.getIsVerify()) {
+            verificationStatus = "PENDING";
+        } else {
+            verificationStatus = "REJECTED";
+        }
+
+        // Use verification notes from request reason
+        String verificationNotes = request.getReason();
+
+        return listingMapper.toResponseWithAdmin(updatedListing, verifyingAdmin, verificationStatus, verificationNotes);
     }
 }

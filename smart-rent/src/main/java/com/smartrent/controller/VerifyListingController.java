@@ -2,7 +2,7 @@ package com.smartrent.controller;
 
 import com.smartrent.dto.request.ListingStatusChangeRequest;
 import com.smartrent.dto.response.ApiResponse;
-import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.service.listing.VerifyListingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -144,16 +144,16 @@ public class VerifyListingController {
             )
         )
     })
-    public ApiResponse<ListingResponse> changeListingStatus(
+    public ApiResponse<ListingResponseWithAdmin> changeListingStatus(
             @PathVariable Long listingId,
             @Valid @RequestBody ListingStatusChangeRequest request) {
 
         log.info("Admin requesting status change for listing {} to verified: {}",
                 listingId, request.getVerified());
 
-        ListingResponse updatedListing = verifyListingService.changeListingStatus(listingId, request);
+        ListingResponseWithAdmin updatedListing = verifyListingService.changeListingStatus(listingId, request);
 
-        return ApiResponse.<ListingResponse>builder()
+        return ApiResponse.<ListingResponseWithAdmin>builder()
                 .message("Listing status updated successfully")
                 .data(updatedListing)
                 .build();
