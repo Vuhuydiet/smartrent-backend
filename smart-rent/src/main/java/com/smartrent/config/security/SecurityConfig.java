@@ -151,7 +151,8 @@ public class SecurityConfig {
     config.setAllowedOrigins(List.of(
         clientUrl,
         "http://localhost:3000",
-        "http://localhost:8080"
+        "http://localhost:8080",
+        "https://smartrent-fe.vercel.app"
     ));
 
     config.setAllowedHeaders(List.of("*"));

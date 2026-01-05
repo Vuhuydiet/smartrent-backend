@@ -1,7 +1,7 @@
 package com.smartrent.service.listing;
 
 import com.smartrent.dto.request.ListingStatusChangeRequest;
-import com.smartrent.dto.response.ListingResponse;
+import com.smartrent.dto.response.ListingResponseWithAdmin;
 
 public interface VerifyListingService {
 
@@ -11,7 +11,7 @@ public interface VerifyListingService {
      *
      * @param listingId The ID of the listing to update
      * @param request The status change request containing the new verification status
-     * @return Updated listing information
+     * @return Updated listing information with admin verification details
      */
-    ListingResponse changeListingStatus(Long listingId, ListingStatusChangeRequest request);
+    ListingResponseWithAdmin changeListingStatus(Long listingId, ListingStatusChangeRequest request);
 }
