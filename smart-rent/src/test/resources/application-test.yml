@@ -55,9 +55,11 @@ VNPAY_QUERY_URL: "https://sandbox.vnpayment.vn"
 VNPAY_RETURN_URL: "http://localhost:3000/payment/result"
 VNPAY_IPN_URL: "http://localhost:8080/v1/payments/ipn/VNPAY"
 CLIENT_URL: "http://localhost:3000"
+ADMIN_URL: "http://localhost:3001"
 
 application:
   client-url: "http://localhost:3000"
+  admin-url: "http://localhost:3001"
   authentication:
     jwt:
       access-signer-key: "test-access-key"

@@ -72,8 +72,7 @@ public class SecurityConfig {
 
     // Configure stateless session management for JWT
     http.sessionManagement(session -> session
-        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-    );
+        .sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
     // Configure OAuth2 resource server with custom bearer token resolver
     // that skips JWT processing for public endpoints
@@ -120,8 +119,7 @@ public class SecurityConfig {
         .jwt(jwtConfigurer -> jwtConfigurer
             .decoder(decoder)
             .jwtAuthenticationConverter(jwtAuthenticationConverter()))
-        .authenticationEntryPoint(new JwtAuthenticationEntryPoint())
-    );
+        .authenticationEntryPoint(new JwtAuthenticationEntryPoint()));
 
     return http.build();
   }
@@ -141,6 +139,7 @@ public class SecurityConfig {
   @Bean
   public CorsFilter corsFilter(
       @Value("${application.client-url}") String clientUrl,
+      @Value("${application.admin-url}") String adminUrl,
       @Value("${application.cors.allowed-origins:}") String additionalOrigins) {
     CorsConfiguration config = new CorsConfiguration();
 
@@ -150,10 +149,10 @@ public class SecurityConfig {
     // Set specific allowed origins (required when allowCredentials is true)
     config.setAllowedOrigins(List.of(
         clientUrl,
+        adminUrl,
         "http://localhost:3000",
-        "http://localhost:8080",
-        "https://smartrent-fe.vercel.app"
-    ));
+        "http://localhost:3001",
+        "http://localhost:8080"));
 
     config.setAllowedHeaders(List.of("*"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
@@ -162,8 +161,7 @@ public class SecurityConfig {
         "X-Suggested-Filename",
         "Content-Length",
         "Content-Type",
-        "Access-Control-Allow-Credentials"
-    ));
+        "Access-Control-Allow-Credentials"));
 
     // Cache preflight for 2 hours to reduce OPTIONS requests
     config.setMaxAge(7200L);
@@ -190,4 +188,3 @@ public class SecurityConfig {
     return new BCryptPasswordEncoder();
   }
 }
-
