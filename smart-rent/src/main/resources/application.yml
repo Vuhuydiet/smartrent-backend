@@ -2,7 +2,7 @@ server:
   port: 8080
   # Tomcat configuration for large file uploads (videos)
   tomcat:
-    connection-timeout: 300000  # 5 minutes for video uploads
+    connection-timeout: 300000 # 5 minutes for video uploads
     max-http-form-post-size: 110MB
     max-swallow-size: 110MB
   error:
@@ -66,9 +66,9 @@ spring:
   servlet:
     multipart:
       enabled: true
-      max-file-size: 100MB      # Maximum file size per file
-      max-request-size: 110MB   # Maximum total request size
-      file-size-threshold: 2MB  # Threshold after which files are written to disk
+      max-file-size: 100MB # Maximum file size per file
+      max-request-size: 110MB # Maximum total request size
+      file-size-threshold: 2MB # Threshold after which files are written to disk
   datasource:
     driverClassName: com.mysql.cj.jdbc.Driver
     url: ${IDENTITY_SERVICE_DB_URL}
@@ -131,6 +131,7 @@ spring:
 
 application:
   client-url: "https://smartrent-fe.vercel.app"
+  admin-url: "https://smartrent-fe-admin.vercel.app"
   cors:
     allowed-origins: "*"
   admin:
@@ -147,7 +148,7 @@ application:
         - "/webjars/**"
         - "/actuator/health"
         - "/actuator/**"
-        - "/v1/listings/**"                   # Public listings (except my-* and draft/* - checked in code)
+        - "/v1/listings/**" # Public listings (except my-* and draft/* - checked in code)
         - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
         - "/v1/new-addresses/**"
@@ -349,18 +350,18 @@ management:
 otp:
   # OTP code configuration
   code-length: 6
-  ttl-seconds: 300  # 5 minutes
+  ttl-seconds: 300 # 5 minutes
   max-verification-attempts: 5
 
   # Storage configuration
   store:
-    type: ${OTP_STORE_TYPE:redis}  # redis or memory (memory for testing only)
+    type: ${OTP_STORE_TYPE:redis} # redis or memory (memory for testing only)
 
   # Rate limiting configuration
   rate-limit:
-    max-sends-per-phone: 5      # Maximum OTP sends per phone in time window
-    max-sends-per-ip: 20         # Maximum OTP sends per IP in time window
-    window-seconds: 3600         # Time window in seconds (1 hour)
+    max-sends-per-phone: 5 # Maximum OTP sends per phone in time window
+    max-sends-per-ip: 20 # Maximum OTP sends per IP in time window
+    window-seconds: 3600 # Time window in seconds (1 hour)
 
   # Provider configurations
   providers:
