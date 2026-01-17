@@ -105,6 +105,13 @@ public class VerifyListingServiceImpl implements VerifyListingService {
         // Use verification notes from request reason
         String verificationNotes = request.getReason();
 
-        return listingMapper.toResponseWithAdmin(updatedListing, verifyingAdmin, verificationStatus, verificationNotes);
+        // Fetch user information
+        com.smartrent.infra.repository.entity.User userEntity = userRepository.findById(updatedListing.getUserId())
+                .orElse(null);
+        com.smartrent.dto.response.UserCreationResponse user = userEntity != null
+                ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity)
+                : null;
+
+        return listingMapper.toResponseWithAdmin(updatedListing, user, verifyingAdmin, verificationStatus, verificationNotes);
     }
 }

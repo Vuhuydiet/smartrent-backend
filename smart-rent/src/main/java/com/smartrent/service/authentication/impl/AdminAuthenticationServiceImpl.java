@@ -160,7 +160,7 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
   private String buildScope(Admin admin) {
     StringJoiner joiner = new StringJoiner(" ");
     admin.getRoles().forEach(role -> {
-      joiner.add("ROLE_" + role.getRoleName());
+      joiner.add("ROLE_" + role.getRoleId());  // Use roleId (SA, UA, SPA) instead of roleName (Super Admin)
     });
 
     return joiner.toString();

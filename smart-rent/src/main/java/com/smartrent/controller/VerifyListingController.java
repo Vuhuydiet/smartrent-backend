@@ -32,10 +32,14 @@ public class VerifyListingController {
     VerifyListingService verifyListingService;
 
     @PutMapping("/{listingId}/status")
-    @PreAuthorize("authentication.authorities.stream().anyMatch(a -> a.authority.startsWith('ROLE_ADMIN') || a.authority.startsWith('ROLE_SUPER_ADMIN'))")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
     @Operation(
         summary = "Change listing verification status",
-        description = "Updates the verification status of a listing. Only admin users can perform this operation.",
+        description = """
+            Updates the verification status of a listing.
+
+            **Permissions:** Only Super Admin (SA), User Admin (UA), and Support Admin (SPA) can perform this operation.
+            """,
         parameters = {
             @Parameter(
                 name = "listingId",

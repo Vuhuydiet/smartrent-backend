@@ -687,7 +687,14 @@ public class ListingServiceImpl implements ListingService {
         // For now, verification notes can be null - in the future, this could be stored in a separate table
         String verificationNotes = null;
 
-        return listingMapper.toResponseWithAdmin(listing, verifyingAdmin, verificationStatus, verificationNotes);
+        // Fetch user information
+        com.smartrent.infra.repository.entity.User userEntity = userRepository.findById(listing.getUserId())
+                .orElse(null);
+        com.smartrent.dto.response.UserCreationResponse user = userEntity != null
+                ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity)
+                : null;
+
+        return listingMapper.toResponseWithAdmin(listing, user, verifyingAdmin, verificationStatus, verificationNotes);
     }
 
     /**
@@ -1516,7 +1523,14 @@ public class ListingServiceImpl implements ListingService {
                         verificationStatus = "NOT_SUBMITTED";
                     }
 
-                    return listingMapper.toResponseWithAdmin(listing, verifyingAdmin, verificationStatus, null);
+                    // Fetch user information
+                    com.smartrent.infra.repository.entity.User userEntity = userRepository.findById(listing.getUserId())
+                            .orElse(null);
+                    com.smartrent.dto.response.UserCreationResponse user = userEntity != null
+                            ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity)
+                            : null;
+
+                    return listingMapper.toResponseWithAdmin(listing, user, verifyingAdmin, verificationStatus, null);
                 })
                 .collect(Collectors.toList());
 
