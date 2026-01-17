@@ -2738,125 +2738,107 @@ public class ListingController {
      */
     @PostMapping("/admin/list")
     @Operation(
-        summary = "Get all listings for admin with pagination (Admin only)",
+        summary = "Get all listings for admin with filters and statistics",
         description = """
-            Retrieves paginated list of all listings with admin-specific information and comprehensive statistics.
-            This endpoint is for administrators only.
+            Admin endpoint to retrieve listings with verification info and dashboard statistics.
 
-            **Features:**
-            - Complete listing data with admin verification info
-            - Flexible filtering (category, province, VIP type, verification status, etc.)
-            - Pagination support
-            - Dashboard statistics (pending, verified, expired, by VIP tier, etc.)
+            **Key Features:**
+            - Filter by verification status, VIP type, location, price, etc.
+            - Get statistics: pending/verified/expired counts, VIP tier breakdown
+            - Admin verification info always includes verificationStatus (PENDING/APPROVED/REJECTED)
 
-            **Use Cases:**
-            - Admin dashboard listing management
-            - Verification queue management
-            - Analytics and reporting
+            **Common Filters:**
+            - `verified` + `isVerify`: Filter by admin verification status
+            - `vipType`: NORMAL, SILVER, GOLD, DIAMOND
+            - `listingStatus`: IN_REVIEW, DISPLAYING, EXPIRED, etc.
+            - `categoryId`, `provinceId`, `userId`: Filter by category/location/owner
             """,
         parameters = {
-            @Parameter(name = "X-Admin-Id", description = "Admin ID from authentication header", required = true)
+            @Parameter(name = "X-Admin-Id", description = "Admin ID", required = true)
         },
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = false,
             content = @Content(
                 mediaType = "application/json",
-                examples = @ExampleObject(
-                    name = "Comprehensive Filter Example",
-                    summary = "Example showing all available filter options for admin (use any combination)",
-                    value = """
-                        {
-                          "page": 0,
-                          "size": 20,
-                          "sortBy": "DEFAULT",
-                          "listingStatus": "EXPIRING_SOON",
-                          "sortDirection": "DESC",
-                          "verified": true,
-                          "isVerify": false,
-                          "expired": false,
-                          "isDraft": false,
-                          "vipType": "GOLD",
-                          "categoryId": 1,
-                          "provinceId": "79",
-                          "districtId": 5,
-                          "wardId": "123",
-                          "userId": "user-uuid-123",
-                          "listingType": "RENT",
-                          "productType": "APARTMENT",
-                          "minPrice": 1000000,
-                          "maxPrice": 50000000,
-                          "minArea": 20,
-                          "maxArea": 200,
-                          "minBedrooms": 1,
-                          "maxBedrooms": 5
-                        }
-                        """
-                )
+                examples = {
+                    @ExampleObject(
+                        name = "Pending listings",
+                        summary = "Get listings waiting for verification",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "verified": false,
+                              "isVerify": true
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "All filters",
+                        summary = "All available filters (use any combination)",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "sortBy": "DEFAULT",
+                              "sortDirection": "DESC",
+                              "verified": true,
+                              "isVerify": true,
+                              "expired": false,
+                              "vipType": "GOLD",
+                              "categoryId": 1,
+                              "provinceId": "79",
+                              "userId": "user-uuid-123",
+                              "listingType": "RENT",
+                              "productType": "APARTMENT",
+                              "minPrice": 1000000,
+                              "maxPrice": 50000000
+                            }
+                            """
+                    )
+                }
             )
         ),
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Listings retrieved successfully with statistics",
+                description = "Success",
                 content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = ApiResponse.class),
                     examples = @ExampleObject(
-                        name = "Admin Listing List Example",
                         value = """
                             {
                               "code": "999999",
-                              "message": null,
                               "data": {
                                 "listings": [
                                   {
                                     "listingId": 123,
                                     "title": "Modern 2BR Apartment",
-                                    "userId": "user-uuid-123",
                                     "verified": false,
                                     "isVerify": true,
                                     "vipType": "GOLD",
                                     "adminVerification": {
-                                      "adminId": "admin-uuid-456",
-                                      "adminName": "John Admin",
+                                      "adminId": null,
+                                      "adminName": null,
                                       "verificationStatus": "PENDING",
                                       "verificationNotes": null
                                     }
                                   }
                                 ],
                                 "totalCount": 150,
-                                "currentPage": 0,
+                                "currentPage": 1,
                                 "pageSize": 20,
                                 "totalPages": 8,
                                 "statistics": {
                                   "pendingVerification": 45,
                                   "verified": 1250,
                                   "expired": 180,
-                                  "drafts": 23,
-                                  "shadows": 89,
                                   "normalListings": 800,
                                   "silverListings": 200,
                                   "goldListings": 150,
                                   "diamondListings": 100
                                 }
                               }
-                            }
-                            """
-                    )
-                )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "401",
-                description = "Admin not authenticated or not authorized",
-                content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                        name = "Unauthorized",
-                        value = """
-                            {
-                              "code": "401001",
-                              "message": "UNAUTHORIZED - Admin not found",
-                              "data": null
                             }
                             """
                     )

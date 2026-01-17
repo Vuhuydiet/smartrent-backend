@@ -168,23 +168,32 @@ public class ListingMapperImpl implements ListingMapper {
                     .collect(Collectors.toList());
         }
 
-        // Build admin verification info if admin is provided
-        AdminVerificationInfo adminVerificationInfo = null;
-        if (verifyingAdmin != null) {
-            String adminName = (verifyingAdmin.getFirstName() != null ? verifyingAdmin.getFirstName() : "") +
-                             " " +
-                             (verifyingAdmin.getLastName() != null ? verifyingAdmin.getLastName() : "");
-            adminName = adminName.trim();
+        // Always calculate verification status based on listing state
+        String finalVerificationStatus = verificationStatus != null
+            ? verificationStatus
+            : (entity.getVerified() ? "APPROVED" : (entity.getIsVerify() ? "PENDING" : "REJECTED"));
 
-            adminVerificationInfo = AdminVerificationInfo.builder()
-                    .adminId(verifyingAdmin.getAdminId())
-                    .adminName(adminName.isEmpty() ? null : adminName)
-                    .adminEmail(verifyingAdmin.getEmail())
-                    .verifiedAt(entity.getUpdatedAt())
-                    .verificationStatus(verificationStatus != null ? verificationStatus : (entity.getVerified() ? "APPROVED" : (entity.getIsVerify() ? "PENDING" : "PENDING")))
-                    .verificationNotes(verificationNotes)
-                    .build();
+        // Build admin verification info - always include verificationStatus for FE filtering
+        // Admin-specific fields (adminId, adminName, adminEmail) are nullable if no admin has verified yet
+        String adminName = null;
+        if (verifyingAdmin != null) {
+            adminName = (verifyingAdmin.getFirstName() != null ? verifyingAdmin.getFirstName() : "") +
+                        " " +
+                        (verifyingAdmin.getLastName() != null ? verifyingAdmin.getLastName() : "");
+            adminName = adminName.trim();
+            if (adminName.isEmpty()) {
+                adminName = null;
+            }
         }
+
+        AdminVerificationInfo adminVerificationInfo = AdminVerificationInfo.builder()
+                .adminId(verifyingAdmin != null ? verifyingAdmin.getAdminId() : null)
+                .adminName(adminName)
+                .adminEmail(verifyingAdmin != null ? verifyingAdmin.getEmail() : null)
+                .verifiedAt(entity.getUpdatedAt())
+                .verificationStatus(finalVerificationStatus)
+                .verificationNotes(verificationNotes)
+                .build();
 
         return ListingResponseWithAdmin.builder()
                 .listingId(entity.getListingId())
