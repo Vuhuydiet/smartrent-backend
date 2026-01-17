@@ -32,8 +32,8 @@ public class ListingResponseWithAdmin {
     @Schema(description = "Detailed description")
     String description;
 
-    @Schema(description = "User ID of the listing owner", example = "user-123")
-    String userId;
+    @Schema(description = "Listing owner information")
+    UserCreationResponse user;
 
     @Schema(description = "Post date")
     LocalDateTime postDate;

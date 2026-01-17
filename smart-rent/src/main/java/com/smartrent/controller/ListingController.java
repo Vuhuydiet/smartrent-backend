@@ -2299,7 +2299,14 @@ public class ListingController {
                                 "listingId": 123,
                                 "title": "Căn hộ 2 phòng ngủ ấm cúng trung tâm thành phố",
                                 "description": "Căn hộ rộng rãi 2 phòng ngủ có ban công và tầm nhìn thành phố.",
-                                "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                "user": {
+                                  "userId": "user-123e4567-e89b-12d3-a456-426614174000",
+                                  "firstName": "John",
+                                  "lastName": "Doe",
+                                  "email": "john@example.com",
+                                  "phoneCode": "+84",
+                                  "phoneNumber": "912345678"
+                                },
                                 "postDate": "2025-09-01T10:00:00",
                                 "expiryDate": "2025-12-31T23:59:59",
                                 "listingType": "RENT",
@@ -2814,6 +2821,14 @@ public class ListingController {
                                   {
                                     "listingId": 123,
                                     "title": "Modern 2BR Apartment",
+                                    "user": {
+                                      "userId": "user-uuid-123",
+                                      "firstName": "John",
+                                      "lastName": "Doe",
+                                      "email": "john@example.com",
+                                      "phoneCode": "+84",
+                                      "phoneNumber": "912345678"
+                                    },
                                     "verified": false,
                                     "isVerify": true,
                                     "vipType": "GOLD",

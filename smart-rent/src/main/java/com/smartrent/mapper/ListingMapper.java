@@ -26,7 +26,17 @@ public interface ListingMapper {
     ListingResponse toResponse(Listing entity, UserCreationResponse user, AddressResponse address);
 
     ListingCreationResponse toCreationResponse(Listing entity);
-    ListingResponseWithAdmin toResponseWithAdmin(Listing entity, Admin verifyingAdmin, String verificationStatus, String verificationNotes);
+
+    /**
+     * Map Listing entity to ListingResponseWithAdmin with admin verification info and user details
+     * @param entity Listing entity
+     * @param user User information (owner)
+     * @param verifyingAdmin Admin who verified/updated the listing (can be null)
+     * @param verificationStatus Verification status (PENDING/APPROVED/REJECTED)
+     * @param verificationNotes Verification notes from admin
+     * @return ListingResponseWithAdmin
+     */
+    ListingResponseWithAdmin toResponseWithAdmin(Listing entity, UserCreationResponse user, Admin verifyingAdmin, String verificationStatus, String verificationNotes);
 
     /**
      * Map Listing entity to ListingResponseForOwner with owner-specific information

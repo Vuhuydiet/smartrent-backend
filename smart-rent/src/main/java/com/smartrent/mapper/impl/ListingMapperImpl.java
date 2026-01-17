@@ -142,7 +142,7 @@ public class ListingMapperImpl implements ListingMapper {
     }
 
     @Override
-    public ListingResponseWithAdmin toResponseWithAdmin(Listing entity, Admin verifyingAdmin, String verificationStatus, String verificationNotes) {
+    public ListingResponseWithAdmin toResponseWithAdmin(Listing entity, UserCreationResponse user, Admin verifyingAdmin, String verificationStatus, String verificationNotes) {
         // Map amenities to AmenityResponse list
         List<AmenityResponse> amenityResponses = null;
 
@@ -199,7 +199,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .listingId(entity.getListingId())
                 .title(entity.getTitle())
                 .description(entity.getDescription())
-                .userId(entity.getUserId())
+                .user(user)
                 .postDate(entity.getPostDate())
                 .expiryDate(entity.getExpiryDate())
                 .listingType(entity.getListingType() != null ? entity.getListingType().name() : null)
