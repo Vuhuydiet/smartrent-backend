@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
-@Service
+// @Service  // DISABLED: Not currently in use, causing errors
 @RequiredArgsConstructor
 public class LocationPricingServiceImpl implements LocationPricingService {
 
