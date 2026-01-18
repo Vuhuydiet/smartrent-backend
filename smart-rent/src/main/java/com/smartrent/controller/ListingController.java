@@ -2701,6 +2701,7 @@ public class ListingController {
                                 "statistics": {
                                   "drafts": 3,
                                   "pendingVerification": 5,
+                                  "rejected": 2,
                                   "active": 12,
                                   "expired": 5,
                                   "normalListings": 15,
@@ -2848,6 +2849,7 @@ public class ListingController {
                                   "pendingVerification": 45,
                                   "verified": 1250,
                                   "expired": 180,
+                                  "rejected": 35,
                                   "normalListings": 800,
                                   "silverListings": 200,
                                   "goldListings": 150,
