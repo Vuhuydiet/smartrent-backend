@@ -50,19 +50,34 @@ public class ListingFilterRequest {
     Boolean isAdminRequest;
 
     // ============ LOCATION FILTERS ============
-    @Schema(description = "Province ID (can be Integer or String for compatibility)", example = "1")
+    @Schema(description = """
+            Province ID (OLD structure - 63 provinces).
+            Use this for legacy addresses. Example: '1' for Hanoi.
+            For NEW structure (34 provinces), use provinceCode instead.
+            """, example = "1")
     String provinceId;
 
-    @Schema(description = "Province code (new structure - 34 provinces)", example = "01")
+    @Schema(description = """
+            Province code (NEW structure - 34 provinces as of July 2025).
+            Accepts both '1' and '01' formats (will be normalized).
+            Examples: '1' or '01' for Hanoi, '79' for HCMC.
+            """, example = "1")
     String provinceCode;
 
-    @Schema(description = "District ID (old structure)", example = "5")
+    @Schema(description = "District ID (OLD structure)", example = "5")
     Integer districtId;
 
-    @Schema(description = "Ward ID (can be Integer or String for compatibility)", example = "123")
+    @Schema(description = """
+            Ward ID (OLD structure - 63 provinces).
+            Use this for legacy addresses.
+            For NEW structure, use newWardCode instead.
+            """, example = "123")
     String wardId;
 
-    @Schema(description = "Ward code (new structure)", example = "00001")
+    @Schema(description = """
+            Ward code (NEW structure - 34 provinces).
+            5-digit code for wards in the new administrative structure.
+            """, example = "00001")
     String newWardCode;
 
     @Schema(description = "Street ID", example = "10")

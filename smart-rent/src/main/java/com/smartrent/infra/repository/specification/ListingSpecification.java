@@ -109,15 +109,25 @@ public class ListingSpecification {
 
                 // Province filters
                 if (filter.getProvinceId() != null) {
-                    locationPredicates.add(criteriaBuilder.equal(
-                        metadataRoot.get("provinceId"),
-                        filter.getProvinceId()
-                    ));
+                    // provinceId is String in request but Integer in DB (old structure)
+                    // Parse and handle as Integer for proper comparison
+                    try {
+                        Integer provinceIdInt = Integer.parseInt(filter.getProvinceId());
+                        locationPredicates.add(criteriaBuilder.equal(
+                            metadataRoot.get("provinceId"),
+                            provinceIdInt
+                        ));
+                    } catch (NumberFormatException e) {
+                        // Invalid provinceId format, skip this filter
+                    }
                 }
                 if (filter.getProvinceCode() != null) {
+                    // Normalize province code: remove leading zeros ("01" -> "1")
+                    // Database stores codes without leading zeros (e.g., '1', '79', not '01', '79')
+                    String normalizedCode = filter.getProvinceCode().replaceFirst("^0+(?!$)", "");
                     locationPredicates.add(criteriaBuilder.equal(
                         metadataRoot.get("newProvinceCode"),
-                        filter.getProvinceCode()
+                        normalizedCode
                     ));
                 }
 
@@ -131,10 +141,16 @@ public class ListingSpecification {
 
                 // Ward filters
                 if (filter.getWardId() != null) {
-                    locationPredicates.add(criteriaBuilder.equal(
-                        metadataRoot.get("wardId"),
-                        filter.getWardId()
-                    ));
+                    // wardId is String in request but Integer in DB (old structure)
+                    try {
+                        Integer wardIdInt = Integer.parseInt(filter.getWardId());
+                        locationPredicates.add(criteriaBuilder.equal(
+                            metadataRoot.get("wardId"),
+                            wardIdInt
+                        ));
+                    } catch (NumberFormatException e) {
+                        // Invalid wardId format, skip this filter
+                    }
                 }
                 if (filter.getNewWardCode() != null) {
                     locationPredicates.add(criteriaBuilder.equal(
