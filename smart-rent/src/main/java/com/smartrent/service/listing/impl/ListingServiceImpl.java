@@ -47,7 +47,7 @@ import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.ListingQueryService;
 import com.smartrent.service.listing.cache.ListingRequestCacheService;
-import com.smartrent.service.pricing.LocationPricingService;
+// import com.smartrent.service.pricing.LocationPricingService;  // DISABLED: Not in use
 import com.smartrent.service.quota.QuotaService;
 import com.smartrent.service.payment.PaymentService;
 import com.smartrent.service.transaction.TransactionService;
@@ -97,7 +97,7 @@ public class ListingServiceImpl implements ListingService {
     com.smartrent.mapper.AmenityMapper amenityMapper;
     com.smartrent.mapper.AddressMapper addressMapper;
     com.smartrent.mapper.UserMapper userMapper;
-    LocationPricingService locationPricingService;
+    // LocationPricingService locationPricingService;  // DISABLED: Service not in use
     QuotaService quotaService;
     TransactionService transactionService;
     TransactionRepository transactionRepository;
@@ -522,7 +522,9 @@ public class ListingServiceImpl implements ListingService {
         // Populate owner's Zalo contact information
         populateOwnerZaloInfo(response, listing.getUserId());
 
+        // DISABLED: Location pricing feature not currently in use
         // Add location pricing if address is available
+        /*
         Address address = listing.getAddress();
         if (address != null) {
             // Get address metadata to retrieve location IDs
@@ -543,6 +545,7 @@ public class ListingServiceImpl implements ListingService {
                         // as it uses a different province/ward system
                     });
         }
+        */
 
         return response;
     }
