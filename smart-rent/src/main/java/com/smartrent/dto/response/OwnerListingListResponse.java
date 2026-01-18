@@ -61,6 +61,9 @@ public class OwnerListingListResponse {
         @Schema(description = "Total number of listings pending verification", example = "5")
         Long pendingVerification;
 
+        @Schema(description = "Total number of rejected listings", example = "2")
+        Long rejected;
+
         @Schema(description = "Total number of verified/active listings", example = "12")
         Long active;
 

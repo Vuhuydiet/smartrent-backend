@@ -64,6 +64,9 @@ public class AdminListingListResponse {
         @Schema(description = "Total number of expired listings", example = "180")
         Long expired;
 
+        @Schema(description = "Total number of rejected listings (verified=false, isVerify=false)", example = "35")
+        Long rejected;
+
         @Schema(description = "Total number of draft listings", example = "23")
         Long drafts;
 

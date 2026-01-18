@@ -1567,6 +1567,12 @@ public class ListingServiceImpl implements ListingService {
         Specification<Listing> expiredSpec = baseSpec.and((root, query, cb) ->
                 cb.equal(root.get("expired"), true));
 
+        Specification<Listing> rejectedSpec = baseSpec.and((root, query, cb) ->
+                cb.and(
+                        cb.equal(root.get("verified"), false),
+                        cb.equal(root.get("isVerify"), false)
+                ));
+
         Specification<Listing> draftSpec = baseSpec.and((root, query, cb) ->
                 cb.equal(root.get("isDraft"), true));
 
@@ -1590,6 +1596,7 @@ public class ListingServiceImpl implements ListingService {
                 .pendingVerification(listingRepository.count(pendingVerificationSpec))
                 .verified(listingRepository.count(verifiedSpec))
                 .expired(listingRepository.count(expiredSpec))
+                .rejected(listingRepository.count(rejectedSpec))
                 .drafts(listingRepository.count(draftSpec))
                 .shadows(listingRepository.count(shadowSpec))
                 .normalListings(listingRepository.count(normalSpec))
@@ -1697,6 +1704,13 @@ public class ListingServiceImpl implements ListingService {
                         cb.equal(root.get("isDraft"), false)
                 ));
 
+        Specification<Listing> rejectedSpec = baseSpec.and((root, query, cb) ->
+                cb.and(
+                        cb.equal(root.get("verified"), false),
+                        cb.equal(root.get("isVerify"), false),
+                        cb.equal(root.get("isDraft"), false)
+                ));
+
         Specification<Listing> activeSpec = baseSpec.and((root, query, cb) ->
                 cb.and(
                         cb.equal(root.get("verified"), true),
@@ -1723,6 +1737,7 @@ public class ListingServiceImpl implements ListingService {
         return com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics.builder()
                 .drafts(listingRepository.count(draftSpec))
                 .pendingVerification(listingRepository.count(pendingVerificationSpec))
+                .rejected(listingRepository.count(rejectedSpec))
                 .active(listingRepository.count(activeSpec))
                 .expired(listingRepository.count(expiredSpec))
                 .normalListings(listingRepository.count(normalSpec))
