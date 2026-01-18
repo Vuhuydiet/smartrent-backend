@@ -242,7 +242,7 @@ open:
     version: "v1.0.0"
     description: "API for SmartRent Application"
     server:
-      url: "https://dev.smartrent-api.smartrent.io.vn"
+      url: "https://dev.api.smartrent.io.vn"
       description: "Local Server."
     group:
       package-to-scan: "com.smartrent.controller"
