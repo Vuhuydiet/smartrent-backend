@@ -111,7 +111,11 @@ public enum DomainCode {
   UPGRADE_ALREADY_IN_PROGRESS("14004", HttpStatus.CONFLICT, "An upgrade transaction is already in progress."),
   MEMBERSHIP_UPGRADE_FAILED("14005", HttpStatus.INTERNAL_SERVER_ERROR, "Membership upgrade failed: %s"),
   INVALID_UPGRADE_TARGET("14006", HttpStatus.BAD_REQUEST, "Invalid upgrade target: %s"),
-  ALREADY_HAS_ACTIVE_MEMBERSHIP("14007", HttpStatus.BAD_REQUEST, "You already have an active membership. Please use the upgrade feature to switch to a higher tier package.")
+  ALREADY_HAS_ACTIVE_MEMBERSHIP("14007", HttpStatus.BAD_REQUEST, "You already have an active membership. Please use the upgrade feature to switch to a higher tier package."),
+  //    News Error 15xxx
+  NEWS_NOT_FOUND("15001", HttpStatus.NOT_FOUND, "News not found"),
+  NEWS_SLUG_ALREADY_EXISTS("15002", HttpStatus.CONFLICT, "News slug already exists"),
+  NEWS_NOT_PUBLISHED("15003", HttpStatus.BAD_REQUEST, "News is not published")
   ;
 
   private final String value;

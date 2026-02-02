@@ -53,6 +53,8 @@ application:
         - "/v1/listings/reports/reasons"
         - "/v1/payments/ipn/**"
         - "/v1/payments/callback/**"
+        - "/v1/news"
+        - "/v1/news/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
