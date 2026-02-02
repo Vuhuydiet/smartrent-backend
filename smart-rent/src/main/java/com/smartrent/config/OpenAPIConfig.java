@@ -741,4 +741,15 @@ public class OpenAPIConfig {
                             .pathsToMatch("/v1/ai/**")
                             .build();
     }
+
+    @Bean
+    public GroupedOpenApi newsApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("news-blog")
+                            .displayName("News & Blog")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch("/v1/news/**", "/v1/admin/news/**")
+                            .addOpenApiCustomizer(securityCustomizer())
+                            .build();
+    }
 }

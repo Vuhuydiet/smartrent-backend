@@ -159,6 +159,8 @@ application:
         - "/v1/categories/**"
         - "/v1/support/contact"
         - "/v1/payments/callback/**"
+        - "/v1/news"
+        - "/v1/news/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
