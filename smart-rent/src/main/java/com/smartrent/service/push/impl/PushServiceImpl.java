@@ -71,13 +71,18 @@ public class PushServiceImpl implements PushService {
         if (useQuota) {
             // Check quota availability
             var quotaStatus = quotaService.checkQuotaAvailability(userId, BenefitType.PUSH);
+            log.info("Quota status for user {}: available={}, used={}, granted={}",
+                    userId, quotaStatus.getTotalAvailable(), quotaStatus.getTotalUsed(), quotaStatus.getTotalGranted());
 
             if (quotaStatus.getTotalAvailable() > 0) {
-                // Use membership quota
+                // Use membership quota - this runs in a separate transaction (REQUIRES_NEW)
+                log.info("Attempting to consume 1 PUSH quota for user {}", userId);
                 boolean consumed = quotaService.consumeQuota(userId, BenefitType.PUSH, 1);
                 if (!consumed) {
+                    log.error("Failed to consume push quota for user {} - consumeQuota returned false", userId);
                     throw new RuntimeException("Failed to consume push quota");
                 }
+                log.info("Successfully consumed 1 PUSH quota for user {}", userId);
 
                 // Create push history with MEMBERSHIP_QUOTA source
                 PushHistory pushHistory = PushHistory.builder()
@@ -102,6 +107,8 @@ public class PushServiceImpl implements PushService {
 
                 log.info("Successfully pushed listing {} using quota", request.getListingId());
                 return mapToPushResponse(pushHistory, "Listing pushed successfully using quota");
+            } else {
+                log.info("User {} has no available PUSH quota, falling back to payment flow", userId);
             }
         }
 
@@ -439,11 +446,16 @@ public class PushServiceImpl implements PushService {
 
         // If using membership quota, consume it
         if (schedule.getSource() == PushSchedule.PushSource.MEMBERSHIP) {
+            log.info("Scheduled push using membership quota - attempting to consume 1 PUSH quota for user {}",
+                    schedule.getUserId());
             boolean consumed = quotaService.consumeQuota(schedule.getUserId(), BenefitType.PUSH, 1);
             if (!consumed) {
-                log.error("Failed to consume quota for schedule {}", schedule.getScheduleId());
+                log.error("Failed to consume quota for schedule {} - user {} may have insufficient quota",
+                        schedule.getScheduleId(), schedule.getUserId());
                 return;
             }
+            log.info("Successfully consumed 1 PUSH quota for scheduled push - scheduleId={}, userId={}",
+                    schedule.getScheduleId(), schedule.getUserId());
         }
 
         // Create push history

@@ -115,7 +115,8 @@ public enum DomainCode {
   //    News Error 15xxx
   NEWS_NOT_FOUND("15001", HttpStatus.NOT_FOUND, "News not found"),
   NEWS_SLUG_ALREADY_EXISTS("15002", HttpStatus.CONFLICT, "News slug already exists"),
-  NEWS_NOT_PUBLISHED("15003", HttpStatus.BAD_REQUEST, "News is not published")
+  NEWS_NOT_PUBLISHED("15003", HttpStatus.BAD_REQUEST, "News is not published"),
+  NEWS_INVALID_LIMIT("15004", HttpStatus.BAD_REQUEST, "Invalid limit: %s")
   ;
 
   private final String value;

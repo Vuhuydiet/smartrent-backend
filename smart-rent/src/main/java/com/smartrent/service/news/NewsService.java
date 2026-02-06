@@ -5,8 +5,11 @@ import com.smartrent.dto.request.NewsUpdateRequest;
 import com.smartrent.dto.response.NewsDetailResponse;
 import com.smartrent.dto.response.NewsListResponse;
 import com.smartrent.dto.response.NewsResponse;
+import com.smartrent.dto.response.NewsSummaryResponse;
 import com.smartrent.enums.NewsCategory;
 import com.smartrent.enums.NewsStatus;
+
+import java.util.List;
 
 /**
  * Service interface for News and Blog operations
@@ -32,6 +35,13 @@ public interface NewsService {
      * @return News detail with related posts
      */
     NewsDetailResponse getNewsBySlug(String slug);
+
+    /**
+     * Get the N newest published news articles
+     * @param limit Number of news articles to return (1-50, default 10)
+     * @return List of newest published news summaries
+     */
+    List<NewsSummaryResponse> getNewestNews(Integer limit);
 
     // ========== Admin APIs (for content management) ==========
 
