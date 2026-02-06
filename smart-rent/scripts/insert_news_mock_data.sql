@@ -1,3 +1,4 @@
+USE smartrent;
 -- =====================================================
 -- Mock Data Script for News & Blog Module
 -- Generates 100 news and blog posts for testing

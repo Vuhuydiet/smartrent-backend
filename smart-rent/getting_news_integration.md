@@ -7,6 +7,7 @@ This document provides comprehensive guidance for frontend developers to integra
 ### Use Cases
 - **Public News Listing Page**: Display published news and blog posts with pagination and filtering
 - **News Detail Page**: Show full article content with related posts
+- **Homepage "Latest News" Section**: Display the N newest published articles
 - **Admin Content Management**: Create, edit, publish, and manage news articles
 - **Category Filtering**: Filter news by category (NEWS, BLOG, MARKET_TREND, GUIDE, ANNOUNCEMENT)
 - **Tag-based Discovery**: Find related content through tags
@@ -21,6 +22,7 @@ This document provides comprehensive guidance for frontend developers to integra
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/v1/news` | Get paginated list of published news |
+| GET | `/v1/news/newest` | Get the N newest published news articles |
 | GET | `/v1/news/{slug}` | Get news detail by URL-friendly slug |
 
 ### Admin Endpoints (Authentication Required)
@@ -138,7 +140,226 @@ async function fetchNewsDetail(slug: string) {
 const newsDetail = await fetchNewsDetail('top-10-tips-for-finding-the-perfect-rental');
 ```
 
-### 3. Create News (Admin)
+### 3. Get Newest News (Public)
+
+**Endpoint**: `GET /v1/news/newest`
+
+**Description**: Retrieve the N newest published news articles, sorted by publication date (newest first). This endpoint is ideal for displaying "Latest News" sections on the homepage or sidebar.
+
+**Query Parameters**:
+- `limit` (optional): Number of news articles to return (1-50, default: 10)
+
+**Validation Rules**:
+- `limit` must be at least 1
+- `limit` must not exceed 50
+- If not provided, defaults to 10
+
+**Example Requests**:
+
+```bash
+# Get 10 newest news (default)
+curl -X GET "https://api.smartrent.com/v1/news/newest"
+
+# Get 5 newest news
+curl -X GET "https://api.smartrent.com/v1/news/newest?limit=5"
+
+# Get 20 newest news
+curl -X GET "https://api.smartrent.com/v1/news/newest?limit=20"
+```
+
+**Success Response** (200 OK):
+
+```json
+{
+  "code": "999999",
+  "message": null,
+  "data": [
+    {
+      "newsId": 5,
+      "title": "New Rental Market Trends for 2024",
+      "slug": "new-rental-market-trends-for-2024",
+      "summary": "Discover the latest trends shaping the rental market this year",
+      "category": "NEWS",
+      "tags": ["market", "trends", "2024"],
+      "thumbnailUrl": "https://example.com/image5.jpg",
+      "publishedAt": "2024-01-20T14:00:00",
+      "authorName": "Admin User",
+      "viewCount": 320,
+      "createdAt": "2024-01-20T12:00:00"
+    },
+    {
+      "newsId": 4,
+      "title": "How to Negotiate Your Rent",
+      "slug": "how-to-negotiate-your-rent",
+      "summary": "Expert tips on negotiating better rental terms",
+      "category": "BLOG",
+      "tags": ["negotiation", "tips", "rent"],
+      "thumbnailUrl": "https://example.com/image4.jpg",
+      "publishedAt": "2024-01-18T10:30:00",
+      "authorName": "Admin User",
+      "viewCount": 580,
+      "createdAt": "2024-01-18T09:00:00"
+    }
+  ]
+}
+```
+
+**Error Response** (400 Bad Request - Invalid Limit):
+
+```json
+{
+  "code": "15004",
+  "message": "Invalid limit: limit must be at least 1",
+  "data": null
+}
+```
+
+```json
+{
+  "code": "15004",
+  "message": "Invalid limit: limit must not exceed 50",
+  "data": null
+}
+```
+
+**JavaScript/TypeScript Example**:
+
+```typescript
+// Fetch newest news
+async function fetchNewestNews(limit: number = 10): Promise<ApiResponse<NewsItem[]>> {
+  const response = await fetch(
+    `https://api.smartrent.com/v1/news/newest?limit=${limit}`
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to fetch newest news');
+  }
+
+  return await response.json();
+}
+
+// Usage examples
+const latestNews = await fetchNewestNews();        // Get 10 newest (default)
+const top5News = await fetchNewestNews(5);         // Get 5 newest
+const top20News = await fetchNewestNews(20);       // Get 20 newest
+```
+
+**React/Next.js Component Example**:
+
+```tsx
+import { useState, useEffect } from 'react';
+
+interface NewsItem {
+  newsId: number;
+  title: string;
+  slug: string;
+  summary: string;
+  category: string;
+  tags: string[];
+  thumbnailUrl: string;
+  publishedAt: string;
+  authorName: string;
+  viewCount: number;
+  createdAt: string;
+}
+
+interface LatestNewsSectionProps {
+  limit?: number;
+}
+
+export function LatestNewsSection({ limit = 5 }: LatestNewsSectionProps) {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadNews() {
+      try {
+        setLoading(true);
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/v1/news/newest?limit=${limit}`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to load news');
+        }
+
+        const data = await response.json();
+        setNews(data.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadNews();
+  }, [limit]);
+
+  if (loading) {
+    return (
+      <div className="animate-pulse space-y-4">
+        {[...Array(limit)].map((_, i) => (
+          <div key={i} className="h-24 bg-gray-200 rounded" />
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-red-500">Error: {error}</div>;
+  }
+
+  return (
+    <section className="latest-news">
+      <h2 className="text-2xl font-bold mb-4">Latest News</h2>
+      <div className="space-y-4">
+        {news.map((item) => (
+          <article key={item.newsId} className="flex gap-4 p-4 border rounded-lg">
+            {item.thumbnailUrl && (
+              <img
+                src={item.thumbnailUrl}
+                alt={item.title}
+                className="w-24 h-24 object-cover rounded"
+              />
+            )}
+            <div className="flex-1">
+              <a href={`/news/${item.slug}`} className="hover:underline">
+                <h3 className="font-semibold text-lg">{item.title}</h3>
+              </a>
+              <p className="text-gray-600 text-sm line-clamp-2">{item.summary}</p>
+              <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+                <span>{item.category}</span>
+                <span>•</span>
+                <span>{new Date(item.publishedAt).toLocaleDateString()}</span>
+                <span>•</span>
+                <span>{item.viewCount} views</span>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Usage in a page
+export default function HomePage() {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8">Welcome to SmartRent</h1>
+
+      {/* Other homepage content */}
+
+      {/* Latest News Section */}
+      <LatestNewsSection limit={5} />
+    </div>
+  );
+}
+```
+
+### 4. Create News (Admin)
 
 **Endpoint**: `POST /v1/admin/news`
 

@@ -27,8 +27,8 @@ public interface UserMembershipBenefitRepository extends JpaRepository<UserMembe
     @Query("SELECT umb FROM user_membership_benefits umb WHERE umb.userId = :userId AND umb.benefitType = :benefitType AND umb.status = 'ACTIVE' AND umb.expiresAt > :now AND umb.quantityUsed < umb.totalQuantity ORDER BY umb.expiresAt ASC")
     List<UserMembershipBenefit> findAvailableBenefits(@Param("userId") String userId, @Param("benefitType") BenefitType benefitType, @Param("now") LocalDateTime now);
 
-    @Query("SELECT umb FROM user_membership_benefits umb WHERE umb.userId = :userId AND umb.benefitType = :benefitType AND umb.status = 'ACTIVE' AND umb.expiresAt > :now AND umb.quantityUsed < umb.totalQuantity ORDER BY umb.expiresAt ASC")
-    Optional<UserMembershipBenefit> findFirstAvailableBenefit(@Param("userId") String userId, @Param("benefitType") BenefitType benefitType, @Param("now") LocalDateTime now);
+    @Query(value = "SELECT * FROM user_membership_benefits umb WHERE umb.user_id = :userId AND umb.benefit_type = :benefitType AND umb.status = 'ACTIVE' AND umb.expires_at > :now AND umb.quantity_used < umb.total_quantity ORDER BY umb.expires_at ASC LIMIT 1", nativeQuery = true)
+    Optional<UserMembershipBenefit> findFirstAvailableBenefit(@Param("userId") String userId, @Param("benefitType") String benefitType, @Param("now") LocalDateTime now);
 
     @Query("SELECT umb FROM user_membership_benefits umb WHERE umb.status = 'ACTIVE' AND umb.expiresAt <= :now")
     List<UserMembershipBenefit> findExpiredBenefits(@Param("now") LocalDateTime now);

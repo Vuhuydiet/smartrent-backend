@@ -105,6 +105,35 @@ public class NewsServiceImpl implements NewsService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<NewsSummaryResponse> getNewestNews(Integer limit) {
+        // Default limit
+        int effectiveLimit = (limit != null) ? limit : 10;
+
+        // Validate limit
+        if (effectiveLimit < 1) {
+            log.warn("Invalid limit value: {} - must be at least 1", effectiveLimit);
+            throw new AppException(DomainCode.NEWS_INVALID_LIMIT, "limit must be at least 1");
+        }
+        if (effectiveLimit > 50) {
+            log.warn("Invalid limit value: {} - must not exceed 50", effectiveLimit);
+            throw new AppException(DomainCode.NEWS_INVALID_LIMIT, "limit must not exceed 50");
+        }
+
+        log.info("Getting newest {} published news articles", effectiveLimit);
+
+        Pageable pageable = PageRequest.of(0, effectiveLimit);
+        Page<News> newsPage = newsRepository.findByStatusOrderByPublishedAtDesc(NewsStatus.PUBLISHED, pageable);
+
+        List<NewsSummaryResponse> newsList = newsPage.getContent().stream()
+                .map(newsMapper::toSummaryResponse)
+                .collect(Collectors.toList());
+
+        log.info("Retrieved {} newest news articles", newsList.size());
+        return newsList;
+    }
+
+    @Override
     @Transactional
     public NewsResponse createNews(NewsCreateRequest request, String adminId, String adminName) {
         log.info("Creating news - title: {}, category: {}, admin: {}", request.getTitle(), request.getCategory(), adminId);

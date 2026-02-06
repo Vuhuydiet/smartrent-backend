@@ -3,7 +3,10 @@ package com.smartrent.controller;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.NewsDetailResponse;
 import com.smartrent.dto.response.NewsListResponse;
+import com.smartrent.dto.response.NewsSummaryResponse;
 import com.smartrent.enums.NewsCategory;
+
+import java.util.List;
 import com.smartrent.service.news.NewsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -99,6 +102,88 @@ public class NewsController {
         NewsListResponse response = newsService.getPublishedNews(page, size, category, tag, keyword);
 
         return ApiResponse.<NewsListResponse>builder()
+                .data(response)
+                .build();
+    }
+
+    @GetMapping("/newest")
+    @Operation(
+            summary = "Get newest published news",
+            description = "Retrieve the N newest published news articles, sorted by publication date (newest first). " +
+                    "This endpoint is ideal for displaying 'Latest News' sections on the homepage or sidebar."
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Successfully retrieved newest news",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": null,
+                                              "data": [
+                                                {
+                                                  "newsId": 5,
+                                                  "title": "New Rental Market Trends for 2024",
+                                                  "slug": "new-rental-market-trends-for-2024",
+                                                  "summary": "Discover the latest trends shaping the rental market this year",
+                                                  "category": "NEWS",
+                                                  "tags": ["market", "trends", "2024"],
+                                                  "thumbnailUrl": "https://example.com/image5.jpg",
+                                                  "publishedAt": "2024-01-20T14:00:00",
+                                                  "authorName": "Admin User",
+                                                  "viewCount": 320,
+                                                  "createdAt": "2024-01-20T12:00:00"
+                                                },
+                                                {
+                                                  "newsId": 4,
+                                                  "title": "How to Negotiate Your Rent",
+                                                  "slug": "how-to-negotiate-your-rent",
+                                                  "summary": "Expert tips on negotiating better rental terms",
+                                                  "category": "BLOG",
+                                                  "tags": ["negotiation", "tips", "rent"],
+                                                  "thumbnailUrl": "https://example.com/image4.jpg",
+                                                  "publishedAt": "2024-01-18T10:30:00",
+                                                  "authorName": "Admin User",
+                                                  "viewCount": 580,
+                                                  "createdAt": "2024-01-18T09:00:00"
+                                                }
+                                              ]
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid limit parameter",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Invalid Limit",
+                                    value = """
+                                            {
+                                              "code": "15004",
+                                              "message": "Invalid limit: limit must be at least 1",
+                                              "data": null
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
+    public ApiResponse<List<NewsSummaryResponse>> getNewestNews(
+            @Parameter(description = "Number of news articles to return (1-50, default: 10)", example = "10")
+            @RequestParam(required = false, defaultValue = "10") Integer limit
+    ) {
+        log.info("GET /v1/news/newest - limit: {}", limit);
+
+        List<NewsSummaryResponse> response = newsService.getNewestNews(limit);
+
+        return ApiResponse.<List<NewsSummaryResponse>>builder()
                 .data(response)
                 .build();
     }

@@ -74,13 +74,13 @@ public class QuotaServiceImpl implements QuotaService {
     }
 
     @Override
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public boolean consumeQuota(String userId, BenefitType benefitType, int quantity) {
         log.info("Consuming {} quota of type {} for user {}", quantity, benefitType, userId);
 
-        // Find first available benefit with quota
+        // Find first available benefit with quota - use benefitType.name() for native query
         UserMembershipBenefit benefit = userBenefitRepository
-                .findFirstAvailableBenefit(userId, benefitType, LocalDateTime.now())
+                .findFirstAvailableBenefit(userId, benefitType.name(), LocalDateTime.now())
                 .orElse(null);
 
         if (benefit == null) {
@@ -88,14 +88,30 @@ public class QuotaServiceImpl implements QuotaService {
             return false;
         }
 
+        log.debug("Found benefit {} with remaining quota: {}", benefit.getUserBenefitId(), benefit.getQuantityRemaining());
+
         try {
+            // Consume quota
             benefit.consumeQuota(quantity);
-            userBenefitRepository.save(benefit);
-            log.info("Successfully consumed {} quota for user {}", quantity, userId);
+
+            // Save and flush to ensure changes are persisted immediately
+            userBenefitRepository.saveAndFlush(benefit);
+
+            log.info("Successfully consumed {} quota for user {}. Benefit ID: {}, New quantity used: {}, Remaining: {}",
+                    quantity, userId, benefit.getUserBenefitId(), benefit.getQuantityUsed(), benefit.getQuantityRemaining());
             return true;
-        } catch (Exception e) {
-            log.error("Failed to consume quota: {}", e.getMessage());
+        } catch (IllegalStateException e) {
+            log.error("Failed to consume quota - insufficient quota: userId={}, benefitType={}, quantity={}, error={}",
+                    userId, benefitType, quantity, e.getMessage(), e);
             return false;
+        } catch (IllegalArgumentException e) {
+            log.error("Failed to consume quota - invalid argument: userId={}, benefitType={}, quantity={}, error={}",
+                    userId, benefitType, quantity, e.getMessage(), e);
+            return false;
+        } catch (Exception e) {
+            log.error("Failed to consume quota - unexpected error: userId={}, benefitType={}, quantity={}, error={}",
+                    userId, benefitType, quantity, e.getMessage(), e);
+            throw new RuntimeException("Failed to consume quota: " + e.getMessage(), e);
         }
     }
 
