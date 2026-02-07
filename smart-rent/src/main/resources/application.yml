@@ -120,6 +120,7 @@ spring:
       - "auth.otp"
       - "auth.invalidatedTokens"
       - "locationCache"
+      - "listing.search"
     type: "${CACHE_TYPE:redis}"
     redis:
       timeToLive: 1d
@@ -128,6 +129,7 @@ spring:
         "[auth.otp]": 5m
         "[auth.invalidatedTokens]": 24h
         "[locationCache]": 24h
+        "[listing.search]": 30s
 
 application:
   client-url: "https://smartrent-fe.vercel.app"

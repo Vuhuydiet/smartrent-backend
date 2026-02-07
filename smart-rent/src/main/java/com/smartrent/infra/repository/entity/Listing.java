@@ -1,6 +1,7 @@
 package com.smartrent.infra.repository.entity;
 
 import com.smartrent.enums.PostSource;
+import com.smartrent.util.TextNormalizer;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -46,6 +47,12 @@ public class Listing {
 
     @Column(name = "description", columnDefinition = "LONGTEXT")
     String description;
+
+    @Column(name = "search_text", length = 512)
+    String searchText;
+
+    @Column(name = "title_norm", length = 256)
+    String titleNorm;
 
     @Column(name = "user_id", nullable = false, length = 36)
     String userId;
@@ -304,6 +311,31 @@ public class Listing {
 
     public boolean isActive() {
         return !isExpiredListing() && (isAutoVerified() || isManuallyVerified());
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void updateSearchFields() {
+        String addressText = address != null ? address.getDisplayAddress() : null;
+        String descSnippet = description;
+        if (descSnippet != null && descSnippet.length() > 200) {
+            descSnippet = descSnippet.substring(0, 200);
+        }
+
+        StringBuilder sb = new StringBuilder();
+        if (title != null && !title.isEmpty()) {
+            sb.append(title).append(' ');
+        }
+        if (addressText != null && !addressText.isEmpty()) {
+            sb.append(addressText).append(' ');
+        }
+        if (descSnippet != null && !descSnippet.isEmpty()) {
+            sb.append(descSnippet);
+        }
+
+        String combined = sb.toString().trim();
+        titleNorm = TextNormalizer.compact(title, 256);
+        searchText = TextNormalizer.compact(combined, 512);
     }
 
     /**
