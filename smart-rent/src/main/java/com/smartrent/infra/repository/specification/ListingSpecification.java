@@ -493,12 +493,28 @@ public class ListingSpecification {
                 ));
             }
 
-            // ============ KEYWORD SEARCH ============
+            // ============ KEYWORD SEARCH (FULLTEXT) ============
             if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()) {
                 String normalized = TextNormalizer.normalize(filter.getKeyword());
                 if (normalized != null && !normalized.isEmpty()) {
-                    String searchPattern = "%" + normalized + "%";
-                    predicates.add(criteriaBuilder.like(root.get("searchText"), searchPattern));
+                    // Use MySQL FULLTEXT MATCH...AGAINST in BOOLEAN MODE for indexed search
+                    // Each word gets a '+' prefix for AND semantics, '*' suffix for prefix matching
+                    String[] words = normalized.split("\\s+");
+                    StringBuilder ftQuery = new StringBuilder();
+                    for (String word : words) {
+                        if (!word.isEmpty()) {
+                            ftQuery.append("+").append(word).append("* ");
+                        }
+                    }
+                    String fulltextQuery = ftQuery.toString().trim();
+                    if (!fulltextQuery.isEmpty()) {
+                        predicates.add(criteriaBuilder.greaterThan(
+                            criteriaBuilder.function("match_against",
+                                Double.class,
+                                root.get("searchText"),
+                                criteriaBuilder.literal(fulltextQuery)),
+                            0.0));
+                    }
                 }
             }
 

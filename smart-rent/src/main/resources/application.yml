@@ -130,7 +130,7 @@ spring:
         "[auth.otp]": 5m
         "[auth.invalidatedTokens]": 24h
         "[locationCache]": 24h
-        "[listing.search]": 30s
+        "[listing.search]": 5m
 
 application:
   client-url: "https://smartrent-fe.vercel.app"
