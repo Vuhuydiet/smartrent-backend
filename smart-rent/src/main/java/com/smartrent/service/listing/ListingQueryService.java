@@ -121,6 +121,11 @@ public class ListingQueryService {
                 case "createdAt" -> Sort.by(direction, "createdAt");
                 case "updatedAt" -> Sort.by(direction, "updatedAt");
                 case "postDate" -> Sort.by(direction, "postDate");
+                // Handle high-level sort options from ListingFilterRequest
+                case "NEWEST" -> Sort.by(Sort.Direction.DESC, "updatedAt");
+                case "OLDEST" -> Sort.by(Sort.Direction.ASC, "updatedAt");
+                case "PRICE_ASC" -> Sort.by(Sort.Direction.ASC, "price");
+                case "PRICE_DESC" -> Sort.by(Sort.Direction.DESC, "price");
                 default -> null;
             };
 

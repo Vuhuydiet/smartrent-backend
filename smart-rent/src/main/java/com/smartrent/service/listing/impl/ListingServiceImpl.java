@@ -70,7 +70,9 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -870,6 +872,26 @@ public class ListingServiceImpl implements ListingService {
         }
     }
 
+    /**
+     * Populate owner contact info from a pre-loaded User object (avoids extra DB query)
+     */
+    private void populateOwnerZaloInfoFromUser(ListingResponse response, User user) {
+        if (user == null) return;
+        String contactPhone = user.getContactPhoneNumber();
+        Boolean contactVerified = user.getContactPhoneVerified();
+        response.setOwnerContactPhoneNumber(contactPhone);
+        response.setOwnerContactPhoneVerified(contactVerified);
+        boolean isPhonePresent = contactPhone != null && !contactPhone.isEmpty();
+        boolean isVerified = Boolean.TRUE.equals(contactVerified);
+        if (isPhonePresent && isVerified) {
+            response.setOwnerZaloLink("https://zalo.me/" + contactPhone);
+            response.setContactAvailable(true);
+        } else {
+            response.setOwnerZaloLink(null);
+            response.setContactAvailable(false);
+        }
+    }
+
     @Override
     @Transactional
     public ListingCreationResponse completeListingCreationAfterPayment(String transactionId) {
@@ -1209,21 +1231,31 @@ public class ListingServiceImpl implements ListingService {
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
 
-        // Convert to response DTOs
+        // Batch-load all users in one query to avoid N+1 (was ~30 queries per page)
+        Set<String> userIds = page.getContent().stream()
+                .map(Listing::getUserId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<String, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
+                : userRepository.findAllById(userIds).stream()
+                        .collect(Collectors.toMap(User::getUserId, Function.identity()));
+
+        // Convert to response DTOs using pre-loaded users
         List<ListingResponse> listings = page.getContent().stream()
                 .map(listing -> {
-                    com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
+                    User user = userMap.get(listing.getUserId());
+                    com.smartrent.dto.response.UserCreationResponse userResponse =
+                            user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
                     com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, user, addressResponse);
-                    populateOwnerZaloInfo(response, listing.getUserId());
+                    ListingResponse response = listingMapper.toResponse(listing, userResponse, addressResponse);
+                    populateOwnerZaloInfoFromUser(response, user);
                     return response;
                 })
                 .collect(Collectors.toList());
 
-        // Get recommendations (only for public search, not for my listings)
-        List<ListingResponse> recommendations = isMyListings
-                ? Collections.emptyList()
-                : getRecommendations(filter, 5);
+        // Recommendations skipped during search for performance
+        // TODO: implement async/lazy recommendations if needed
+        List<ListingResponse> recommendations = Collections.emptyList();
 
         return ListingListResponse.builder()
                 .listings(listings)
