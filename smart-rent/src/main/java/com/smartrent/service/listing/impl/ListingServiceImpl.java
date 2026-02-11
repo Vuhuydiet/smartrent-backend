@@ -557,32 +557,8 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional(readOnly = true)
     public List<ListingResponse> getListingsByIds(Set<Long> ids) {
-        // Fetch listings with amenities first
-        List<Listing> listings = listingRepository.findByIdsWithAmenities(ids);
-
-        // Fetch media separately to avoid MultipleBagFetchException
-        listingRepository.findByIdsWithMedia(ids);
-
-        // Batch-load all users in one query to avoid N+1
-        Set<String> userIds = listings.stream()
-                .map(Listing::getUserId)
-                .filter(id -> id != null)
-                .collect(Collectors.toSet());
-        Map<String, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
-                : userRepository.findAllById(userIds).stream()
-                        .collect(Collectors.toMap(User::getUserId, Function.identity()));
-
-        return listings.stream()
-                .map(listing -> {
-                    User user = userMap.get(listing.getUserId());
-                    com.smartrent.dto.response.UserCreationResponse userResponse =
-                            user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
-                    com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, userResponse, addressResponse);
-                    populateOwnerZaloInfoFromUser(response, user);
-                    return response;
-                })
-                .collect(Collectors.toList());
+        List<Listing> listings = listingRepository.findByListingIdIn(ids);
+        return batchMapListings(listings);
     }
 
     @Override
@@ -590,32 +566,15 @@ public class ListingServiceImpl implements ListingService {
     public List<ListingResponse> getListings(int page, int size) {
         // Convert 1-based page to 0-based for Spring Data
         int safePage = Math.max(page - 1, 0);
-        int safeSize = Math.min(Math.max(size, 1), 100); // cap size to 100
+        int safeSize = Math.min(Math.max(size, 1), 100);
         Pageable pageable = PageRequest.of(safePage, safeSize,
                 Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
                         .and(Sort.by(Sort.Direction.DESC, "updatedAt")));
-        Page<Listing> pageResult = listingRepository.findAll(pageable);
 
-        // Batch-load all users in one query to avoid N+1
-        Set<String> userIds = pageResult.getContent().stream()
-                .map(Listing::getUserId)
-                .filter(id -> id != null)
-                .collect(Collectors.toSet());
-        Map<String, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
-                : userRepository.findAllById(userIds).stream()
-                        .collect(Collectors.toMap(User::getUserId, Function.identity()));
+        // Use filtered query with address JOIN FETCH (1 query instead of N+1)
+        Page<Listing> pageResult = listingRepository.findPublicListings(pageable);
 
-        return pageResult.getContent().stream()
-                .map(listing -> {
-                    User user = userMap.get(listing.getUserId());
-                    com.smartrent.dto.response.UserCreationResponse userResponse =
-                            user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
-                    com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, userResponse, addressResponse);
-                    populateOwnerZaloInfoFromUser(response, user);
-                    return response;
-                })
-                .collect(Collectors.toList());
+        return batchMapListings(pageResult.getContent());
     }
 
     @Override
@@ -915,6 +874,46 @@ public class ListingServiceImpl implements ListingService {
             response.setOwnerZaloLink(null);
             response.setContactAvailable(false);
         }
+    }
+
+    /**
+     * Batch-load all relationships (users, amenities, media) and map listings to responses.
+     * Reduces N+1 from ~33 queries to 4 queries for a page of 10 listings.
+     */
+    private List<ListingResponse> batchMapListings(List<Listing> listings) {
+        if (listings.isEmpty()) return Collections.emptyList();
+
+        List<Long> listingIds = listings.stream()
+                .map(Listing::getListingId)
+                .collect(Collectors.toList());
+
+        // 1 query: batch-load all users
+        Set<String> userIds = listings.stream()
+                .map(Listing::getUserId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<String, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
+                : userRepository.findAllById(userIds).stream()
+                        .collect(Collectors.toMap(User::getUserId, Function.identity()));
+
+        // 1 query: batch-load amenities (populates Hibernate session cache)
+        listingRepository.findByIdsWithAmenities(listingIds);
+
+        // 1 query: batch-load media (populates Hibernate session cache)
+        listingRepository.findByIdsWithMedia(listingIds);
+
+        // Map to DTOs - amenities/media are now in Hibernate L1 cache, no extra queries
+        return listings.stream()
+                .map(listing -> {
+                    User user = userMap.get(listing.getUserId());
+                    com.smartrent.dto.response.UserCreationResponse userResponse =
+                            user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
+                    com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
+                    ListingResponse response = listingMapper.toResponse(listing, userResponse, addressResponse);
+                    populateOwnerZaloInfoFromUser(response, user);
+                    return response;
+                })
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -1253,27 +1252,8 @@ public class ListingServiceImpl implements ListingService {
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
 
-        // Batch-load all users in one query to avoid N+1 (was ~30 queries per page)
-        Set<String> userIds = page.getContent().stream()
-                .map(Listing::getUserId)
-                .filter(id -> id != null)
-                .collect(Collectors.toSet());
-        Map<String, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
-                : userRepository.findAllById(userIds).stream()
-                        .collect(Collectors.toMap(User::getUserId, Function.identity()));
-
-        // Convert to response DTOs using pre-loaded users
-        List<ListingResponse> listings = page.getContent().stream()
-                .map(listing -> {
-                    User user = userMap.get(listing.getUserId());
-                    com.smartrent.dto.response.UserCreationResponse userResponse =
-                            user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
-                    com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, userResponse, addressResponse);
-                    populateOwnerZaloInfoFromUser(response, user);
-                    return response;
-                })
-                .collect(Collectors.toList());
+        // Batch-load all relationships and map to DTOs (4 queries total)
+        List<ListingResponse> listings = batchMapListings(page.getContent());
 
         return ListingListResponse.builder()
                 .listings(listings)
