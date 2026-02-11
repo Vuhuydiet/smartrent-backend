@@ -78,6 +78,16 @@ public interface ListingService {
     ListingListResponse searchListings(ListingFilterRequest filter);
 
     /**
+     * Autocomplete listings by title prefix (normalized).
+     * Returns lightweight results for search suggestions.
+     *
+     * @param query Search prefix
+     * @param limit Max results (default 10)
+     * @return List of autocomplete responses
+     */
+    List<com.smartrent.dto.response.ListingAutocompleteResponse> autocompleteListings(String query, int limit);
+
+    /**
      * Get listing statistics by provinces (for home screen)
      * Returns statistics for each province including total listings, verified, and VIP counts
      * @param request Province statistics request (provinceIds or provinceCodes)

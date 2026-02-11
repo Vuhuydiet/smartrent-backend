@@ -47,6 +47,7 @@ import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.ListingQueryService;
 import com.smartrent.service.listing.cache.ListingRequestCacheService;
+import com.smartrent.util.TextNormalizer;
 // import com.smartrent.service.pricing.LocationPricingService;  // DISABLED: Not in use
 import com.smartrent.service.quota.QuotaService;
 import com.smartrent.service.payment.PaymentService;
@@ -63,6 +64,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -1181,12 +1183,28 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_SEARCH,
+            key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
+            unless = "#result == null")
     public ListingListResponse searchListings(ListingFilterRequest filter) {
         boolean isMyListings = filter.getUserId() != null && !filter.getUserId().isEmpty();
 
         log.info("Unified search - UserId: {}, Category: {}, Province: {}/{}, isDraft: {}, Page: {}, Size: {}",
                 filter.getUserId(), filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCode(),
                 filter.getIsDraft(), filter.getPage(), filter.getSize());
+
+        String normalizedKeyword = TextNormalizer.normalize(filter.getKeyword());
+        if (filter.getKeyword() != null && (normalizedKeyword == null || normalizedKeyword.length() < 3)) {
+            return ListingListResponse.builder()
+                    .listings(Collections.emptyList())
+                    .totalCount(0L)
+                    .currentPage(1)
+                    .pageSize(filter.getSize() != null ? filter.getSize() : 20)
+                    .totalPages(0)
+                    .recommendations(Collections.emptyList())
+                    .filterCriteria(filter)
+                    .build();
+        }
 
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
@@ -1216,6 +1234,33 @@ public class ListingServiceImpl implements ListingService {
                 .recommendations(recommendations)
                 .filterCriteria(filter)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.smartrent.dto.response.ListingAutocompleteResponse> autocompleteListings(String query, int limit) {
+        String normalized = TextNormalizer.normalize(query);
+        if (normalized == null || normalized.length() < 2) {
+            return Collections.emptyList();
+        }
+
+        int safeLimit = Math.min(Math.max(limit, 1), 20);
+        Pageable pageable = PageRequest.of(0, safeLimit,
+                Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                        .and(Sort.by(Sort.Direction.DESC, "updatedAt")));
+
+        Page<Listing> page = listingRepository.findAutocomplete(normalized, pageable);
+
+        return page.getContent().stream()
+                .map(listing -> com.smartrent.dto.response.ListingAutocompleteResponse.builder()
+                        .listingId(listing.getListingId())
+                        .title(listing.getTitle())
+                        .address(listing.getAddress() != null ? listing.getAddress().getDisplayAddress() : null)
+                        .price(listing.getPrice())
+                        .priceUnit(listing.getPriceUnit())
+                        .vipType(listing.getVipType())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     /**

@@ -9,6 +9,7 @@ import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.Media;
 import com.smartrent.infra.repository.entity.PricingHistory;
 import com.smartrent.infra.repository.entity.User;
+import com.smartrent.util.TextNormalizer;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
@@ -494,16 +495,11 @@ public class ListingSpecification {
 
             // ============ KEYWORD SEARCH ============
             if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()) {
-                String searchPattern = "%" + filter.getKeyword().toLowerCase() + "%";
-                Predicate titleMatch = criteriaBuilder.like(
-                        criteriaBuilder.lower(root.get("title")),
-                        searchPattern
-                );
-                Predicate descriptionMatch = criteriaBuilder.like(
-                        criteriaBuilder.lower(root.get("description")),
-                        searchPattern
-                );
-                predicates.add(criteriaBuilder.or(titleMatch, descriptionMatch));
+                String normalized = TextNormalizer.normalize(filter.getKeyword());
+                if (normalized != null && !normalized.isEmpty()) {
+                    String searchPattern = "%" + normalized + "%";
+                    predicates.add(criteriaBuilder.like(root.get("searchText"), searchPattern));
+                }
             }
 
             // ============ CONTACT FILTERS ============

@@ -1155,6 +1155,20 @@ public class ListingController {
         return ApiResponse.<ListingListResponse>builder().data(response).build();
     }
 
+    @GetMapping("/autocomplete")
+    @Operation(
+        summary = "Autocomplete listing titles",
+        description = "Returns lightweight listing suggestions by title prefix."
+    )
+    public ApiResponse<List<ListingAutocompleteResponse>> autocompleteListings(
+            @Parameter(description = "Query prefix", required = true, example = "can ho")
+            @RequestParam("q") String query,
+            @Parameter(description = "Max results (1-20)", example = "10")
+            @RequestParam(value = "limit", defaultValue = "10") int limit) {
+        List<ListingAutocompleteResponse> results = listingService.autocompleteListings(query, limit);
+        return ApiResponse.<List<ListingAutocompleteResponse>>builder().data(results).build();
+    }
+
     @PostMapping("/map-bounds")
     @Operation(
         summary = "[PUBLIC API] Get listings within map bounds for interactive map display",
