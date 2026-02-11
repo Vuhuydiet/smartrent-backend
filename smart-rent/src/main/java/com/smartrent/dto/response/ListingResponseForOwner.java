@@ -68,6 +68,17 @@ public class ListingResponseForOwner extends ListingResponse {
     @Schema(description = "Reason for rejection (if rejected)")
     String rejectionReason;
 
+    // ── Moderation context ──
+    @Schema(description = "Canonical moderation status", example = "REVISION_REQUIRED",
+            allowableValues = {"PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED"})
+    String moderationStatus;
+
+    @Schema(description = "Pending owner action (if any)")
+    OwnerActionResponse pendingOwnerAction;
+
+    @Schema(description = "Moderation audit trail (most recent first)")
+    List<ModerationEventResponse> moderationTimeline;
+
     /**
      * Payment information for the listing
      */

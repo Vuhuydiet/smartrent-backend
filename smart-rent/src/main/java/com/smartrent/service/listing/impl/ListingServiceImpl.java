@@ -110,6 +110,7 @@ public class ListingServiceImpl implements ListingService {
     AddressCreationService addressCreationService;
     ListingRequestCacheService listingRequestCacheService;
     ListingQueryService listingQueryService;
+    com.smartrent.service.moderation.ListingModerationService listingModerationService;
 
     @Override
     @Transactional
@@ -1524,11 +1525,11 @@ public class ListingServiceImpl implements ListingService {
                         .reportCount(0L)
                         .build();
 
-        // Verification notes and rejection reason - can be retrieved from a verification table if exists
-        String verificationNotes = null;
-        String rejectionReason = null;
+        // Verification notes and rejection reason from moderation system
+        String verificationNotes = listing.getLastModerationReasonText();
+        String rejectionReason = listing.getLastModerationReasonCode();
 
-        return listingMapper.toResponseForOwner(
+        com.smartrent.dto.response.ListingResponseForOwner response = listingMapper.toResponseForOwner(
                 listing,
                 user,
                 mediaResponses,
@@ -1538,6 +1539,12 @@ public class ListingServiceImpl implements ListingService {
                 verificationNotes,
                 rejectionReason
         );
+
+        // Populate moderation context (pendingOwnerAction & moderationTimeline)
+        response.setPendingOwnerAction(listingModerationService.getOwnerPendingAction(id));
+        response.setModerationTimeline(listingModerationService.getModerationTimeline(id));
+
+        return response;
     }
 
     @Override
@@ -1710,11 +1717,11 @@ public class ListingServiceImpl implements ListingService {
                                     .reportCount(0L)
                                     .build();
 
-                    // Verification notes and rejection reason - can be retrieved from a verification table if exists
-                    String verificationNotes = null;
-                    String rejectionReason = null;
+                    // Verification notes and rejection reason from moderation system
+                    String verificationNotes = listing.getLastModerationReasonText();
+                    String rejectionReason = listing.getLastModerationReasonCode();
 
-                    return listingMapper.toResponseForOwner(
+                    com.smartrent.dto.response.ListingResponseForOwner ownerResponse = listingMapper.toResponseForOwner(
                             listing,
                             user,
                             mediaResponses,
@@ -1724,6 +1731,11 @@ public class ListingServiceImpl implements ListingService {
                             verificationNotes,
                             rejectionReason
                     );
+
+                    // Populate moderation context
+                    ownerResponse.setPendingOwnerAction(listingModerationService.getOwnerPendingAction(listing.getListingId()));
+
+                    return ownerResponse;
                 })
                 .collect(Collectors.toList());
 

@@ -10,6 +10,7 @@ import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.service.listing.VerifyListingService;
+import com.smartrent.service.moderation.ListingModerationService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -31,87 +32,25 @@ public class VerifyListingServiceImpl implements VerifyListingService {
     com.smartrent.mapper.AddressMapper addressMapper;
     com.smartrent.infra.repository.UserRepository userRepository;
     AdminRepository adminRepository;
+    ListingModerationService listingModerationService;
 
     @Override
     @Transactional
     public ListingResponseWithAdmin changeListingStatus(Long listingId, ListingStatusChangeRequest request) {
-        log.info("Changing listing status for listing ID: {} to verified: {}", listingId, request.getVerified());
-
-        // Find the listing
-        Listing listing = listingRepository.findById(listingId)
-                .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
-
-        // Update verification status
-        listing.setVerified(request.getVerified());
-        
-        // If approving (verified=true), keep isVerify=true to indicate it has been reviewed
-        // If rejecting (verified=false), set isVerify=false to mark as REJECTED status
-        if (Boolean.TRUE.equals(request.getVerified())) {
-            // Approved - keep isVerify=true (should already be true if it was in review)
-            listing.setIsVerify(true);
-
-            // Calculate expiryDate based on approval time and postDate
-            // If approval time > postDate (user's chosen time), use approval time + durationDays
-            // Otherwise, use postDate + durationDays
-            java.time.LocalDateTime approvalTime = java.time.LocalDateTime.now();
-            java.time.LocalDateTime postDate = listing.getPostDate();
-            Integer durationDays = listing.getDurationDays() != null ? listing.getDurationDays() : 30;
-
-            if (postDate != null && approvalTime.isAfter(postDate)) {
-                // Approval time is after user's chosen postDate
-                // Use approval time as base for expiry calculation
-                listing.setExpiryDate(approvalTime.plusDays(durationDays));
-                log.info("Listing {} approved after postDate. ExpiryDate calculated from approval time: {} + {} days = {}",
-                        listingId, approvalTime, durationDays, listing.getExpiryDate());
-            } else {
-                // Use postDate as base for expiry calculation
-                java.time.LocalDateTime baseDate = postDate != null ? postDate : approvalTime;
-                listing.setExpiryDate(baseDate.plusDays(durationDays));
-                log.info("Listing {} approved. ExpiryDate calculated from postDate: {} + {} days = {}",
-                        listingId, baseDate, durationDays, listing.getExpiryDate());
-            }
-        } else {
-            // Rejected - set isVerify=false to indicate rejection
-            listing.setIsVerify(false);
-        }
-
-        // Save the updated listing
-        Listing updatedListing = listingRepository.save(listing);
-
-        log.info("Successfully updated listing {} verification status to: {}, isVerify: {}, reason: {}",
-                listingId, request.getVerified(), listing.getIsVerify(), request.getReason());
-
         // Get admin from SecurityContext
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String adminId = authentication.getName();
 
-        Admin verifyingAdmin = adminRepository.findById(adminId)
-                .orElse(null);
-
-        if (verifyingAdmin != null) {
-            log.info("Listing {} verified by admin: {} ({})", listingId, adminId, verifyingAdmin.getEmail());
+        // ── New moderation path (decision-based) ──
+        if (request.isNewFormat()) {
+            log.info("Admin {} moderating listing {} with decision: {}", adminId, listingId, request.getDecision());
+            return listingModerationService.moderateListing(listingId, request, adminId);
         }
 
-        // Determine verification status
-        String verificationStatus;
-        if (updatedListing.getVerified()) {
-            verificationStatus = "APPROVED";
-        } else if (updatedListing.getIsVerify()) {
-            verificationStatus = "PENDING";
-        } else {
-            verificationStatus = "REJECTED";
-        }
+        // ── Legacy path (verified boolean) ──
+        log.info("Changing listing status for listing ID: {} to verified: {}", listingId, request.getVerified());
 
-        // Use verification notes from request reason
-        String verificationNotes = request.getReason();
-
-        // Fetch user information
-        com.smartrent.infra.repository.entity.User userEntity = userRepository.findById(updatedListing.getUserId())
-                .orElse(null);
-        com.smartrent.dto.response.UserCreationResponse user = userEntity != null
-                ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity)
-                : null;
-
-        return listingMapper.toResponseWithAdmin(updatedListing, user, verifyingAdmin, verificationStatus, verificationNotes);
+        // Delegate to moderation service even for legacy requests (it handles the adapter)
+        return listingModerationService.moderateListing(listingId, request, adminId);
     }
 }

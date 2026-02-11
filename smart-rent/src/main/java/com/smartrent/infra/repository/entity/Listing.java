@@ -1,5 +1,6 @@
 package com.smartrent.infra.repository.entity;
 
+import com.smartrent.enums.ModerationStatus;
 import com.smartrent.enums.PostSource;
 import com.smartrent.util.TextNormalizer;
 import jakarta.persistence.*;
@@ -110,6 +111,27 @@ public class Listing {
 
     @Column(name = "pushed_at")
     LocalDateTime pushedAt;
+
+    // ── Moderation fields (nullable for backward compatibility) ──
+    @Enumerated(EnumType.STRING)
+    @Column(name = "moderation_status", length = 30)
+    ModerationStatus moderationStatus;
+
+    @Column(name = "last_moderated_by", length = 36)
+    String lastModeratedBy;
+
+    @Column(name = "last_moderated_at")
+    LocalDateTime lastModeratedAt;
+
+    @Column(name = "last_moderation_reason_code", length = 50)
+    String lastModerationReasonCode;
+
+    @Column(name = "last_moderation_reason_text", columnDefinition = "TEXT")
+    String lastModerationReasonText;
+
+    @Builder.Default
+    @Column(name = "revision_count", nullable = false)
+    Integer revisionCount = 0;
 
     @Column(name = "category_id", nullable = false)
     Long categoryId;
@@ -339,7 +361,9 @@ public class Listing {
     }
 
     /**
-     * Compute the current listing status for owner view
+     * Compute the current listing status for owner view.
+     * When moderationStatus is present, it takes precedence for REVISION_REQUIRED/RESUBMITTED states.
+     * Falls back to legacy verified/isVerify logic for other states (backward compat).
      * @return ListingStatus enum value
      */
     public com.smartrent.enums.ListingStatus computeListingStatus() {
@@ -353,11 +377,29 @@ public class Listing {
             return com.smartrent.enums.ListingStatus.EXPIRED;
         }
 
-        // 2. PENDING_PAYMENT - Has transaction but not completed (check transactionId exists but listing not verified)
+        // 2. PENDING_PAYMENT - Has transaction but not completed
         if (this.transactionId != null && !this.transactionId.isEmpty() &&
             (this.verified == null || !this.verified) &&
             (this.isVerify == null || !this.isVerify)) {
             return com.smartrent.enums.ListingStatus.PENDING_PAYMENT;
+        }
+
+        // 2.5 New moderation-aware states (when moderationStatus is populated)
+        if (this.moderationStatus != null) {
+            switch (this.moderationStatus) {
+                case REVISION_REQUIRED:
+                    return com.smartrent.enums.ListingStatus.REJECTED; // maps to REJECTED for owner view
+                case RESUBMITTED:
+                case PENDING_REVIEW:
+                    return com.smartrent.enums.ListingStatus.IN_REVIEW;
+                case SUSPENDED:
+                    return com.smartrent.enums.ListingStatus.REJECTED;
+                case REJECTED:
+                    return com.smartrent.enums.ListingStatus.REJECTED;
+                case APPROVED:
+                    // fall through to legacy expiry/display checks below
+                    break;
+            }
         }
 
         // 3. IN_REVIEW - Pending verification (isVerify=true, verified=false)

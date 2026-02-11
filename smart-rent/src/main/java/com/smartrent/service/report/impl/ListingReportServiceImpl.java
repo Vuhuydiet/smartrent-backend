@@ -19,6 +19,7 @@ import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.ListingReport;
 import com.smartrent.infra.repository.entity.ReportReason;
 import com.smartrent.mapper.ListingReportMapper;
+import com.smartrent.service.moderation.ListingModerationService;
 import com.smartrent.service.report.ListingReportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,7 @@ public class ListingReportServiceImpl implements ListingReportService {
     private final ListingRepository listingRepository;
     private final ListingReportMapper listingReportMapper;
     private final AdminRepository adminRepository;
+    private final ListingModerationService listingModerationService;
 
     @Override
     public List<ReportReasonResponse> getReportReasons() {
@@ -219,6 +221,13 @@ public class ListingReportServiceImpl implements ListingReportService {
 
         ListingReport savedReport = listingReportRepository.save(report);
         log.info("Report {} successfully {} by admin {}", reportId, newStatus.name().toLowerCase(), adminId);
+
+        // If admin resolved and owner action is required, delegate to moderation service
+        if (newStatus == ReportStatus.RESOLVED && Boolean.TRUE.equals(request.getOwnerActionRequired())) {
+            listingModerationService.handleReportResolutionOwnerAction(
+                    reportId, report.getListingId(), request, adminId);
+            log.info("Owner action created for report {} on listing {}", reportId, report.getListingId());
+        }
 
         return mapToResponseWithAdminInfo(savedReport);
     }

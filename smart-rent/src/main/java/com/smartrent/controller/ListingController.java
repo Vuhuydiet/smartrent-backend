@@ -66,6 +66,7 @@ public class ListingController {
 
     private final ListingService listingService;
     private final QuotaService quotaService;
+    private final com.smartrent.service.moderation.ListingModerationService listingModerationService;
 
     @Operation(
         summary = "Create a new listing with transactional address",
@@ -3615,6 +3616,77 @@ public class ListingController {
         String userId = extractUserId();
         listingService.deleteDraft(draftId, userId);
         return ApiResponse.<Void>builder().message("Draft deleted successfully").build();
+    }
+
+    /**
+     * Resubmit a rejected/revision-required listing for admin review.
+     * Owner must be authenticated and own the listing.
+     * POST /v1/listings/{id}/resubmit-for-review
+     */
+    @Operation(
+        summary = "Resubmit listing for review",
+        description = """
+            Resubmit a listing that was rejected or has revision required.
+            The listing must be in REJECTED or REVISION_REQUIRED moderation state.
+            Only the listing owner can call this endpoint.
+            """,
+        parameters = {
+            @Parameter(name = "id", description = "Listing ID", required = true)
+        },
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = com.smartrent.dto.request.ResubmitListingRequest.class),
+                examples = @ExampleObject(
+                    name = "Resubmit with notes",
+                    value = """
+                        {
+                          "notes": "Updated listing title and added missing legal information"
+                        }
+                        """
+                )
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Listing resubmitted for review",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Success",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": "Listing resubmitted for review successfully",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Listing cannot be resubmitted in current state"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "403",
+                description = "Not the listing owner"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Listing not found"
+            )
+        }
+    )
+    @PostMapping("/{id}/resubmit-for-review")
+    public ApiResponse<Void> resubmitForReview(
+            @PathVariable Long id,
+            @RequestBody(required = false) com.smartrent.dto.request.ResubmitListingRequest request) {
+        String userId = extractUserId();
+        listingModerationService.resubmitForReview(id, userId, request != null ? request : new com.smartrent.dto.request.ResubmitListingRequest());
+        return ApiResponse.<Void>builder().message("Listing resubmitted for review successfully").build();
     }
 
     /**

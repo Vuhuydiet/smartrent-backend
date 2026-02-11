@@ -229,6 +229,11 @@ public class ListingMapperImpl implements ListingMapper {
                 .createdAt(entity.getCreatedAt())
                 .updatedAt(entity.getUpdatedAt())
                 .updatedBy(entity.getUpdatedBy())
+                // Moderation context
+                .moderationStatus(entity.getModerationStatus() != null ? entity.getModerationStatus().name() : null)
+                .revisionCount(entity.getRevisionCount())
+                .lastModerationReasonCode(entity.getLastModerationReasonCode())
+                .lastModerationReasonText(entity.getLastModerationReasonText())
                 .build();
     }
 
@@ -300,6 +305,8 @@ public class ListingMapperImpl implements ListingMapper {
                 .statistics(statistics)
                 .verificationNotes(verificationNotes)
                 .rejectionReason(rejectionReason)
+                // Moderation context (pendingOwnerAction & moderationTimeline populated by service layer)
+                .moderationStatus(entity.getModerationStatus() != null ? entity.getModerationStatus().name() : null)
                 .build();
     }
 }
