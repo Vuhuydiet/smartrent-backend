@@ -17,7 +17,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Schema(description = "Paginated listing response with count and recommendations")
+@Schema(description = "Paginated listing response with count")
 public class ListingListResponse {
 
     @Schema(description = "List of listings for the current page")
@@ -34,9 +34,6 @@ public class ListingListResponse {
 
     @Schema(description = "Total number of pages", example = "8")
     Integer totalPages;
-
-    @Schema(description = "Recommended listings based on user preferences and behavior (for future recommendation system)")
-    List<ListingResponse> recommendations;
 
     @Schema(description = "Filter criteria used for this query")
     Object filterCriteria;
