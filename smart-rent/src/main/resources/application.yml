@@ -42,6 +42,7 @@ logging:
     com.zaxxer.hikari: WARN
     org.flywaydb: INFO
     feign: INFO
+    io.lettuce.core: WARN
     io.github.resilience4j: INFO
     org.springframework.web: WARN
     org.springframework.security: WARN
