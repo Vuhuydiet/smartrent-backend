@@ -250,4 +250,24 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.expired = false
     """)
     Page<Listing> findAutocomplete(@Param("prefix") String prefix, Pageable pageable);
+
+    /**
+     * Public listing browse: fetch with address eagerly joined, filtered to public-visible listings only.
+     * Uses a separate countQuery to avoid Hibernate in-memory pagination with JOIN FETCH.
+     */
+    @Query(value = """
+        SELECT l FROM listings l JOIN FETCH l.address
+        WHERE l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+    """,
+    countQuery = """
+        SELECT COUNT(l) FROM listings l
+        WHERE l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+    """)
+    Page<Listing> findPublicListings(Pageable pageable);
 }
