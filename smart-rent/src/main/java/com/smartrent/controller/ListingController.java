@@ -1038,7 +1038,7 @@ public class ListingController {
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Search results with pagination and recommendations",
+                description = "Search results with pagination",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = ApiResponse.class),
@@ -1102,14 +1102,6 @@ public class ListingController {
                                 "currentPage": 0,
                                 "pageSize": 20,
                                 "totalPages": 8,
-                                "recommendations": [
-                                  {
-                                    "listingId": 456,
-                                    "title": "Penthouse DIAMOND cao cấp",
-                                    "vipType": "DIAMOND",
-                                    "verified": true
-                                  }
-                                ],
                                 "filterCriteria": {
                                   "categoryId": 1,
                                   "provinceId": 1,

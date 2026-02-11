@@ -73,7 +73,7 @@ public interface ListingService {
      * @param filter Filter criteria (all fields optional)
      *               - If userId is null: public search (excludes drafts by default)
      *               - If userId is provided: user's listings (includes drafts if isDraft filter allows)
-     * @return Paginated listing response with total count and recommendations
+     * @return Paginated listing response with total count
      */
     ListingListResponse searchListings(ListingFilterRequest filter);
 
