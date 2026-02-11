@@ -47,6 +47,7 @@ import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.ListingQueryService;
 import com.smartrent.service.listing.cache.ListingRequestCacheService;
+import com.smartrent.util.TextNormalizer;
 // import com.smartrent.service.pricing.LocationPricingService;  // DISABLED: Not in use
 import com.smartrent.service.quota.QuotaService;
 import com.smartrent.service.payment.PaymentService;
@@ -63,12 +64,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -559,12 +563,23 @@ public class ListingServiceImpl implements ListingService {
         // Fetch media separately to avoid MultipleBagFetchException
         listingRepository.findByIdsWithMedia(ids);
 
+        // Batch-load all users in one query to avoid N+1
+        Set<String> userIds = listings.stream()
+                .map(Listing::getUserId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<String, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
+                : userRepository.findAllById(userIds).stream()
+                        .collect(Collectors.toMap(User::getUserId, Function.identity()));
+
         return listings.stream()
                 .map(listing -> {
-                    com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
+                    User user = userMap.get(listing.getUserId());
+                    com.smartrent.dto.response.UserCreationResponse userResponse =
+                            user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
                     com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, user, addressResponse);
-                    populateOwnerZaloInfo(response, listing.getUserId());
+                    ListingResponse response = listingMapper.toResponse(listing, userResponse, addressResponse);
+                    populateOwnerZaloInfoFromUser(response, user);
                     return response;
                 })
                 .collect(Collectors.toList());
@@ -576,14 +591,28 @@ public class ListingServiceImpl implements ListingService {
         // Convert 1-based page to 0-based for Spring Data
         int safePage = Math.max(page - 1, 0);
         int safeSize = Math.min(Math.max(size, 1), 100); // cap size to 100
-        Pageable pageable = PageRequest.of(safePage, safeSize);
+        Pageable pageable = PageRequest.of(safePage, safeSize,
+                Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                        .and(Sort.by(Sort.Direction.DESC, "updatedAt")));
         Page<Listing> pageResult = listingRepository.findAll(pageable);
+
+        // Batch-load all users in one query to avoid N+1
+        Set<String> userIds = pageResult.getContent().stream()
+                .map(Listing::getUserId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<String, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
+                : userRepository.findAllById(userIds).stream()
+                        .collect(Collectors.toMap(User::getUserId, Function.identity()));
+
         return pageResult.getContent().stream()
                 .map(listing -> {
-                    com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
+                    User user = userMap.get(listing.getUserId());
+                    com.smartrent.dto.response.UserCreationResponse userResponse =
+                            user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
                     com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, user, addressResponse);
-                    populateOwnerZaloInfo(response, listing.getUserId());
+                    ListingResponse response = listingMapper.toResponse(listing, userResponse, addressResponse);
+                    populateOwnerZaloInfoFromUser(response, user);
                     return response;
                 })
                 .collect(Collectors.toList());
@@ -865,6 +894,26 @@ public class ListingServiceImpl implements ListingService {
                     response.setContactAvailable(false);
                 }
             });
+        }
+    }
+
+    /**
+     * Populate owner contact info from a pre-loaded User object (avoids extra DB query)
+     */
+    private void populateOwnerZaloInfoFromUser(ListingResponse response, User user) {
+        if (user == null) return;
+        String contactPhone = user.getContactPhoneNumber();
+        Boolean contactVerified = user.getContactPhoneVerified();
+        response.setOwnerContactPhoneNumber(contactPhone);
+        response.setOwnerContactPhoneVerified(contactVerified);
+        boolean isPhonePresent = contactPhone != null && !contactPhone.isEmpty();
+        boolean isVerified = Boolean.TRUE.equals(contactVerified);
+        if (isPhonePresent && isVerified) {
+            response.setOwnerZaloLink("https://zalo.me/" + contactPhone);
+            response.setContactAvailable(true);
+        } else {
+            response.setOwnerZaloLink(null);
+            response.setContactAvailable(false);
         }
     }
 
@@ -1181,31 +1230,50 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_SEARCH,
+            key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
+            unless = "#result == null")
     public ListingListResponse searchListings(ListingFilterRequest filter) {
-        boolean isMyListings = filter.getUserId() != null && !filter.getUserId().isEmpty();
-
         log.info("Unified search - UserId: {}, Category: {}, Province: {}/{}, isDraft: {}, Page: {}, Size: {}",
                 filter.getUserId(), filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCode(),
                 filter.getIsDraft(), filter.getPage(), filter.getSize());
 
+        String normalizedKeyword = TextNormalizer.normalize(filter.getKeyword());
+        if (filter.getKeyword() != null && (normalizedKeyword == null || normalizedKeyword.length() < 3)) {
+            return ListingListResponse.builder()
+                    .listings(Collections.emptyList())
+                    .totalCount(0L)
+                    .currentPage(1)
+                    .pageSize(filter.getSize() != null ? filter.getSize() : 20)
+                    .totalPages(0)
+                    .filterCriteria(filter)
+                    .build();
+        }
+
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
 
-        // Convert to response DTOs
+        // Batch-load all users in one query to avoid N+1 (was ~30 queries per page)
+        Set<String> userIds = page.getContent().stream()
+                .map(Listing::getUserId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<String, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
+                : userRepository.findAllById(userIds).stream()
+                        .collect(Collectors.toMap(User::getUserId, Function.identity()));
+
+        // Convert to response DTOs using pre-loaded users
         List<ListingResponse> listings = page.getContent().stream()
                 .map(listing -> {
-                    com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
+                    User user = userMap.get(listing.getUserId());
+                    com.smartrent.dto.response.UserCreationResponse userResponse =
+                            user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
                     com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, user, addressResponse);
-                    populateOwnerZaloInfo(response, listing.getUserId());
+                    ListingResponse response = listingMapper.toResponse(listing, userResponse, addressResponse);
+                    populateOwnerZaloInfoFromUser(response, user);
                     return response;
                 })
                 .collect(Collectors.toList());
-
-        // Get recommendations (only for public search, not for my listings)
-        List<ListingResponse> recommendations = isMyListings
-                ? Collections.emptyList()
-                : getRecommendations(filter, 5);
 
         return ListingListResponse.builder()
                 .listings(listings)
@@ -1213,51 +1281,34 @@ public class ListingServiceImpl implements ListingService {
                 .currentPage(page.getNumber() + 1)  // Convert from 0-based (Spring Data) to 1-based (frontend)
                 .pageSize(page.getSize())
                 .totalPages(page.getTotalPages())
-                .recommendations(recommendations)
                 .filterCriteria(filter)
                 .build();
     }
 
-    /**
-     * Get recommended listings based on filter criteria
-     * TODO: Implement proper recommendation algorithm using ML or collaborative filtering
-     */
-    private List<ListingResponse> getRecommendations(ListingFilterRequest filter, int limit) {
-        // For now, return recent high-tier listings (GOLD/DIAMOND) as recommendations
-        Specification<Listing> recommendationSpec = (root, query, criteriaBuilder) -> {
-            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.smartrent.dto.response.ListingAutocompleteResponse> autocompleteListings(String query, int limit) {
+        String normalized = TextNormalizer.normalize(query);
+        if (normalized == null || normalized.length() < 2) {
+            return Collections.emptyList();
+        }
 
-            // High-tier listings
-            predicates.add(criteriaBuilder.or(
-                    criteriaBuilder.equal(root.get("vipType"), Listing.VipType.GOLD),
-                    criteriaBuilder.equal(root.get("vipType"), Listing.VipType.DIAMOND)
-            ));
+        int safeLimit = Math.min(Math.max(limit, 1), 20);
+        Pageable pageable = PageRequest.of(0, safeLimit,
+                Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                        .and(Sort.by(Sort.Direction.DESC, "updatedAt")));
 
-            // Verified and not expired
-            predicates.add(criteriaBuilder.equal(root.get("verified"), true));
-            predicates.add(criteriaBuilder.equal(root.get("expired"), false));
-            predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
-            predicates.add(criteriaBuilder.equal(root.get("isShadow"), false));
+        Page<Listing> page = listingRepository.findAutocomplete(normalized, pageable);
 
-            // Same category if provided
-            if (filter.getCategoryId() != null) {
-                predicates.add(criteriaBuilder.equal(root.get("categoryId"), filter.getCategoryId()));
-            }
-
-            return criteriaBuilder.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
-        };
-
-        Pageable pageable = PageRequest.of(0, limit, Sort.by(Sort.Direction.DESC, "postDate"));
-        Page<Listing> recommendedListings = listingRepository.findAll(recommendationSpec, pageable);
-
-        return recommendedListings.getContent().stream()
-                .map(listing -> {
-                    com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
-                    com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, user, addressResponse);
-                    populateOwnerZaloInfo(response, listing.getUserId());
-                    return response;
-                })
+        return page.getContent().stream()
+                .map(listing -> com.smartrent.dto.response.ListingAutocompleteResponse.builder()
+                        .listingId(listing.getListingId())
+                        .title(listing.getTitle())
+                        .address(listing.getAddress() != null ? listing.getAddress().getDisplayAddress() : null)
+                        .price(listing.getPrice())
+                        .priceUnit(listing.getPriceUnit())
+                        .vipType(listing.getVipType())
+                        .build())
                 .collect(Collectors.toList());
     }
 

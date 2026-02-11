@@ -11,9 +11,11 @@ public class Constants {
   public static final class CacheNames {
     private static final String USER = "user.";
     private static final String AUTH = "auth.";
+    private static final String LISTING = "listing.";
     public static final String USER_DETAILS = USER + "details";
     public static final String INVALIDATED_TOKENS = AUTH + "invalidatedTokens";
     public static final String OTP = AUTH + "otp";
+    public static final String LISTING_SEARCH = LISTING + "search";
   }
 
   @NoArgsConstructor(access = AccessLevel.NONE)
