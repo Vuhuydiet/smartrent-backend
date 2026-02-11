@@ -1,0 +1,50 @@
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: smartrent-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-smartrent}
+      MYSQL_USER: ${MYSQL_USER:-smartrent_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-smartrent_pass}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d
+    networks:
+      - smartrent-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: ${MYSQL_HEALTH_CHECK_INTERVAL:-30}s
+      timeout: ${MYSQL_HEALTH_CHECK_TIMEOUT:-20}s
+      retries: ${MYSQL_HEALTH_CHECK_RETRIES:-10}
+
+  # Redis Cache
+  redis:
+    image: redis:8.2.0
+    container_name: smartrent-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - smartrent-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: ${REDIS_HEALTH_CHECK_INTERVAL:-30}s
+      timeout: ${REDIS_HEALTH_CHECK_TIMEOUT:-3}s
+      retries: ${REDIS_HEALTH_CHECK_RETRIES:-3}
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  smartrent-network:
+    driver: bridge

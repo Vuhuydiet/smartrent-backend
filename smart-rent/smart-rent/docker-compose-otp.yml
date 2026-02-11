@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  # Redis for OTP storage and rate limiting
+  redis-otp:
+    image: redis:7-alpine
+    container_name: smartrent-redis-otp
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-otp-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - smartrent-network
+
+volumes:
+  redis-otp-data:
+    driver: local
+
+networks:
+  smartrent-network:
+    driver: bridge
+
