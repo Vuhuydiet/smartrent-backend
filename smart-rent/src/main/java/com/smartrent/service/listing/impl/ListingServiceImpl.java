@@ -1197,7 +1197,7 @@ public class ListingServiceImpl implements ListingService {
         if (filter.getKeyword() != null && (normalizedKeyword == null || normalizedKeyword.length() < 3)) {
             return ListingListResponse.builder()
                     .listings(Collections.emptyList())
-                    .totalCount(0)
+                    .totalCount(0L)
                     .currentPage(1)
                     .pageSize(filter.getSize() != null ? filter.getSize() : 20)
                     .totalPages(0)
