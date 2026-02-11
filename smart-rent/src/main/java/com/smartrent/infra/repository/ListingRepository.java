@@ -240,4 +240,14 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         GROUP BY l.categoryId
     """)
     List<Object[]> getListingStatsByCategoryIds(@Param("categoryIds") List<Long> categoryIds);
+
+    @Query("""
+        SELECT l FROM listings l
+        WHERE l.titleNorm LIKE CONCAT(:prefix, '%')
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+    """)
+    Page<Listing> findAutocomplete(@Param("prefix") String prefix, Pageable pageable);
 }

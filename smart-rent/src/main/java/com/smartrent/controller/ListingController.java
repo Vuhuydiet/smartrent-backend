@@ -1038,7 +1038,7 @@ public class ListingController {
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Search results with pagination and recommendations",
+                description = "Search results with pagination",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = ApiResponse.class),
@@ -1102,14 +1102,6 @@ public class ListingController {
                                 "currentPage": 0,
                                 "pageSize": 20,
                                 "totalPages": 8,
-                                "recommendations": [
-                                  {
-                                    "listingId": 456,
-                                    "title": "Penthouse DIAMOND cao cấp",
-                                    "vipType": "DIAMOND",
-                                    "verified": true
-                                  }
-                                ],
                                 "filterCriteria": {
                                   "categoryId": 1,
                                   "provinceId": 1,
@@ -1153,6 +1145,20 @@ public class ListingController {
         // when userId is not provided (public search)
         ListingListResponse response = listingService.searchListings(filter);
         return ApiResponse.<ListingListResponse>builder().data(response).build();
+    }
+
+    @GetMapping("/autocomplete")
+    @Operation(
+        summary = "Autocomplete listing titles",
+        description = "Returns lightweight listing suggestions by title prefix."
+    )
+    public ApiResponse<List<ListingAutocompleteResponse>> autocompleteListings(
+            @Parameter(description = "Query prefix", required = true, example = "can ho")
+            @RequestParam("q") String query,
+            @Parameter(description = "Max results (1-20)", example = "10")
+            @RequestParam(value = "limit", defaultValue = "10") int limit) {
+        List<ListingAutocompleteResponse> results = listingService.autocompleteListings(query, limit);
+        return ApiResponse.<List<ListingAutocompleteResponse>>builder().data(results).build();
     }
 
     @PostMapping("/map-bounds")

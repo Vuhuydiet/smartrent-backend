@@ -73,9 +73,19 @@ public interface ListingService {
      * @param filter Filter criteria (all fields optional)
      *               - If userId is null: public search (excludes drafts by default)
      *               - If userId is provided: user's listings (includes drafts if isDraft filter allows)
-     * @return Paginated listing response with total count and recommendations
+     * @return Paginated listing response with total count
      */
     ListingListResponse searchListings(ListingFilterRequest filter);
+
+    /**
+     * Autocomplete listings by title prefix (normalized).
+     * Returns lightweight results for search suggestions.
+     *
+     * @param query Search prefix
+     * @param limit Max results (default 10)
+     * @return List of autocomplete responses
+     */
+    List<com.smartrent.dto.response.ListingAutocompleteResponse> autocompleteListings(String query, int limit);
 
     /**
      * Get listing statistics by provinces (for home screen)

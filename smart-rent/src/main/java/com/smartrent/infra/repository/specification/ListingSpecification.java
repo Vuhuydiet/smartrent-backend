@@ -9,6 +9,7 @@ import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.Media;
 import com.smartrent.infra.repository.entity.PricingHistory;
 import com.smartrent.infra.repository.entity.User;
+import com.smartrent.util.TextNormalizer;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
@@ -492,18 +493,29 @@ public class ListingSpecification {
                 ));
             }
 
-            // ============ KEYWORD SEARCH ============
+            // ============ KEYWORD SEARCH (FULLTEXT) ============
             if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()) {
-                String searchPattern = "%" + filter.getKeyword().toLowerCase() + "%";
-                Predicate titleMatch = criteriaBuilder.like(
-                        criteriaBuilder.lower(root.get("title")),
-                        searchPattern
-                );
-                Predicate descriptionMatch = criteriaBuilder.like(
-                        criteriaBuilder.lower(root.get("description")),
-                        searchPattern
-                );
-                predicates.add(criteriaBuilder.or(titleMatch, descriptionMatch));
+                String normalized = TextNormalizer.normalize(filter.getKeyword());
+                if (normalized != null && !normalized.isEmpty()) {
+                    // Use MySQL FULLTEXT MATCH...AGAINST in BOOLEAN MODE for indexed search
+                    // Each word gets a '+' prefix for AND semantics, '*' suffix for prefix matching
+                    String[] words = normalized.split("\\s+");
+                    StringBuilder ftQuery = new StringBuilder();
+                    for (String word : words) {
+                        if (!word.isEmpty()) {
+                            ftQuery.append("+").append(word).append("* ");
+                        }
+                    }
+                    String fulltextQuery = ftQuery.toString().trim();
+                    if (!fulltextQuery.isEmpty()) {
+                        predicates.add(criteriaBuilder.greaterThan(
+                            criteriaBuilder.function("match_against",
+                                Double.class,
+                                root.get("searchText"),
+                                criteriaBuilder.literal(fulltextQuery)),
+                            0.0));
+                    }
+                }
             }
 
             // ============ CONTACT FILTERS ============
