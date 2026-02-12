@@ -69,7 +69,7 @@ public class ListingResponse {
 
     @Schema(description = "Computed listing status for owner view",
             example = "DISPLAYING",
-            allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED"})
+            allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED", "DISABLED"})
     String listingStatus;
 
     @Schema(
