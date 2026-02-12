@@ -16,6 +16,8 @@ public class Constants {
     public static final String INVALIDATED_TOKENS = AUTH + "invalidatedTokens";
     public static final String OTP = AUTH + "otp";
     public static final String LISTING_SEARCH = LISTING + "search";
+    public static final String LISTING_BROWSE = LISTING + "browse";
+    public static final String LISTING_DETAIL = LISTING + "detail";
   }
 
   @NoArgsConstructor(access = AccessLevel.NONE)
