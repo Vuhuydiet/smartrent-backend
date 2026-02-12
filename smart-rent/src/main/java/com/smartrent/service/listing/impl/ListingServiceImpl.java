@@ -1331,10 +1331,10 @@ public class ListingServiceImpl implements ListingService {
                             com.smartrent.infra.repository.entity.LegacyProvince::getName));
 
             for (Object[] row : statsData) {
-                Integer provinceId = (Integer) row[0];
-                Long totalCount = (Long) row[1];
-                Long verifiedCount = (Long) row[2];
-                Long vipCount = (Long) row[3];
+                Integer provinceId = ((Number) row[0]).intValue();
+                Long totalCount = toLong(row[1]);
+                Long verifiedCount = toLong(row[2]);
+                Long vipCount = toLong(row[3]);
 
                 if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
                     continue;
@@ -1363,9 +1363,9 @@ public class ListingServiceImpl implements ListingService {
 
             for (Object[] row : statsData) {
                 String provinceCode = (String) row[0];
-                Long totalCount = (Long) row[1];
-                Long verifiedCount = (Long) row[2];
-                Long vipCount = (Long) row[3];
+                Long totalCount = toLong(row[1]);
+                Long verifiedCount = toLong(row[2]);
+                Long vipCount = toLong(row[3]);
 
                 if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
                     continue;
@@ -1424,10 +1424,10 @@ public class ListingServiceImpl implements ListingService {
 
         // Map to response objects
         for (Object[] row : statsData) {
-            Long categoryId = (Long) row[0];
-            Long totalCount = (Long) row[1];
-            Long verifiedCount = (Long) row[2];
-            Long vipCount = (Long) row[3];
+            Long categoryId = toLong(row[0]);
+            Long totalCount = toLong(row[1]);
+            Long verifiedCount = toLong(row[2]);
+            Long vipCount = toLong(row[3]);
 
             Category category = categoryMap.get(categoryId);
             if (category == null) {
@@ -1602,14 +1602,15 @@ public class ListingServiceImpl implements ListingService {
      * Calculate admin statistics in a single query instead of 10 separate COUNT queries
      */
     private com.smartrent.dto.response.AdminListingListResponse.AdminStatistics calculateAdminStatistics() {
-        Object[] row = listingRepository.getAdminStatistics();
-        if (row == null || row[0] == null) {
+        List<Object[]> results = listingRepository.getAdminStatistics();
+        if (results == null || results.isEmpty()) {
             return com.smartrent.dto.response.AdminListingListResponse.AdminStatistics.builder()
                     .pendingVerification(0L).verified(0L).expired(0L).rejected(0L)
                     .drafts(0L).shadows(0L)
                     .normalListings(0L).silverListings(0L).goldListings(0L).diamondListings(0L)
                     .build();
         }
+        Object[] row = results.get(0);
         return com.smartrent.dto.response.AdminListingListResponse.AdminStatistics.builder()
                 .pendingVerification(toLong(row[0]))
                 .verified(toLong(row[1]))
@@ -1727,13 +1728,14 @@ public class ListingServiceImpl implements ListingService {
      * Calculate owner statistics in a single query instead of 9 separate COUNT queries
      */
     private com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics calculateOwnerStatistics(String userId) {
-        Object[] row = listingRepository.getOwnerStatistics(userId);
-        if (row == null || row[0] == null) {
+        List<Object[]> results = listingRepository.getOwnerStatistics(userId);
+        if (results == null || results.isEmpty()) {
             return com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics.builder()
                     .drafts(0L).pendingVerification(0L).rejected(0L).active(0L).expired(0L)
                     .normalListings(0L).silverListings(0L).goldListings(0L).diamondListings(0L)
                     .build();
         }
+        Object[] row = results.get(0);
         return com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics.builder()
                 .drafts(toLong(row[0]))
                 .pendingVerification(toLong(row[1]))

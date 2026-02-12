@@ -198,7 +198,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
             SUM(CASE WHEN l.vipType = 'DIAMOND' THEN 1 ELSE 0 END)
         FROM listings l
     """)
-    Object[] getAdminStatistics();
+    List<Object[]> getAdminStatistics();
 
     /**
      * Get listing statistics grouped by province (old structure)
@@ -279,7 +279,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         FROM listings l
         WHERE l.userId = :userId
     """)
-    Object[] getOwnerStatistics(@Param("userId") String userId);
+    List<Object[]> getOwnerStatistics(@Param("userId") String userId);
 
     @Query(value = """
         SELECT l FROM listings l JOIN FETCH l.address
