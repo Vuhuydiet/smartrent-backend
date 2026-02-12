@@ -34,6 +34,7 @@ import com.smartrent.service.authentication.VerificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service(Constants.ADMIN_AUTHENTICATION_SERVICE)
 public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
@@ -57,6 +58,7 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
   }
 
   @Override
+  @Transactional(readOnly = true)
   public AuthenticationResponse authenticate(AuthenticationRequest request) {
 
     Admin admin = adminRepository.findByEmail(request.getEmail())
@@ -70,6 +72,7 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
   }
 
   @Override
+  @Transactional(readOnly = true)
   public AuthenticationResponse refresh(RefreshTokenRequest request) {
     SignedJWT signedJWT = verifyToken(request.getRefreshToken(), TokenType.REFRESH);
 
