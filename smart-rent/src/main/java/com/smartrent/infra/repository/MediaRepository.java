@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -94,4 +95,10 @@ public interface MediaRepository extends JpaRepository<Media, Long> {
      * Check if user owns media
      */
     boolean existsByMediaIdAndUserId(Long mediaId, String userId);
+
+    /**
+     * Batch-load active media for multiple listings (avoids N+1)
+     */
+    @Query("SELECT m FROM media m WHERE m.listing.listingId IN :listingIds AND m.status = 'ACTIVE' ORDER BY m.listing.listingId, m.sortOrder ASC")
+    List<Media> findActiveMediaByListingIds(@Param("listingIds") Collection<Long> listingIds);
 }

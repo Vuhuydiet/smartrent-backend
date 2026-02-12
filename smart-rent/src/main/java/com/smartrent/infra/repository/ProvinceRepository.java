@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,6 +17,9 @@ public interface ProvinceRepository extends JpaRepository<Province, Integer> {
 
     // Find province by code
     Optional<Province> findByCode(String code);
+
+    // Batch-load provinces by codes
+    List<Province> findByCodeIn(Collection<String> codes);
 
     // Search provinces by keyword (name, shortName, key, alias, or code) - with pagination
     @Query("SELECT p FROM Province p WHERE " +

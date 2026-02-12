@@ -5,6 +5,7 @@ import com.smartrent.infra.repository.entity.ListingOwnerAction;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,4 +17,9 @@ public interface ListingOwnerActionRepository extends JpaRepository<ListingOwner
     Optional<ListingOwnerAction> findFirstByListingIdOrderByCreatedAtDesc(Long listingId);
 
     List<ListingOwnerAction> findByListingIdOrderByCreatedAtDesc(Long listingId);
+
+    /**
+     * Batch-load pending owner actions for multiple listings (avoids N+1)
+     */
+    List<ListingOwnerAction> findByListingIdInAndStatus(Collection<Long> listingIds, OwnerActionStatus status);
 }

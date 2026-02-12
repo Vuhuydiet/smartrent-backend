@@ -109,30 +109,30 @@ public class ListingQueryService {
         Sort defaultSort = Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
                 .and(Sort.by(Sort.Direction.DESC, "updatedAt"));
 
-        // If user specifies custom sorting, apply it after default sorting
+        // If user specifies custom sorting, apply it
         if (sortBy != null && !sortBy.isEmpty()) {
             Sort.Direction direction = "ASC".equalsIgnoreCase(sortDirection)
                     ? Sort.Direction.ASC
                     : Sort.Direction.DESC;
 
-            Sort userSort = switch (sortBy) {
-                case "price" -> Sort.by(direction, "price");
-                case "area" -> Sort.by(direction, "area");
-                case "createdAt" -> Sort.by(direction, "createdAt");
+            // NEWEST/OLDEST replace default sort entirely (otherwise updatedAt conflicts)
+            // PRICE_ASC/PRICE_DESC prepend price sort before default
+            return switch (sortBy) {
+                case "NEWEST" -> Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                        .and(Sort.by(Sort.Direction.DESC, "updatedAt"));
+                case "OLDEST" -> Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                        .and(Sort.by(Sort.Direction.ASC, "updatedAt"));
+                case "PRICE_ASC" -> Sort.by(Sort.Direction.ASC, "price")
+                        .and(defaultSort);
+                case "PRICE_DESC" -> Sort.by(Sort.Direction.DESC, "price")
+                        .and(defaultSort);
+                case "price" -> Sort.by(direction, "price").and(defaultSort);
+                case "area" -> Sort.by(direction, "area").and(defaultSort);
+                case "createdAt" -> Sort.by(direction, "createdAt").and(defaultSort);
                 case "updatedAt" -> Sort.by(direction, "updatedAt");
-                case "postDate" -> Sort.by(direction, "postDate");
-                // Handle high-level sort options from ListingFilterRequest
-                case "NEWEST" -> Sort.by(Sort.Direction.DESC, "updatedAt");
-                case "OLDEST" -> Sort.by(Sort.Direction.ASC, "updatedAt");
-                case "PRICE_ASC" -> Sort.by(Sort.Direction.ASC, "price");
-                case "PRICE_DESC" -> Sort.by(Sort.Direction.DESC, "price");
-                default -> null;
+                case "postDate" -> Sort.by(direction, "postDate").and(defaultSort);
+                default -> defaultSort; // includes "DEFAULT"
             };
-
-            // Apply user sort only if it's different from default sort fields
-            if (userSort != null && !sortBy.equals("vipTypeSortOrder")) {
-                return defaultSort.and(userSort);
-            }
         }
 
         return defaultSort;
