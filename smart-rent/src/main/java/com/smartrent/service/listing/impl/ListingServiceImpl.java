@@ -509,6 +509,9 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_DETAIL,
+            key = "#id",
+            unless = "#result == null")
     public ListingResponse getListingById(Long id) {
         // Fetch listing with amenities first
         Listing listing = listingRepository.findByIdWithAmenities(id)
@@ -567,6 +570,9 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_BROWSE,
+            key = "'page:' + #page + ':size:' + #size",
+            unless = "#result == null || #result.isEmpty()")
     public List<ListingResponse> getListings(int page, int size) {
         // Convert 1-based page to 0-based for Spring Data
         int safePage = Math.max(page - 1, 0);
