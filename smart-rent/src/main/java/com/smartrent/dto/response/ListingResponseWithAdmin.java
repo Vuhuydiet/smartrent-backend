@@ -116,4 +116,18 @@ public class ListingResponseWithAdmin {
 
     @Schema(description = "ID of admin who last updated the listing")
     Long updatedBy;
+
+    // ── Moderation context ──
+    @Schema(description = "Canonical moderation status", example = "PENDING_REVIEW",
+            allowableValues = {"PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED"})
+    String moderationStatus;
+
+    @Schema(description = "Number of times the listing has been revised", example = "0")
+    Integer revisionCount;
+
+    @Schema(description = "Structured reason code for last moderation action", example = "MISSING_INFO")
+    String lastModerationReasonCode;
+
+    @Schema(description = "Human-readable reason for last moderation action")
+    String lastModerationReasonText;
 }

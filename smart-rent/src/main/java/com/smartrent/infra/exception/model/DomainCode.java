@@ -116,7 +116,12 @@ public enum DomainCode {
   NEWS_NOT_FOUND("15001", HttpStatus.NOT_FOUND, "News not found"),
   NEWS_SLUG_ALREADY_EXISTS("15002", HttpStatus.CONFLICT, "News slug already exists"),
   NEWS_NOT_PUBLISHED("15003", HttpStatus.BAD_REQUEST, "News is not published"),
-  NEWS_INVALID_LIMIT("15004", HttpStatus.BAD_REQUEST, "Invalid limit: %s")
+  NEWS_INVALID_LIMIT("15004", HttpStatus.BAD_REQUEST, "Invalid limit: %s"),
+  //    Moderation Error 16xxx
+  MODERATION_INVALID_DECISION("16001", HttpStatus.BAD_REQUEST, "Invalid moderation decision"),
+  MODERATION_REASON_REQUIRED("16002", HttpStatus.BAD_REQUEST, "Reason is required for rejection or revision request"),
+  RESUBMIT_NOT_ALLOWED("16003", HttpStatus.BAD_REQUEST, "Listing cannot be resubmitted in its current state"),
+  NOT_LISTING_OWNER("16004", HttpStatus.FORBIDDEN, "You are not the owner of this listing")
   ;
 
   private final String value;
