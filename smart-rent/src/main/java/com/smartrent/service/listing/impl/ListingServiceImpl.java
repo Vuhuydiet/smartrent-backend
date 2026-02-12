@@ -517,15 +517,18 @@ public class ListingServiceImpl implements ListingService {
         // Fetch media separately to avoid MultipleBagFetchException
         listingRepository.findByIdWithMedia(id);
 
-        // Build user and address responses
-        com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
+        // Load user once — reuse for both user response and Zalo info
+        User userEntity = listing.getUserId() != null
+                ? userRepository.findById(listing.getUserId()).orElse(null) : null;
+        com.smartrent.dto.response.UserCreationResponse user = userEntity != null
+                ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity) : null;
         com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
 
         // Build basic response with user and address
         ListingResponse response = listingMapper.toResponse(listing, user, addressResponse);
 
-        // Populate owner's Zalo contact information
-        populateOwnerZaloInfo(response, listing.getUserId());
+        // Populate owner's Zalo contact information from pre-loaded user
+        populateOwnerZaloInfoFromUser(response, userEntity);
 
         // DISABLED: Location pricing feature not currently in use
         // Add location pricing if address is available
@@ -1239,7 +1242,8 @@ public class ListingServiceImpl implements ListingService {
                 filter.getIsDraft(), filter.getPage(), filter.getSize());
 
         String normalizedKeyword = TextNormalizer.normalize(filter.getKeyword());
-        if (filter.getKeyword() != null && (normalizedKeyword == null || normalizedKeyword.length() < 3)) {
+        if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()
+                && (normalizedKeyword == null || normalizedKeyword.length() < 3)) {
             return ListingListResponse.builder()
                     .listings(Collections.emptyList())
                     .totalCount(0L)
@@ -1314,19 +1318,18 @@ public class ListingServiceImpl implements ListingService {
 
             List<Object[]> statsData = listingRepository.getListingStatsByProvinceIds(request.getProvinceIds());
 
-            // Map to response objects
+            // Batch-load all province names in 1 query (avoids N+1)
+            Map<Integer, String> provinceNames = legacyProvinceRepository.findAllById(request.getProvinceIds())
+                    .stream().collect(Collectors.toMap(
+                            com.smartrent.infra.repository.entity.LegacyProvince::getId,
+                            com.smartrent.infra.repository.entity.LegacyProvince::getName));
+
             for (Object[] row : statsData) {
                 Integer provinceId = (Integer) row[0];
                 Long totalCount = (Long) row[1];
                 Long verifiedCount = (Long) row[2];
                 Long vipCount = (Long) row[3];
 
-                // Get province name
-                String provinceName = legacyProvinceRepository.findById(provinceId)
-                        .map(com.smartrent.infra.repository.entity.LegacyProvince::getName)
-                        .orElse("Unknown Province");
-
-                // Filter if verifiedOnly is requested
                 if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
                     continue;
                 }
@@ -1334,7 +1337,7 @@ public class ListingServiceImpl implements ListingService {
                 results.add(ProvinceListingStatsResponse.builder()
                         .provinceId(provinceId)
                         .provinceCode(null)
-                        .provinceName(provinceName)
+                        .provinceName(provinceNames.getOrDefault(provinceId, "Unknown Province"))
                         .totalListings(totalCount)
                         .verifiedListings(verifiedCount)
                         .vipListings(vipCount)
@@ -1348,19 +1351,16 @@ public class ListingServiceImpl implements ListingService {
 
             List<Object[]> statsData = listingRepository.getListingStatsByProvinceCodes(request.getProvinceCodes());
 
-            // Map to response objects
+            // Batch-load all province names in 1 query (avoids N+1)
+            Map<String, String> provinceNames = provinceRepository.findByCodeIn(request.getProvinceCodes())
+                    .stream().collect(Collectors.toMap(Province::getCode, Province::getName));
+
             for (Object[] row : statsData) {
                 String provinceCode = (String) row[0];
                 Long totalCount = (Long) row[1];
                 Long verifiedCount = (Long) row[2];
                 Long vipCount = (Long) row[3];
 
-                // Get province name
-                String provinceName = provinceRepository.findByCode(provinceCode)
-                        .map(Province::getName)
-                        .orElse("Unknown Province");
-
-                // Filter if verifiedOnly is requested
                 if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
                     continue;
                 }
@@ -1368,7 +1368,7 @@ public class ListingServiceImpl implements ListingService {
                 results.add(ProvinceListingStatsResponse.builder()
                         .provinceId(null)
                         .provinceCode(provinceCode)
-                        .provinceName(provinceName)
+                        .provinceName(provinceNames.getOrDefault(provinceCode, "Unknown Province"))
                         .totalListings(totalCount)
                         .verifiedListings(verifiedCount)
                         .vipListings(vipCount)
@@ -1412,6 +1412,10 @@ public class ListingServiceImpl implements ListingService {
         // Get stats from repository
         List<Object[]> statsData = listingRepository.getListingStatsByCategoryIds(request.getCategoryIds());
 
+        // Batch-load all categories in 1 query (avoids N+1)
+        Map<Long, Category> categoryMap = categoryRepository.findAllById(request.getCategoryIds())
+                .stream().collect(Collectors.toMap(Category::getCategoryId, Function.identity()));
+
         // Map to response objects
         for (Object[] row : statsData) {
             Long categoryId = (Long) row[0];
@@ -1419,14 +1423,12 @@ public class ListingServiceImpl implements ListingService {
             Long verifiedCount = (Long) row[2];
             Long vipCount = (Long) row[3];
 
-            // Get category details
-            Category category = categoryRepository.findById(categoryId).orElse(null);
+            Category category = categoryMap.get(categoryId);
             if (category == null) {
                 log.warn("Category not found: {}", categoryId);
                 continue;
             }
 
-            // Filter if verifiedOnly is requested
             if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
                 continue;
             }
@@ -1458,12 +1460,9 @@ public class ListingServiceImpl implements ListingService {
     public com.smartrent.dto.response.ListingResponseForOwner getMyListingDetail(Long id, String userId) {
         log.info("Owner {} requesting detail for listing {}", userId, id);
 
-        // Get listing with amenities
+        // Get listing with amenities (also loads address via JOIN)
         Listing listing = listingRepository.findByIdWithAmenities(id)
                 .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
-
-        // Fetch media separately to avoid MultipleBagFetchException (though we fetch it again below)
-        listingRepository.findByIdWithMedia(id);
 
         // Validate ownership
         if (!listing.getUserId().equals(userId)) {
@@ -1471,53 +1470,28 @@ public class ListingServiceImpl implements ListingService {
                     "You don't have permission to view this listing's detail");
         }
 
-        // Build user response
-        com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
+        // Load user once — same owner for all cases
+        com.smartrent.dto.response.UserCreationResponse user = userRepository.findById(userId)
+                .map(userMapper::mapFromUserEntityToUserCreationResponse)
+                .orElse(null);
 
-        // Get media for this listing
-        List<Media> mediaList = mediaRepository.findByListing_ListingIdAndStatusOrderBySortOrderAsc(
-                id, Media.MediaStatus.ACTIVE);
-        List<com.smartrent.dto.response.MediaResponse> mediaResponses = mediaList.stream()
-                .map(mediaMapper::toResponse)
-                .collect(Collectors.toList());
+        // Get active media for this listing (single query, filtered by status)
+        List<com.smartrent.dto.response.MediaResponse> mediaResponses =
+                mediaRepository.findByListing_ListingIdAndStatusOrderBySortOrderAsc(id, Media.MediaStatus.ACTIVE)
+                        .stream().map(mediaMapper::toResponse).collect(Collectors.toList());
 
-        // Get full address information
-        com.smartrent.dto.response.AddressResponse addressResponse = null;
-        if (listing.getAddress() != null) {
-            addressResponse = addressMapper.toResponse(listing.getAddress());
-        }
+        com.smartrent.dto.response.AddressResponse addressResponse =
+                listing.getAddress() != null ? addressMapper.toResponse(listing.getAddress()) : null;
 
-        // Get payment info if listing was created via payment
-        com.smartrent.dto.response.ListingResponseForOwner.PaymentInfo paymentInfo = null;
-        if (listing.getTransactionId() != null) {
-            transactionRepository.findById(listing.getTransactionId()).ifPresent(transaction -> {
-                // Build payment info from transaction
-            });
-            // For now, payment info is optional - can be enhanced later
-        }
-
-        // Build statistics - placeholder for now, can be enhanced with actual view/contact counts
         com.smartrent.dto.response.ListingResponseForOwner.ListingStatistics statistics =
                 com.smartrent.dto.response.ListingResponseForOwner.ListingStatistics.builder()
-                        .viewCount(0L)
-                        .contactCount(0L)
-                        .saveCount(0L)
-                        .reportCount(0L)
-                        .build();
-
-        // Verification notes and rejection reason from moderation system
-        String verificationNotes = listing.getLastModerationReasonText();
-        String rejectionReason = listing.getLastModerationReasonCode();
+                        .viewCount(0L).contactCount(0L).saveCount(0L).reportCount(0L).build();
 
         com.smartrent.dto.response.ListingResponseForOwner response = listingMapper.toResponseForOwner(
-                listing,
-                user,
-                mediaResponses,
-                addressResponse,
-                paymentInfo,
-                statistics,
-                verificationNotes,
-                rejectionReason
+                listing, user, mediaResponses, addressResponse,
+                null, statistics,
+                listing.getLastModerationReasonText(),
+                listing.getLastModerationReasonCode()
         );
 
         // Populate moderation context (pendingOwnerAction & moderationTimeline)
@@ -1541,48 +1515,76 @@ public class ListingServiceImpl implements ListingService {
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
 
-        // Build specification for statistics calculation
-        Specification<Listing> spec = listingQueryService.buildSpecification(filter);
+        List<Listing> content = page.getContent();
 
-        // Convert to response DTOs with admin info
-        List<com.smartrent.dto.response.ListingResponseWithAdmin> listings = page.getContent().stream()
-                .map(listing -> {
-                    // Get admin info if listing was updated by an admin
-                    Admin verifyingAdmin = null;
-                    if (listing.getUpdatedBy() != null) {
-                        verifyingAdmin = adminRepository.findById(String.valueOf(listing.getUpdatedBy()))
-                                .orElse(null);
-                    }
+        List<com.smartrent.dto.response.ListingResponseWithAdmin> listings;
 
-                    // Determine verification status
-                    String verificationStatus;
-                    if (listing.getVerified()) {
-                        verificationStatus = "APPROVED";
-                    } else if (listing.getIsVerify()) {
-                        verificationStatus = "PENDING";
-                    } else {
-                        verificationStatus = "NOT_SUBMITTED";
-                    }
+        if (!content.isEmpty()) {
+            List<Long> listingIds = content.stream()
+                    .map(Listing::getListingId).collect(Collectors.toList());
 
-                    // Fetch user information
-                    com.smartrent.infra.repository.entity.User userEntity = userRepository.findById(listing.getUserId())
-                            .orElse(null);
-                    com.smartrent.dto.response.UserCreationResponse user = userEntity != null
-                            ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity)
-                            : null;
+            // ---- Batch-load all related data (avoids N+1) ----
 
-                    return listingMapper.toResponseWithAdmin(listing, user, verifyingAdmin, verificationStatus, null);
-                })
-                .collect(Collectors.toList());
+            // 1. Batch-load addresses into Hibernate session cache
+            listingRepository.findByIdsWithAmenities(listingIds);
 
-        // Calculate statistics for the filtered results
+            // 2. Batch-load all distinct users — 1 query
+            Set<String> userIds = content.stream()
+                    .map(Listing::getUserId).filter(id -> id != null).collect(Collectors.toSet());
+            Map<String, com.smartrent.infra.repository.entity.User> userMap = userIds.isEmpty()
+                    ? Collections.emptyMap()
+                    : userRepository.findAllById(userIds).stream()
+                            .collect(Collectors.toMap(
+                                    com.smartrent.infra.repository.entity.User::getUserId,
+                                    Function.identity()));
+
+            // 3. Batch-load all distinct admins who updated listings — 1 query
+            Set<String> adminIds = content.stream()
+                    .map(Listing::getUpdatedBy).filter(id -> id != null)
+                    .map(String::valueOf).collect(Collectors.toSet());
+            Map<String, Admin> adminMap = adminIds.isEmpty()
+                    ? Collections.emptyMap()
+                    : adminRepository.findAllById(adminIds).stream()
+                            .collect(Collectors.toMap(Admin::getAdminId, Function.identity()));
+
+            // ---- Map to response DTOs ----
+            listings = content.stream()
+                    .map(listing -> {
+                        // Look up admin from batch-loaded map
+                        Admin verifyingAdmin = listing.getUpdatedBy() != null
+                                ? adminMap.get(String.valueOf(listing.getUpdatedBy()))
+                                : null;
+
+                        String verificationStatus;
+                        if (listing.getVerified()) {
+                            verificationStatus = "APPROVED";
+                        } else if (listing.getIsVerify()) {
+                            verificationStatus = "PENDING";
+                        } else {
+                            verificationStatus = "NOT_SUBMITTED";
+                        }
+
+                        // Look up user from batch-loaded map
+                        com.smartrent.infra.repository.entity.User userEntity = userMap.get(listing.getUserId());
+                        com.smartrent.dto.response.UserCreationResponse user = userEntity != null
+                                ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity)
+                                : null;
+
+                        return listingMapper.toResponseWithAdmin(listing, user, verifyingAdmin, verificationStatus, null);
+                    })
+                    .collect(Collectors.toList());
+        } else {
+            listings = Collections.emptyList();
+        }
+
+        // Calculate statistics — 1 query instead of 10
         com.smartrent.dto.response.AdminListingListResponse.AdminStatistics statistics =
-                calculateAdminStatistics(spec);
+                calculateAdminStatistics();
 
         return com.smartrent.dto.response.AdminListingListResponse.builder()
                 .listings(listings)
                 .totalCount(page.getTotalElements())
-                .currentPage(page.getNumber() + 1)  // Convert from 0-based (Spring Data) to 1-based (frontend)
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .totalPages(page.getTotalPages())
                 .filterCriteria(filter)
@@ -1591,59 +1593,28 @@ public class ListingServiceImpl implements ListingService {
     }
 
     /**
-     * Calculate statistics for admin dashboard
+     * Calculate admin statistics in a single query instead of 10 separate COUNT queries
      */
-    private com.smartrent.dto.response.AdminListingListResponse.AdminStatistics calculateAdminStatistics(
-            Specification<Listing> baseSpec) {
-        // Count listings by different criteria
-        Specification<Listing> pendingVerificationSpec = baseSpec.and((root, query, cb) ->
-                cb.and(
-                        cb.equal(root.get("isVerify"), true),
-                        cb.equal(root.get("verified"), false)
-                ));
-
-        Specification<Listing> verifiedSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("verified"), true));
-
-        Specification<Listing> expiredSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("expired"), true));
-
-        Specification<Listing> rejectedSpec = baseSpec.and((root, query, cb) ->
-                cb.and(
-                        cb.equal(root.get("verified"), false),
-                        cb.equal(root.get("isVerify"), false)
-                ));
-
-        Specification<Listing> draftSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("isDraft"), true));
-
-        Specification<Listing> shadowSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("isShadow"), true));
-
-        // Count by VIP tier
-        Specification<Listing> normalSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("vipType"), Listing.VipType.NORMAL));
-
-        Specification<Listing> silverSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("vipType"), Listing.VipType.SILVER));
-
-        Specification<Listing> goldSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("vipType"), Listing.VipType.GOLD));
-
-        Specification<Listing> diamondSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("vipType"), Listing.VipType.DIAMOND));
-
+    private com.smartrent.dto.response.AdminListingListResponse.AdminStatistics calculateAdminStatistics() {
+        Object[] row = listingRepository.getAdminStatistics();
+        if (row == null || row[0] == null) {
+            return com.smartrent.dto.response.AdminListingListResponse.AdminStatistics.builder()
+                    .pendingVerification(0L).verified(0L).expired(0L).rejected(0L)
+                    .drafts(0L).shadows(0L)
+                    .normalListings(0L).silverListings(0L).goldListings(0L).diamondListings(0L)
+                    .build();
+        }
         return com.smartrent.dto.response.AdminListingListResponse.AdminStatistics.builder()
-                .pendingVerification(listingRepository.count(pendingVerificationSpec))
-                .verified(listingRepository.count(verifiedSpec))
-                .expired(listingRepository.count(expiredSpec))
-                .rejected(listingRepository.count(rejectedSpec))
-                .drafts(listingRepository.count(draftSpec))
-                .shadows(listingRepository.count(shadowSpec))
-                .normalListings(listingRepository.count(normalSpec))
-                .silverListings(listingRepository.count(silverSpec))
-                .goldListings(listingRepository.count(goldSpec))
-                .diamondListings(listingRepository.count(diamondSpec))
+                .pendingVerification(toLong(row[0]))
+                .verified(toLong(row[1]))
+                .expired(toLong(row[2]))
+                .rejected(toLong(row[3]))
+                .drafts(toLong(row[4]))
+                .shadows(toLong(row[5]))
+                .normalListings(toLong(row[6]))
+                .silverListings(toLong(row[7]))
+                .goldListings(toLong(row[8]))
+                .diamondListings(toLong(row[9]))
                 .build();
     }
 
@@ -1660,137 +1631,119 @@ public class ListingServiceImpl implements ListingService {
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
 
-        // Build specification for statistics calculation
-        Specification<Listing> spec = listingQueryService.buildSpecification(filter);
+        List<Listing> content = page.getContent();
 
-        // Convert to ListingResponseForOwner with full details
-        List<com.smartrent.dto.response.ListingResponseForOwner> listings = page.getContent().stream()
-                .map(listing -> {
-                    // Build user response
-                    com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
+        // ---- Batch-load all related data in bulk (avoids N+1) ----
 
-                    // Get media for this listing
-                    List<Media> mediaList = mediaRepository.findByListing_ListingIdAndStatusOrderBySortOrderAsc(
-                            listing.getListingId(), Media.MediaStatus.ACTIVE);
-                    List<com.smartrent.dto.response.MediaResponse> mediaResponses = mediaList.stream()
-                            .map(mediaMapper::toResponse)
-                            .collect(Collectors.toList());
+        // 1. Single user query — all listings belong to the same owner
+        com.smartrent.dto.response.UserCreationResponse ownerResponse = userRepository.findById(userId)
+                .map(userMapper::mapFromUserEntityToUserCreationResponse)
+                .orElse(null);
 
-                    // Get full address information
-                    com.smartrent.dto.response.AddressResponse addressResponse = null;
-                    if (listing.getAddress() != null) {
-                        addressResponse = addressMapper.toResponse(listing.getAddress());
-                    }
+        if (!content.isEmpty()) {
+            List<Long> listingIds = content.stream()
+                    .map(Listing::getListingId).collect(Collectors.toList());
 
-                    // Get payment info if listing was created via payment
-                    com.smartrent.dto.response.ListingResponseForOwner.PaymentInfo paymentInfo = null;
-                    if (listing.getTransactionId() != null) {
-                        // For now, payment info is optional - can be enhanced later
-                    }
+            // 2. Batch-load addresses into Hibernate session cache
+            listingRepository.findByIdsWithAmenities(listingIds);
 
-                    // Build statistics - placeholder for now
-                    com.smartrent.dto.response.ListingResponseForOwner.ListingStatistics statistics =
-                            com.smartrent.dto.response.ListingResponseForOwner.ListingStatistics.builder()
-                                    .viewCount(0L)
-                                    .contactCount(0L)
-                                    .saveCount(0L)
-                                    .reportCount(0L)
-                                    .build();
+            // 3. Batch-load active media for all listings — 1 query
+            Map<Long, List<com.smartrent.dto.response.MediaResponse>> mediaByListing =
+                    mediaRepository.findActiveMediaByListingIds(listingIds).stream()
+                            .collect(Collectors.groupingBy(
+                                    m -> m.getListing().getListingId(),
+                                    Collectors.mapping(mediaMapper::toResponse, Collectors.toList())
+                            ));
 
-                    // Verification notes and rejection reason from moderation system
-                    String verificationNotes = listing.getLastModerationReasonText();
-                    String rejectionReason = listing.getLastModerationReasonCode();
+            // 4. Batch-load pending owner actions — 1 query
+            Map<Long, com.smartrent.dto.response.OwnerActionResponse> pendingActions =
+                    listingModerationService.getOwnerPendingActions(listingIds);
 
-                    com.smartrent.dto.response.ListingResponseForOwner ownerResponse = listingMapper.toResponseForOwner(
-                            listing,
-                            user,
-                            mediaResponses,
-                            addressResponse,
-                            paymentInfo,
-                            statistics,
-                            verificationNotes,
-                            rejectionReason
-                    );
+            // ---- Map to response DTOs ----
+            List<com.smartrent.dto.response.ListingResponseForOwner> listings = content.stream()
+                    .map(listing -> {
+                        Long lid = listing.getListingId();
 
-                    // Populate moderation context
-                    ownerResponse.setPendingOwnerAction(listingModerationService.getOwnerPendingAction(listing.getListingId()));
+                        com.smartrent.dto.response.AddressResponse addressResp =
+                                listing.getAddress() != null ? addressMapper.toResponse(listing.getAddress()) : null;
 
-                    return ownerResponse;
-                })
-                .collect(Collectors.toList());
+                        List<com.smartrent.dto.response.MediaResponse> mediaResponses =
+                                mediaByListing.getOrDefault(lid, Collections.emptyList());
 
-        // Calculate owner statistics
-        com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics statistics =
-                calculateOwnerStatistics(spec);
+                        com.smartrent.dto.response.ListingResponseForOwner.ListingStatistics statistics =
+                                com.smartrent.dto.response.ListingResponseForOwner.ListingStatistics.builder()
+                                        .viewCount(0L).contactCount(0L).saveCount(0L).reportCount(0L).build();
+
+                        com.smartrent.dto.response.ListingResponseForOwner ownerListingResponse = listingMapper.toResponseForOwner(
+                                listing, ownerResponse, mediaResponses, addressResp,
+                                null, statistics,
+                                listing.getLastModerationReasonText(),
+                                listing.getLastModerationReasonCode()
+                        );
+
+                        ownerListingResponse.setPendingOwnerAction(pendingActions.get(lid));
+
+                        return ownerListingResponse;
+                    })
+                    .collect(Collectors.toList());
+
+            // 5. Calculate owner statistics — 1 query instead of 9
+            com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics ownerStats =
+                    calculateOwnerStatistics(userId);
+
+            return com.smartrent.dto.response.OwnerListingListResponse.builder()
+                    .listings(listings)
+                    .totalCount(page.getTotalElements())
+                    .currentPage(page.getNumber() + 1)
+                    .pageSize(page.getSize())
+                    .totalPages(page.getTotalPages())
+                    .filterCriteria(filter)
+                    .statistics(ownerStats)
+                    .build();
+        }
+
+        // Empty page — still need statistics
+        com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics ownerStats =
+                calculateOwnerStatistics(userId);
 
         return com.smartrent.dto.response.OwnerListingListResponse.builder()
-                .listings(listings)
+                .listings(Collections.emptyList())
                 .totalCount(page.getTotalElements())
-                .currentPage(page.getNumber() + 1)  // Convert from 0-based (Spring Data) to 1-based (frontend)
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .totalPages(page.getTotalPages())
                 .filterCriteria(filter)
-                .statistics(statistics)
+                .statistics(ownerStats)
                 .build();
     }
 
     /**
-     * Calculate statistics for owner dashboard
+     * Calculate owner statistics in a single query instead of 9 separate COUNT queries
      */
-    private com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics calculateOwnerStatistics(
-            Specification<Listing> baseSpec) {
-        // Count listings by different criteria
-        Specification<Listing> draftSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("isDraft"), true));
-
-        Specification<Listing> pendingVerificationSpec = baseSpec.and((root, query, cb) ->
-                cb.and(
-                        cb.equal(root.get("isVerify"), true),
-                        cb.equal(root.get("verified"), false),
-                        cb.equal(root.get("isDraft"), false)
-                ));
-
-        Specification<Listing> rejectedSpec = baseSpec.and((root, query, cb) ->
-                cb.and(
-                        cb.equal(root.get("verified"), false),
-                        cb.equal(root.get("isVerify"), false),
-                        cb.equal(root.get("isDraft"), false)
-                ));
-
-        Specification<Listing> activeSpec = baseSpec.and((root, query, cb) ->
-                cb.and(
-                        cb.equal(root.get("verified"), true),
-                        cb.equal(root.get("expired"), false),
-                        cb.equal(root.get("isDraft"), false)
-                ));
-
-        Specification<Listing> expiredSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("expired"), true));
-
-        // Count by VIP tier
-        Specification<Listing> normalSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("vipType"), Listing.VipType.NORMAL));
-
-        Specification<Listing> silverSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("vipType"), Listing.VipType.SILVER));
-
-        Specification<Listing> goldSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("vipType"), Listing.VipType.GOLD));
-
-        Specification<Listing> diamondSpec = baseSpec.and((root, query, cb) ->
-                cb.equal(root.get("vipType"), Listing.VipType.DIAMOND));
-
+    private com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics calculateOwnerStatistics(String userId) {
+        Object[] row = listingRepository.getOwnerStatistics(userId);
+        if (row == null || row[0] == null) {
+            return com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics.builder()
+                    .drafts(0L).pendingVerification(0L).rejected(0L).active(0L).expired(0L)
+                    .normalListings(0L).silverListings(0L).goldListings(0L).diamondListings(0L)
+                    .build();
+        }
         return com.smartrent.dto.response.OwnerListingListResponse.OwnerStatistics.builder()
-                .drafts(listingRepository.count(draftSpec))
-                .pendingVerification(listingRepository.count(pendingVerificationSpec))
-                .rejected(listingRepository.count(rejectedSpec))
-                .active(listingRepository.count(activeSpec))
-                .expired(listingRepository.count(expiredSpec))
-                .normalListings(listingRepository.count(normalSpec))
-                .silverListings(listingRepository.count(silverSpec))
-                .goldListings(listingRepository.count(goldSpec))
-                .diamondListings(listingRepository.count(diamondSpec))
+                .drafts(toLong(row[0]))
+                .pendingVerification(toLong(row[1]))
+                .rejected(toLong(row[2]))
+                .active(toLong(row[3]))
+                .expired(toLong(row[4]))
+                .normalListings(toLong(row[5]))
+                .silverListings(toLong(row[6]))
+                .goldListings(toLong(row[7]))
+                .diamondListings(toLong(row[8]))
                 .build();
+    }
+
+    private static Long toLong(Object val) {
+        if (val == null) return 0L;
+        return ((Number) val).longValue();
     }
 
     // ============ DRAFT MANAGEMENT METHODS IMPLEMENTATION ============
@@ -2373,16 +2326,8 @@ public class ListingServiceImpl implements ListingService {
                 request.getVipType()
         );
 
-        // Convert to response DTOs
-        List<ListingResponse> listings = page.getContent().stream()
-                .map(listing -> {
-                    com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(listing.getUserId());
-                    com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, user, addressResponse);
-                    populateOwnerZaloInfo(response, listing.getUserId());
-                    return response;
-                })
-                .collect(Collectors.toList());
+        // Batch-load all relationships and map to DTOs (avoids N+1)
+        List<ListingResponse> listings = batchMapListings(page.getContent());
 
         // Build bounds info
         com.smartrent.dto.response.MapListingsResponse.MapBoundsInfo boundsInfo =

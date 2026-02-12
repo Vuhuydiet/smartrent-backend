@@ -7,7 +7,9 @@ import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.ModerationEventResponse;
 import com.smartrent.dto.response.OwnerActionResponse;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Unified moderation lifecycle service for listings.
@@ -34,6 +36,12 @@ public interface ListingModerationService {
      * Get the most recent pending owner action for a listing (if any).
      */
     OwnerActionResponse getOwnerPendingAction(Long listingId);
+
+    /**
+     * Batch-load pending owner actions for multiple listings (avoids N+1).
+     * Returns a map from listingId to OwnerActionResponse (only listings with pending actions are included).
+     */
+    Map<Long, OwnerActionResponse> getOwnerPendingActions(Collection<Long> listingIds);
 
     /**
      * Get the full moderation audit trail for a listing.

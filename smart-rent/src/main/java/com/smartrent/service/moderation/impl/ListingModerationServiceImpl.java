@@ -34,7 +34,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -227,6 +229,20 @@ public class ListingModerationServiceImpl implements ListingModerationService {
                 .findFirst()
                 .map(this::mapOwnerAction)
                 .orElse(null);
+    }
+
+    @Override
+    public Map<Long, OwnerActionResponse> getOwnerPendingActions(Collection<Long> listingIds) {
+        if (listingIds == null || listingIds.isEmpty()) {
+            return Map.of();
+        }
+        return ownerActionRepository.findByListingIdInAndStatus(listingIds, OwnerActionStatus.PENDING_OWNER)
+                .stream()
+                .collect(Collectors.toMap(
+                        ListingOwnerAction::getListingId,
+                        this::mapOwnerAction,
+                        (first, second) -> first // keep first if duplicate listingId
+                ));
     }
 
     @Override

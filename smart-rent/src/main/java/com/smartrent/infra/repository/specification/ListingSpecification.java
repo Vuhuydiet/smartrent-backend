@@ -35,6 +35,11 @@ public class ListingSpecification {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            // Eagerly fetch address to avoid N+1 lazy loads (skip for count queries)
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("address", JoinType.LEFT);
+            }
+
             // ============ USER & OWNERSHIP FILTERS ============
             // User ID filter - if provided, search listings of specific user (my listings)
             if (filter.getUserId() != null && !filter.getUserId().isEmpty()) {

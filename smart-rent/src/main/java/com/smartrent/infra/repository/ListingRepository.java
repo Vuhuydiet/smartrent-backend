@@ -33,13 +33,13 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     Optional<Listing> findByTransactionId(String transactionId);
 
 
-    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.amenities WHERE l.listingId = :id")
+    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address LEFT JOIN FETCH l.amenities WHERE l.listingId = :id")
     Optional<Listing> findByIdWithAmenities(@Param("id") Long id);
 
     @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.media WHERE l.listingId = :id")
     Optional<Listing> findByIdWithMedia(@Param("id") Long id);
 
-    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.amenities WHERE l.listingId IN :ids")
+    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address LEFT JOIN FETCH l.amenities WHERE l.listingId IN :ids")
     List<Listing> findByIdsWithAmenities(@Param("ids") Collection<Long> ids);
 
     @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.media WHERE l.listingId IN :ids")
@@ -181,6 +181,26 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     );
 
     /**
+     * Get admin statistics in a single query instead of 10 separate COUNT queries.
+     * Returns: [pendingVerification, verified, expired, rejected, drafts, shadows, normalListings, silverListings, goldListings, diamondListings]
+     */
+    @Query("""
+        SELECT
+            SUM(CASE WHEN l.isVerify = true AND l.verified = false THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.expired = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.verified = false AND l.isVerify = false THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.isDraft = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.isShadow = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType = 'NORMAL' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType = 'SILVER' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType = 'GOLD' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType = 'DIAMOND' THEN 1 ELSE 0 END)
+        FROM listings l
+    """)
+    Object[] getAdminStatistics();
+
+    /**
      * Get listing statistics grouped by province (old structure)
      * Returns: provinceId, totalCount, verifiedCount, vipCount
      */
@@ -241,8 +261,36 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     """)
     List<Object[]> getListingStatsByCategoryIds(@Param("categoryIds") List<Long> categoryIds);
 
+    /**
+     * Get owner statistics in a single query instead of 9 separate COUNT queries.
+     * Returns: [drafts, pendingVerification, rejected, active, expired, normalListings, silverListings, goldListings, diamondListings]
+     */
     @Query("""
-        SELECT l FROM listings l
+        SELECT
+            SUM(CASE WHEN l.isDraft = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.isVerify = true AND l.verified = false AND l.isDraft = false THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.verified = false AND l.isVerify = false AND l.isDraft = false THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.verified = true AND l.expired = false AND l.isDraft = false THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.expired = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType = 'NORMAL' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType = 'SILVER' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType = 'GOLD' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType = 'DIAMOND' THEN 1 ELSE 0 END)
+        FROM listings l
+        WHERE l.userId = :userId
+    """)
+    Object[] getOwnerStatistics(@Param("userId") String userId);
+
+    @Query(value = """
+        SELECT l FROM listings l JOIN FETCH l.address
+        WHERE l.titleNorm LIKE CONCAT(:prefix, '%')
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+    """,
+    countQuery = """
+        SELECT COUNT(l) FROM listings l
         WHERE l.titleNorm LIKE CONCAT(:prefix, '%')
         AND l.isDraft = false
         AND l.isShadow = false

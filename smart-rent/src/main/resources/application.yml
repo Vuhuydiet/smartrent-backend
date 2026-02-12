@@ -44,6 +44,8 @@ logging:
     feign: INFO
     io.lettuce.core: WARN
     io.github.resilience4j: INFO
+    org.apache.coyote: WARN
+    org.apache.tomcat: WARN
     org.springframework.web: WARN
     org.springframework.security: WARN
     org.springframework.boot.actuate: WARN
@@ -82,10 +84,11 @@ spring:
     clean-on-validation-error: false
   jpa:
     database: MYSQL
-    openInView: true
+    openInView: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
+        default_batch_fetch_size: 20
         jdbc:
           batch_size: 25
           batch_versioned_data: true
