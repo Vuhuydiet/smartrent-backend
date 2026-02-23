@@ -14,15 +14,22 @@ import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingReportRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.ReportReasonRepository;
+import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.ListingReport;
 import com.smartrent.infra.repository.entity.ReportReason;
 import com.smartrent.mapper.ListingReportMapper;
+import com.smartrent.infra.connector.model.EmailInfo;
+import com.smartrent.infra.connector.model.EmailRequest;
+import com.smartrent.service.email.EmailService;
 import com.smartrent.service.moderation.ListingModerationService;
+import com.smartrent.utility.ModerationEmailBuilder;
 import com.smartrent.service.report.ListingReportService;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +52,16 @@ public class ListingReportServiceImpl implements ListingReportService {
     private final ListingReportMapper listingReportMapper;
     private final AdminRepository adminRepository;
     private final ListingModerationService listingModerationService;
+    private final EmailService emailService;
+    private final UserRepository userRepository;
+
+    @NonFinal
+    @Value("${application.email.sender.email}")
+    String senderEmail;
+
+    @NonFinal
+    @Value("${application.email.sender.name}")
+    String senderName;
 
     @Override
     public List<ReportReasonResponse> getReportReasons() {
@@ -222,6 +239,12 @@ public class ListingReportServiceImpl implements ListingReportService {
         ListingReport savedReport = listingReportRepository.save(report);
         log.info("Report {} successfully {} by admin {}", reportId, newStatus.name().toLowerCase(), adminId);
 
+        // Notify the reporter about the resolution
+        sendReporterNotificationEmail(savedReport, newStatus);
+
+        // Notify the listing owner about the resolution
+        sendOwnerNotificationEmail(savedReport, newStatus);
+
         // If admin resolved and owner action is required, delegate to moderation service
         if (newStatus == ReportStatus.RESOLVED && Boolean.TRUE.equals(request.getOwnerActionRequired())) {
             listingModerationService.handleReportResolutionOwnerAction(
@@ -246,6 +269,86 @@ public class ListingReportServiceImpl implements ListingReportService {
                 totalReports, pendingReports, resolvedReports, rejectedReports);
 
         return new ListingReportService.ReportStatistics(totalReports, pendingReports, resolvedReports, rejectedReports);
+    }
+
+    /**
+     * Send notification email to the reporter about the report resolution.
+     * Wrapped in try-catch so email failures never break the transaction.
+     */
+    private void sendReporterNotificationEmail(ListingReport report, ReportStatus status) {
+        try {
+            if (report.getReporterEmail() == null || report.getReporterEmail().isBlank()) {
+                log.warn("No reporter email for report {}, skipping notification", report.getReportId());
+                return;
+            }
+
+            String listingTitle = listingRepository.findById(report.getListingId())
+                    .map(Listing::getTitle)
+                    .orElse("(unknown listing)");
+
+            String htmlContent = ModerationEmailBuilder.buildReportResolvedForReporterEmail(
+                    listingTitle,
+                    report.getReporterName(),
+                    status.name(),
+                    report.getAdminNotes());
+
+            EmailRequest emailRequest = EmailRequest.builder()
+                    .sender(EmailInfo.builder().name(senderName).email(senderEmail).build())
+                    .to(List.of(EmailInfo.builder()
+                            .name(report.getReporterName())
+                            .email(report.getReporterEmail())
+                            .build()))
+                    .subject("Your report has been reviewed - SmartRent")
+                    .htmlContent(htmlContent)
+                    .build();
+
+            emailService.sendEmail(emailRequest);
+            log.info("Reporter notification email sent to {} for report {}", report.getReporterEmail(), report.getReportId());
+        } catch (Exception e) {
+            log.warn("Failed to send reporter notification email for report {}: {}", report.getReportId(), e.getMessage());
+        }
+    }
+
+    /**
+     * Send notification email to the listing owner about the report resolution.
+     * Wrapped in try-catch so email failures never break the transaction.
+     */
+    private void sendOwnerNotificationEmail(ListingReport report, ReportStatus status) {
+        try {
+            Listing listing = listingRepository.findById(report.getListingId()).orElse(null);
+            if (listing == null || listing.getUserId() == null) {
+                log.warn("Cannot find listing or owner for report {}, skipping owner notification", report.getReportId());
+                return;
+            }
+
+            var userEntity = userRepository.findById(listing.getUserId()).orElse(null);
+            if (userEntity == null || userEntity.getEmail() == null) {
+                log.warn("No owner email found for listing {}, skipping owner notification", listing.getListingId());
+                return;
+            }
+
+            String htmlContent = ModerationEmailBuilder.buildReportResolvedForOwnerEmail(
+                    listing.getTitle(),
+                    userEntity.getFirstName(),
+                    status.name(),
+                    report.getAdminNotes());
+
+            EmailRequest emailRequest = EmailRequest.builder()
+                    .sender(EmailInfo.builder().name(senderName).email(senderEmail).build())
+                    .to(List.of(EmailInfo.builder()
+                            .name(userEntity.getFirstName())
+                            .email(userEntity.getEmail())
+                            .build()))
+                    .subject("Report on your listing has been reviewed - SmartRent")
+                    .htmlContent(htmlContent)
+                    .build();
+
+            emailService.sendEmail(emailRequest);
+            log.info("Owner notification email sent to {} for report {} on listing {}",
+                    userEntity.getEmail(), report.getReportId(), listing.getListingId());
+        } catch (Exception e) {
+            log.warn("Failed to send owner notification email for report {}: {}", report.getReportId(), e.getMessage());
+        }
     }
 
     /**

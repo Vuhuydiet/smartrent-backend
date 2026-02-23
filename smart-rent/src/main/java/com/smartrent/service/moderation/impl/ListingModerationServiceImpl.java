@@ -29,7 +29,9 @@ import com.smartrent.service.email.EmailService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +55,14 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     ListingMapper listingMapper;
     UserMapper userMapper;
     EmailService emailService;
+
+    @NonFinal
+    @Value("${application.email.sender.email}")
+    String senderEmail;
+
+    @NonFinal
+    @Value("${application.email.sender.name}")
+    String senderName;
 
     // ───────────────────────────────────────────────────────────────
     // Admin moderation decision
@@ -437,7 +447,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             }
 
             EmailRequest emailRequest = EmailRequest.builder()
-                    .sender(EmailInfo.builder().name("SmartRent").email("no-reply@smartrent.vn").build())
+                    .sender(EmailInfo.builder().name(senderName).email(senderEmail).build())
                     .to(List.of(EmailInfo.builder().name(userEntity.getFirstName()).email(userEntity.getEmail()).build()))
                     .subject(subject)
                     .htmlContent(htmlContent)
@@ -454,7 +464,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             if (userEntity == null || userEntity.getEmail() == null) return;
 
             EmailRequest emailRequest = EmailRequest.builder()
-                    .sender(EmailInfo.builder().name("SmartRent").email("no-reply@smartrent.vn").build())
+                    .sender(EmailInfo.builder().name(senderName).email(senderEmail).build())
                     .to(List.of(EmailInfo.builder().name(userEntity.getFirstName()).email(userEntity.getEmail()).build()))
                     .subject("Action required for your listing - SmartRent")
                     .htmlContent(ModerationEmailBuilder.buildReportActionRequiredEmail(listing.getTitle(), userEntity.getFirstName(), adminNotes))
