@@ -39,6 +39,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .listingType(req.getListingType() != null ? Listing.ListingType.valueOf(req.getListingType()) : null)
                 .verified(false)  // Always false for new listings (IN_REVIEW status)
                 .isVerify(true)   // Always true for new listings (IN_REVIEW status)
+                .moderationStatus(com.smartrent.enums.ModerationStatus.PENDING_REVIEW)
                 .expired(req.getExpired() != null ? req.getExpired() : false)
                 .vipType(vipType)
                 .vipTypeSortOrder(Listing.getVipTypeSortOrder(vipType))
