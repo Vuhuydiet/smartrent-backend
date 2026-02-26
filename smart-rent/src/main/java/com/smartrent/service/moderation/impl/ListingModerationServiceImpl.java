@@ -79,8 +79,9 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         switch (decision) {
             case "APPROVE" -> handleApprove(listing, adminId);
-            case "REJECT" -> handleRejectOrRevision(listing, request, adminId, ModerationStatus.REJECTED, ModerationAction.REJECT);
+            case "REJECT" -> handleRejectOrRevision(listing, request, adminId, ModerationStatus.SUSPENDED, ModerationAction.REJECT);
             case "REQUEST_REVISION" -> handleRejectOrRevision(listing, request, adminId, ModerationStatus.REVISION_REQUIRED, ModerationAction.REQUEST_REVISION);
+            case "SUSPEND" -> handleRejectOrRevision(listing, request, adminId, ModerationStatus.SUSPENDED, ModerationAction.SUSPEND);
             default -> throw new DomainException(DomainCode.MODERATION_INVALID_DECISION);
         }
 
@@ -188,8 +189,9 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         // Validate state: must be REJECTED, REVISION_REQUIRED, or have pending owner action
         boolean canResubmit = false;
         if (listing.getModerationStatus() != null) {
-            canResubmit = listing.getModerationStatus() == ModerationStatus.REJECTED
-                    || listing.getModerationStatus() == ModerationStatus.REVISION_REQUIRED;
+            canResubmit = listing.getModerationStatus() == ModerationStatus.REVISION_REQUIRED
+                    || listing.getModerationStatus() == ModerationStatus.SUSPENDED
+                    || listing.getModerationStatus() == ModerationStatus.REJECTED; // backward compat
         }
         // Also allow if legacy REJECTED state (verified=false, isVerify=false)
         if (!canResubmit && Boolean.FALSE.equals(listing.getVerified()) && Boolean.FALSE.equals(listing.getIsVerify())) {
@@ -202,7 +204,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         ModerationStatus previousStatus = listing.getModerationStatus();
 
         // Transition listing state
-        listing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+        listing.setModerationStatus(ModerationStatus.RESUBMITTED);
         listing.setVerified(false);
         listing.setIsVerify(true); // Back to IN_REVIEW in legacy view
         listing.setRevisionCount(listing.getRevisionCount() + 1);
