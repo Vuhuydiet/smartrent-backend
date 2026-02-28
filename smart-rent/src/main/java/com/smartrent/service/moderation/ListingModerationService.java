@@ -3,6 +3,7 @@ package com.smartrent.service.moderation;
 import com.smartrent.dto.request.ListingStatusChangeRequest;
 import com.smartrent.dto.request.ResolveReportRequest;
 import com.smartrent.dto.request.ResubmitListingRequest;
+import com.smartrent.dto.request.UpdateAndResubmitRequest;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.ModerationEventResponse;
 import com.smartrent.dto.response.OwnerActionResponse;
@@ -31,6 +32,12 @@ public interface ListingModerationService {
      * Owner resubmits their listing for review after making required changes.
      */
     void resubmitForReview(Long listingId, String userId, ResubmitListingRequest request);
+
+    /**
+     * Owner updates listing content and resubmits for review in one operation.
+     * Combines content update + status transition (REJECTED/REVISION_REQUIRED → PENDING_REVIEW).
+     */
+    void updateAndResubmitForReview(Long listingId, UpdateAndResubmitRequest request, String userId);
 
     /**
      * Get the most recent pending owner action for a listing (if any).

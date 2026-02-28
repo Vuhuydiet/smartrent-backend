@@ -129,6 +129,7 @@ public class ListingReportServiceImpl implements ListingReportService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ListingReportResponse> getReportHistory(Long listingId) {
         log.info("Fetching report history for listing ID: {}", listingId);
 

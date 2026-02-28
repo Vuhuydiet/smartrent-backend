@@ -3,6 +3,7 @@ package com.smartrent.service.moderation.impl;
 import com.smartrent.dto.request.ListingStatusChangeRequest;
 import com.smartrent.dto.request.ResolveReportRequest;
 import com.smartrent.dto.request.ResubmitListingRequest;
+import com.smartrent.dto.request.UpdateAndResubmitRequest;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.ModerationEventResponse;
 import com.smartrent.dto.response.OwnerActionResponse;
@@ -14,11 +15,13 @@ import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingModerationEventRepository;
 import com.smartrent.infra.repository.ListingOwnerActionRepository;
 import com.smartrent.infra.repository.ListingRepository;
+import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.ListingModerationEvent;
 import com.smartrent.infra.repository.entity.ListingOwnerAction;
+import com.smartrent.infra.repository.entity.Media;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.mapper.UserMapper;
 import com.smartrent.service.moderation.ListingModerationService;
@@ -50,6 +53,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     ListingRepository listingRepository;
     ListingModerationEventRepository moderationEventRepository;
     ListingOwnerActionRepository ownerActionRepository;
+    MediaRepository mediaRepository;
     AdminRepository adminRepository;
     UserRepository userRepository;
     ListingMapper listingMapper;
@@ -126,16 +130,15 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         ModerationStatus previousStatus = listing.getModerationStatus();
 
-        // Hide listing if requested
-        if ("HIDE_UNTIL_REVIEW".equalsIgnoreCase(request.getListingVisibilityAction())) {
-            listing.setModerationStatus(ModerationStatus.REVISION_REQUIRED);
-            listing.setVerified(false);
-            listing.setIsVerify(false);
-            listing.setLastModeratedBy(adminId);
-            listing.setLastModeratedAt(LocalDateTime.now());
-            listing.setLastModerationReasonText(request.getAdminNotes());
-            listingRepository.save(listing);
-        }
+        // When owner action is required, always transition to REVISION_REQUIRED
+        // so the owner can update and resubmit. Optionally hide until review.
+        listing.setModerationStatus(ModerationStatus.REVISION_REQUIRED);
+        listing.setVerified(false);
+        listing.setIsVerify(false);
+        listing.setLastModeratedBy(adminId);
+        listing.setLastModeratedAt(LocalDateTime.now());
+        listing.setLastModerationReasonText(request.getAdminNotes());
+        listingRepository.save(listing);
 
         // Create owner action
         OwnerActionType actionType = OwnerActionType.UPDATE_LISTING;
@@ -159,9 +162,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         // Audit event
         createModerationEvent(listingId, ModerationSource.REPORT_RESOLUTION,
-                previousStatus,
-                "HIDE_UNTIL_REVIEW".equalsIgnoreCase(request.getListingVisibilityAction())
-                        ? ModerationStatus.REVISION_REQUIRED : previousStatus,
+                previousStatus, ModerationStatus.REVISION_REQUIRED,
                 ModerationAction.REQUEST_REVISION, adminId, null,
                 null, request.getAdminNotes(), reportId);
 
@@ -227,6 +228,102 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         sendResubmitNotificationAsync(listing);
 
         log.info("Listing {} resubmitted for review by user {}", listingId, userId);
+    }
+
+    // ───────────────────────────────────────────────────────────────
+    // Owner update and resubmit (combined)
+    // ───────────────────────────────────────────────────────────────
+    @Override
+    @Transactional
+    public void updateAndResubmitForReview(Long listingId, UpdateAndResubmitRequest request, String userId) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
+
+        // Validate ownership
+        if (!listing.getUserId().equals(userId)) {
+            throw new DomainException(DomainCode.NOT_LISTING_OWNER);
+        }
+
+        // Validate state: must be REJECTED, REVISION_REQUIRED, or legacy rejected
+        boolean canResubmit = false;
+        if (listing.getModerationStatus() != null) {
+            canResubmit = listing.getModerationStatus() == ModerationStatus.REJECTED
+                    || listing.getModerationStatus() == ModerationStatus.REVISION_REQUIRED;
+        }
+        if (!canResubmit && Boolean.FALSE.equals(listing.getVerified()) && Boolean.FALSE.equals(listing.getIsVerify())) {
+            canResubmit = true;
+        }
+        if (!canResubmit) {
+            throw new DomainException(DomainCode.RESUBMIT_NOT_ALLOWED);
+        }
+
+        ModerationStatus previousStatus = listing.getModerationStatus();
+
+        // ── Apply content updates (null-safe partial update) ──
+        if (request.getTitle() != null) listing.setTitle(request.getTitle());
+        if (request.getDescription() != null) listing.setDescription(request.getDescription());
+        if (request.getListingType() != null) listing.setListingType(Listing.ListingType.valueOf(request.getListingType()));
+        if (request.getCategoryId() != null) listing.setCategoryId(request.getCategoryId());
+        if (request.getProductType() != null) listing.setProductType(Listing.ProductType.valueOf(request.getProductType()));
+        if (request.getPrice() != null) listing.setPrice(request.getPrice());
+        if (request.getPriceUnit() != null) listing.setPriceUnit(Listing.PriceUnit.valueOf(request.getPriceUnit()));
+        if (request.getArea() != null) listing.setArea(request.getArea());
+        if (request.getBedrooms() != null) listing.setBedrooms(request.getBedrooms());
+        if (request.getBathrooms() != null) listing.setBathrooms(request.getBathrooms());
+        if (request.getDirection() != null) listing.setDirection(Listing.Direction.valueOf(request.getDirection()));
+        if (request.getFurnishing() != null) listing.setFurnishing(Listing.Furnishing.valueOf(request.getFurnishing()));
+        if (request.getRoomCapacity() != null) listing.setRoomCapacity(request.getRoomCapacity());
+        if (request.getWaterPrice() != null) listing.setWaterPrice(request.getWaterPrice());
+        if (request.getElectricityPrice() != null) listing.setElectricityPrice(request.getElectricityPrice());
+        if (request.getInternetPrice() != null) listing.setInternetPrice(request.getInternetPrice());
+        if (request.getServiceFee() != null) listing.setServiceFee(request.getServiceFee());
+
+        // Handle media update if provided
+        if (request.getMediaIds() != null) {
+            log.info("Updating media for listing {} during resubmit: {} media items", listingId, request.getMediaIds().size());
+            List<Media> existingMedia = mediaRepository.findByListing_ListingIdAndStatusOrderBySortOrderAsc(
+                    listingId, Media.MediaStatus.ACTIVE);
+            for (Media media : existingMedia) {
+                media.setListing(null);
+                mediaRepository.save(media);
+            }
+            if (!request.getMediaIds().isEmpty()) {
+                for (Long mediaId : request.getMediaIds()) {
+                    Media media = mediaRepository.findById(mediaId).orElse(null);
+                    if (media != null && media.getUserId().equals(userId) && media.getStatus() == Media.MediaStatus.ACTIVE) {
+                        media.setListing(listing);
+                        mediaRepository.save(media);
+                    }
+                }
+            }
+        }
+
+        // ── Transition moderation status ──
+        listing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+        listing.setVerified(false);
+        listing.setIsVerify(true); // Back to IN_REVIEW in legacy view
+        listing.setRevisionCount(listing.getRevisionCount() + 1);
+        listingRepository.save(listing);
+
+        // Advance any pending owner actions
+        List<ListingOwnerAction> pendingActions = ownerActionRepository
+                .findByListingIdAndStatus(listingId, OwnerActionStatus.PENDING_OWNER);
+        for (ListingOwnerAction action : pendingActions) {
+            action.setStatus(OwnerActionStatus.SUBMITTED_FOR_REVIEW);
+            action.setCompletedAt(LocalDateTime.now());
+        }
+        ownerActionRepository.saveAll(pendingActions);
+
+        // Audit event
+        createModerationEvent(listingId, ModerationSource.OWNER_EDIT,
+                previousStatus, ModerationStatus.PENDING_REVIEW,
+                ModerationAction.RESUBMIT, null, userId,
+                null, request.getNotes(), null);
+
+        // Notify admins asynchronously
+        sendResubmitNotificationAsync(listing);
+
+        log.info("Listing {} updated and resubmitted for review by user {}", listingId, userId);
     }
 
     // ───────────────────────────────────────────────────────────────

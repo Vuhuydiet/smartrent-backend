@@ -121,7 +121,8 @@ public enum DomainCode {
   MODERATION_INVALID_DECISION("16001", HttpStatus.BAD_REQUEST, "Invalid moderation decision"),
   MODERATION_REASON_REQUIRED("16002", HttpStatus.BAD_REQUEST, "Reason is required for rejection or revision request"),
   RESUBMIT_NOT_ALLOWED("16003", HttpStatus.BAD_REQUEST, "Listing cannot be resubmitted in its current state"),
-  NOT_LISTING_OWNER("16004", HttpStatus.FORBIDDEN, "You are not the owner of this listing")
+  NOT_LISTING_OWNER("16004", HttpStatus.FORBIDDEN, "You are not the owner of this listing"),
+  UPDATE_NOT_ALLOWED("16005", HttpStatus.BAD_REQUEST, "Listing cannot be updated in its current state")
   ;
 
   private final String value;

@@ -22,8 +22,10 @@ import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.dto.response.ProvinceListingStatsResponse;
 import com.smartrent.enums.BenefitType;
+import com.smartrent.enums.ModerationStatus;
 import com.smartrent.enums.PostSource;
 import com.smartrent.infra.exception.AppException;
+import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AddressRepository;
 import com.smartrent.infra.repository.AddressMetadataRepository;
@@ -589,9 +591,19 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional
-    public ListingResponse updateListing(Long id, ListingRequest request) {
+    public ListingResponse updateListing(Long id, ListingRequest request, String userId) {
         Listing existing = listingRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Listing not found"));
+                .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
+
+        // Validate ownership
+        if (!existing.getUserId().equals(userId)) {
+            throw new DomainException(DomainCode.NOT_LISTING_OWNER);
+        }
+
+        // Block updates on SUSPENDED listings
+        if (existing.getModerationStatus() == ModerationStatus.SUSPENDED) {
+            throw new DomainException(DomainCode.UPDATE_NOT_ALLOWED);
+        }
         // Update fields from request (null-safe for partial update)
         if (request.getTitle() != null) existing.setTitle(request.getTitle());
         if (request.getDescription() != null) existing.setDescription(request.getDescription());
