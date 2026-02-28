@@ -49,6 +49,11 @@ public class ListingFilterRequest {
     @Schema(description = "Internal flag to indicate this is an admin request (set by backend, not by frontend)", hidden = true)
     Boolean isAdminRequest;
 
+    @Schema(description = "Filter by moderation status (admin only)",
+            example = "PENDING_REVIEW",
+            allowableValues = {"PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED"})
+    String moderationStatus;
+
     // ============ LOCATION FILTERS ============
     @Schema(description = """
             Province ID (OLD structure - 63 provinces).

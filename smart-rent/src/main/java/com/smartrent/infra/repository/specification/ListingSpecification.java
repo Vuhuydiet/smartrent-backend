@@ -93,6 +93,17 @@ public class ListingSpecification {
                 }
             }
 
+            // Moderation Status filter (admin-only, direct moderationStatus column)
+            if (filter.getModerationStatus() != null && !filter.getModerationStatus().isEmpty()) {
+                try {
+                    com.smartrent.enums.ModerationStatus moderationStatus =
+                        com.smartrent.enums.ModerationStatus.valueOf(filter.getModerationStatus());
+                    predicates.add(criteriaBuilder.equal(root.get("moderationStatus"), moderationStatus));
+                } catch (IllegalArgumentException e) {
+                    // Invalid moderation status value, skip filter
+                }
+            }
+
             // ============ LOCATION FILTERS ============
             // Category filter
             if (filter.getCategoryId() != null) {

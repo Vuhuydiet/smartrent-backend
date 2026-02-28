@@ -5,6 +5,7 @@ import com.smartrent.dto.request.DraftListingRequest;
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.ListingRequest;
+import com.smartrent.dto.request.UpdateAndResubmitRequest;
 import com.smartrent.dto.request.MapBoundsRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
@@ -1653,7 +1654,8 @@ public class ListingController {
     )
     @PutMapping("/{id}")
     public ApiResponse<ListingResponse> updateListing(@PathVariable Long id, @RequestBody ListingRequest request) {
-        ListingResponse response = listingService.updateListing(id, request);
+        String userId = extractUserId();
+        ListingResponse response = listingService.updateListing(id, request, userId);
         return ApiResponse.<ListingResponse>builder().data(response).build();
     }
 
@@ -2810,6 +2812,17 @@ public class ListingController {
                               "maxPrice": 50000000
                             }
                             """
+                    ),
+                    @ExampleObject(
+                        name = "Listings pending review",
+                        summary = "Get listings awaiting admin review (new + resubmitted)",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "moderationStatus": "PENDING_REVIEW"
+                            }
+                            """
                     )
                 }
             )
@@ -3687,6 +3700,84 @@ public class ListingController {
         String userId = extractUserId();
         listingModerationService.resubmitForReview(id, userId, request != null ? request : new com.smartrent.dto.request.ResubmitListingRequest());
         return ApiResponse.<Void>builder().message("Listing resubmitted for review successfully").build();
+    }
+
+    /**
+     * Update listing content and resubmit for review in one operation.
+     * Owner must be authenticated and own the listing.
+     * PUT /v1/listings/{id}/update-and-resubmit
+     */
+    @Operation(
+        summary = "Update listing and resubmit for review",
+        description = """
+            Update listing content and resubmit for review in a single operation.
+            The listing must be in REJECTED or REVISION_REQUIRED moderation state.
+            Only the listing owner can call this endpoint.
+
+            **Use cases**:
+            1. Owner updates listing after admin resolves a listing report
+            2. Owner updates listing after admin rejects during moderation review
+            """,
+        parameters = {
+            @Parameter(name = "id", description = "Listing ID", required = true)
+        },
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = UpdateAndResubmitRequest.class),
+                examples = @ExampleObject(
+                    name = "Update and resubmit",
+                    value = """
+                        {
+                          "title": "Updated listing title as requested",
+                          "description": "Updated description with corrected information",
+                          "mediaIds": [101, 102, 103],
+                          "notes": "Fixed title and added missing photos per admin feedback"
+                        }
+                        """
+                )
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Listing updated and resubmitted for review",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Success",
+                        value = """
+                            {
+                              "code": "999999",
+                              "message": "Listing updated and resubmitted for review successfully",
+                              "data": null
+                            }
+                            """
+                    )
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Listing cannot be resubmitted in current state"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "403",
+                description = "Not the listing owner"
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "404",
+                description = "Listing not found"
+            )
+        }
+    )
+    @PutMapping("/{id}/update-and-resubmit")
+    public ApiResponse<Void> updateAndResubmitForReview(
+            @PathVariable Long id,
+            @RequestBody UpdateAndResubmitRequest request) {
+        String userId = extractUserId();
+        listingModerationService.updateAndResubmitForReview(id, request, userId);
+        return ApiResponse.<Void>builder().message("Listing updated and resubmitted for review successfully").build();
     }
 
     /**
