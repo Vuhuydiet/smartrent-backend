@@ -25,6 +25,7 @@ import com.smartrent.infra.repository.entity.Media;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.mapper.UserMapper;
 import com.smartrent.service.moderation.ListingModerationService;
+import com.smartrent.service.notification.NotificationService;
 import com.smartrent.utility.ModerationEmailBuilder;
 import com.smartrent.infra.connector.model.EmailInfo;
 import com.smartrent.infra.connector.model.EmailRequest;
@@ -59,6 +60,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     ListingMapper listingMapper;
     UserMapper userMapper;
     EmailService emailService;
+    NotificationService notificationService;
 
     @NonFinal
     @Value("${application.email.sender.email}")
@@ -99,6 +101,30 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         // Async email notification (never fail the transaction)
         sendModerationEmailAsync(saved, decision, resolveReasonText(request));
+
+        // Realtime notification: notify owner
+        if (saved.getUserId() != null) {
+            NotificationType notifType = switch (decision) {
+                case "APPROVE" -> NotificationType.LISTING_APPROVED;
+                case "REJECT" -> NotificationType.LISTING_REJECTED;
+                case "REQUEST_REVISION" -> NotificationType.LISTING_REVISION_REQUIRED;
+                case "SUSPEND" -> NotificationType.LISTING_SUSPENDED;
+                default -> null;
+            };
+            if (notifType != null) {
+                String notifMessage = switch (decision) {
+                    case "APPROVE" -> "Your listing \"" + saved.getTitle() + "\" has been approved and is now visible.";
+                    case "REJECT" -> "Your listing \"" + saved.getTitle() + "\" has been rejected. Reason: " + resolveReasonText(request);
+                    case "REQUEST_REVISION" -> "Your listing \"" + saved.getTitle() + "\" needs revision. Reason: " + resolveReasonText(request);
+                    case "SUSPEND" -> "Your listing \"" + saved.getTitle() + "\" has been suspended. Reason: " + resolveReasonText(request);
+                    default -> "";
+                };
+                notificationService.sendNotification(
+                        saved.getUserId(), RecipientType.USER,
+                        notifType, "Listing moderation update", notifMessage,
+                        saved.getListingId(), "LISTING");
+            }
+        }
 
         // Build response
         Admin admin = adminRepository.findById(adminId).orElse(null);
@@ -170,6 +196,16 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         // Async email
         sendReportActionEmailAsync(listing, request.getAdminNotes());
 
+        // Realtime notification: notify owner about required action
+        if (listing.getUserId() != null) {
+            notificationService.sendNotification(
+                    listing.getUserId(), RecipientType.USER,
+                    NotificationType.REPORT_ACTION_REQUIRED,
+                    "Action required on your listing",
+                    "Your listing \"" + listing.getTitle() + "\" requires updates based on a report review. " + (request.getAdminNotes() != null ? request.getAdminNotes() : ""),
+                    listing.getListingId(), "LISTING");
+        }
+
         log.info("Created owner action for listing {} from report {}", listingId, reportId);
     }
 
@@ -228,6 +264,13 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         // Notify admins asynchronously
         sendResubmitNotificationAsync(listing);
+
+        // Realtime notification: notify all admins about resubmission
+        notificationService.sendToAllAdmins(
+                NotificationType.LISTING_RESUBMITTED,
+                "Listing resubmitted for review",
+                "Listing \"" + listing.getTitle() + "\" has been updated and resubmitted for review.",
+                listing.getListingId(), "LISTING");
 
         log.info("Listing {} resubmitted for review by user {}", listingId, userId);
     }
@@ -324,6 +367,13 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         // Notify admins asynchronously
         sendResubmitNotificationAsync(listing);
+
+        // Realtime notification: notify all admins about update & resubmission
+        notificationService.sendToAllAdmins(
+                NotificationType.LISTING_RESUBMITTED,
+                "Listing updated and resubmitted",
+                "Listing \"" + listing.getTitle() + "\" has been updated and resubmitted for review.",
+                listing.getListingId(), "LISTING");
 
         log.info("Listing {} updated and resubmitted for review by user {}", listingId, userId);
     }
