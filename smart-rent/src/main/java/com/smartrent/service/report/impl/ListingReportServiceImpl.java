@@ -5,6 +5,8 @@ import com.smartrent.dto.request.ResolveReportRequest;
 import com.smartrent.dto.response.ListingReportResponse;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.ReportReasonResponse;
+import com.smartrent.enums.NotificationType;
+import com.smartrent.enums.RecipientType;
 import com.smartrent.enums.ReportCategory;
 import com.smartrent.enums.ReportStatus;
 import com.smartrent.infra.exception.DomainException;
@@ -24,6 +26,7 @@ import com.smartrent.infra.connector.model.EmailInfo;
 import com.smartrent.infra.connector.model.EmailRequest;
 import com.smartrent.service.email.EmailService;
 import com.smartrent.service.moderation.ListingModerationService;
+import com.smartrent.service.notification.NotificationService;
 import com.smartrent.utility.ModerationEmailBuilder;
 import com.smartrent.service.report.ListingReportService;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +57,7 @@ public class ListingReportServiceImpl implements ListingReportService {
     private final ListingModerationService listingModerationService;
     private final EmailService emailService;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     @NonFinal
     @Value("${application.email.sender.email}")
@@ -124,6 +128,23 @@ public class ListingReportServiceImpl implements ListingReportService {
 
         ListingReport savedReport = listingReportRepository.save(report);
         log.info("Report created successfully with ID: {} for listing ID: {}", savedReport.getReportId(), listingId);
+
+        // Realtime notification: notify all admins about new report
+        notificationService.sendToAllAdmins(
+                NotificationType.NEW_REPORT,
+                "New listing report",
+                "A new report has been submitted for listing: " + listing.getTitle(),
+                savedReport.getReportId(), "REPORT");
+
+        // Realtime notification: notify listing owner about the report
+        if (listing.getUserId() != null) {
+            notificationService.sendNotification(
+                    listing.getUserId(), RecipientType.USER,
+                    NotificationType.NEW_REPORT,
+                    "Your listing has been reported",
+                    "Your listing \"" + listing.getTitle() + "\" has received a new report.",
+                    listing.getListingId(), "LISTING");
+        }
 
         return listingReportMapper.mapFromListingReportEntityToResponse(savedReport);
     }
@@ -245,6 +266,30 @@ public class ListingReportServiceImpl implements ListingReportService {
 
         // Notify the listing owner about the resolution
         sendOwnerNotificationEmail(savedReport, newStatus);
+
+        // Realtime notification: notify reporter
+        NotificationType reporterNotifType = (newStatus == ReportStatus.RESOLVED)
+                ? NotificationType.REPORT_RESOLVED : NotificationType.REPORT_REJECTED;
+        if (report.getReporterEmail() != null) {
+            userRepository.findByEmail(report.getReporterEmail()).ifPresent(reporter ->
+                    notificationService.sendNotification(
+                            reporter.getUserId(), RecipientType.USER,
+                            reporterNotifType,
+                            "Your report has been reviewed",
+                            "Your report #" + reportId + " has been " + newStatus.name().toLowerCase() + ".",
+                            reportId, "REPORT"));
+        }
+
+        // Realtime notification: notify listing owner
+        Listing listing = listingRepository.findById(report.getListingId()).orElse(null);
+        if (listing != null && listing.getUserId() != null) {
+            notificationService.sendNotification(
+                    listing.getUserId(), RecipientType.USER,
+                    reporterNotifType,
+                    "Report on your listing has been reviewed",
+                    "A report on your listing \"" + listing.getTitle() + "\" has been " + newStatus.name().toLowerCase() + ".",
+                    listing.getListingId(), "LISTING");
+        }
 
         // If admin resolved and owner action is required, delegate to moderation service
         if (newStatus == ReportStatus.RESOLVED && Boolean.TRUE.equals(request.getOwnerActionRequired())) {

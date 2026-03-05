@@ -165,6 +165,7 @@ application:
         - "/actuator/health"
         - "/actuator/**"
         - "/v1/listings/**" # Public listings (except my-* and draft/* - checked in code)
+        - "/ws/**" # WebSocket endpoint for realtime notifications
         - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
         - "/v1/new-addresses/**"
