@@ -1,5 +1,6 @@
 package com.smartrent.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -8,6 +9,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -63,11 +66,22 @@ public class ListingFilterRequest {
     String provinceId;
 
     @Schema(description = """
-            Province code (NEW structure - 34 provinces as of July 2025).
+            Province code (NEW structure - 34 provinces as of July 2025). Single code.
             Accepts both '1' and '01' formats (will be normalized).
             Examples: '1' or '01' for Hanoi, '79' for HCMC.
             """, example = "1")
     String provinceCode;
+
+    @Schema(description = """
+            List of Province codes (NEW structure - 34 provinces as of July 2025).
+            Accepts both '1' and '01' formats (will be normalized).
+            Examples: '1' or '01' for Hanoi, '79' for HCMC.
+            """, example = "[\"1\", \"79\"]")
+    List<String> provinceCodes;
+
+    @JsonIgnore
+    @Schema(hidden = true)
+    List<Integer> resolvedLegacyProvinceIds; // Populated by service layer — NOT from API
 
     @Schema(description = "District ID (OLD structure)", example = "5")
     Integer districtId;

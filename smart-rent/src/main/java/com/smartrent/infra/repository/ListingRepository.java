@@ -207,7 +207,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     @Query("""
         SELECT
             am.provinceId,
-            COUNT(l.listingId),
+            COUNT(DISTINCT l.listingId),
             SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
             SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
         FROM listings l
@@ -222,13 +222,36 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     List<Object[]> getListingStatsByProvinceIds(@Param("provinceIds") List<Integer> provinceIds);
 
     /**
+     * Get listing statistics grouped by province (old structure), excluding listings already mapped to new structure.
+     * Adding AND am.newProvinceCode IS NULL prevents double-counting listings that have both old and new address codes.
+     * Returns: provinceId, totalCount, verifiedCount, vipCount
+     */
+    @Query("""
+        SELECT
+            am.provinceId,
+            COUNT(DISTINCT l.listingId),
+            SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
+            SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
+        FROM listings l
+        JOIN l.address a
+        JOIN AddressMetadata am ON am.address.addressId = a.addressId
+        WHERE am.provinceId IN :provinceIds
+        AND am.newProvinceCode IS NULL
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.expired = false
+        GROUP BY am.provinceId
+    """)
+    List<Object[]> getListingStatsByProvinceIdsWithoutNewCode(@Param("provinceIds") List<Integer> provinceIds);
+
+    /**
      * Get listing statistics grouped by province code (new structure)
      * Returns: provinceCode, totalCount, verifiedCount, vipCount
      */
     @Query("""
         SELECT
             am.newProvinceCode,
-            COUNT(l.listingId),
+            COUNT(DISTINCT l.listingId),
             SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
             SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
         FROM listings l

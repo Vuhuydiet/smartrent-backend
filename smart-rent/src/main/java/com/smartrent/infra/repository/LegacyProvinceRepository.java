@@ -28,5 +28,7 @@ public interface LegacyProvinceRepository extends JpaRepository<LegacyProvince, 
 
     Optional<LegacyProvince> findByCode(String code);
 
+    List<LegacyProvince> findByCodeIn(List<String> codes);
+
     List<LegacyProvince> findByNameContainingIgnoreCase(String name);
 }

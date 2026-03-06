@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
  * Implementation of AddressCreationService
  * Handles creation of addresses for both old and new structures
@@ -27,6 +29,7 @@ public class AddressCreationServiceImpl implements AddressCreationService {
     private final ProvinceRepository provinceRepository;
     private final WardRepository wardRepository;
     private final ProjectRepository projectRepository;
+    private final AddressMappingRepository addressMappingRepository;
 
     @Override
     @Transactional
@@ -76,6 +79,43 @@ public class AddressCreationServiceImpl implements AddressCreationService {
             log.info("Built new address: {}", fullNewAddress);
         }
 
+        // Auto-map old → new when only legacy address is provided
+        // Accuracy note: old→new is precise (ward-level); new→old is NOT attempted (ambiguous due to merges/splits)
+        String autoMappedProvinceCode = null;
+        String autoMappedWardCode = null;
+        if (request.isLegacyStructure() && !request.isNewStructure()) {
+            autoMappedProvinceCode = null;
+            autoMappedWardCode = null;
+            try {
+                Integer pId = request.getLegacyProvinceId();
+                Integer dId = request.getLegacyDistrictId();
+                Integer wId = request.getLegacyWardId();
+                if (pId != null && dId != null && wId != null) {
+                    // Entities are loaded in Hibernate 1st-level cache from buildOldAddressString() above
+                    LegacyProvince province = legacyProvinceRepository.findById(pId).orElse(null);
+                    District district = legacyDistrictRepository.findById(dId).orElse(null);
+                    LegacyWard ward = legacyWardRepository.findById(wId).orElse(null);
+                    if (province != null && district != null && ward != null) {
+                        Optional<AddressMapping> mappingOpt = addressMappingRepository
+                                .findBestByLegacyAddress(province.getCode(), district.getCode(), ward.getCode());
+                        if (mappingOpt.isPresent()) {
+                            autoMappedProvinceCode = mappingOpt.get().getNewProvinceCode();
+                            autoMappedWardCode = mappingOpt.get().getNewWardCode();
+                            addressBuilder.newProvinceCode(autoMappedProvinceCode)
+                                    .newWardCode(autoMappedWardCode);
+                            log.info("Auto-mapped legacy address [{},{},{}] → new [{},{}]",
+                                    province.getCode(), district.getCode(), ward.getCode(),
+                                    autoMappedProvinceCode, autoMappedWardCode);
+                        } else {
+                            log.warn("No address_mapping found for legacy [{},{},{}] — new_province_code will be null",
+                                    province.getCode(), district.getCode(), ward.getCode());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Auto-map old→new address failed (non-fatal): {}", e.getMessage());
+            }
+        }
 
         // Save address
         Address address = addressBuilder.build();
@@ -89,8 +129,12 @@ public class AddressCreationServiceImpl implements AddressCreationService {
                 address.getNewProvinceCode(),
                 address.getNewWardCode());
 
-        // Create and save metadata
+        // Create and save metadata (inject auto-mapped codes into metadata when resolved)
         AddressMetadata metadata = createAddressMetadata(address, request);
+        if (autoMappedProvinceCode != null) {
+            metadata.setNewProvinceCode(autoMappedProvinceCode);
+            metadata.setNewWardCode(autoMappedWardCode);
+        }
         addressMetadataRepository.save(metadata);
         log.info("Saved address metadata with ID: {}", metadata.getMetadataId());
 

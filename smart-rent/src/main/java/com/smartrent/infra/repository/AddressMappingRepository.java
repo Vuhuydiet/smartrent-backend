@@ -97,6 +97,24 @@ public interface AddressMappingRepository extends JpaRepository<AddressMapping, 
     // ========== Special Mapping Types ==========
 
     /**
+     * Returns distinct (newProvinceCode, legacyProvince.id) pairs for the given new province codes.
+     * Scans all rows (any ward level) — does NOT require province-level-only rows.
+     * row[0] = newProvinceCode (String), row[1] = legacyProvince.id (Integer)
+     */
+    @Query("SELECT DISTINCT am.newProvinceCode, lp.id FROM AddressMapping am JOIN am.legacyProvince lp " +
+            "WHERE am.newProvinceCode IN :newProvinceCodes")
+    List<Object[]> findNewCodeToLegacyIdPairs(@Param("newProvinceCodes") List<String> newProvinceCodes);
+
+    /**
+     * Returns distinct new province codes that map to the given legacy province codes.
+     * Scans all rows (any ward level).
+     * Used when FE sends old provinceIds and we need to resolve to new province codes.
+     */
+    @Query("SELECT DISTINCT am.newProvinceCode FROM AddressMapping am " +
+            "WHERE am.legacyProvinceCode IN :legacyProvinceCodes")
+    List<String> findNewProvinceCodesByLegacyProvinceCodes(@Param("legacyProvinceCodes") List<String> legacyProvinceCodes);
+
+    /**
      * Find all merged provinces
      */
     @Query("SELECT DISTINCT am FROM AddressMapping am WHERE am.isMergedProvince = TRUE")
