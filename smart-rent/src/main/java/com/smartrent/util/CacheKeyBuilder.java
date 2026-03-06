@@ -27,6 +27,7 @@ public final class CacheKeyBuilder {
 
         append(sb, "provinceId", filter.getProvinceId());
         append(sb, "provinceCode", filter.getProvinceCode());
+        append(sb, "provinceCodes", filter.getProvinceCodes());
         append(sb, "districtId", filter.getDistrictId());
         append(sb, "wardId", filter.getWardId());
         append(sb, "newWardCode", filter.getNewWardCode());

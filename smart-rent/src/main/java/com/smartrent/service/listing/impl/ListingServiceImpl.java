@@ -38,6 +38,7 @@ import com.smartrent.infra.repository.LegacyWardRepository;
 import com.smartrent.infra.repository.ListingDraftRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
+import com.smartrent.infra.repository.AddressMappingRepository;
 import com.smartrent.infra.repository.ProvinceRepository;
 import com.smartrent.infra.repository.WardRepository;
 import com.smartrent.infra.repository.ProjectRepository;
@@ -71,6 +72,9 @@ import org.springframework.cache.annotation.Cacheable;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -96,6 +100,7 @@ public class ListingServiceImpl implements ListingService {
     LegacyDistrictRepository legacyDistrictRepository;
     LegacyWardRepository legacyWardRepository;
     ProvinceRepository provinceRepository;
+    AddressMappingRepository addressMappingRepository;
     WardRepository wardRepository;
     ProjectRepository projectRepository;
     ListingMapper listingMapper;
@@ -905,6 +910,15 @@ public class ListingServiceImpl implements ListingService {
     private List<ListingResponse> batchMapListings(List<Listing> listings) {
         if (listings.isEmpty()) return Collections.emptyList();
 
+        List<Listing> validListings = listings.stream()
+                .filter(l -> l.getListingId() != null)
+                .collect(Collectors.toList());
+        if (validListings.size() < listings.size()) {
+            log.warn("batchMapListings: {} listing(s) had null listingId and were excluded",
+                    listings.size() - validListings.size());
+        }
+        listings = validListings;
+
         List<Long> listingIds = listings.stream()
                 .map(Listing::getListingId)
                 .collect(Collectors.toList());
@@ -1256,7 +1270,7 @@ public class ListingServiceImpl implements ListingService {
             unless = "#result == null")
     public ListingListResponse searchListings(ListingFilterRequest filter) {
         log.info("Unified search - UserId: {}, Category: {}, Province: {}/{}, isDraft: {}, Page: {}, Size: {}",
-                filter.getUserId(), filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCode(),
+                filter.getUserId(), filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCodes(),
                 filter.getIsDraft(), filter.getPage(), filter.getSize());
 
         String normalizedKeyword = TextNormalizer.normalize(filter.getKeyword());
@@ -1270,6 +1284,57 @@ public class ListingServiceImpl implements ListingService {
                     .totalPages(0)
                     .filterCriteria(filter)
                     .build();
+        }
+
+        // Merge single provinceCode into provinceCodes list (FE typically sends provinceCode singular)
+        if (filter.getProvinceCode() != null && !filter.getProvinceCode().isBlank()) {
+            List<String> merged = new ArrayList<>();
+            if (filter.getProvinceCodes() != null) merged.addAll(filter.getProvinceCodes());
+            if (!merged.contains(filter.getProvinceCode())) merged.add(filter.getProvinceCode());
+            filter.setProvinceCodes(merged);
+        }
+
+        // Resolve legacy province IDs so the spec can match old-structure listings too.
+        // address_mapping stores province codes with leading zeros (e.g. "01" for Hanoi),
+        // but FE typically sends without leading zeros ("1"). Pass both formats to cover both cases.
+        if (filter.getProvinceCodes() != null && !filter.getProvinceCodes().isEmpty()) {
+            Set<String> codesToQuery = new java.util.LinkedHashSet<>();
+            for (String code : filter.getProvinceCodes()) {
+                String stripped = code.replaceFirst("^0+(?!$)", "");
+                codesToQuery.add(stripped);
+                // Also add zero-padded version (2-digit) in case address_mapping uses that format
+                try {
+                    codesToQuery.add(String.format("%02d", Integer.parseInt(stripped)));
+                } catch (NumberFormatException ignored) {}
+            }
+
+            List<Object[]> pairs = addressMappingRepository
+                    .findNewCodeToLegacyIdPairs(new ArrayList<>(codesToQuery));
+            List<Integer> legacyIds;
+            if (!pairs.isEmpty()) {
+                legacyIds = pairs.stream()
+                        .map(p -> ((Number) p[1]).intValue())
+                        .distinct()
+                        .collect(Collectors.toList());
+                log.info("Resolved province codes {} → legacy IDs {} (via address_mapping)", codesToQuery, legacyIds);
+            } else {
+                // Fallback: address_mapping has no data or code format mismatch.
+                // Directly find LegacyProvince by code (handles non-merged provinces).
+                List<LegacyProvince> directMatches = legacyProvinceRepository.findByCodeIn(new ArrayList<>(codesToQuery));
+                legacyIds = directMatches.stream()
+                        .map(LegacyProvince::getId)
+                        .distinct()
+                        .collect(Collectors.toList());
+                if (!legacyIds.isEmpty()) {
+                    log.info("Resolved province codes {} → legacy IDs {} (via direct LegacyProvince lookup)", codesToQuery, legacyIds);
+                } else {
+                    log.warn("No legacy IDs resolved for province codes {} — old-structure listings won't be included", codesToQuery);
+                }
+            }
+            if (!legacyIds.isEmpty()) {
+                filter.setResolvedLegacyProvinceIds(legacyIds);
+            }
+            log.info("Search province filter: provinceCodes={}, resolvedLegacyIds={}", filter.getProvinceCodes(), filter.getResolvedLegacyProvinceIds());
         }
 
         // Execute query using shared query service
@@ -1321,95 +1386,128 @@ public class ListingServiceImpl implements ListingService {
         log.info("Getting province stats - provinceIds: {}, provinceCodes: {}, verifiedOnly: {}",
                 request.getProvinceIds(), request.getProvinceCodes(), request.getVerifiedOnly());
 
-        // Validate request - must have either provinceIds or provinceCodes
-        if ((request.getProvinceIds() == null || request.getProvinceIds().isEmpty()) &&
-            (request.getProvinceCodes() == null || request.getProvinceCodes().isEmpty())) {
-            log.warn("Province stats request missing both provinceIds and provinceCodes");
+        // Build a unified set of provinceCodes (new 34-province codes) preserving input order
+        Set<String> provinceCodeSet = new LinkedHashSet<>();
+        if (request.getProvinceCodes() != null) {
+            provinceCodeSet.addAll(request.getProvinceCodes());
+        }
+
+        // Convert any legacy provinceIds to codes via address_mapping table
+        if (request.getProvinceIds() != null && !request.getProvinceIds().isEmpty()) {
+            List<LegacyProvince> legacyProvinces = legacyProvinceRepository.findAllById(request.getProvinceIds());
+            List<String> legacyCodes = legacyProvinces.stream()
+                    .map(LegacyProvince::getCode).collect(Collectors.toList());
+            if (!legacyCodes.isEmpty()) {
+                List<String> resolvedCodes = addressMappingRepository
+                        .findNewProvinceCodesByLegacyProvinceCodes(legacyCodes);
+                provinceCodeSet.addAll(resolvedCodes);
+            }
+        }
+
+        if (provinceCodeSet.isEmpty()) {
+            log.warn("Province stats request: no valid provinceCodes or provinceIds resolved");
             return Collections.emptyList();
         }
 
+        List<String> provinceCodes = new ArrayList<>(provinceCodeSet);
+
+        // Build canonical (stripped) code → original code mapping for lookup normalization.
+        // address_mapping may store codes with leading zeros ("01") while FE sends "1".
+        // We query both formats and then normalize the result back to the original key.
+        Map<String, String> strippedToOriginal = new LinkedHashMap<>();
+        Set<String> codesToQuery = new java.util.LinkedHashSet<>();
+        for (String code : provinceCodes) {
+            String stripped = code.replaceFirst("^0+(?!$)", "");
+            strippedToOriginal.put(stripped, code);
+            codesToQuery.add(stripped);
+            try { codesToQuery.add(String.format("%02d", Integer.parseInt(stripped))); } catch (NumberFormatException ignored) {}
+        }
+
+        // Try to resolve legacyId → provinceCode mapping via address_mapping
+        List<Object[]> codeIdPairs = addressMappingRepository.findNewCodeToLegacyIdPairs(new ArrayList<>(codesToQuery));
+        Map<Integer, String> legacyIdToCode = new HashMap<>();
+        List<Integer> allLegacyIds = new ArrayList<>();
+        for (Object[] pair : codeIdPairs) {
+            String rawCode = (String) pair[0];
+            String strippedRaw = rawCode.replaceFirst("^0+(?!$)", "");
+            String originalCode = strippedToOriginal.getOrDefault(strippedRaw, rawCode);
+            Integer legacyId = ((Number) pair[1]).intValue();
+            legacyIdToCode.putIfAbsent(legacyId, originalCode);
+            allLegacyIds.add(legacyId);
+        }
+
+        // Accumulator: provinceCode → [total, verified, vip]
+        Map<String, long[]> aggregated = new LinkedHashMap<>();
+        for (String code : provinceCodes) {
+            aggregated.put(code, new long[]{0L, 0L, 0L});
+        }
+
+        // Fallback: if address_mapping has no data, use provinceIds from request directly.
+        // FE sends provinceIds: [1, 79, ...] and provinceCodes: ["1", "79", ...] with matching numeric values.
+        if (allLegacyIds.isEmpty() && request.getProvinceIds() != null && !request.getProvinceIds().isEmpty()) {
+            for (Integer id : request.getProvinceIds()) {
+                String codeKey = strippedToOriginal.getOrDefault(String.valueOf(id), String.valueOf(id));
+                if (aggregated.containsKey(codeKey)) {
+                    legacyIdToCode.put(id, codeKey);
+                    allLegacyIds.add(id);
+                }
+            }
+            log.debug("address_mapping empty — built legacyIdToCode directly from request provinceIds: {}", legacyIdToCode);
+        }
+
+        // Aggregate new-structure listings (address_metadata.new_province_code)
+        List<Object[]> newStats = listingRepository.getListingStatsByProvinceCodes(provinceCodes);
+        for (Object[] row : newStats) {
+            String code = (String) row[0];
+            long[] acc = aggregated.get(code);
+            if (acc != null) {
+                acc[0] += toLong(row[1]);
+                acc[1] += toLong(row[2]);
+                acc[2] += toLong(row[3]);
+            }
+        }
+
+        // Aggregate old-structure listings (address_metadata.province_id)
+        // Exclude listings already counted via new_province_code to avoid double-counting
+        if (!allLegacyIds.isEmpty()) {
+            List<Object[]> oldStats = listingRepository.getListingStatsByProvinceIdsWithoutNewCode(allLegacyIds);
+            for (Object[] row : oldStats) {
+                Integer legacyId = ((Number) row[0]).intValue();
+                String code = legacyIdToCode.get(legacyId);
+                long[] acc = (code != null) ? aggregated.get(code) : null;
+                if (acc != null) {
+                    acc[0] += toLong(row[1]);
+                    acc[1] += toLong(row[2]);
+                    acc[2] += toLong(row[3]);
+                }
+            }
+        }
+
+        // Load province names for new structure
+        Map<String, String> provinceNames = provinceRepository.findByCodeIn(provinceCodes)
+                .stream().collect(Collectors.toMap(Province::getCode, Province::getName));
+
+        // Build response list (preserves insertion order from LinkedHashMap)
         List<ProvinceListingStatsResponse> results = new ArrayList<>();
+        for (Map.Entry<String, long[]> entry : aggregated.entrySet()) {
+            String code = entry.getKey();
+            long[] counts = entry.getValue();
+            long verified = counts[1];
 
-        // Handle old structure (63 provinces)
-        if (request.getProvinceIds() != null && !request.getProvinceIds().isEmpty()) {
-            log.info("Processing old structure with {} provinces", request.getProvinceIds().size());
-
-            List<Object[]> statsData = listingRepository.getListingStatsByProvinceIds(request.getProvinceIds());
-
-            // Batch-load all province names in 1 query (avoids N+1)
-            Map<Integer, String> provinceNames = legacyProvinceRepository.findAllById(request.getProvinceIds())
-                    .stream().collect(Collectors.toMap(
-                            com.smartrent.infra.repository.entity.LegacyProvince::getId,
-                            com.smartrent.infra.repository.entity.LegacyProvince::getName));
-
-            for (Object[] row : statsData) {
-                Integer provinceId = ((Number) row[0]).intValue();
-                Long totalCount = toLong(row[1]);
-                Long verifiedCount = toLong(row[2]);
-                Long vipCount = toLong(row[3]);
-
-                if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
-                    continue;
-                }
-
-                results.add(ProvinceListingStatsResponse.builder()
-                        .provinceId(provinceId)
-                        .provinceCode(null)
-                        .provinceName(provinceNames.getOrDefault(provinceId, "Unknown Province"))
-                        .totalListings(totalCount)
-                        .verifiedListings(verifiedCount)
-                        .vipListings(vipCount)
-                        .build());
+            if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verified == 0) {
+                continue;
             }
+
+            results.add(ProvinceListingStatsResponse.builder()
+                    .provinceCode(code)
+                    .provinceName(provinceNames.getOrDefault(code, "Unknown Province"))
+                    .totalListings(counts[0])
+                    .verifiedListings(verified)
+                    .vipListings(counts[2])
+                    .build());
         }
 
-        // Handle new structure (34 provinces)
-        if (request.getProvinceCodes() != null && !request.getProvinceCodes().isEmpty()) {
-            log.info("Processing new structure with {} provinces", request.getProvinceCodes().size());
-
-            List<Object[]> statsData = listingRepository.getListingStatsByProvinceCodes(request.getProvinceCodes());
-
-            // Batch-load all province names in 1 query (avoids N+1)
-            Map<String, String> provinceNames = provinceRepository.findByCodeIn(request.getProvinceCodes())
-                    .stream().collect(Collectors.toMap(Province::getCode, Province::getName));
-
-            for (Object[] row : statsData) {
-                String provinceCode = (String) row[0];
-                Long totalCount = toLong(row[1]);
-                Long verifiedCount = toLong(row[2]);
-                Long vipCount = toLong(row[3]);
-
-                if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
-                    continue;
-                }
-
-                results.add(ProvinceListingStatsResponse.builder()
-                        .provinceId(null)
-                        .provinceCode(provinceCode)
-                        .provinceName(provinceNames.getOrDefault(provinceCode, "Unknown Province"))
-                        .totalListings(totalCount)
-                        .verifiedListings(verifiedCount)
-                        .vipListings(vipCount)
-                        .build());
-            }
-        }
-
-        // Sort results to match input order
-        if (request.getProvinceIds() != null && !request.getProvinceIds().isEmpty()) {
-            results.sort((a, b) -> {
-                int indexA = request.getProvinceIds().indexOf(a.getProvinceId());
-                int indexB = request.getProvinceIds().indexOf(b.getProvinceId());
-                return Integer.compare(indexA, indexB);
-            });
-        } else if (request.getProvinceCodes() != null && !request.getProvinceCodes().isEmpty()) {
-            results.sort((a, b) -> {
-                int indexA = request.getProvinceCodes().indexOf(a.getProvinceCode());
-                int indexB = request.getProvinceCodes().indexOf(b.getProvinceCode());
-                return Integer.compare(indexA, indexB);
-            });
-        }
-
-        log.info("Province stats retrieved successfully - {} results", results.size());
+        log.info("Province stats retrieved successfully - {} results (aggregated old+new structures)", results.size());
         return results;
     }
 

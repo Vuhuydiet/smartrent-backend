@@ -111,7 +111,7 @@ public class ListingSpecification {
             }
 
             // Province/District/Ward filter - supports both old and new address structures
-            if (filter.getProvinceId() != null || filter.getProvinceCode() != null ||
+            if (filter.getProvinceId() != null || (filter.getProvinceCodes() != null && !filter.getProvinceCodes().isEmpty()) ||
                 filter.getDistrictId() != null || filter.getWardId() != null ||
                 filter.getNewWardCode() != null || filter.getStreetId() != null) {
 
@@ -124,28 +124,39 @@ public class ListingSpecification {
                     metadataRoot.get("address").get("addressId")
                 ));
 
-                // Province filters
-                if (filter.getProvinceId() != null) {
-                    // provinceId is String in request but Integer in DB (old structure)
-                    // Parse and handle as Integer for proper comparison
-                    try {
-                        Integer provinceIdInt = Integer.parseInt(filter.getProvinceId());
-                        locationPredicates.add(criteriaBuilder.equal(
-                            metadataRoot.get("provinceId"),
-                            provinceIdInt
-                        ));
-                    } catch (NumberFormatException e) {
-                        // Invalid provinceId format, skip this filter
+                // Province filters — combine old provinceId and new provinceCode as OR
+                // so listings from either address structure are included
+                {
+                    List<Predicate> provinceOrParts = new ArrayList<>();
+
+                    // Old structure: provinceId (Integer)
+                    if (filter.getProvinceId() != null) {
+                        try {
+                            Integer provinceIdInt = Integer.parseInt(filter.getProvinceId());
+                            provinceOrParts.add(criteriaBuilder.equal(
+                                metadataRoot.get("provinceId"), provinceIdInt));
+                        } catch (NumberFormatException ignored) {}
                     }
-                }
-                if (filter.getProvinceCode() != null) {
-                    // Normalize province code: remove leading zeros ("01" -> "1")
-                    // Database stores codes without leading zeros (e.g., '1', '79', not '01', '79')
-                    String normalizedCode = filter.getProvinceCode().replaceFirst("^0+(?!$)", "");
-                    locationPredicates.add(criteriaBuilder.equal(
-                        metadataRoot.get("newProvinceCode"),
-                        normalizedCode
-                    ));
+
+                    // New structure: provinceCodes list + resolved legacy IDs
+                    if (filter.getProvinceCodes() != null && !filter.getProvinceCodes().isEmpty()) {
+                        List<String> normalizedCodes = filter.getProvinceCodes().stream()
+                                .map(c -> c.replaceFirst("^0+(?!$)", ""))
+                                .toList();
+                        provinceOrParts.add(metadataRoot.get("newProvinceCode").in(normalizedCodes));
+
+                        // Also match old-structure listings via resolved legacy province IDs
+                        if (filter.getResolvedLegacyProvinceIds() != null
+                                && !filter.getResolvedLegacyProvinceIds().isEmpty()) {
+                            provinceOrParts.add(metadataRoot.get("provinceId")
+                                    .in(filter.getResolvedLegacyProvinceIds()));
+                        }
+                    }
+
+                    if (!provinceOrParts.isEmpty()) {
+                        locationPredicates.add(criteriaBuilder.or(
+                                provinceOrParts.toArray(new Predicate[0])));
+                    }
                 }
 
                 // District filter (old structure)

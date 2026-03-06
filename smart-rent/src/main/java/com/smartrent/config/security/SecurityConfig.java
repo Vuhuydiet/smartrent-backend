@@ -18,9 +18,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
+import org.springframework.security.config.Customizer;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 import java.util.List;
 
@@ -68,6 +69,7 @@ public class SecurityConfig {
           .authenticated();
     });
 
+    http.cors(Customizer.withDefaults());
     http.csrf(AbstractHttpConfigurer::disable);
 
     // Configure stateless session management for JWT
@@ -137,7 +139,7 @@ public class SecurityConfig {
   }
 
   @Bean
-  public CorsFilter corsFilter(
+  public CorsConfigurationSource corsConfigurationSource(
       @Value("${application.client-url}") String clientUrl,
       @Value("${application.admin-url}") String adminUrl,
       @Value("${application.cors.allowed-origins:}") String additionalOrigins) {
@@ -166,10 +168,10 @@ public class SecurityConfig {
     // Cache preflight for 2 hours to reduce OPTIONS requests
     config.setMaxAge(7200L);
 
-    UrlBasedCorsConfigurationSource urlBasedCorsConfigurationSource = new UrlBasedCorsConfigurationSource();
-    urlBasedCorsConfigurationSource.registerCorsConfiguration("/**", config);
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", config);
 
-    return new CorsFilter(urlBasedCorsConfigurationSource);
+    return source;
   }
 
   @Bean

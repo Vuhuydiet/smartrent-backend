@@ -46,7 +46,7 @@ public class ListingQueryService {
      */
     public Page<Listing> executeQuery(ListingFilterRequest filter) {
         log.debug("Executing listing query - Category: {}, Province: {}/{}, Page: {}, Size: {}",
-                filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCode(),
+                filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCodes(),
                 filter.getPage(), filter.getSize());
 
         // Build JPA specification from filter request
