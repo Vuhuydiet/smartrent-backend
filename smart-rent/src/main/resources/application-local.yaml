@@ -38,6 +38,7 @@ application:
         - "/actuator/**"
         - "/debug/**"
         - "/v1/listings/**"
+        - "/ws/**" # WebSocket endpoint for realtime notifications
         - "/v1/addresses/convert/**"
         - "/v1/addresses/**"
         - "/v1/new-addresses/**"
