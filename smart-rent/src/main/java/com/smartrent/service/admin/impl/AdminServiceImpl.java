@@ -75,6 +75,7 @@ public class AdminServiceImpl implements AdminService {
   }
 
   @Override
+  @Transactional(readOnly = true)
   public GetAdminResponse getAdminById(String id) {
     Admin admin = adminRepository.findById(id).orElseThrow(UserNotFoundException::new);
 
@@ -90,6 +91,7 @@ public class AdminServiceImpl implements AdminService {
   }
 
   @Override
+  @Transactional(readOnly = true)
   public PageResponse<GetAdminResponse> getAllAdmins(int page, int size) {
     log.info("Fetching all admins - page: {}, size: {}", page, size);
 
