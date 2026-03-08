@@ -56,7 +56,7 @@ public class ListingResponseWithAdmin {
     @Schema(
         description = "Computed listing status based on verification state",
         example = "IN_REVIEW",
-        allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED"})
+        allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED", "RESUBMITTED"})
     String listingStatus;
 
     @Schema(
