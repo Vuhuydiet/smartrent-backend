@@ -38,7 +38,12 @@ public enum ListingStatus {
     /**
      * Listing is verified and active (verified=true)
      */
-    VERIFIED(7);
+    VERIFIED(7),
+
+    /**
+     * Listing was resubmitted by owner after rejection/revision and is awaiting re-review
+     */
+    RESUBMITTED(8);
 
     private final int code;
 

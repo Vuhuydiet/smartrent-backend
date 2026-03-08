@@ -681,6 +681,8 @@ public class ListingSpecification {
 
             case IN_REVIEW ->
                 // isVerify = true AND verified = false
+                // Includes both PENDING_REVIEW and RESUBMITTED listings
+                // Use moderationStatus filter for granular control
                 criteriaBuilder.and(
                     criteriaBuilder.isTrue(root.get("isVerify")),
                     criteriaBuilder.or(
@@ -724,6 +726,11 @@ public class ListingSpecification {
             case VERIFIED ->
                 // verified = true
                 criteriaBuilder.isTrue(root.get("verified"));
+
+            case RESUBMITTED ->
+                // moderationStatus = RESUBMITTED
+                criteriaBuilder.equal(root.get("moderationStatus"),
+                    com.smartrent.enums.ModerationStatus.RESUBMITTED);
         };
     }
 

@@ -390,6 +390,7 @@ public class Listing {
                 case REVISION_REQUIRED:
                     return com.smartrent.enums.ListingStatus.REJECTED; // maps to REJECTED for owner view
                 case RESUBMITTED:
+                    return com.smartrent.enums.ListingStatus.RESUBMITTED;
                 case PENDING_REVIEW:
                     return com.smartrent.enums.ListingStatus.IN_REVIEW;
                 case SUSPENDED:

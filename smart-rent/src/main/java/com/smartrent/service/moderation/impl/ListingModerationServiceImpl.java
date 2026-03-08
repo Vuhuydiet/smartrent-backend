@@ -258,7 +258,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         // Audit event
         createModerationEvent(listingId, ModerationSource.OWNER_EDIT,
-                previousStatus, ModerationStatus.PENDING_REVIEW,
+                previousStatus, ModerationStatus.RESUBMITTED,
                 ModerationAction.RESUBMIT, null, userId,
                 null, request != null ? request.getNotes() : null, null);
 
@@ -344,7 +344,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         }
 
         // ── Transition moderation status ──
-        listing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+        listing.setModerationStatus(ModerationStatus.RESUBMITTED);
         listing.setVerified(false);
         listing.setIsVerify(true); // Back to IN_REVIEW in legacy view
         listing.setRevisionCount(listing.getRevisionCount() + 1);
@@ -361,7 +361,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         // Audit event
         createModerationEvent(listingId, ModerationSource.OWNER_EDIT,
-                previousStatus, ModerationStatus.PENDING_REVIEW,
+                previousStatus, ModerationStatus.RESUBMITTED,
                 ModerationAction.RESUBMIT, null, userId,
                 null, request.getNotes(), null);
 
