@@ -140,9 +140,14 @@ public class ListingSpecification {
 
                     // New structure: provinceCodes list + resolved legacy IDs
                     if (filter.getProvinceCodes() != null && !filter.getProvinceCodes().isEmpty()) {
-                        List<String> normalizedCodes = filter.getProvinceCodes().stream()
-                                .map(c -> c.replaceFirst("^0+(?!$)", ""))
-                                .toList();
+                        List<String> normalizedCodes = new ArrayList<>();
+                        for (String c : filter.getProvinceCodes()) {
+                            String stripped = c.replaceFirst("^0+(?!$)", "");
+                            normalizedCodes.add(stripped);
+                            try {
+                                normalizedCodes.add(String.format("%02d", Integer.parseInt(stripped)));
+                            } catch (NumberFormatException ignored) {}
+                        }
                         provinceOrParts.add(metadataRoot.get("newProvinceCode").in(normalizedCodes));
 
                         // Also match old-structure listings via resolved legacy province IDs

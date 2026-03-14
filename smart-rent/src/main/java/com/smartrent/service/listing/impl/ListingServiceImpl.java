@@ -1487,6 +1487,12 @@ public class ListingServiceImpl implements ListingService {
         Map<String, String> provinceNames = provinceRepository.findByCodeIn(provinceCodes)
                 .stream().collect(Collectors.toMap(Province::getCode, Province::getName));
 
+        // Create reverse mapping for response
+        Map<String, Integer> codeToLegacyId = new HashMap<>();
+        for (Map.Entry<Integer, String> entry : legacyIdToCode.entrySet()) {
+            codeToLegacyId.putIfAbsent(entry.getValue(), entry.getKey());
+        }
+
         // Build response list (preserves insertion order from LinkedHashMap)
         List<ProvinceListingStatsResponse> results = new ArrayList<>();
         for (Map.Entry<String, long[]> entry : aggregated.entrySet()) {
@@ -1499,6 +1505,7 @@ public class ListingServiceImpl implements ListingService {
             }
 
             results.add(ProvinceListingStatsResponse.builder()
+                    .provinceId(codeToLegacyId.get(code))
                     .provinceCode(code)
                     .provinceName(provinceNames.getOrDefault(code, "Unknown Province"))
                     .totalListings(counts[0])
