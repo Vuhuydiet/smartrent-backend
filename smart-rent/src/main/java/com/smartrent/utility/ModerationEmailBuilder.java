@@ -9,79 +9,79 @@ public class ModerationEmailBuilder {
     private ModerationEmailBuilder() {}
 
     public static String buildApprovedEmail(String listingTitle, String ownerFirstName) {
-        StringBuilder html = EmailBuilder.buildHtmlHeader("Listing Approved");
+        StringBuilder html = EmailBuilder.buildHtmlHeader("Tin đăng đã được duyệt");
         html.append("<div class=\"container\">");
-        html.append("<div class=\"header\"><h1>Listing Approved ✅</h1></div>");
+        html.append("<div class=\"header\"><h1>Tin đăng đã được duyệt ✅</h1></div>");
         html.append("<div class=\"content\">");
-        html.append("<div class=\"greeting\">Hello %s! 👋</div>".formatted(safe(ownerFirstName)));
+        html.append("<div class=\"greeting\">Xin chào %s! 👋</div>".formatted(safe(ownerFirstName)));
         html.append("<div class=\"message\">");
-        html.append("Great news! Your listing <strong>%s</strong> has been approved and is now visible to the public.".formatted(safe(listingTitle)));
+        html.append("Tin tốt! Tin đăng <strong>%s</strong> của bạn đã được duyệt và hiện đã hiển thị công khai.".formatted(safe(listingTitle)));
         html.append("</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">© 2024 SmartRent. All rights reserved.</div>");
+        html.append("<div class=\"footer\">© 2024 SmartRent. Bản quyền được bảo lưu.</div>");
         html.append("</div></body></html>");
         return html.toString();
     }
 
     public static String buildRejectedEmail(String listingTitle, String ownerFirstName, String reason) {
-        StringBuilder html = EmailBuilder.buildHtmlHeader("Listing Rejected");
+        StringBuilder html = EmailBuilder.buildHtmlHeader("Tin đăng bị từ chối");
         html.append("<div class=\"container\">");
-        html.append("<div class=\"header\"><h1>Listing Rejected ❌</h1></div>");
+        html.append("<div class=\"header\"><h1>Tin đăng bị từ chối ❌</h1></div>");
         html.append("<div class=\"content\">");
-        html.append("<div class=\"greeting\">Hello %s,</div>".formatted(safe(ownerFirstName)));
+        html.append("<div class=\"greeting\">Xin chào %s,</div>".formatted(safe(ownerFirstName)));
         html.append("<div class=\"message\">");
-        html.append("Unfortunately, your listing <strong>%s</strong> has been rejected.".formatted(safe(listingTitle)));
+        html.append("Rất tiếc, tin đăng <strong>%s</strong> của bạn đã bị từ chối.".formatted(safe(listingTitle)));
         html.append("</div>");
         if (reason != null && !reason.isBlank()) {
             html.append("<div class=\"expiry-info\">");
-            html.append("<strong>Reason:</strong> %s".formatted(safe(reason)));
+            html.append("<strong>Lý do:</strong> %s".formatted(safe(reason)));
             html.append("</div>");
         }
-        html.append("<div class=\"message\">Please update the listing and resubmit it for review.</div>");
+        html.append("<div class=\"message\">Vui lòng cập nhật tin đăng và gửi lại để được xem xét.</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">© 2024 SmartRent. All rights reserved.</div>");
+        html.append("<div class=\"footer\">© 2024 SmartRent. Bản quyền được bảo lưu.</div>");
         html.append("</div></body></html>");
         return html.toString();
     }
 
     public static String buildRevisionRequestedEmail(String listingTitle, String ownerFirstName, String reason) {
-        StringBuilder html = EmailBuilder.buildHtmlHeader("Revision Required");
+        StringBuilder html = EmailBuilder.buildHtmlHeader("Yêu cầu chỉnh sửa");
         html.append("<div class=\"container\">");
-        html.append("<div class=\"header\"><h1>Revision Required 📝</h1></div>");
+        html.append("<div class=\"header\"><h1>Yêu cầu chỉnh sửa 📝</h1></div>");
         html.append("<div class=\"content\">");
-        html.append("<div class=\"greeting\">Hello %s,</div>".formatted(safe(ownerFirstName)));
+        html.append("<div class=\"greeting\">Xin chào %s,</div>".formatted(safe(ownerFirstName)));
         html.append("<div class=\"message\">");
-        html.append("Your listing <strong>%s</strong> needs some updates before it can be approved.".formatted(safe(listingTitle)));
+        html.append("Tin đăng <strong>%s</strong> của bạn cần được cập nhật trước khi có thể được duyệt.".formatted(safe(listingTitle)));
         html.append("</div>");
         if (reason != null && !reason.isBlank()) {
             html.append("<div class=\"expiry-info\">");
-            html.append("<strong>What to update:</strong> %s".formatted(safe(reason)));
+            html.append("<strong>Nội dung cần cập nhật:</strong> %s".formatted(safe(reason)));
             html.append("</div>");
         }
-        html.append("<div class=\"message\">Please edit the listing and click \"Resubmit for Review\" when you're done.</div>");
+        html.append("<div class=\"message\">Vui lòng chỉnh sửa tin đăng và nhấn \"Gửi lại để xem xét\" khi bạn hoàn tất.</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">© 2024 SmartRent. All rights reserved.</div>");
+        html.append("<div class=\"footer\">© 2024 SmartRent. Bản quyền được bảo lưu.</div>");
         html.append("</div></body></html>");
         return html.toString();
     }
 
     public static String buildReportActionRequiredEmail(String listingTitle, String ownerFirstName, String adminNotes) {
-        StringBuilder html = EmailBuilder.buildHtmlHeader("Action Required");
+        StringBuilder html = EmailBuilder.buildHtmlHeader("Yêu cầu hành động");
         html.append("<div class=\"container\">");
-        html.append("<div class=\"header\"><h1>Action Required ⚠️</h1></div>");
+        html.append("<div class=\"header\"><h1>Yêu cầu hành động ⚠️</h1></div>");
         html.append("<div class=\"content\">");
-        html.append("<div class=\"greeting\">Hello %s,</div>".formatted(safe(ownerFirstName)));
+        html.append("<div class=\"greeting\">Xin chào %s,</div>".formatted(safe(ownerFirstName)));
         html.append("<div class=\"message\">");
-        html.append("A report on your listing <strong>%s</strong> has been reviewed by our admin team and requires your action.".formatted(safe(listingTitle)));
+        html.append("Một báo cáo về tin đăng <strong>%s</strong> của bạn đã được đội ngũ quản trị xem xét và yêu cầu bạn thực hiện hành động.".formatted(safe(listingTitle)));
         html.append("</div>");
         if (adminNotes != null && !adminNotes.isBlank()) {
             html.append("<div class=\"expiry-info\">");
-            html.append("<strong>Admin notes:</strong> %s".formatted(safe(adminNotes)));
+            html.append("<strong>Ghi chú từ quản trị viên:</strong> %s".formatted(safe(adminNotes)));
             html.append("</div>");
         }
-        html.append("<div class=\"message\">Please update the listing and resubmit it for review.</div>");
+        html.append("<div class=\"message\">Vui lòng cập nhật tin đăng và gửi lại để được xem xét.</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">© 2024 SmartRent. All rights reserved.</div>");
+        html.append("<div class=\"footer\">© 2024 SmartRent. Bản quyền được bảo lưu.</div>");
         html.append("</div></body></html>");
         return html.toString();
     }
@@ -89,28 +89,28 @@ public class ModerationEmailBuilder {
     public static String buildReportResolvedForReporterEmail(String listingTitle, String reporterName,
                                                                String resolution, String adminNotes) {
         boolean resolved = "RESOLVED".equalsIgnoreCase(resolution);
-        String headerText = resolved ? "Report Resolved ✅" : "Report Reviewed ℹ️";
+        String headerText = resolved ? "Báo cáo đã được xử lý ✅" : "Báo cáo đã được xem xét ℹ️";
         String outcomeText = resolved
-                ? "we have taken appropriate action regarding this listing."
-                : "after careful review, no further action is required at this time.";
+                ? "chúng tôi đã thực hiện các biện pháp phù hợp đối với tin đăng này."
+                : "sau khi xem xét kỹ lưỡng, hiện tại không cần thực hiện thêm hành động nào.";
 
         StringBuilder html = EmailBuilder.buildHtmlHeader(headerText);
         html.append("<div class=\"container\">");
         html.append("<div class=\"header\"><h1>%s</h1></div>".formatted(headerText));
         html.append("<div class=\"content\">");
-        html.append("<div class=\"greeting\">Hello %s,</div>".formatted(safe(reporterName)));
+        html.append("<div class=\"greeting\">Xin chào %s,</div>".formatted(safe(reporterName)));
         html.append("<div class=\"message\">");
-        html.append("Thank you for reporting the listing <strong>%s</strong>. ".formatted(safe(listingTitle)));
-        html.append("We have reviewed your report and %s".formatted(outcomeText));
+        html.append("Cảm ơn bạn đã báo cáo tin đăng <strong>%s</strong>. ".formatted(safe(listingTitle)));
+        html.append("Chúng tôi đã xem xét báo cáo của bạn và %s".formatted(outcomeText));
         html.append("</div>");
         if (adminNotes != null && !adminNotes.isBlank()) {
             html.append("<div class=\"expiry-info\">");
-            html.append("<strong>Admin notes:</strong> %s".formatted(safe(adminNotes)));
+            html.append("<strong>Ghi chú từ quản trị viên:</strong> %s".formatted(safe(adminNotes)));
             html.append("</div>");
         }
-        html.append("<div class=\"message\">We appreciate your help in keeping SmartRent a safe and accurate platform.</div>");
+        html.append("<div class=\"message\">Chúng tôi đánh giá cao sự giúp đỡ của bạn trong việc giữ SmartRent trở thành nền tảng an toàn và chính xác.</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">© 2024 SmartRent. All rights reserved.</div>");
+        html.append("<div class=\"footer\">© 2024 SmartRent. Bản quyền được bảo lưu.</div>");
         html.append("</div></body></html>");
         return html.toString();
     }
@@ -118,27 +118,27 @@ public class ModerationEmailBuilder {
     public static String buildReportResolvedForOwnerEmail(String listingTitle, String ownerFirstName,
                                                             String resolution, String adminNotes) {
         boolean resolved = "RESOLVED".equalsIgnoreCase(resolution);
-        String headerText = resolved ? "Report on Your Listing — Action Taken ⚠️" : "Report on Your Listing — No Issues Found ✅";
+        String headerText = resolved ? "Báo cáo về tin đăng của bạn — Đã xử lý ⚠️" : "Báo cáo về tin đăng của bạn — Không phát hiện vấn đề ✅";
         String outcomeText = resolved
-                ? "Our team has reviewed the report and taken appropriate action. Please review your listing and make any necessary updates."
-                : "Our team has reviewed the report and found no issues. Your listing remains active and no action is required on your part.";
+                ? "Đội ngũ của chúng tôi đã xem xét báo cáo và thực hiện các biện pháp phù hợp. Vui lòng kiểm tra tin đăng và cập nhật nếu cần thiết."
+                : "Đội ngũ của chúng tôi đã xem xét báo cáo và không phát hiện vấn đề nào. Tin đăng của bạn vẫn đang hoạt động và bạn không cần thực hiện thêm hành động nào.";
 
         StringBuilder html = EmailBuilder.buildHtmlHeader(headerText);
         html.append("<div class=\"container\">");
         html.append("<div class=\"header\"><h1>%s</h1></div>".formatted(headerText));
         html.append("<div class=\"content\">");
-        html.append("<div class=\"greeting\">Hello %s,</div>".formatted(safe(ownerFirstName)));
+        html.append("<div class=\"greeting\">Xin chào %s,</div>".formatted(safe(ownerFirstName)));
         html.append("<div class=\"message\">");
-        html.append("A report was submitted regarding your listing <strong>%s</strong>. ".formatted(safe(listingTitle)));
+        html.append("Một báo cáo đã được gửi liên quan đến tin đăng <strong>%s</strong> của bạn. ".formatted(safe(listingTitle)));
         html.append(outcomeText);
         html.append("</div>");
         if (adminNotes != null && !adminNotes.isBlank()) {
             html.append("<div class=\"expiry-info\">");
-            html.append("<strong>Admin notes:</strong> %s".formatted(safe(adminNotes)));
+            html.append("<strong>Ghi chú từ quản trị viên:</strong> %s".formatted(safe(adminNotes)));
             html.append("</div>");
         }
         html.append("</div>");
-        html.append("<div class=\"footer\">© 2024 SmartRent. All rights reserved.</div>");
+        html.append("<div class=\"footer\">© 2024 SmartRent. Bản quyền được bảo lưu.</div>");
         html.append("</div></body></html>");
         return html.toString();
     }

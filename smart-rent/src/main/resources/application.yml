@@ -203,7 +203,7 @@ application:
     sender:
       email: "${SENDER_EMAIL}"
       name: "${SENDER_NAME:SmartRent}"
-    subject: "SmartRent"
+    subject: "SmartRent - Xác minh tài khoản"
   otp:
     length: 6
     duration: 60 #s
@@ -417,4 +417,4 @@ smarrent:
       retry-backoff-seconds: ${AI_VERIFICATION_RETRY_BACKOFF:2}
       auth-token: ${TWILIO_AUTH_TOKEN:}
       from-number: ${TWILIO_FROM_NUMBER:}
-      message-template: "${TWILIO_MESSAGE_TEMPLATE:SmartRent - Your verification code is %s. Valid for 5 minutes. Do not share this code.}"
+      message-template: "${TWILIO_MESSAGE_TEMPLATE:SmartRent - Mã xác minh của bạn là %s. Có hiệu lực trong 5 phút. Không chia sẻ mã này.}"

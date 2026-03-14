@@ -132,8 +132,8 @@ public class ListingReportServiceImpl implements ListingReportService {
         // Realtime notification: notify all admins about new report
         notificationService.sendToAllAdmins(
                 NotificationType.NEW_REPORT,
-                "New listing report",
-                "A new report has been submitted for listing: " + listing.getTitle(),
+                "Báo cáo tin đăng mới",
+                "Một báo cáo mới đã được gửi cho tin đăng: " + listing.getTitle(),
                 savedReport.getReportId(), "REPORT");
 
         // Realtime notification: notify listing owner about the report
@@ -141,8 +141,8 @@ public class ListingReportServiceImpl implements ListingReportService {
             notificationService.sendNotification(
                     listing.getUserId(), RecipientType.USER,
                     NotificationType.NEW_REPORT,
-                    "Your listing has been reported",
-                    "Your listing \"" + listing.getTitle() + "\" has received a new report.",
+                    "Tin đăng của bạn đã bị báo cáo",
+                    "Tin đăng \"" + listing.getTitle() + "\" của bạn đã nhận được một báo cáo mới.",
                     listing.getListingId(), "LISTING");
         }
 
@@ -275,8 +275,8 @@ public class ListingReportServiceImpl implements ListingReportService {
                     notificationService.sendNotification(
                             reporter.getUserId(), RecipientType.USER,
                             reporterNotifType,
-                            "Your report has been reviewed",
-                            "Your report #" + reportId + " has been " + newStatus.name().toLowerCase() + ".",
+                            "Báo cáo của bạn đã được xem xét",
+                            "Báo cáo #" + reportId + " của bạn đã được " + newStatus.name().toLowerCase() + ".",
                             reportId, "REPORT"));
         }
 
@@ -286,8 +286,8 @@ public class ListingReportServiceImpl implements ListingReportService {
             notificationService.sendNotification(
                     listing.getUserId(), RecipientType.USER,
                     reporterNotifType,
-                    "Report on your listing has been reviewed",
-                    "A report on your listing \"" + listing.getTitle() + "\" has been " + newStatus.name().toLowerCase() + ".",
+                    "Báo cáo về tin đăng của bạn đã được xem xét",
+                    "Một báo cáo về tin đăng \"" + listing.getTitle() + "\" của bạn đã được " + newStatus.name().toLowerCase() + ".",
                     listing.getListingId(), "LISTING");
         }
 
@@ -344,7 +344,7 @@ public class ListingReportServiceImpl implements ListingReportService {
                             .name(report.getReporterName())
                             .email(report.getReporterEmail())
                             .build()))
-                    .subject("Your report has been reviewed - SmartRent")
+                    .subject("Báo cáo của bạn đã được xem xét - SmartRent")
                     .htmlContent(htmlContent)
                     .build();
 
@@ -385,7 +385,7 @@ public class ListingReportServiceImpl implements ListingReportService {
                             .name(userEntity.getFirstName())
                             .email(userEntity.getEmail())
                             .build()))
-                    .subject("Report on your listing has been reviewed - SmartRent")
+                    .subject("Báo cáo về tin đăng của bạn đã được xem xét - SmartRent")
                     .htmlContent(htmlContent)
                     .build();
 

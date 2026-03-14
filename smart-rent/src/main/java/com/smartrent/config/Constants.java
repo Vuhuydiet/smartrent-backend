@@ -68,5 +68,5 @@ public class Constants {
 
   public static final String VERIFICATION_EMAIL_SERVICE = "VERIFICATION_EMAIL_SERVICE";
 
-  public static final String EMAIL_VERIFICATION_HEADER = "Email Verification";
+  public static final String EMAIL_VERIFICATION_HEADER = "Xác minh Email";
 }

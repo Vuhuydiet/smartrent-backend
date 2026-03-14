@@ -9,7 +9,7 @@ public class EmailBuilder {
     StringBuilder htmlContent = new StringBuilder();
     
     htmlContent.append("<!DOCTYPE html>");
-    htmlContent.append("<html lang=\"en\">");
+    htmlContent.append("<html lang=\"vi\">");
     htmlContent.append("<head>");
     htmlContent.append("<meta charset=\"UTF-8\">");
     htmlContent.append("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
@@ -43,15 +43,15 @@ public class EmailBuilder {
 
     // Header section
     htmlContent.append("<div class=\"header\">");
-    htmlContent.append("<h1>Welcome to %s</h1>".formatted(senderName));
+    htmlContent.append("<h1>Chào mừng đến với %s</h1>".formatted(senderName));
     htmlContent.append("</div>");
 
     // Content section
     htmlContent.append("<div class=\"content\">");
-    htmlContent.append("<div class=\"greeting\">Hello %s! 👋</div>".formatted(Utils.buildName(firstName, lastName)));
+    htmlContent.append("<div class=\"greeting\">Xin chào %s! 👋</div>".formatted(Utils.buildName(firstName, lastName)));
 
     htmlContent.append("<div class=\"message\">");
-    htmlContent.append("To complete your account verification, please use the verification code below:");
+    htmlContent.append("Để hoàn tất xác minh tài khoản, vui lòng sử dụng mã xác minh bên dưới:");
     htmlContent.append("</div>");
 
     // OTP section
@@ -61,20 +61,20 @@ public class EmailBuilder {
 
     // Expiry information
     htmlContent.append("<div class=\"expiry-info\">");
-    htmlContent.append("⏰ <strong>Important:</strong> This verification code will expire in %d seconds.".formatted(otpDuration));
+    htmlContent.append("⏰ <strong>Lưu ý:</strong> Mã xác minh này sẽ hết hạn sau %d giây.".formatted(otpDuration));
     htmlContent.append("</div>");
 
     // Security note
     htmlContent.append("<div class=\"security-note\">");
-    htmlContent.append("🔒 <strong>Security Note:</strong> Never share this code with anyone. Our team will never ask for your verification code.");
+    htmlContent.append("🔒 <strong>Lưu ý bảo mật:</strong> Không chia sẻ mã này với bất kỳ ai. Đội ngũ của chúng tôi sẽ không bao giờ yêu cầu mã xác minh của bạn.");
     htmlContent.append("</div>");
 
     htmlContent.append("</div>"); // End content
 
     // Footer
     htmlContent.append("<div class=\"footer\">");
-    htmlContent.append("If you didn't request this verification, please ignore this email.<br>");
-    htmlContent.append("© 2024 %s. All rights reserved.".formatted(senderName));
+    htmlContent.append("Nếu bạn không yêu cầu xác minh này, vui lòng bỏ qua email này.<br>");
+    htmlContent.append("© 2024 %s. Bản quyền được bảo lưu.".formatted(senderName));
     htmlContent.append("</div>");
 
     htmlContent.append("</div>"); // End container

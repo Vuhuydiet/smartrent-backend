@@ -113,15 +113,15 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             };
             if (notifType != null) {
                 String notifMessage = switch (decision) {
-                    case "APPROVE" -> "Your listing \"" + saved.getTitle() + "\" has been approved and is now visible.";
-                    case "REJECT" -> "Your listing \"" + saved.getTitle() + "\" has been rejected. Reason: " + resolveReasonText(request);
-                    case "REQUEST_REVISION" -> "Your listing \"" + saved.getTitle() + "\" needs revision. Reason: " + resolveReasonText(request);
-                    case "SUSPEND" -> "Your listing \"" + saved.getTitle() + "\" has been suspended. Reason: " + resolveReasonText(request);
+                    case "APPROVE" -> "Tin đăng \"" + saved.getTitle() + "\" của bạn đã được duyệt và hiện đã hiển thị.";
+                    case "REJECT" -> "Tin đăng \"" + saved.getTitle() + "\" của bạn đã bị từ chối. Lý do: " + resolveReasonText(request);
+                    case "REQUEST_REVISION" -> "Tin đăng \"" + saved.getTitle() + "\" của bạn cần chỉnh sửa. Lý do: " + resolveReasonText(request);
+                    case "SUSPEND" -> "Tin đăng \"" + saved.getTitle() + "\" của bạn đã bị tạm ngưng. Lý do: " + resolveReasonText(request);
                     default -> "";
                 };
                 notificationService.sendNotification(
                         saved.getUserId(), RecipientType.USER,
-                        notifType, "Listing moderation update", notifMessage,
+                        notifType, "Cập nhật kiểm duyệt tin đăng", notifMessage,
                         saved.getListingId(), "LISTING");
             }
         }
@@ -201,8 +201,8 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             notificationService.sendNotification(
                     listing.getUserId(), RecipientType.USER,
                     NotificationType.REPORT_ACTION_REQUIRED,
-                    "Action required on your listing",
-                    "Your listing \"" + listing.getTitle() + "\" requires updates based on a report review. " + (request.getAdminNotes() != null ? request.getAdminNotes() : ""),
+                    "Tin đăng của bạn cần hành động",
+                    "Tin đăng \"" + listing.getTitle() + "\" của bạn cần được cập nhật dựa trên kết quả xem xét báo cáo. " + (request.getAdminNotes() != null ? request.getAdminNotes() : ""),
                     listing.getListingId(), "LISTING");
         }
 
@@ -268,8 +268,8 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         // Realtime notification: notify all admins about resubmission
         notificationService.sendToAllAdmins(
                 NotificationType.LISTING_RESUBMITTED,
-                "Listing resubmitted for review",
-                "Listing \"" + listing.getTitle() + "\" has been updated and resubmitted for review.",
+                "Tin đăng đã được gửi lại để xem xét",
+                "Tin đăng \"" + listing.getTitle() + "\" đã được cập nhật và gửi lại để xem xét.",
                 listing.getListingId(), "LISTING");
 
         log.info("Listing {} resubmitted for review by user {}", listingId, userId);
@@ -371,8 +371,8 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         // Realtime notification: notify all admins about update & resubmission
         notificationService.sendToAllAdmins(
                 NotificationType.LISTING_RESUBMITTED,
-                "Listing updated and resubmitted",
-                "Listing \"" + listing.getTitle() + "\" has been updated and resubmitted for review.",
+                "Tin đăng đã được cập nhật và gửi lại",
+                "Tin đăng \"" + listing.getTitle() + "\" đã được cập nhật và gửi lại để xem xét.",
                 listing.getListingId(), "LISTING");
 
         log.info("Listing {} updated and resubmitted for review by user {}", listingId, userId);
@@ -581,15 +581,15 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             String htmlContent;
             switch (decision) {
                 case "APPROVE" -> {
-                    subject = "Your listing has been approved - SmartRent";
+                    subject = "Tin đăng của bạn đã được duyệt - SmartRent";
                     htmlContent = ModerationEmailBuilder.buildApprovedEmail(listing.getTitle(), userEntity.getFirstName());
                 }
                 case "REJECT" -> {
-                    subject = "Your listing has been rejected - SmartRent";
+                    subject = "Tin đăng của bạn đã bị từ chối - SmartRent";
                     htmlContent = ModerationEmailBuilder.buildRejectedEmail(listing.getTitle(), userEntity.getFirstName(), reasonText);
                 }
                 case "REQUEST_REVISION" -> {
-                    subject = "Revision required for your listing - SmartRent";
+                    subject = "Tin đăng của bạn cần chỉnh sửa - SmartRent";
                     htmlContent = ModerationEmailBuilder.buildRevisionRequestedEmail(listing.getTitle(), userEntity.getFirstName(), reasonText);
                 }
                 default -> { return; }
@@ -615,7 +615,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             EmailRequest emailRequest = EmailRequest.builder()
                     .sender(EmailInfo.builder().name(senderName).email(senderEmail).build())
                     .to(List.of(EmailInfo.builder().name(userEntity.getFirstName()).email(userEntity.getEmail()).build()))
-                    .subject("Action required for your listing - SmartRent")
+                    .subject("Tin đăng của bạn cần hành động - SmartRent")
                     .htmlContent(ModerationEmailBuilder.buildReportActionRequiredEmail(listing.getTitle(), userEntity.getFirstName(), adminNotes))
                     .build();
             emailService.sendEmail(emailRequest);
