@@ -5,6 +5,11 @@ package com.smartrent.enums;
  */
 public enum NewsCategory {
     NEWS,           // General news
-    BLOG            // Blog posts
+    BLOG,           // Blog posts
+    POLICY,         // Policy & regulation updates
+    MARKET,         // Market news & updates
+    PROJECT,        // Project announcements
+    INVESTMENT,     // Investment trends & analysis
+    GUIDE           // Guides & tips
 }
 
