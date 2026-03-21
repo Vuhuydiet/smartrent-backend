@@ -1,11 +1,16 @@
 package com.smartrent.service.analytics.impl;
 
 import com.smartrent.dto.response.DailyClickCount;
+import com.smartrent.dto.response.DailySaveCount;
 import com.smartrent.dto.response.ListingAnalyticsResponse;
 import com.smartrent.dto.response.ListingClickSummary;
+import com.smartrent.dto.response.ListingSaveSummary;
 import com.smartrent.dto.response.OwnerListingsAnalyticsResponse;
+import com.smartrent.dto.response.OwnerSavedListingsAnalyticsResponse;
+import com.smartrent.dto.response.SavedListingsTrendResponse;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.PhoneClickDetailRepository;
+import com.smartrent.infra.repository.SavedListingRepository;
 import com.smartrent.infra.repository.ViewRepository;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.service.analytics.AnalyticsService;
@@ -32,6 +37,7 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     PhoneClickDetailRepository phoneClickDetailRepository;
     ViewRepository viewRepository;
     ListingRepository listingRepository;
+    SavedListingRepository savedListingRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -124,5 +130,64 @@ public class AnalyticsServiceImpl implements AnalyticsService {
             case 7 -> "SAT";
             default -> "UNK";
         };
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SavedListingsTrendResponse getSavedListingTrend(Long listingId, String ownerId) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new RuntimeException("Listing not found with ID: " + listingId));
+
+        if (!listing.getUserId().equals(ownerId)) {
+            throw new RuntimeException("You are not the owner of this listing");
+        }
+
+        long totalSaves = savedListingRepository.countByIdListingId(listingId);
+
+        List<Object[]> rawData = savedListingRepository.countSavesGroupedByDate(listingId);
+        List<DailySaveCount> savesOverTime = rawData.stream()
+                .map(row -> DailySaveCount.builder()
+                        .date(((java.sql.Date) row[0]).toLocalDate())
+                        .count(((Number) row[1]).longValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        return SavedListingsTrendResponse.builder()
+                .listingId(listingId)
+                .listingTitle(listing.getTitle())
+                .totalSaves(totalSaves)
+                .savesOverTime(savesOverTime)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OwnerSavedListingsAnalyticsResponse getOwnerSavedListingsAnalytics(String ownerId) {
+        List<Object[]> rawCounts = savedListingRepository.countSavesPerListingForOwner(ownerId);
+        long totalSavesAcrossAll = 0;
+
+        List<ListingSaveSummary> summaries = rawCounts.stream()
+                .map(row -> {
+                    Long lid = ((Number) row[0]).longValue();
+                    Long count = ((Number) row[1]).longValue();
+                    String title = listingRepository.findById(lid)
+                            .map(Listing::getTitle)
+                            .orElse("Unknown");
+                    return ListingSaveSummary.builder()
+                            .listingId(lid)
+                            .listingTitle(title)
+                            .totalSaves(count)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        for (ListingSaveSummary s : summaries) {
+            totalSavesAcrossAll += s.getTotalSaves();
+        }
+
+        return OwnerSavedListingsAnalyticsResponse.builder()
+                .listings(summaries)
+                .totalSavesAcrossAll(totalSavesAcrossAll)
+                .build();
     }
 }
