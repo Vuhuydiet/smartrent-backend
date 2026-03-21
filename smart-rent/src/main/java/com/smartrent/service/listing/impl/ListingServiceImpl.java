@@ -28,7 +28,7 @@ import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AddressRepository;
-import com.smartrent.infra.repository.AddressMetadataRepository;
+// AddressMetadataRepository removed — queries now use addresses table directly
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.AmenityRepository;
 import com.smartrent.infra.repository.CategoryRepository;
@@ -93,7 +93,6 @@ public class ListingServiceImpl implements ListingService {
     AmenityRepository amenityRepository;
     CategoryRepository categoryRepository;
     AddressRepository addressRepository;
-    AddressMetadataRepository addressMetadataRepository;
     AdminRepository adminRepository;
     UserRepository userRepository;
     LegacyProvinceRepository legacyProvinceRepository;
@@ -1455,7 +1454,7 @@ public class ListingServiceImpl implements ListingService {
             log.debug("address_mapping empty — built legacyIdToCode directly from request provinceIds: {}", legacyIdToCode);
         }
 
-        // Aggregate new-structure listings (address_metadata.new_province_code)
+        // Aggregate new-structure listings (addresses.new_province_code)
         List<Object[]> newStats = listingRepository.getListingStatsByProvinceCodes(provinceCodes);
         for (Object[] row : newStats) {
             String code = (String) row[0];
@@ -1467,7 +1466,7 @@ public class ListingServiceImpl implements ListingService {
             }
         }
 
-        // Aggregate old-structure listings (address_metadata.province_id)
+        // Aggregate old-structure listings (addresses.legacy_province_id)
         // Exclude listings already counted via new_province_code to avoid double-counting
         if (!allLegacyIds.isEmpty()) {
             List<Object[]> oldStats = listingRepository.getListingStatsByProvinceIdsWithoutNewCode(allLegacyIds);
@@ -2163,9 +2162,9 @@ public class ListingServiceImpl implements ListingService {
 
         // Set address type based on which structure was marked as primary
         if ("OLD".equals(draft.getAddressType())) {
-            builder.addressType(com.smartrent.infra.repository.entity.AddressMetadata.AddressType.OLD);
+            builder.addressType(AddressMetadata.AddressType.OLD);
         } else if ("NEW".equals(draft.getAddressType())) {
-            builder.addressType(com.smartrent.infra.repository.entity.AddressMetadata.AddressType.NEW);
+            builder.addressType(AddressMetadata.AddressType.NEW);
         }
 
         // ALWAYS populate legacy fields if they exist (regardless of addressType)

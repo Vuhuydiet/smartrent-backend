@@ -22,7 +22,6 @@ import java.util.Optional;
 public class AddressCreationServiceImpl implements AddressCreationService {
 
     private final AddressRepository addressRepository;
-    private final AddressMetadataRepository addressMetadataRepository;
     private final LegacyProvinceRepository legacyProvinceRepository;
     private final LegacyDistrictRepository legacyDistrictRepository;
     private final LegacyWardRepository legacyWardRepository;
@@ -129,15 +128,6 @@ public class AddressCreationServiceImpl implements AddressCreationService {
                 address.getNewProvinceCode(),
                 address.getNewWardCode());
 
-        // Create and save metadata (inject auto-mapped codes into metadata when resolved)
-        AddressMetadata metadata = createAddressMetadata(address, request);
-        if (autoMappedProvinceCode != null) {
-            metadata.setNewProvinceCode(autoMappedProvinceCode);
-            metadata.setNewWardCode(autoMappedWardCode);
-        }
-        addressMetadataRepository.save(metadata);
-        log.info("Saved address metadata with ID: {}", metadata.getMetadataId());
-
         return address;
     }
 
@@ -223,23 +213,6 @@ public class AddressCreationServiceImpl implements AddressCreationService {
         }
 
         return sb.toString().trim();
-    }
-
-    @Override
-    public AddressMetadata createAddressMetadata(Address address, AddressCreationRequest request) {
-        AddressMetadata.AddressMetadataBuilder builder = AddressMetadata.builder()
-                .address(address)
-                .addressType(request.getEffectiveAddressType())
-                .projectId(request.getProjectId());
-
-        builder.provinceId(request.getLegacyProvinceId())
-                .districtId(request.getLegacyDistrictId())
-                .wardId(request.getLegacyWardId());
-
-        builder.newProvinceCode(request.getNewProvinceCodeValue())
-                .newWardCode(request.getNewWardCodeValue());
-
-        return builder.build();
     }
 
     @Override

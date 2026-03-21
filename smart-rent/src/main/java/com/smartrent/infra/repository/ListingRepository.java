@@ -51,8 +51,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     @Query("""
         SELECT l FROM listings l
         JOIN l.address a
-        JOIN AddressMetadata am ON am.address.addressId = a.addressId
-        WHERE am.wardId = :wardId
+        WHERE a.legacyWardId = :wardId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -71,8 +70,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     @Query("""
         SELECT l FROM listings l
         JOIN l.address a
-        JOIN AddressMetadata am ON am.address.addressId = a.addressId
-        WHERE am.districtId = :districtId
+        WHERE a.legacyDistrictId = :districtId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -91,8 +89,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     @Query("""
         SELECT l FROM listings l
         JOIN l.address a
-        JOIN AddressMetadata am ON am.address.addressId = a.addressId
-        WHERE am.provinceId = :provinceId
+        WHERE a.legacyProvinceId = :provinceId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -118,8 +115,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
         JOIN l.address a
-        JOIN AddressMetadata am ON am.address.addressId = a.addressId
-        WHERE am.wardId = :wardId
+        WHERE a.legacyWardId = :wardId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -143,8 +139,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
         JOIN l.address a
-        JOIN AddressMetadata am ON am.address.addressId = a.addressId
-        WHERE am.districtId = :districtId
+        WHERE a.legacyDistrictId = :districtId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -168,8 +163,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
             AVG(CASE WHEN l.area > 0 THEN l.price / l.area ELSE 0 END)
         FROM listings l
         JOIN l.address a
-        JOIN AddressMetadata am ON am.address.addressId = a.addressId
-        WHERE am.provinceId = :provinceId
+        WHERE a.legacyProvinceId = :provinceId
         AND l.expired = false
         AND l.productType = :productType
         AND l.priceUnit = :priceUnit
@@ -206,41 +200,39 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      */
     @Query("""
         SELECT
-            am.provinceId,
+            a.legacyProvinceId,
             COUNT(DISTINCT l.listingId),
             SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
             SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
         FROM listings l
         JOIN l.address a
-        JOIN AddressMetadata am ON am.address.addressId = a.addressId
-        WHERE am.provinceId IN :provinceIds
+        WHERE a.legacyProvinceId IN :provinceIds
         AND l.isDraft = false
         AND l.isShadow = false
         AND l.expired = false
-        GROUP BY am.provinceId
+        GROUP BY a.legacyProvinceId
     """)
     List<Object[]> getListingStatsByProvinceIds(@Param("provinceIds") List<Integer> provinceIds);
 
     /**
      * Get listing statistics grouped by province (old structure), excluding listings already mapped to new structure.
-     * Adding AND am.newProvinceCode IS NULL prevents double-counting listings that have both old and new address codes.
+     * Adding AND a.newProvinceCode IS NULL prevents double-counting listings that have both old and new address codes.
      * Returns: provinceId, totalCount, verifiedCount, vipCount
      */
     @Query("""
         SELECT
-            am.provinceId,
+            a.legacyProvinceId,
             COUNT(DISTINCT l.listingId),
             SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
             SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
         FROM listings l
         JOIN l.address a
-        JOIN AddressMetadata am ON am.address.addressId = a.addressId
-        WHERE am.provinceId IN :provinceIds
-        AND am.newProvinceCode IS NULL
+        WHERE a.legacyProvinceId IN :provinceIds
+        AND a.newProvinceCode IS NULL
         AND l.isDraft = false
         AND l.isShadow = false
         AND l.expired = false
-        GROUP BY am.provinceId
+        GROUP BY a.legacyProvinceId
     """)
     List<Object[]> getListingStatsByProvinceIdsWithoutNewCode(@Param("provinceIds") List<Integer> provinceIds);
 
@@ -250,18 +242,17 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      */
     @Query("""
         SELECT
-            am.newProvinceCode,
+            a.newProvinceCode,
             COUNT(DISTINCT l.listingId),
             SUM(CASE WHEN l.verified = true THEN 1 ELSE 0 END),
             SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
         FROM listings l
         JOIN l.address a
-        JOIN AddressMetadata am ON am.address.addressId = a.addressId
-        WHERE am.newProvinceCode IN :provinceCodes
+        WHERE a.newProvinceCode IN :provinceCodes
         AND l.isDraft = false
         AND l.isShadow = false
         AND l.expired = false
-        GROUP BY am.newProvinceCode
+        GROUP BY a.newProvinceCode
     """)
     List<Object[]> getListingStatsByProvinceCodes(@Param("provinceCodes") List<String> provinceCodes);
 
