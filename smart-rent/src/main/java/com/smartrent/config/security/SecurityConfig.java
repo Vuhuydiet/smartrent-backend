@@ -55,6 +55,9 @@ public class SecurityConfig {
 
     http.authorizeHttpRequests(configurer -> {
       configurer
+          // Allow WebSocket endpoints for all HTTP methods (SockJS uses GET, POST, etc.)
+          .requestMatchers("/ws/**")
+          .permitAll()
           // Configure public POST endpoints from YAML
           .requestMatchers(HttpMethod.POST, postPatterns)
           .permitAll()
@@ -83,6 +86,12 @@ public class SecurityConfig {
           // Skip JWT processing for public endpoints - return null to skip authentication
           String path = request.getRequestURI();
           String method = request.getMethod();
+
+          // Skip JWT for WebSocket endpoints (SockJS uses GET, POST, etc.)
+          if (path.startsWith("/ws")) {
+            log.debug("Skipping JWT for WebSocket endpoint: {}", path);
+            return null;
+          }
 
           // Check if this is a public GET endpoint
           if ("GET".equalsIgnoreCase(method)) {

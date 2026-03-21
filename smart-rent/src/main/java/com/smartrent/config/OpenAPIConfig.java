@@ -564,9 +564,83 @@ public class OpenAPIConfig {
     public GroupedOpenApi listingApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
             return GroupedOpenApi.builder()
                             .group("listings")
-                            .displayName("Property Listings")
+                            .displayName("Property Listings (All)")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/listings/**")
+                            .addOpenApiCustomizer(securityCustomizer())
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi listingSearchApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("listing-search")
+                            .displayName("Listing Search & Discovery")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch(
+                                            "/v1/listings/search",
+                                            "/v1/listings/autocomplete",
+                                            "/v1/listings/map-bounds"
+                            )
+                            .addOpenApiCustomizer(securityCustomizer())
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi listingDraftApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("listing-drafts")
+                            .displayName("Listing Drafts")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch(
+                                            "/v1/listings/draft",
+                                            "/v1/listings/draft/**",
+                                            "/v1/listings/my-drafts"
+                            )
+                            .addOpenApiCustomizer(securityCustomizer())
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi listingStatsApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("listing-stats")
+                            .displayName("Listing Statistics & Quota")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch(
+                                            "/v1/listings/stats/**",
+                                            "/v1/listings/quota-check"
+                            )
+                            .addOpenApiCustomizer(securityCustomizer())
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi listingOwnerApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("listing-owner")
+                            .displayName("Listing Owner Management")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch(
+                                            "/v1/listings/my-listings",
+                                            "/v1/listings/*/my-detail",
+                                            "/v1/listings/*/resubmit-for-review",
+                                            "/v1/listings/*/update-and-resubmit"
+                            )
+                            .addOpenApiCustomizer(securityCustomizer())
+                            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi listingAdminApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
+            return GroupedOpenApi.builder()
+                            .group("listing-admin")
+                            .displayName("Listing Admin Management")
+                            .packagesToScan(packageToScan)
+                            .pathsToMatch(
+                                            "/v1/listings/admin/**",
+                                            "/v1/listings/*/admin"
+                            )
                             .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }

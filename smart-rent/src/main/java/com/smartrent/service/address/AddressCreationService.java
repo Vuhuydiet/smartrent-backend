@@ -2,7 +2,6 @@ package com.smartrent.service.address;
 
 import com.smartrent.dto.request.AddressCreationRequest;
 import com.smartrent.infra.repository.entity.Address;
-import com.smartrent.infra.repository.entity.AddressMetadata;
 
 /**
  * Service for creating and managing addresses
@@ -33,15 +32,6 @@ public interface AddressCreationService {
      * @return Formatted address string
      */
     String buildNewAddressString(AddressCreationRequest request);
-
-    /**
-     * Create address metadata from request
-     *
-     * @param address The created address entity
-     * @param request Address creation request
-     * @return Created address metadata
-     */
-    AddressMetadata createAddressMetadata(Address address, AddressCreationRequest request);
 
     /**
      * Validate address request fields

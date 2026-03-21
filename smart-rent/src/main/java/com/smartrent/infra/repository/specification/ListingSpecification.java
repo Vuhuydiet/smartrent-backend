@@ -3,7 +3,6 @@ package com.smartrent.infra.repository.specification;
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.MyListingsFilterRequest;
 import com.smartrent.infra.repository.entity.Address;
-import com.smartrent.infra.repository.entity.AddressMetadata;
 import com.smartrent.infra.repository.entity.Amenity;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.Media;
@@ -35,8 +34,15 @@ public class ListingSpecification {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
+            // Determine if we need location filters
+            boolean hasLocationFilter = filter.getProvinceId() != null
+                    || (filter.getProvinceCodes() != null && !filter.getProvinceCodes().isEmpty())
+                    || filter.getDistrictId() != null || filter.getWardId() != null
+                    || filter.getNewWardCode() != null || filter.getStreetId() != null;
+
             // Eagerly fetch address to avoid N+1 lazy loads (skip for count queries)
-            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+            // When location filters are used, the INNER JOIN below handles the fetch
+            if (query.getResultType() != Long.class && query.getResultType() != long.class && !hasLocationFilter) {
                 root.fetch("address", JoinType.LEFT);
             }
 
@@ -111,18 +117,13 @@ public class ListingSpecification {
             }
 
             // Province/District/Ward filter - supports both old and new address structures
+            // Queries addresses table directly (no AddressMetadata dependency)
             if (filter.getProvinceId() != null || (filter.getProvinceCodes() != null && !filter.getProvinceCodes().isEmpty()) ||
                 filter.getDistrictId() != null || filter.getWardId() != null ||
                 filter.getNewWardCode() != null || filter.getStreetId() != null) {
 
-                Subquery<Long> subquery = query.subquery(Long.class);
-                var metadataRoot = subquery.from(AddressMetadata.class);
-
-                List<Predicate> locationPredicates = new ArrayList<>();
-                locationPredicates.add(criteriaBuilder.equal(
-                    root.get("address").get("addressId"),
-                    metadataRoot.get("address").get("addressId")
-                ));
+                // Join address (already fetched above for non-count queries)
+                Join<Listing, Address> addressJoin = root.join("address", JoinType.INNER);
 
                 // Province filters — combine old provinceId and new provinceCode as OR
                 // so listings from either address structure are included
@@ -134,35 +135,40 @@ public class ListingSpecification {
                         try {
                             Integer provinceIdInt = Integer.parseInt(filter.getProvinceId());
                             provinceOrParts.add(criteriaBuilder.equal(
-                                metadataRoot.get("provinceId"), provinceIdInt));
+                                addressJoin.get("legacyProvinceId"), provinceIdInt));
                         } catch (NumberFormatException ignored) {}
                     }
 
                     // New structure: provinceCodes list + resolved legacy IDs
                     if (filter.getProvinceCodes() != null && !filter.getProvinceCodes().isEmpty()) {
-                        List<String> normalizedCodes = filter.getProvinceCodes().stream()
-                                .map(c -> c.replaceFirst("^0+(?!$)", ""))
-                                .toList();
-                        provinceOrParts.add(metadataRoot.get("newProvinceCode").in(normalizedCodes));
+                        List<String> normalizedCodes = new ArrayList<>();
+                        for (String c : filter.getProvinceCodes()) {
+                            String stripped = c.replaceFirst("^0+(?!$)", "");
+                            normalizedCodes.add(stripped);
+                            try {
+                                normalizedCodes.add(String.format("%02d", Integer.parseInt(stripped)));
+                            } catch (NumberFormatException ignored) {}
+                        }
+                        provinceOrParts.add(addressJoin.get("newProvinceCode").in(normalizedCodes));
 
                         // Also match old-structure listings via resolved legacy province IDs
                         if (filter.getResolvedLegacyProvinceIds() != null
                                 && !filter.getResolvedLegacyProvinceIds().isEmpty()) {
-                            provinceOrParts.add(metadataRoot.get("provinceId")
+                            provinceOrParts.add(addressJoin.get("legacyProvinceId")
                                     .in(filter.getResolvedLegacyProvinceIds()));
                         }
                     }
 
                     if (!provinceOrParts.isEmpty()) {
-                        locationPredicates.add(criteriaBuilder.or(
+                        predicates.add(criteriaBuilder.or(
                                 provinceOrParts.toArray(new Predicate[0])));
                     }
                 }
 
                 // District filter (old structure)
                 if (filter.getDistrictId() != null) {
-                    locationPredicates.add(criteriaBuilder.equal(
-                        metadataRoot.get("districtId"),
+                    predicates.add(criteriaBuilder.equal(
+                        addressJoin.get("legacyDistrictId"),
                         filter.getDistrictId()
                     ));
                 }
@@ -172,8 +178,8 @@ public class ListingSpecification {
                     // wardId is String in request but Integer in DB (old structure)
                     try {
                         Integer wardIdInt = Integer.parseInt(filter.getWardId());
-                        locationPredicates.add(criteriaBuilder.equal(
-                            metadataRoot.get("wardId"),
+                        predicates.add(criteriaBuilder.equal(
+                            addressJoin.get("legacyWardId"),
                             wardIdInt
                         ));
                     } catch (NumberFormatException e) {
@@ -181,24 +187,15 @@ public class ListingSpecification {
                     }
                 }
                 if (filter.getNewWardCode() != null) {
-                    locationPredicates.add(criteriaBuilder.equal(
-                        metadataRoot.get("newWardCode"),
+                    predicates.add(criteriaBuilder.equal(
+                        addressJoin.get("newWardCode"),
                         filter.getNewWardCode()
                     ));
                 }
 
-                // Street filter
-                if (filter.getStreetId() != null) {
-                    locationPredicates.add(criteriaBuilder.equal(
-                        metadataRoot.get("streetId"),
-                        filter.getStreetId()
-                    ));
-                }
-
-                subquery.select(metadataRoot.get("address").get("addressId"))
-                        .where(criteriaBuilder.and(locationPredicates.toArray(new Predicate[0])));
-
-                predicates.add(criteriaBuilder.in(root.get("address").get("addressId")).value(subquery));
+                // Street filter (uses legacy_street on addresses table)
+                // Note: streetId was from address_metadata, not available on addresses directly
+                // Skip streetId filter as it has no corresponding column in addresses
             }
 
             // Listing type filter
