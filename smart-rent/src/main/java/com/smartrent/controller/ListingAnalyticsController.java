@@ -3,6 +3,8 @@ package com.smartrent.controller;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.ListingAnalyticsResponse;
 import com.smartrent.dto.response.OwnerListingsAnalyticsResponse;
+import com.smartrent.dto.response.OwnerSavedListingsAnalyticsResponse;
+import com.smartrent.dto.response.SavedListingsTrendResponse;
 import com.smartrent.service.analytics.AnalyticsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -123,6 +125,104 @@ public class ListingAnalyticsController {
         OwnerListingsAnalyticsResponse response = analyticsService.getOwnerListingsAnalytics(ownerId);
 
         return ApiResponse.<OwnerListingsAnalyticsResponse>builder()
+                .code("999999")
+                .data(response)
+                .build();
+    }
+
+    @GetMapping("/{listingId}/saves-trend")
+    @Operation(
+            summary = "Get saved-listing trend for a specific listing",
+            description = "Returns the total save count and daily save trend for a listing. Only the listing owner can access this.",
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Saved listings trend retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "999999",
+                                      "data": {
+                                        "listingId": 123,
+                                        "listingTitle": "Beautiful 2BR Apartment",
+                                        "totalSaves": 28,
+                                        "savesOverTime": [
+                                          {"date": "2026-03-14", "count": 3},
+                                          {"date": "2026-03-15", "count": 5},
+                                          {"date": "2026-03-16", "count": 2},
+                                          {"date": "2026-03-17", "count": 8},
+                                          {"date": "2026-03-18", "count": 4},
+                                          {"date": "2026-03-19", "count": 3},
+                                          {"date": "2026-03-20", "count": 3}
+                                        ]
+                                      }
+                                    }
+                                    """)
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Not the listing owner"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Listing not found")
+    })
+    public ApiResponse<SavedListingsTrendResponse> getSavedListingTrend(
+            @Parameter(description = "Listing ID", example = "123")
+            @PathVariable Long listingId
+    ) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String ownerId = authentication.getName();
+
+        log.info("Owner {} requesting saves trend for listing {}", ownerId, listingId);
+
+        SavedListingsTrendResponse response = analyticsService.getSavedListingTrend(listingId, ownerId);
+
+        return ApiResponse.<SavedListingsTrendResponse>builder()
+                .code("999999")
+                .data(response)
+                .build();
+    }
+
+    @GetMapping("/saves-analytics")
+    @Operation(
+            summary = "Get saves summary for all owner's listings",
+            description = "Returns save counts per listing for the authenticated owner, sorted by most saved.",
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Saves analytics retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "999999",
+                                      "data": {
+                                        "listings": [
+                                          {"listingId": 123, "listingTitle": "2BR Apartment", "totalSaves": 28},
+                                          {"listingId": 456, "listingTitle": "Studio Near Park", "totalSaves": 9}
+                                        ],
+                                        "totalSavesAcrossAll": 37
+                                      }
+                                    }
+                                    """)
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    public ApiResponse<OwnerSavedListingsAnalyticsResponse> getOwnerSavedListingsAnalytics() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String ownerId = authentication.getName();
+
+        log.info("Owner {} requesting saves analytics for all listings", ownerId);
+
+        OwnerSavedListingsAnalyticsResponse response = analyticsService.getOwnerSavedListingsAnalytics(ownerId);
+
+        return ApiResponse.<OwnerSavedListingsAnalyticsResponse>builder()
                 .code("999999")
                 .data(response)
                 .build();

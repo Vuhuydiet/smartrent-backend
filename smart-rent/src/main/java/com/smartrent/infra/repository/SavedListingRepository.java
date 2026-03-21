@@ -42,4 +42,21 @@ public interface SavedListingRepository extends JpaRepository<SavedListing, Save
             org.springframework.data.domain.Pageable pageable);
 
     long countByIdUserId(String userId);
+
+    // ─── Owner Analytics: Saved Listings Trend ───
+
+    @Query(value = "SELECT DATE(sl.created_at) AS save_date, COUNT(*) AS save_count " +
+            "FROM saved_listings sl " +
+            "WHERE sl.listing_id = :listingId " +
+            "GROUP BY DATE(sl.created_at) ORDER BY save_date ASC", nativeQuery = true)
+    List<Object[]> countSavesGroupedByDate(@Param("listingId") Long listingId);
+
+    @Query(value = "SELECT sl.listing_id, COUNT(*) AS save_count " +
+            "FROM saved_listings sl " +
+            "JOIN listings l ON sl.listing_id = l.listing_id " +
+            "WHERE l.user_id = :ownerId " +
+            "GROUP BY sl.listing_id ORDER BY save_count DESC", nativeQuery = true)
+    List<Object[]> countSavesPerListingForOwner(@Param("ownerId") String ownerId);
+
+    long countByIdListingId(Long listingId);
 }
