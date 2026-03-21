@@ -33,5 +33,15 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
 
     @Query("SELECT COUNT(um) > 0 FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.endDate > :now")
     boolean hasActiveMembership(@Param("userId") String userId, @Param("now") LocalDateTime now);
+
+    // ─── Admin Dashboard: Membership Distribution ───
+
+    @Query(value = "SELECT mp.package_level, mp.package_name, COUNT(um.user_membership_id) AS member_count " +
+            "FROM user_memberships um " +
+            "JOIN membership_packages mp ON um.membership_id = mp.membership_id " +
+            "WHERE um.status = 'ACTIVE' AND um.end_date > :now " +
+            "GROUP BY mp.package_level, mp.package_name " +
+            "ORDER BY member_count DESC", nativeQuery = true)
+    List<Object[]> countActiveGroupedByPackageLevel(@Param("now") LocalDateTime now);
 }
 

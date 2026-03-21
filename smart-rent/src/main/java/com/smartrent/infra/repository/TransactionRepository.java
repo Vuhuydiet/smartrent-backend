@@ -54,5 +54,19 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
 
     @Query("SELECT t FROM transactions t WHERE t.userId = :userId AND t.status = :status ORDER BY t.createdAt DESC")
     Page<Transaction> findByUserIdAndStatusOrderByCreatedAtDesc(@Param("userId") String userId, @Param("status") TransactionStatus status, Pageable pageable);
+
+    // ─── Admin Dashboard: Revenue Over Time ───
+
+    @Query(value = "SELECT DATE(t.created_at) AS revenue_date, SUM(t.amount) AS total_amount, COUNT(*) AS tx_count " +
+            "FROM transactions t " +
+            "WHERE t.status = 'COMPLETED' AND t.created_at BETWEEN :startDate AND :endDate " +
+            "GROUP BY DATE(t.created_at) ORDER BY revenue_date ASC", nativeQuery = true)
+    List<Object[]> findDailyRevenue(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query(value = "SELECT t.transaction_type, SUM(t.amount) AS total_amount, COUNT(*) AS tx_count " +
+            "FROM transactions t " +
+            "WHERE t.status = 'COMPLETED' AND t.created_at BETWEEN :startDate AND :endDate " +
+            "GROUP BY t.transaction_type ORDER BY total_amount DESC", nativeQuery = true)
+    List<Object[]> findRevenueGroupedByType(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 }
 
