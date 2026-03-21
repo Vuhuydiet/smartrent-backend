@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -149,5 +150,33 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
     List<PhoneClickDetail> findByListingOwnerIdAndClickingUserId(
             @Param("ownerId") String ownerId,
             @Param("clickingUserId") String clickingUserId);
+
+    boolean existsByUser_UserIdAndListing_ListingIdAndClickedAtAfter(
+            String userId, Long listingId, LocalDateTime since);
+
+    boolean existsByIpAddressAndListing_ListingIdAndClickedAtAfter(
+            String ipAddress, Long listingId, LocalDateTime since);
+
+    long countByListing_ListingIdAndClickedAtAfter(Long listingId, LocalDateTime since);
+
+    @Query("SELECT CAST(pc.clickedAt AS LocalDate) AS clickDate, COUNT(pc) AS cnt " +
+           "FROM phone_clicks pc WHERE pc.listing.listingId = :listingId " +
+           "GROUP BY CAST(pc.clickedAt AS LocalDate) ORDER BY clickDate ASC")
+    List<Object[]> countClicksGroupedByDate(@Param("listingId") Long listingId);
+
+    @Query("SELECT FUNCTION('DAYOFWEEK', pc.clickedAt) AS dow, COUNT(pc) AS cnt " +
+           "FROM phone_clicks pc WHERE pc.listing.listingId = :listingId " +
+           "GROUP BY FUNCTION('DAYOFWEEK', pc.clickedAt)")
+    List<Object[]> countClicksGroupedByDayOfWeek(@Param("listingId") Long listingId);
+
+    @Query("SELECT pc.listing.listingId AS listingId, COUNT(pc) AS cnt " +
+           "FROM phone_clicks pc WHERE pc.listing.userId = :ownerId " +
+           "GROUP BY pc.listing.listingId")
+    List<Object[]> countClicksPerListingForOwner(@Param("ownerId") String ownerId);
+
+    @Query(value = "SELECT listing_id, DATE(clicked_at) AS click_date, COUNT(*) AS cnt " +
+           "FROM phone_clicks WHERE DATE(clicked_at) = :targetDate " +
+           "GROUP BY listing_id, DATE(clicked_at)", nativeQuery = true)
+    List<Object[]> countClicksGroupedByListingAndDate(@Param("targetDate") LocalDate targetDate);
 }
 

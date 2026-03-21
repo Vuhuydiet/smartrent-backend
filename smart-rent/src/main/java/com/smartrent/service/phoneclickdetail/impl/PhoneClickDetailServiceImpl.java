@@ -23,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -42,27 +43,31 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
     public PhoneClickResponse trackPhoneClick(PhoneClickRequest request, String userId, String ipAddress, String userAgent) {
         log.info("Tracking phone click for listing {} by user {}", request.getListingId(), userId);
 
-        // Verify listing exists
         Listing listing = listingRepository.findById(request.getListingId())
                 .orElseThrow(() -> new RuntimeException("Listing not found with ID: " + request.getListingId()));
 
-        // Verify user exists
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
-        // Check if user already clicked on this listing
-        boolean alreadyClicked = phoneClickDetailRepository.existsByListing_ListingIdAndUser_UserId(
-                request.getListingId(), userId);
+        LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
 
-        if (alreadyClicked) {
-            log.info("User {} already clicked on listing {}, updating timestamp", userId, request.getListingId());
-            // User already clicked, we can either:
-            // 1. Do nothing and return existing record
-            // 2. Create a new record to track multiple clicks
-            // For now, we'll create a new record to track all interactions
+        boolean duplicateByUser = phoneClickDetailRepository
+                .existsByUser_UserIdAndListing_ListingIdAndClickedAtAfter(userId, request.getListingId(), tenMinutesAgo);
+
+        if (!duplicateByUser && ipAddress != null) {
+            boolean duplicateByIp = phoneClickDetailRepository
+                    .existsByIpAddressAndListing_ListingIdAndClickedAtAfter(ipAddress, request.getListingId(), tenMinutesAgo);
+            if (duplicateByIp) {
+                log.info("Duplicate click from IP {} on listing {} within 10 minutes, ignoring", ipAddress, request.getListingId());
+                return buildSpamResponse(listing, user);
+            }
         }
 
-        // Create phone click record
+        if (duplicateByUser) {
+            log.info("Duplicate click from user {} on listing {} within 10 minutes, ignoring", userId, request.getListingId());
+            return buildSpamResponse(listing, user);
+        }
+
         PhoneClickDetail phoneClickDetail = PhoneClickDetail.builder()
                 .listing(listing)
                 .user(user)
@@ -74,6 +79,21 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
         log.info("Phone click tracked successfully with ID: {}", saved.getId());
 
         return mapToResponse(saved);
+    }
+
+    private PhoneClickResponse buildSpamResponse(Listing listing, User user) {
+        return PhoneClickResponse.builder()
+                .listingId(listing.getListingId())
+                .listingTitle(listing.getTitle())
+                .userId(user.getUserId())
+                .userFirstName(user.getFirstName())
+                .userLastName(user.getLastName())
+                .userEmail(user.getEmail())
+                .userContactPhone(user.getContactPhoneNumber())
+                .userContactPhoneVerified(user.getContactPhoneVerified())
+                .userAvatarUrl(user.getAvatarUrl())
+                .clickedAt(LocalDateTime.now())
+                .build();
     }
 
     @Override
