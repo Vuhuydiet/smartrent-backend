@@ -94,6 +94,8 @@ jobs:
         tags: |
           vuhuydiet/smartrent-backend:${{ github.sha }}
           vuhuydiet/smartrent-backend:dev
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
   update-dev-deployment:
     runs-on: ubuntu-latest
