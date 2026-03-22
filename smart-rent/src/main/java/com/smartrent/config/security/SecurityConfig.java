@@ -158,12 +158,25 @@ public class SecurityConfig {
     config.setAllowCredentials(true);
 
     // Set specific allowed origins (required when allowCredentials is true)
-    config.setAllowedOrigins(List.of(
+    List<String> origins = new java.util.ArrayList<>(List.of(
         clientUrl,
         adminUrl,
+        "https://smartrent.io.vn",
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:8080"));
+
+    // Add any additional origins from config
+    if (additionalOrigins != null && !additionalOrigins.isBlank()) {
+      for (String origin : additionalOrigins.split(",")) {
+        String trimmed = origin.trim();
+        if (!trimmed.isEmpty() && !"*".equals(trimmed)) {
+          origins.add(trimmed);
+        }
+      }
+    }
+
+    config.setAllowedOrigins(origins);
 
     config.setAllowedHeaders(List.of("*"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"));
