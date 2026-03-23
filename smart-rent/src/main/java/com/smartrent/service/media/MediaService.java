@@ -82,4 +82,32 @@ public interface MediaService {
      * Cleanup expired pending uploads (scheduled job)
      */
     void cleanupExpiredPendingUploads();
+
+    // ==================== Admin Methods ====================
+
+    /**
+     * Admin: Upload media directly (no user ownership check).
+     * Stores adminId as the media owner.
+     */
+    MediaResponse adminUploadMedia(
+            MultipartFile file,
+            String mediaType,
+            Long listingId,
+            String title,
+            String description,
+            String altText,
+            Boolean isPrimary,
+            Integer sortOrder,
+            String adminId
+    );
+
+    /**
+     * Admin: Delete any media by ID (no ownership check)
+     */
+    void adminDeleteMedia(Long mediaId);
+
+    /**
+     * Admin: Get all media (paginated) for moderation
+     */
+    List<MediaResponse> adminGetAllMedia(String status, int page, int size);
 }
