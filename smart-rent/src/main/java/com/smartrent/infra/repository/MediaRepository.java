@@ -1,6 +1,8 @@
 package com.smartrent.infra.repository;
 
 import com.smartrent.infra.repository.entity.Media;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -95,6 +97,11 @@ public interface MediaRepository extends JpaRepository<Media, Long> {
      * Check if user owns media
      */
     boolean existsByMediaIdAndUserId(Long mediaId, String userId);
+
+    /**
+     * Find media by status with pagination (for admin)
+     */
+    Page<Media> findByStatus(Media.MediaStatus status, Pageable pageable);
 
     /**
      * Batch-load active media for multiple listings (avoids N+1)

@@ -7,6 +7,7 @@ import com.smartrent.dto.response.GenerateUploadUrlResponse;
 import com.smartrent.dto.response.MediaResponse;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.model.DomainCode;
+import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.UserRepository;
@@ -17,6 +18,8 @@ import com.smartrent.infra.storage.R2StorageService;
 import com.smartrent.mapper.MediaMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +37,7 @@ public class MediaServiceImpl implements MediaService {
 
     private final MediaRepository mediaRepository;
     private final UserRepository userRepository;
+    private final AdminRepository adminRepository;
     private final ListingRepository listingRepository;
     private final R2StorageService storageService;
     private final MediaMapper mediaMapper;
@@ -131,97 +135,22 @@ public class MediaServiceImpl implements MediaService {
                 userId, file.getOriginalFilename(), mediaType);
 
         // Validate user exists
-        User user = userRepository.findById(userId)
+        userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(DomainCode.USER_NOT_FOUND, "User not found"));
 
-        // Validate file is not empty
-        if (file.isEmpty()) {
-            throw new AppException(DomainCode.BAD_REQUEST_ERROR, "File is empty");
-        }
-
-        // Validate file size
-        if (!storageService.isValidFileSize(file.getSize())) {
-            throw new AppException(DomainCode.INVALID_FILE_TYPE,
-                    String.format("File size exceeds maximum allowed: %d MB", file.getSize() / (1024 * 1024)));
-        }
-
-        // Determine if image or video
-        boolean isImage = "IMAGE".equalsIgnoreCase(mediaType);
-        Media.MediaType mediaTypeEnum = isImage ? Media.MediaType.IMAGE : Media.MediaType.VIDEO;
-
-        // Validate content type
-        String contentType = file.getContentType();
-        if (contentType == null || !storageService.isValidContentType(contentType, isImage)) {
-            throw new AppException(DomainCode.INVALID_FILE_TYPE,
-                    String.format("Invalid content type: %s for media type: %s", contentType, mediaType));
-        }
-
-        // Validate listing if provided
+        // Validate listing ownership if provided
         Listing listing = null;
         if (listingId != null) {
             listing = listingRepository.findById(listingId)
                     .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
 
-            // Validate user owns the listing
             if (!listing.getUserId().equals(userId)) {
                 throw new AppException(DomainCode.UNAUTHORIZED,
                         "You don't have permission to add media to this listing");
             }
         }
 
-        // Generate storage key
-        String storageKey = storageService.generateStorageKey(userId, file.getOriginalFilename());
-
-        try {
-            // Upload file directly to R2/S3
-            log.info("Uploading file to cloud storage: {}", storageKey);
-            storageService.uploadFile(
-                    storageKey,
-                    file.getInputStream(),
-                    contentType,
-                    file.getSize()
-            );
-            log.info("File uploaded successfully to cloud storage: {}", storageKey);
-
-            // Generate public URL
-            String publicUrl = storageService.getPublicUrl(storageKey);
-
-            // Create media entity in ACTIVE status (already uploaded)
-            Media media = Media.builder()
-                    .userId(userId)
-                    .listing(listing)
-                    .mediaType(mediaTypeEnum)
-                    .sourceType(Media.MediaSourceType.UPLOAD)
-                    .status(Media.MediaStatus.ACTIVE)
-                    .storageKey(storageKey)
-                    .url(publicUrl)
-                    .originalFilename(file.getOriginalFilename())
-                    .mimeType(contentType)
-                    .fileSize(file.getSize())
-                    .title(title)
-                    .description(description)
-                    .altText(altText)
-                    .isPrimary(isPrimary != null && isPrimary)
-                    .sortOrder(sortOrder != null ? sortOrder : 0)
-                    .uploadConfirmed(true)
-                    .confirmedAt(LocalDateTime.now())
-                    .build();
-
-            media = mediaRepository.save(media);
-
-            log.info("Media saved successfully with ID: {}", media.getMediaId());
-
-            return mediaMapper.toResponse(media);
-
-        } catch (IOException e) {
-            log.error("Failed to read file content: {}", file.getOriginalFilename(), e);
-            throw new AppException(DomainCode.FILE_READ_ERROR,
-                    e.getMessage());
-        } catch (RuntimeException e) {
-            log.error("Failed to upload file to cloud storage: {}", storageKey, e);
-            throw new AppException(DomainCode.FILE_UPLOAD_ERROR,
-                    e.getMessage());
-        }
+        return doUploadMedia(file, mediaType, listing, title, description, altText, isPrimary, sortOrder, userId);
     }
 
     @Override
@@ -498,7 +427,167 @@ public class MediaServiceImpl implements MediaService {
         log.info("Orphan media cleanup completed. Processed {} items", orphanMedia.size());
     }
 
-    // Helper methods
+    // ==================== Admin Methods ====================
+
+    @Override
+    @Transactional
+    public MediaResponse adminUploadMedia(
+            MultipartFile file,
+            String mediaType,
+            Long listingId,
+            String title,
+            String description,
+            String altText,
+            Boolean isPrimary,
+            Integer sortOrder,
+            String adminId) {
+
+        log.info("Admin upload - admin: {}, filename: {}, type: {}",
+                adminId, file.getOriginalFilename(), mediaType);
+
+        // Validate admin exists
+        adminRepository.findById(adminId)
+                .orElseThrow(() -> new AppException(DomainCode.USER_NOT_FOUND, "Admin not found"));
+
+        // Validate listing if provided (no ownership check for admin)
+        Listing listing = null;
+        if (listingId != null) {
+            listing = listingRepository.findById(listingId)
+                    .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
+        }
+
+        return doUploadMedia(file, mediaType, listing, title, description, altText, isPrimary, sortOrder, adminId);
+    }
+
+    @Override
+    @Transactional
+    public void adminDeleteMedia(Long mediaId) {
+        log.info("Admin deleting media ID: {}", mediaId);
+
+        Media media = mediaRepository.findById(mediaId)
+                .orElseThrow(() -> new AppException(DomainCode.ADDRESS_NOT_FOUND, "Media not found"));
+
+        media.setStatus(Media.MediaStatus.DELETED);
+        mediaRepository.save(media);
+
+        if (media.isUploaded() && media.getStorageKey() != null) {
+            try {
+                storageService.deleteObject(media.getStorageKey());
+                log.info("File deleted from storage: {}", media.getStorageKey());
+            } catch (Exception e) {
+                log.error("Failed to delete file from storage: {}", media.getStorageKey(), e);
+            }
+        }
+
+        log.info("Admin deleted media successfully: {}", mediaId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MediaResponse> adminGetAllMedia(String status, int page, int size) {
+        log.info("Admin fetching media - status: {}, page: {}, size: {}", status, page, size);
+
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        List<Media> mediaList;
+        if (status != null && !status.isBlank()) {
+            Media.MediaStatus mediaStatus = Media.MediaStatus.valueOf(status.toUpperCase());
+            mediaList = mediaRepository.findByStatus(mediaStatus, pageRequest).getContent();
+        } else {
+            mediaList = mediaRepository.findAll(pageRequest).getContent();
+        }
+
+        return mediaList.stream()
+                .map(mediaMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // ==================== Core Upload Logic ====================
+
+    private MediaResponse doUploadMedia(
+            MultipartFile file,
+            String mediaType,
+            Listing listing,
+            String title,
+            String description,
+            String altText,
+            Boolean isPrimary,
+            Integer sortOrder,
+            String ownerId) {
+
+        // Validate file is not empty
+        if (file.isEmpty()) {
+            throw new AppException(DomainCode.BAD_REQUEST_ERROR, "File is empty");
+        }
+
+        // Validate file size
+        if (!storageService.isValidFileSize(file.getSize())) {
+            throw new AppException(DomainCode.INVALID_FILE_TYPE,
+                    String.format("File size exceeds maximum allowed: %d MB", file.getSize() / (1024 * 1024)));
+        }
+
+        // Determine if image or video
+        boolean isImage = "IMAGE".equalsIgnoreCase(mediaType);
+        Media.MediaType mediaTypeEnum = isImage ? Media.MediaType.IMAGE : Media.MediaType.VIDEO;
+
+        // Validate content type
+        String contentType = file.getContentType();
+        if (contentType == null || !storageService.isValidContentType(contentType, isImage)) {
+            throw new AppException(DomainCode.INVALID_FILE_TYPE,
+                    String.format("Invalid content type: %s for media type: %s", contentType, mediaType));
+        }
+
+        // Generate storage key
+        String storageKey = storageService.generateStorageKey(ownerId, file.getOriginalFilename());
+
+        try {
+            log.info("Uploading file to cloud storage: {}", storageKey);
+            storageService.uploadFile(
+                    storageKey,
+                    file.getInputStream(),
+                    contentType,
+                    file.getSize()
+            );
+            log.info("File uploaded successfully to cloud storage: {}", storageKey);
+
+            String publicUrl = storageService.getPublicUrl(storageKey);
+
+            Media media = Media.builder()
+                    .userId(ownerId)
+                    .listing(listing)
+                    .mediaType(mediaTypeEnum)
+                    .sourceType(Media.MediaSourceType.UPLOAD)
+                    .status(Media.MediaStatus.ACTIVE)
+                    .storageKey(storageKey)
+                    .url(publicUrl)
+                    .originalFilename(file.getOriginalFilename())
+                    .mimeType(contentType)
+                    .fileSize(file.getSize())
+                    .title(title)
+                    .description(description)
+                    .altText(altText)
+                    .isPrimary(isPrimary != null && isPrimary)
+                    .sortOrder(sortOrder != null ? sortOrder : 0)
+                    .uploadConfirmed(true)
+                    .confirmedAt(LocalDateTime.now())
+                    .build();
+
+            media = mediaRepository.save(media);
+
+            log.info("Media saved successfully with ID: {}", media.getMediaId());
+
+            return mediaMapper.toResponse(media);
+
+        } catch (IOException e) {
+            log.error("Failed to read file content: {}", file.getOriginalFilename(), e);
+            throw new AppException(DomainCode.FILE_READ_ERROR, e.getMessage());
+        } catch (RuntimeException e) {
+            log.error("Failed to upload file to cloud storage: {}", storageKey, e);
+            throw new AppException(DomainCode.FILE_UPLOAD_ERROR, e.getMessage());
+        }
+    }
+
+    // ==================== Helper Methods ====================
 
     private Media.MediaSourceType detectSourceType(String url) {
         if (url.contains("youtube.com") || url.contains("youtu.be")) {
