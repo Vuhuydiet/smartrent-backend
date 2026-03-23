@@ -662,7 +662,7 @@ public class OpenAPIConfig {
                             .group("media-management")
                             .displayName("Media Management (R2 Storage)")
                             .packagesToScan(packageToScan)
-                            .pathsToMatch("/v1/media/**")
+                            .pathsToMatch("/v1/media/**", "/v1/admin/media/**")
                             .addOpenApiCustomizer(securityCustomizer())
                             .build();
     }
