@@ -58,6 +58,7 @@ public class NewsMapperImpl implements NewsMapper {
                 .category(news.getCategory())
                 .tags(parseTags(news.getTags()))
                 .thumbnailUrl(news.getThumbnailUrl())
+                .status(news.getStatus())
                 .publishedAt(news.getPublishedAt())
                 .authorName(news.getAuthorName())
                 .viewCount(news.getViewCount())
@@ -124,4 +125,3 @@ public class NewsMapperImpl implements NewsMapper {
                 .collect(Collectors.toList());
     }
 }
-
