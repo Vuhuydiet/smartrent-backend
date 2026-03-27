@@ -31,6 +31,18 @@ public class AiListingVerificationResponse {
     @Schema(description = "Confidence level of the verification", example = "0.9")
     private Double confidence;
 
+    @JsonProperty("decision")
+    @Schema(description = "High-level AI decision for this listing", example = "REJECT", allowableValues = {"APPROVE", "REVIEW", "REJECT"})
+    private String decision;
+
+    @JsonProperty("recommended_listing_status")
+    @Schema(
+        description = "Recommended listing status based on AI decision (aligned with frontend ListingStatus)",
+        example = "IN_REVIEW",
+        allowableValues = {"DISPLAYING", "IN_REVIEW", "REJECTED"}
+    )
+    private String recommendedListingStatus;
+
     @JsonProperty("image_validation")
     @Schema(description = "Image validation results")
     private ImageValidation imageValidation;
@@ -183,7 +195,7 @@ public class AiListingVerificationResponse {
         private String category;
 
         @JsonProperty("severity")
-        @Schema(description = "Violation severity", example = "high")
+        @Schema(description = "Violation severity", example = "high", allowableValues = {"low", "medium", "high", "critical"})
         private String severity;
 
         @JsonProperty("message")
@@ -215,7 +227,7 @@ public class AiListingVerificationResponse {
         private String field;
 
         @JsonProperty("priority")
-        @Schema(description = "Suggestion priority", example = "medium")
+        @Schema(description = "Suggestion priority", example = "medium", allowableValues = {"low", "medium", "high"})
         private String priority;
     }
 }

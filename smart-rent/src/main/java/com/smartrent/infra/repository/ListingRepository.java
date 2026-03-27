@@ -221,4 +221,23 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         GROUP BY am.newProvinceCode
     """)
     List<Object[]> getListingStatsByProvinceCodes(@Param("provinceCodes") List<String> provinceCodes);
+
+    /**
+     * Find listings that need AI verification / moderation.
+     *
+     * Criteria (initial version):
+     * - Not draft and not shadow
+     * - Not expired
+     * - Not manually verified
+     * - Marked as not auto-verified yet (isVerify = false)
+     */
+    @Query("""
+        SELECT l FROM listings l
+        WHERE l.isDraft = false
+          AND l.isShadow = false
+          AND l.expired = false
+          AND (l.verified = false OR l.verified IS NULL)
+          AND (l.isVerify = false OR l.isVerify IS NULL)
+    """)
+    List<Listing> findListingsNeedingAiVerification();
 }

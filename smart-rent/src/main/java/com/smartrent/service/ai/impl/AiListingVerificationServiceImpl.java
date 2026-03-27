@@ -65,6 +65,10 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
                 log.info("AI verification completed successfully with score: {}, confidence: {}", 
                     responseBody.getScore(), responseBody.getConfidence());
 
+                // Derive a high-level decision for easier frontend consumption
+                responseBody.setDecision(determineDecision(responseBody));
+                responseBody.setRecommendedListingStatus(mapDecisionToListingStatus(responseBody.getDecision()));
+
                 // Debug video validation inconsistency
                 if (responseBody.getVideoValidation() != null) {
                     var videoVal = responseBody.getVideoValidation();
@@ -145,6 +149,53 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
             log.debug("AI service health check failed: {}", e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * Map detailed AI scores and violations to a simple decision label
+     * consistent with auto-moderation logic.
+     */
+    private String determineDecision(AiListingVerificationResponse ai) {
+        if (ai == null) {
+            return "REVIEW";
+        }
+
+        Double score = ai.getScore();
+        Double confidence = ai.getConfidence();
+
+        double s = score != null ? score : 0.5;
+        double c = confidence != null ? confidence : 0.5;
+
+        boolean hasHighRiskViolation = ai.getViolations() != null && ai.getViolations().stream()
+                .anyMatch(v -> {
+                    String sev = v.getSeverity();
+                    return sev != null && ("high".equalsIgnoreCase(sev) || "critical".equalsIgnoreCase(sev));
+                });
+
+        if (s >= 0.8 && c >= 0.8 && !hasHighRiskViolation) {
+            return "APPROVE";
+        } else if (s >= 0.5 && !hasHighRiskViolation) {
+            return "REVIEW";
+        } else {
+            return "REJECT";
+        }
+    }
+
+    /**
+     * Map a high-level decision to a frontend ListingStatus-like value.
+     * This does not change the actual entity flags; it is only a suggestion
+     * for how the listing could be presented (DISPLAYING / IN_REVIEW / REJECTED).
+     */
+    private String mapDecisionToListingStatus(String decision) {
+        if (decision == null) {
+            return "IN_REVIEW";
+        }
+
+        return switch (decision) {
+            case "APPROVE" -> "DISPLAYING";
+            case "REJECT" -> "REJECTED";
+            default -> "IN_REVIEW";
+        };
     }
 
     /**

@@ -4,6 +4,10 @@ import com.smartrent.dto.request.AiListingVerificationRequest;
 import com.smartrent.dto.response.AiListingVerificationResponse;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.service.ai.AiListingVerificationService;
+import com.smartrent.infra.repository.ListingRepository;
+import com.smartrent.infra.repository.entity.Listing;
+import com.smartrent.infra.exception.DomainException;
+import com.smartrent.infra.exception.model.DomainCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -28,14 +32,16 @@ import org.springframework.web.bind.annotation.*;
 public class AiListingVerificationController {
 
     private final AiListingVerificationService aiListingVerificationService;
+    private final ListingRepository listingRepository;
 
     @PostMapping("/verify")
     // @PreAuthorize("authentication.authorities.stream().anyMatch(a -> a.authority.startsWith('ROLE_ADMIN') || a.authority.startsWith('ROLE_SUPER_ADMIN') || a.authority.startsWith('ROLE_USER'))") // Temporarily disabled for testing
     @Operation(
         summary = "Verify listing using AI",
-        description = "Analyzes a listing using AI to check for quality, completeness, and compliance issues. " +
-                     "Returns detailed verification results with scores and suggestions for improvement. " +
-                     "Note: metadata fields (furnished, pet_friendly, parking_available) are optional and will default to false if not provided.",
+      description = "Analyzes a listing using AI to check for quality, completeness, and compliance issues. " +
+             "Returns detailed verification results with scores and suggestions for improvement. " +
+             "All prices are treated as monthly rent in VND (Vietnamese Dong) for the Vietnam market. " +
+             "Note: metadata fields (furnished, pet_friendly, parking_available) are optional and will default to false if not provided.",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             description = "Listing verification request",
             required = true,
@@ -200,8 +206,9 @@ public class AiListingVerificationController {
     @PostMapping("/{listingId}/verify")
     // @PreAuthorize("authentication.authorities.stream().anyMatch(a -> a.authority.startsWith('ROLE_ADMIN') || a.authority.startsWith('ROLE_SUPER_ADMIN'))") // Temporarily disabled for testing
     @Operation(
-        summary = "Verify existing listing by ID",
-        description = "Verifies an existing listing in the system using its ID. Only admins can perform this operation.",
+        summary = "Verify existing listing by ID (auto-update status)",
+        description = "Verifies an existing listing in the system using its ID and automatically updates its verification flags " +
+                "based on the AI decision. Only admins can trigger this operation manually.",
         parameters = {
             @Parameter(
                 name = "listingId",
@@ -235,26 +242,56 @@ public class AiListingVerificationController {
                           "data": null
                         }
                         """
-                )
-            )
-        ),
-        @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "403",
-            description = "Access denied - Admin role required",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = ApiResponse.class)
-            )
+          )
         )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+        responseCode = "403",
+        description = "Access denied - Admin role required",
+        content = @Content(
+          mediaType = "application/json",
+          schema = @Schema(implementation = ApiResponse.class)
+        )
+      )
     })
     public ResponseEntity<ApiResponse<AiListingVerificationResponse>> verifyListingById(
-            @PathVariable Long listingId) {
-        
-        log.info("Received AI verification request for listing ID: {}", listingId);
-        
-        // Note: This would require injecting ListingService to fetch the listing
-        // For now, we'll leave this as a placeholder for future implementation
-        throw new UnsupportedOperationException("Verify by listing ID not yet implemented");
+        @PathVariable Long listingId) {
+
+      log.info("Received AI verification request for listing ID: {}", listingId);
+
+      // Load existing listing
+      Listing listing = listingRepository.findById(listingId)
+          .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
+
+      // Call AI service to verify this listing
+      AiListingVerificationResponse aiResponse = aiListingVerificationService.verifyListing(listing);
+
+      if (aiResponse == null) {
+        throw new DomainException(DomainCode.AI_SERVICE_ERROR);
+      }
+
+      String decision = aiResponse.getDecision();
+
+      if ("APPROVE".equalsIgnoreCase(decision)) {
+        // Good listing - auto approve and mark as verified
+        listing.setVerified(true);
+        listing.setIsVerify(true);
+      } else if ("REVIEW".equalsIgnoreCase(decision)) {
+        // Medium risk - keep in review state
+        listing.setVerified(false);
+        listing.setIsVerify(true);
+      } else {
+        // High risk or unknown - effectively rejected
+        listing.setVerified(false);
+        listing.setIsVerify(false);
+      }
+
+      listingRepository.save(listing);
+
+      return ResponseEntity.ok(ApiResponse.<AiListingVerificationResponse>builder()
+          .message("Listing AI verification completed and status updated")
+          .data(aiResponse)
+          .build());
     }
 
     @GetMapping("/service-status")

@@ -71,9 +71,9 @@ spring:
       file-size-threshold: 2MB  # Threshold after which files are written to disk
   datasource:
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: ${IDENTITY_SERVICE_DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: jdbc:mysql://localhost:3306/smartrent?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: root
   flyway:
     enabled: true
     out-of-order: true
@@ -164,6 +164,7 @@ application:
         - "/otp/**"
         - "/v1/listings/*/reports"
         - "/v1/listings/search"
+        - "/v1/ai/listings/verify"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
