@@ -1,5 +1,6 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.request.AnalyticsSearchRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.ListingAnalyticsResponse;
 import com.smartrent.dto.response.OwnerListingsAnalyticsResponse;
@@ -164,7 +165,57 @@ public class ListingAnalyticsController {
 
         log.info("Owner {} requesting analytics page={}, size={}", ownerId, page, size);
 
-        OwnerListingsAnalyticsResponse response = analyticsService.getOwnerListingsAnalytics(ownerId, pageable);
+        OwnerListingsAnalyticsResponse response = analyticsService.getOwnerListingsAnalytics(ownerId, null, pageable);
+
+        return ApiResponse.<OwnerListingsAnalyticsResponse>builder()
+                .code("999999")
+                .data(response)
+                .build();
+    }
+
+    @PostMapping("/analytics/search")
+    @Operation(
+            summary = "Search owner's listings analytics by title",
+            description = "Search click analytics across all owner listings by keyword (case-insensitive contains match on listing title), with pagination.",
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Search results retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "999999",
+                                      "data": {
+                                        "listings": [
+                                          {"listingId": 123, "listingTitle": "2BR Apartment", "totalClicks": 45}
+                                        ],
+                                        "currentPage": 0,
+                                        "totalPages": 1,
+                                        "totalElements": 1,
+                                        "pageSize": 10
+                                      }
+                                    }
+                                    """)
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    public ApiResponse<OwnerListingsAnalyticsResponse> searchOwnerListingsAnalytics(
+            @RequestBody AnalyticsSearchRequest request
+    ) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String ownerId = authentication.getName();
+        Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
+
+        log.info("Owner {} searching analytics keyword='{}', page={}, size={}",
+                ownerId, request.getKeyword(), request.getPage(), request.getSize());
+
+        OwnerListingsAnalyticsResponse response = analyticsService.getOwnerListingsAnalytics(
+                ownerId, request.getKeyword(), pageable);
 
         return ApiResponse.<OwnerListingsAnalyticsResponse>builder()
                 .code("999999")
@@ -274,7 +325,58 @@ public class ListingAnalyticsController {
 
         log.info("Owner {} requesting saves analytics page={}, size={}", ownerId, page, size);
 
-        OwnerSavedListingsAnalyticsResponse response = analyticsService.getOwnerSavedListingsAnalytics(ownerId, pageable);
+        OwnerSavedListingsAnalyticsResponse response = analyticsService.getOwnerSavedListingsAnalytics(ownerId, null, pageable);
+
+        return ApiResponse.<OwnerSavedListingsAnalyticsResponse>builder()
+                .code("999999")
+                .data(response)
+                .build();
+    }
+
+    @PostMapping("/saves-analytics/search")
+    @Operation(
+            summary = "Search owner's saved listings analytics by title",
+            description = "Search save analytics across all owner listings by keyword (case-insensitive contains match on listing title), with pagination.",
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Search results retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "code": "999999",
+                                      "data": {
+                                        "listings": [
+                                          {"listingId": 123, "listingTitle": "2BR Apartment", "totalSaves": 28}
+                                        ],
+                                        "totalSavesAcrossAll": 28,
+                                        "currentPage": 0,
+                                        "totalPages": 1,
+                                        "totalElements": 1,
+                                        "pageSize": 10
+                                      }
+                                    }
+                                    """)
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
+    })
+    public ApiResponse<OwnerSavedListingsAnalyticsResponse> searchOwnerSavedListingsAnalytics(
+            @RequestBody AnalyticsSearchRequest request
+    ) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String ownerId = authentication.getName();
+        Pageable pageable = PageRequest.of(request.getPage(), request.getSize());
+
+        log.info("Owner {} searching saves analytics keyword='{}', page={}, size={}",
+                ownerId, request.getKeyword(), request.getPage(), request.getSize());
+
+        OwnerSavedListingsAnalyticsResponse response = analyticsService.getOwnerSavedListingsAnalytics(
+                ownerId, request.getKeyword(), pageable);
 
         return ApiResponse.<OwnerSavedListingsAnalyticsResponse>builder()
                 .code("999999")
