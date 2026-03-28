@@ -17,4 +17,10 @@ public class OwnerSavedListingsAnalyticsResponse {
 
     List<ListingSaveSummary> listings;
     Long totalSavesAcrossAll;
+
+    // Pagination metadata
+    Integer currentPage;
+    Integer totalPages;
+    Long totalElements;
+    Integer pageSize;
 }

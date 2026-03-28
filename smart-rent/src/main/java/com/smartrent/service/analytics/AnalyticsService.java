@@ -4,14 +4,17 @@ import com.smartrent.dto.response.ListingAnalyticsResponse;
 import com.smartrent.dto.response.OwnerListingsAnalyticsResponse;
 import com.smartrent.dto.response.OwnerSavedListingsAnalyticsResponse;
 import com.smartrent.dto.response.SavedListingsTrendResponse;
+import org.springframework.data.domain.Pageable;
+
+import java.time.LocalDateTime;
 
 public interface AnalyticsService {
 
-    ListingAnalyticsResponse getListingAnalytics(Long listingId, String ownerId);
+    ListingAnalyticsResponse getListingAnalytics(Long listingId, String ownerId, LocalDateTime since);
 
-    OwnerListingsAnalyticsResponse getOwnerListingsAnalytics(String ownerId);
+    OwnerListingsAnalyticsResponse getOwnerListingsAnalytics(String ownerId, Pageable pageable);
 
-    SavedListingsTrendResponse getSavedListingTrend(Long listingId, String ownerId);
+    SavedListingsTrendResponse getSavedListingTrend(Long listingId, String ownerId, LocalDateTime since);
 
-    OwnerSavedListingsAnalyticsResponse getOwnerSavedListingsAnalytics(String ownerId);
+    OwnerSavedListingsAnalyticsResponse getOwnerSavedListingsAnalytics(String ownerId, Pageable pageable);
 }

@@ -147,12 +147,16 @@ export function InterestBadge({ listingId }: { listingId: number }) {
 
 **Authenticated endpoints for listing owners only.**
 
-### 3.1 Single Listing Analytics
+### 3.1 Single Listing Analytics (with Time Period Filter)
 
 ```
-GET /v1/owners/listings/{listingId}/analytics
+GET /v1/owners/listings/{listingId}/analytics?period=30d
 Authorization: Bearer <token>
 ```
+
+| Param    | Type   | Required | Default | Values                              |
+|----------|--------|----------|---------|-------------------------------------|
+| `period` | string | No       | `30d`   | `7d`, `30d`, `90d`, `180d`, `365d`, `all` |
 
 #### Response
 
@@ -167,32 +171,27 @@ Authorization: Bearer <token>
     "conversionRate": 0.1406,
     "clicksOverTime": [
       { "date": "2026-03-14", "count": 5 },
-      { "date": "2026-03-15", "count": 8 },
-      { "date": "2026-03-16", "count": 3 },
-      { "date": "2026-03-17", "count": 12 },
-      { "date": "2026-03-18", "count": 7 },
-      { "date": "2026-03-19", "count": 6 },
-      { "date": "2026-03-20", "count": 4 }
+      { "date": "2026-03-15", "count": 8 }
     ],
     "clicksByDayOfWeek": {
-      "MON": 10,
-      "TUE": 8,
-      "WED": 6,
-      "THU": 5,
-      "FRI": 7,
-      "SAT": 5,
-      "SUN": 4
+      "MON": 10, "TUE": 8, "WED": 6, "THU": 5,
+      "FRI": 7, "SAT": 5, "SUN": 4
     }
   }
 }
 ```
 
-### 3.2 All Listings Summary
+### 3.2 All Listings Summary (Paginated)
 
 ```
-GET /v1/owners/listings/analytics
+GET /v1/owners/listings/analytics?page=0&size=10
 Authorization: Bearer <token>
 ```
+
+| Param  | Type | Required | Default |
+|--------|------|----------|---------|
+| `page` | int  | No       | `0`     |
+| `size` | int  | No       | `10`    |
 
 #### Response
 
@@ -203,7 +202,11 @@ Authorization: Bearer <token>
     "listings": [
       { "listingId": 123, "listingTitle": "2BR Apartment", "totalClicks": 45 },
       { "listingId": 456, "listingTitle": "Studio Near Park", "totalClicks": 12 }
-    ]
+    ],
+    "currentPage": 0,
+    "totalPages": 5,
+    "totalElements": 48,
+    "pageSize": 10
   }
 }
 ```
@@ -333,9 +336,9 @@ All error responses follow the same shape:
 ### Suggested Error Handling
 
 ```tsx
-async function fetchAnalytics(listingId: number, token: string) {
+async function fetchAnalytics(listingId: number, token: string, period = '30d') {
   const res = await fetch(
-    `${API_URL}/v1/owners/listings/${listingId}/analytics`,
+    `${API_URL}/v1/owners/listings/${listingId}/analytics?period=${period}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
 
@@ -353,9 +356,9 @@ async function fetchAnalytics(listingId: number, token: string) {
 
 ## 6. Quick Reference
 
-| Feature | Endpoint | Auth | Method |
-|---------|----------|------|--------|
-| Track phone click | `/v1/phone-click-details` | ✅ | POST |
-| Interest level (public) | `/v1/listings/{id}/interest-level` | ❌ | GET |
-| Single listing analytics | `/v1/owners/listings/{id}/analytics` | ✅ | GET |
-| All listings analytics | `/v1/owners/listings/analytics` | ✅ | GET |
+| Feature | Endpoint | Auth | Method | Params |
+|---------|----------|------|--------|--------|
+| Track phone click | `/v1/phone-click-details` | ✅ | POST | — |
+| Interest level (public) | `/v1/listings/{id}/interest-level` | ❌ | GET | — |
+| Single listing analytics | `/v1/owners/listings/{id}/analytics` | ✅ | GET | `period` |
+| All listings analytics | `/v1/owners/listings/analytics` | ✅ | GET | `page`, `size` |

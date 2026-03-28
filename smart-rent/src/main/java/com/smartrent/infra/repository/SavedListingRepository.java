@@ -2,11 +2,14 @@ package com.smartrent.infra.repository;
 
 import com.smartrent.infra.repository.entity.SavedListing;
 import com.smartrent.infra.repository.entity.SavedListingId;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -59,4 +62,21 @@ public interface SavedListingRepository extends JpaRepository<SavedListing, Save
     List<Object[]> countSavesPerListingForOwner(@Param("ownerId") String ownerId);
 
     long countByIdListingId(Long listingId);
+
+    @Query(value = "SELECT DATE(sl.created_at) AS save_date, COUNT(*) AS save_count " +
+            "FROM saved_listings sl " +
+            "WHERE sl.listing_id = :listingId AND sl.created_at >= :since " +
+            "GROUP BY DATE(sl.created_at) ORDER BY save_date ASC", nativeQuery = true)
+    List<Object[]> countSavesGroupedByDateSince(@Param("listingId") Long listingId, @Param("since") LocalDateTime since);
+
+    @Query(value = "SELECT sl.listing_id, COUNT(*) AS save_count " +
+            "FROM saved_listings sl " +
+            "JOIN listings l ON sl.listing_id = l.listing_id " +
+            "WHERE l.user_id = :ownerId " +
+            "GROUP BY sl.listing_id ORDER BY save_count DESC",
+            countQuery = "SELECT COUNT(DISTINCT sl.listing_id) " +
+            "FROM saved_listings sl JOIN listings l ON sl.listing_id = l.listing_id " +
+            "WHERE l.user_id = :ownerId",
+            nativeQuery = true)
+    Page<Object[]> countSavesPerListingForOwnerPaged(@Param("ownerId") String ownerId, Pageable pageable);
 }

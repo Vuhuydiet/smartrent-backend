@@ -21,4 +21,10 @@ import java.util.List;
 public class OwnerListingsAnalyticsResponse {
 
     List<ListingClickSummary> listings;
+
+    // Pagination metadata
+    Integer currentPage;
+    Integer totalPages;
+    Long totalElements;
+    Integer pageSize;
 }
