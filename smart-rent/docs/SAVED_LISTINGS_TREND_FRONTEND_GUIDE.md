@@ -8,14 +8,18 @@
 
 ## 1. Single Listing — Saves Trend (Line Chart)
 
-Shows how many users save a specific listing over time.
+Shows how many users save a specific listing over time, filtered by time period.
 
 ### Endpoint
 
 ```
-GET /v1/owners/listings/{listingId}/saves-trend
+GET /v1/owners/listings/{listingId}/saves-trend?period=30d
 Authorization: Bearer <token>
 ```
+
+| Param    | Type   | Required | Default | Values                              |
+|----------|--------|----------|---------|-------------------------------------|
+| `period` | string | No       | `30d`   | `7d`, `30d`, `90d`, `180d`, `365d`, `all` |
 
 ### Response (200)
 
@@ -58,9 +62,9 @@ interface SavedListingsTrendResponse {
 ### Fetch Helper
 
 ```ts
-async function fetchSavesTrend(listingId: number, token: string): Promise<SavedListingsTrendResponse> {
+async function fetchSavesTrend(listingId: number, token: string, period = '30d'): Promise<SavedListingsTrendResponse> {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/v1/owners/listings/${listingId}/saves-trend`,
+    `${process.env.NEXT_PUBLIC_API_URL}/v1/owners/listings/${listingId}/saves-trend?period=${period}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   const json = await res.json();
@@ -135,16 +139,21 @@ export function SavesTrendChart({ listingId, token }: { listingId: number; token
 
 ---
 
-## 2. All Listings — Saves Summary (Table + Bar)
+## 2. All Listings — Saves Summary (Paginated Table + Bar)
 
-Shows save counts across all of the owner's listings.
+Shows save counts across all of the owner's listings, with pagination.
 
 ### Endpoint
 
 ```
-GET /v1/owners/listings/saves-analytics
+GET /v1/owners/listings/saves-analytics?page=0&size=10
 Authorization: Bearer <token>
 ```
+
+| Param  | Type | Required | Default |
+|--------|------|----------|---------|
+| `page` | int  | No       | `0`     |
+| `size` | int  | No       | `10`    |
 
 ### Response (200)
 
@@ -156,7 +165,11 @@ Authorization: Bearer <token>
       { "listingId": 123, "listingTitle": "2BR Apartment", "totalSaves": 28 },
       { "listingId": 456, "listingTitle": "Studio Near Park", "totalSaves": 9 }
     ],
-    "totalSavesAcrossAll": 37
+    "totalSavesAcrossAll": 37,
+    "currentPage": 0,
+    "totalPages": 3,
+    "totalElements": 25,
+    "pageSize": 10
   }
 }
 ```
@@ -173,15 +186,19 @@ interface ListingSaveSummary {
 interface OwnerSavedListingsAnalyticsResponse {
   listings: ListingSaveSummary[];
   totalSavesAcrossAll: number;
+  currentPage: number;
+  totalPages: number;
+  totalElements: number;
+  pageSize: number;
 }
 ```
 
 ### Fetch Helper
 
 ```ts
-async function fetchSavesAnalytics(token: string): Promise<OwnerSavedListingsAnalyticsResponse> {
+async function fetchSavesAnalytics(token: string, page = 0, size = 10): Promise<OwnerSavedListingsAnalyticsResponse> {
   const res = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL}/v1/owners/listings/saves-analytics`,
+    `${process.env.NEXT_PUBLIC_API_URL}/v1/owners/listings/saves-analytics?page=${page}&size=${size}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   const json = await res.json();
@@ -295,7 +312,7 @@ All error responses follow the standard shape:
 
 ## 4. Quick Reference
 
-| Feature | Endpoint | Method | Auth |
-|---------|----------|--------|------|
-| Single listing saves trend | `/v1/owners/listings/{id}/saves-trend` | GET | ✅ Owner |
-| All listings saves summary | `/v1/owners/listings/saves-analytics` | GET | ✅ Owner |
+| Feature | Endpoint | Method | Auth | Params |
+|---------|----------|--------|------|--------|
+| Single listing saves trend | `/v1/owners/listings/{id}/saves-trend` | GET | ✅ Owner | `period` |
+| All listings saves summary | `/v1/owners/listings/saves-analytics` | GET | ✅ Owner | `page`, `size` |

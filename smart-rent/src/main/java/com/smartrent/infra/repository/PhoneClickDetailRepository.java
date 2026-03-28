@@ -178,5 +178,33 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
            "FROM phone_clicks WHERE DATE(clicked_at) = :targetDate " +
            "GROUP BY listing_id, DATE(clicked_at)", nativeQuery = true)
     List<Object[]> countClicksGroupedByListingAndDate(@Param("targetDate") LocalDate targetDate);
+
+    // ─── Date-range-aware analytics queries ───
+
+    @Query("SELECT CAST(pc.clickedAt AS LocalDate) AS clickDate, COUNT(pc) AS cnt " +
+           "FROM phone_clicks pc WHERE pc.listing.listingId = :listingId " +
+           "AND pc.clickedAt >= :since " +
+           "GROUP BY CAST(pc.clickedAt AS LocalDate) ORDER BY clickDate ASC")
+    List<Object[]> countClicksGroupedByDateSince(@Param("listingId") Long listingId, @Param("since") LocalDateTime since);
+
+    @Query("SELECT FUNCTION('DAYOFWEEK', pc.clickedAt) AS dow, COUNT(pc) AS cnt " +
+           "FROM phone_clicks pc WHERE pc.listing.listingId = :listingId " +
+           "AND pc.clickedAt >= :since " +
+           "GROUP BY FUNCTION('DAYOFWEEK', pc.clickedAt)")
+    List<Object[]> countClicksGroupedByDayOfWeekSince(@Param("listingId") Long listingId, @Param("since") LocalDateTime since);
+
+    long countByListing_ListingIdAndClickedAtBetween(Long listingId, LocalDateTime start, LocalDateTime end);
+
+    // ─── Paginated owner analytics ───
+
+    @Query(value = "SELECT pc.listing_id AS listingId, COUNT(*) AS cnt " +
+           "FROM phone_clicks pc JOIN listings l ON pc.listing_id = l.listing_id " +
+           "WHERE l.user_id = :ownerId " +
+           "GROUP BY pc.listing_id ORDER BY cnt DESC",
+           countQuery = "SELECT COUNT(DISTINCT pc.listing_id) " +
+           "FROM phone_clicks pc JOIN listings l ON pc.listing_id = l.listing_id " +
+           "WHERE l.user_id = :ownerId",
+           nativeQuery = true)
+    Page<Object[]> countClicksPerListingForOwnerPaged(@Param("ownerId") String ownerId, Pageable pageable);
 }
 
