@@ -181,6 +181,152 @@ Authorization: Bearer <token>
 }
 ```
 
+#### TypeScript Interfaces
+
+```ts
+interface DailyClickCount {
+  date: string;   // "2026-03-14"
+  count: number;
+}
+
+interface ListingAnalyticsResponse {
+  listingId: number;
+  listingTitle: string;
+  totalClicks: number;
+  totalViews: number;
+  conversionRate: number;
+  clicksOverTime: DailyClickCount[];
+  clicksByDayOfWeek: Record<string, number>;
+}
+```
+
+#### Fetch Helper
+
+```ts
+async function fetchListingAnalytics(
+  listingId: number, token: string, period = '30d'
+): Promise<ListingAnalyticsResponse> {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/v1/owners/listings/${listingId}/analytics?period=${period}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const json = await res.json();
+  if (json.code !== '999999') throw new Error(json.message);
+  return json.data;
+}
+```
+
+#### Full Chart Component with Period Selector (Recharts)
+
+```tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar
+} from 'recharts';
+
+const PERIODS = [
+  { value: '7d', label: '7 ngày' },
+  { value: '30d', label: '30 ngày' },
+  { value: '90d', label: '90 ngày' },
+  { value: '180d', label: '6 tháng' },
+  { value: '365d', label: '1 năm' },
+  { value: 'all', label: 'Tất cả' },
+];
+
+export function ClickAnalyticsChart({ listingId, token }: { listingId: number; token: string }) {
+  const [data, setData] = useState<ListingAnalyticsResponse | null>(null);
+  const [period, setPeriod] = useState('30d');
+
+  useEffect(() => {
+    fetchListingAnalytics(listingId, token, period).then(setData).catch(console.error);
+  }, [listingId, token, period]);
+
+  if (!data) return <div>Đang tải...</div>;
+
+  const dayOfWeekData = Object.entries(data.clicksByDayOfWeek).map(([day, count]) => ({ day, count }));
+
+  return (
+    <div>
+      {/* Summary Cards */}
+      <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+        <div style={{ padding: '12px 20px', borderRadius: 8, background: '#fff7ed', flex: 1 }}>
+          <div style={{ fontSize: 13, color: '#92400e' }}>Tổng lượt gọi</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>📞 {data.totalClicks}</div>
+        </div>
+        <div style={{ padding: '12px 20px', borderRadius: 8, background: '#eff6ff', flex: 1 }}>
+          <div style={{ fontSize: 13, color: '#1e40af' }}>Tổng lượt xem</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>👁️ {data.totalViews}</div>
+        </div>
+        <div style={{ padding: '12px 20px', borderRadius: 8, background: '#f0fdf4', flex: 1 }}>
+          <div style={{ fontSize: 13, color: '#166534' }}>Tỷ lệ chuyển đổi</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>📊 {(data.conversionRate * 100).toFixed(2)}%</div>
+        </div>
+      </div>
+
+      {/* Period Selector */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {PERIODS.map(p => (
+          <button
+            key={p.value}
+            onClick={() => setPeriod(p.value)}
+            style={{
+              padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: period === p.value ? '#f97316' : '#f1f5f9',
+              color: period === p.value ? '#fff' : '#334155',
+              fontWeight: period === p.value ? 600 : 400,
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Clicks Over Time — Area Chart */}
+      <h4>Lượt gọi theo ngày</h4>
+      <ResponsiveContainer width="100%" height={300}>
+        <AreaChart data={data.clicksOverTime}>
+          <defs>
+            <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#f97316" stopOpacity={0.8} />
+              <stop offset="95%" stopColor="#f97316" stopOpacity={0.05} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" />
+          <YAxis allowDecimals={false} />
+          <Tooltip
+            formatter={(value: number) => [`${value} lượt gọi`, 'Lượt gọi']}
+            labelFormatter={(label) => `Ngày: ${label}`}
+          />
+          <Area
+            type="monotone"
+            dataKey="count"
+            stroke="#f97316"
+            fillOpacity={1}
+            fill="url(#colorClicks)"
+            strokeWidth={2}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+
+      {/* Clicks by Day of Week — Bar Chart */}
+      <h4 style={{ marginTop: 24 }}>Lượt gọi theo thứ</h4>
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart data={dayOfWeekData}>
+          <XAxis dataKey="day" />
+          <YAxis allowDecimals={false} />
+          <Tooltip formatter={(value: number) => [`${value} lượt gọi`, 'Lượt gọi']} />
+          <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+```
+
 ### 3.2 All Listings Summary (Paginated)
 
 ```
@@ -208,6 +354,40 @@ Authorization: Bearer <token>
     "totalElements": 48,
     "pageSize": 10
   }
+}
+```
+
+#### TypeScript Interfaces
+
+```ts
+interface ListingClickSummary {
+  listingId: number;
+  listingTitle: string;
+  totalClicks: number;
+}
+
+interface OwnerListingsAnalyticsResponse {
+  listings: ListingClickSummary[];
+  currentPage: number;
+  totalPages: number;
+  totalElements: number;
+  pageSize: number;
+}
+```
+
+#### Fetch Helper
+
+```ts
+async function fetchListingsAnalytics(
+  token: string, page = 0, size = 10
+): Promise<OwnerListingsAnalyticsResponse> {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/v1/owners/listings/analytics?page=${page}&size=${size}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const json = await res.json();
+  if (json.code !== '999999') throw new Error(json.message);
+  return json.data;
 }
 ```
 
@@ -241,7 +421,7 @@ Content-Type: application/json
 
 ```ts
 async function searchAnalytics(keyword: string, token: string, page = 0, size = 10) {
-  const res = await fetch(`${API_URL}/v1/owners/listings/analytics/search`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/owners/listings/analytics/search`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -255,83 +435,29 @@ async function searchAnalytics(keyword: string, token: string, page = 0, size = 
 }
 ```
 
-### Dashboard UI Suggestions
-
-#### Summary Cards Row
-
-```
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ Total Clicks │  │ Total Views  │  │  Conv. Rate  │
-│     45       │  │    320       │  │   14.06%     │
-└──────────────┘  └──────────────┘  └──────────────┘
-```
-
-#### Clicks Over Time (Line Chart)
-
-Use `clicksOverTime` array directly with [recharts](https://recharts.org):
+### Multi-Listing Table with Pagination
 
 ```tsx
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-
-function ClicksChart({ data }: { data: { date: string; count: number }[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={data}>
-        <XAxis dataKey="date" />
-        <YAxis />
-        <Tooltip />
-        <Line type="monotone" dataKey="count" stroke="#f97316" strokeWidth={2} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-```
-
-#### Clicks by Day of Week (Bar Chart)
-
-Use `clicksByDayOfWeek` map:
-
-```tsx
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-
-function DayOfWeekChart({ data }: { data: Record<string, number> }) {
-  const chartData = Object.entries(data).map(([day, count]) => ({ day, count }));
-
-  return (
-    <ResponsiveContainer width="100%" height={250}>
-      <BarChart data={chartData}>
-        <XAxis dataKey="day" />
-        <YAxis />
-        <Tooltip />
-        <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-```
-
-#### Multi-Listing Table
-
-Use the `/v1/owners/listings/analytics` endpoint:
-
-```tsx
-function ListingsTable({ listings }: { listings: { listingId: number; listingTitle: string; totalClicks: number }[] }) {
+function ListingsTable({ listings, onViewDetail }: {
+  listings: ListingClickSummary[];
+  onViewDetail: (listingId: number) => void;
+}) {
   return (
     <table>
       <thead>
         <tr>
-          <th>Listing</th>
-          <th>Total Clicks</th>
-          <th>Action</th>
+          <th>Tin đăng</th>
+          <th>Lượt gọi</th>
+          <th>Hành động</th>
         </tr>
       </thead>
       <tbody>
         {listings.map(l => (
           <tr key={l.listingId}>
             <td>{l.listingTitle}</td>
-            <td>{l.totalClicks}</td>
+            <td>📞 {l.totalClicks}</td>
             <td>
-              <a href={`/owner/listings/${l.listingId}/analytics`}>View Details</a>
+              <button onClick={() => onViewDetail(l.listingId)}>Xem chi tiết</button>
             </td>
           </tr>
         ))}
