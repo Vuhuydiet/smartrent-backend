@@ -83,8 +83,13 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     @Override
     @Transactional(readOnly = true)
-    public OwnerListingsAnalyticsResponse getOwnerListingsAnalytics(String ownerId, Pageable pageable) {
-        Page<Object[]> page = phoneClickDetailRepository.countClicksPerListingForOwnerPaged(ownerId, pageable);
+    public OwnerListingsAnalyticsResponse getOwnerListingsAnalytics(String ownerId, String search, Pageable pageable) {
+        Page<Object[]> page;
+        if (search != null && !search.isBlank()) {
+            page = phoneClickDetailRepository.countClicksPerListingForOwnerPagedWithSearch(ownerId, search.trim(), pageable);
+        } else {
+            page = phoneClickDetailRepository.countClicksPerListingForOwnerPaged(ownerId, pageable);
+        }
 
         List<ListingClickSummary> summaries = page.getContent().stream()
                 .map(row -> {
@@ -148,8 +153,13 @@ public class AnalyticsServiceImpl implements AnalyticsService {
 
     @Override
     @Transactional(readOnly = true)
-    public OwnerSavedListingsAnalyticsResponse getOwnerSavedListingsAnalytics(String ownerId, Pageable pageable) {
-        Page<Object[]> page = savedListingRepository.countSavesPerListingForOwnerPaged(ownerId, pageable);
+    public OwnerSavedListingsAnalyticsResponse getOwnerSavedListingsAnalytics(String ownerId, String search, Pageable pageable) {
+        Page<Object[]> page;
+        if (search != null && !search.isBlank()) {
+            page = savedListingRepository.countSavesPerListingForOwnerPagedWithSearch(ownerId, search.trim(), pageable);
+        } else {
+            page = savedListingRepository.countSavesPerListingForOwnerPaged(ownerId, pageable);
+        }
         long totalSavesAcrossAll = 0;
 
         List<ListingSaveSummary> summaries = page.getContent().stream()

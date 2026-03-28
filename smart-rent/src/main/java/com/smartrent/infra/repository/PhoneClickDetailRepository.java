@@ -206,5 +206,16 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
            "WHERE l.user_id = :ownerId",
            nativeQuery = true)
     Page<Object[]> countClicksPerListingForOwnerPaged(@Param("ownerId") String ownerId, Pageable pageable);
+
+    @Query(value = "SELECT pc.listing_id AS listingId, COUNT(*) AS cnt " +
+           "FROM phone_clicks pc JOIN listings l ON pc.listing_id = l.listing_id " +
+           "WHERE l.user_id = :ownerId AND LOWER(l.title) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "GROUP BY pc.listing_id ORDER BY cnt DESC",
+           countQuery = "SELECT COUNT(DISTINCT pc.listing_id) " +
+           "FROM phone_clicks pc JOIN listings l ON pc.listing_id = l.listing_id " +
+           "WHERE l.user_id = :ownerId AND LOWER(l.title) LIKE LOWER(CONCAT('%', :keyword, '%'))",
+           nativeQuery = true)
+    Page<Object[]> countClicksPerListingForOwnerPagedWithSearch(
+            @Param("ownerId") String ownerId, @Param("keyword") String keyword, Pageable pageable);
 }
 

@@ -79,4 +79,16 @@ public interface SavedListingRepository extends JpaRepository<SavedListing, Save
             "WHERE l.user_id = :ownerId",
             nativeQuery = true)
     Page<Object[]> countSavesPerListingForOwnerPaged(@Param("ownerId") String ownerId, Pageable pageable);
+
+    @Query(value = "SELECT sl.listing_id, COUNT(*) AS save_count " +
+            "FROM saved_listings sl " +
+            "JOIN listings l ON sl.listing_id = l.listing_id " +
+            "WHERE l.user_id = :ownerId AND LOWER(l.title) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+            "GROUP BY sl.listing_id ORDER BY save_count DESC",
+            countQuery = "SELECT COUNT(DISTINCT sl.listing_id) " +
+            "FROM saved_listings sl JOIN listings l ON sl.listing_id = l.listing_id " +
+            "WHERE l.user_id = :ownerId AND LOWER(l.title) LIKE LOWER(CONCAT('%', :keyword, '%'))",
+            nativeQuery = true)
+    Page<Object[]> countSavesPerListingForOwnerPagedWithSearch(
+            @Param("ownerId") String ownerId, @Param("keyword") String keyword, Pageable pageable);
 }

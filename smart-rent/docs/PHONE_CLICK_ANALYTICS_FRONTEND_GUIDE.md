@@ -211,6 +211,50 @@ Authorization: Bearer <token>
 }
 ```
 
+### 3.3 Search Listings Analytics by Title
+
+```
+POST /v1/owners/listings/analytics/search
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+#### Request Body
+
+```json
+{
+  "keyword": "phòng trọ",
+  "page": 0,
+  "size": 10
+}
+```
+
+| Field     | Type   | Required | Default | Description |
+|-----------|--------|----------|---------|-------------|
+| `keyword` | string | No       | `null`  | Search listing title (case-insensitive contains) |
+| `page`    | int    | No       | `0`     | Page number (0-indexed) |
+| `size`    | int    | No       | `10`    | Items per page |
+
+#### Response — same shape as 3.2
+
+#### Fetch Helper
+
+```ts
+async function searchAnalytics(keyword: string, token: string, page = 0, size = 10) {
+  const res = await fetch(`${API_URL}/v1/owners/listings/analytics/search`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ keyword, page, size }),
+  });
+  const json = await res.json();
+  if (json.code !== '999999') throw new Error(json.message);
+  return json.data;
+}
+```
+
 ### Dashboard UI Suggestions
 
 #### Summary Cards Row
@@ -358,7 +402,8 @@ async function fetchAnalytics(listingId: number, token: string, period = '30d') 
 
 | Feature | Endpoint | Auth | Method | Params |
 |---------|----------|------|--------|--------|
-| Track phone click | `/v1/phone-click-details` | ✅ | POST | — |
+| Track phone click | `/v1/phone-click-details` | ✅ | POST | body: `{ listingId }` |
 | Interest level (public) | `/v1/listings/{id}/interest-level` | ❌ | GET | — |
 | Single listing analytics | `/v1/owners/listings/{id}/analytics` | ✅ | GET | `period` |
 | All listings analytics | `/v1/owners/listings/analytics` | ✅ | GET | `page`, `size` |
+| Search listings analytics | `/v1/owners/listings/analytics/search` | ✅ | POST | body: `{ keyword, page, size }` |

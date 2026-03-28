@@ -207,6 +207,50 @@ async function fetchSavesAnalytics(token: string, page = 0, size = 10): Promise<
 }
 ```
 
+### Search Saves Analytics by Title (POST)
+
+```
+POST /v1/owners/listings/saves-analytics/search
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+#### Request Body
+
+```json
+{
+  "keyword": "phòng trọ",
+  "page": 0,
+  "size": 10
+}
+```
+
+| Field     | Type   | Required | Default | Description |
+|-----------|--------|----------|---------|-------------|
+| `keyword` | string | No       | `null`  | Search listing title (case-insensitive contains) |
+| `page`    | int    | No       | `0`     | Page number (0-indexed) |
+| `size`    | int    | No       | `10`    | Items per page |
+
+#### Response — same shape as the GET endpoint above
+
+#### Fetch Helper
+
+```ts
+async function searchSavesAnalytics(keyword: string, token: string, page = 0, size = 10) {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/v1/owners/listings/saves-analytics/search`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ keyword, page, size }),
+  });
+  const json = await res.json();
+  if (json.code !== '999999') throw new Error(json.message);
+  return json.data;
+}
+```
+
 ### Horizontal Bar Chart Component (Recharts)
 
 ```tsx
@@ -316,3 +360,4 @@ All error responses follow the standard shape:
 |---------|----------|--------|------|--------|
 | Single listing saves trend | `/v1/owners/listings/{id}/saves-trend` | GET | ✅ Owner | `period` |
 | All listings saves summary | `/v1/owners/listings/saves-analytics` | GET | ✅ Owner | `page`, `size` |
+| Search saves analytics | `/v1/owners/listings/saves-analytics/search` | POST | ✅ Owner | body: `{ keyword, page, size }` |

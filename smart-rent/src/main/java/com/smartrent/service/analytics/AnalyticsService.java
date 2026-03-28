@@ -12,9 +12,9 @@ public interface AnalyticsService {
 
     ListingAnalyticsResponse getListingAnalytics(Long listingId, String ownerId, LocalDateTime since);
 
-    OwnerListingsAnalyticsResponse getOwnerListingsAnalytics(String ownerId, Pageable pageable);
+    OwnerListingsAnalyticsResponse getOwnerListingsAnalytics(String ownerId, String search, Pageable pageable);
 
     SavedListingsTrendResponse getSavedListingTrend(Long listingId, String ownerId, LocalDateTime since);
 
-    OwnerSavedListingsAnalyticsResponse getOwnerSavedListingsAnalytics(String ownerId, Pageable pageable);
+    OwnerSavedListingsAnalyticsResponse getOwnerSavedListingsAnalytics(String ownerId, String search, Pageable pageable);
 }
