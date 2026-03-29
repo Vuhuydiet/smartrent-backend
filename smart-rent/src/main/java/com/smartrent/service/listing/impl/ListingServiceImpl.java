@@ -42,6 +42,7 @@ import com.smartrent.infra.repository.AddressMappingRepository;
 import com.smartrent.infra.repository.ProvinceRepository;
 import com.smartrent.infra.repository.WardRepository;
 import com.smartrent.infra.repository.ProjectRepository;
+import com.smartrent.infra.repository.SavedListingRepository;
 import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.VipTierDetailRepository;
@@ -102,6 +103,7 @@ public class ListingServiceImpl implements ListingService {
     AddressMappingRepository addressMappingRepository;
     WardRepository wardRepository;
     ProjectRepository projectRepository;
+    SavedListingRepository savedListingRepository;
     ListingMapper listingMapper;
     com.smartrent.mapper.MediaMapper mediaMapper;
     com.smartrent.mapper.AmenityMapper amenityMapper;
@@ -1274,6 +1276,52 @@ public class ListingServiceImpl implements ListingService {
                 .filterCriteria(filter)
                 .build();
     }
+
+            @Override
+            @Transactional(readOnly = true)
+            public ListingListResponse getTopSavedListingsByUser(String userId, int limit) {
+            int safeLimit = Math.min(Math.max(limit, 1), 20);
+
+            List<Object[]> rows = savedListingRepository.findTopSavedListingIdsForOwner(
+                userId,
+                PageRequest.of(0, safeLimit)
+            );
+
+            if (rows.isEmpty()) {
+                return ListingListResponse.builder()
+                    .listings(Collections.emptyList())
+                    .totalCount(0L)
+                    .currentPage(1)
+                    .pageSize(safeLimit)
+                    .totalPages(0)
+                    .filterCriteria(Map.of("userId", userId, "sortBy", "MOST_SAVED"))
+                    .build();
+            }
+
+            List<Long> listingIds = rows.stream()
+                .map(row -> ((Number) row[0]).longValue())
+                .collect(Collectors.toList());
+
+            List<Listing> listingEntities = listingRepository.findByListingIdIn(listingIds);
+            Map<Long, Listing> listingMap = listingEntities.stream()
+                .collect(Collectors.toMap(Listing::getListingId, Function.identity(), (a, b) -> a));
+
+            List<Listing> orderedListings = listingIds.stream()
+                .map(listingMap::get)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
+
+            List<ListingResponse> listingResponses = batchMapListings(orderedListings);
+
+            return ListingListResponse.builder()
+                .listings(listingResponses)
+                .totalCount((long) listingResponses.size())
+                .currentPage(1)
+                .pageSize(safeLimit)
+                .totalPages(listingResponses.isEmpty() ? 0 : 1)
+                .filterCriteria(Map.of("userId", userId, "sortBy", "MOST_SAVED"))
+                .build();
+            }
 
     @Override
     @Transactional(readOnly = true)

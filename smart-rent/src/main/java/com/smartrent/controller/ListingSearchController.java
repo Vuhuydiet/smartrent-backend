@@ -168,6 +168,89 @@ public class ListingSearchController {
         return ApiResponse.<ListingListResponse>builder().data(response).build();
     }
 
+    @GetMapping("/sellers/{userId}/diamond")
+    @Operation(
+        summary = "[PUBLIC API] Seller DIAMOND listings",
+        description = "Get paginated DIAMOND listings for a public seller profile section."
+    )
+    public ApiResponse<ListingListResponse> getSellerDiamondListings(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "12") Integer size,
+            @RequestParam(defaultValue = "NEWEST") String sortBy) {
+        return searchSellerListingsByVipType(userId, "DIAMOND", page, size, sortBy);
+    }
+
+    @GetMapping("/sellers/{userId}/gold")
+    @Operation(
+        summary = "[PUBLIC API] Seller GOLD listings",
+        description = "Get paginated GOLD listings for a public seller profile section."
+    )
+    public ApiResponse<ListingListResponse> getSellerGoldListings(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "12") Integer size,
+            @RequestParam(defaultValue = "NEWEST") String sortBy) {
+        return searchSellerListingsByVipType(userId, "GOLD", page, size, sortBy);
+    }
+
+    @GetMapping("/sellers/{userId}/silver")
+    @Operation(
+        summary = "[PUBLIC API] Seller SILVER listings",
+        description = "Get paginated SILVER listings for a public seller profile section."
+    )
+    public ApiResponse<ListingListResponse> getSellerSilverListings(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "12") Integer size,
+            @RequestParam(defaultValue = "NEWEST") String sortBy) {
+        return searchSellerListingsByVipType(userId, "SILVER", page, size, sortBy);
+    }
+
+    @GetMapping("/sellers/{userId}/normal")
+    @Operation(
+        summary = "[PUBLIC API] Seller NORMAL listings",
+        description = "Get paginated NORMAL listings for a public seller profile section."
+    )
+    public ApiResponse<ListingListResponse> getSellerNormalListings(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "12") Integer size,
+            @RequestParam(defaultValue = "NEWEST") String sortBy) {
+        return searchSellerListingsByVipType(userId, "NORMAL", page, size, sortBy);
+    }
+
+    @GetMapping("/sellers/{userId}/top-saved")
+    @Operation(
+        summary = "[PUBLIC API] Seller top saved listings",
+        description = "Get top listings with most saves for a public seller profile."
+    )
+    public ApiResponse<ListingListResponse> getSellerTopSavedListings(
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "5") Integer limit) {
+        int safeLimit = limit != null && limit > 0 ? Math.min(limit, 20) : 5;
+        ListingListResponse response = listingService.getTopSavedListingsByUser(userId, safeLimit);
+        return ApiResponse.<ListingListResponse>builder().data(response).build();
+    }
+
+    private ApiResponse<ListingListResponse> searchSellerListingsByVipType(
+            String userId,
+            String vipType,
+            Integer page,
+            Integer size,
+            String sortBy) {
+        ListingFilterRequest filter = ListingFilterRequest.builder()
+                .userId(userId)
+                .vipType(vipType)
+                .page(page != null && page > 0 ? page : 1)
+                .size(size != null && size > 0 ? Math.min(size, 100) : 12)
+                .sortBy(sortBy)
+                .build();
+
+        ListingListResponse response = listingService.searchListings(filter);
+        return ApiResponse.<ListingListResponse>builder().data(response).build();
+    }
+
     @GetMapping("/autocomplete")
     @Operation(
         summary = "Autocomplete listing titles",
