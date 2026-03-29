@@ -78,6 +78,16 @@ public interface ListingService {
     ListingListResponse searchListings(ListingFilterRequest filter);
 
     /**
+     * Public endpoint data source: get top saved listings for a specific seller.
+     * Sorted by number of saves descending.
+     *
+     * @param userId Seller user ID
+     * @param limit Max listings to return (recommended default: 5)
+     * @return Listing list response for top saved listings
+     */
+    ListingListResponse getTopSavedListingsByUser(String userId, int limit);
+
+    /**
      * Autocomplete listings by title prefix (normalized).
      * Returns lightweight results for search suggestions.
      *

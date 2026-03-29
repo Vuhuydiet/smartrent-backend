@@ -61,6 +61,20 @@ public interface SavedListingRepository extends JpaRepository<SavedListing, Save
             "GROUP BY sl.listing_id ORDER BY save_count DESC", nativeQuery = true)
     List<Object[]> countSavesPerListingForOwner(@Param("ownerId") String ownerId);
 
+    @Query(value = "SELECT sl.listing_id, COUNT(*) AS save_count " +
+            "FROM saved_listings sl " +
+            "JOIN listings l ON sl.listing_id = l.listing_id " +
+            "WHERE l.user_id = :ownerId " +
+            "AND l.is_draft = false " +
+            "AND l.is_shadow = false " +
+            "AND l.expired = false " +
+            "AND l.verified = true " +
+            "GROUP BY sl.listing_id " +
+            "ORDER BY save_count DESC, sl.listing_id DESC", nativeQuery = true)
+    List<Object[]> findTopSavedListingIdsForOwner(
+            @Param("ownerId") String ownerId,
+            Pageable pageable);
+
     long countByIdListingId(Long listingId);
 
     @Query(value = "SELECT DATE(sl.created_at) AS save_date, COUNT(*) AS save_count " +
