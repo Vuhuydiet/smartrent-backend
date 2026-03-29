@@ -519,6 +519,8 @@ public class ListingServiceImpl implements ListingService {
             key = "#id",
             unless = "#result == null")
     public ListingResponse getListingById(Long id) {
+        log.info("getListingById called for id={}", id);
+
         // Fetch listing with amenities first
         Listing listing = listingRepository.findByIdWithAmenities(id)
                 .orElseThrow(() -> new RuntimeException("Listing not found"));
@@ -536,34 +538,7 @@ public class ListingServiceImpl implements ListingService {
         // Build basic response with user and address
         ListingResponse response = listingMapper.toResponse(listing, user, addressResponse);
 
-        // Populate owner's Zalo contact information from pre-loaded user
-        populateOwnerZaloInfoFromUser(response, userEntity);
-
-        // DISABLED: Location pricing feature not currently in use
-        // Add location pricing if address is available
-        /*
-        Address address = listing.getAddress();
-        if (address != null) {
-            // Get address metadata to retrieve location IDs
-            addressMetadataRepository.findByAddress_AddressId(address.getAddressId())
-                    .ifPresent(metadata -> {
-                        // Use old structure for pricing if available
-                        if (metadata.getAddressType() == AddressMetadata.AddressType.OLD) {
-                            response.setLocationPricing(
-                                    locationPricingService.getLocationPricing(
-                                            listing,
-                                            metadata.getWardId(),
-                                            metadata.getDistrictId(),
-                                            metadata.getProvinceId()
-                                    )
-                            );
-                        }
-                        // For new structure, location pricing may not be applicable
-                        // as it uses a different province/ward system
-                    });
-        }
-        */
-
+        log.info("getListingById completed for id={}, title={}", id, response.getTitle());
         return response;
     }
 
@@ -657,9 +632,7 @@ public class ListingServiceImpl implements ListingService {
         Listing saved = listingRepository.save(existing);
         com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(saved.getUserId());
         com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(saved.getAddress());
-        ListingResponse response = listingMapper.toResponse(saved, user, addressResponse);
-        populateOwnerZaloInfo(response, saved.getUserId());
-        return response;
+        return listingMapper.toResponse(saved, user, addressResponse);
     }
 
     @Override
@@ -855,54 +828,6 @@ public class ListingServiceImpl implements ListingService {
     }
 
     /**
-     * Helper method to populate owner's contact information in ListingResponse
-     * Only sets contactAvailable=true if phone is present AND verified
-     */
-    private void populateOwnerZaloInfo(ListingResponse response, String userId) {
-        if (userId != null) {
-            userRepository.findById(userId).ifPresent(user -> {
-                String contactPhone = user.getContactPhoneNumber();
-                Boolean contactVerified = user.getContactPhoneVerified();
-
-                response.setOwnerContactPhoneNumber(contactPhone);
-                response.setOwnerContactPhoneVerified(contactVerified);
-
-                // Only make contact available if phone exists AND is verified
-                boolean isPhonePresent = contactPhone != null && !contactPhone.isEmpty();
-                boolean isVerified = Boolean.TRUE.equals(contactVerified);
-
-                if (isPhonePresent && isVerified) {
-                    response.setOwnerZaloLink("https://zalo.me/" + contactPhone);
-                    response.setContactAvailable(true);
-                } else {
-                    response.setOwnerZaloLink(null);
-                    response.setContactAvailable(false);
-                }
-            });
-        }
-    }
-
-    /**
-     * Populate owner contact info from a pre-loaded User object (avoids extra DB query)
-     */
-    private void populateOwnerZaloInfoFromUser(ListingResponse response, User user) {
-        if (user == null) return;
-        String contactPhone = user.getContactPhoneNumber();
-        Boolean contactVerified = user.getContactPhoneVerified();
-        response.setOwnerContactPhoneNumber(contactPhone);
-        response.setOwnerContactPhoneVerified(contactVerified);
-        boolean isPhonePresent = contactPhone != null && !contactPhone.isEmpty();
-        boolean isVerified = Boolean.TRUE.equals(contactVerified);
-        if (isPhonePresent && isVerified) {
-            response.setOwnerZaloLink("https://zalo.me/" + contactPhone);
-            response.setContactAvailable(true);
-        } else {
-            response.setOwnerZaloLink(null);
-            response.setContactAvailable(false);
-        }
-    }
-
-    /**
      * Batch-load all relationships (users, amenities, media) and map listings to responses.
      * Reduces N+1 from ~33 queries to 4 queries for a page of 10 listings.
      */
@@ -944,9 +869,7 @@ public class ListingServiceImpl implements ListingService {
                     com.smartrent.dto.response.UserCreationResponse userResponse =
                             user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
                     com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
-                    ListingResponse response = listingMapper.toResponse(listing, userResponse, addressResponse);
-                    populateOwnerZaloInfoFromUser(response, user);
-                    return response;
+                    return listingMapper.toResponse(listing, userResponse, addressResponse);
                 })
                 .collect(Collectors.toList());
     }
@@ -2143,10 +2066,9 @@ public class ListingServiceImpl implements ListingService {
     }
 
     /**
-     * Build AddressResponse from ListingDraft address fields
+     * Build AddressResponse from ListingDraft address fields (unified format)
      */
     private com.smartrent.dto.response.AddressResponse buildAddressResponseFromDraft(ListingDraft draft) {
-        // If no address data, return null
         if (draft.getAddressType() == null) {
             return null;
         }
@@ -2154,74 +2076,52 @@ public class ListingServiceImpl implements ListingService {
         com.smartrent.dto.response.AddressResponse.AddressResponseBuilder builder =
                 com.smartrent.dto.response.AddressResponse.builder();
 
-        // Set common fields
         if (draft.getLatitude() != null && draft.getLongitude() != null) {
             builder.latitude(java.math.BigDecimal.valueOf(draft.getLatitude()))
                    .longitude(java.math.BigDecimal.valueOf(draft.getLongitude()));
         }
 
-        // Set address type based on which structure was marked as primary
-        if ("OLD".equals(draft.getAddressType())) {
-            builder.addressType(AddressMetadata.AddressType.OLD);
-        } else if ("NEW".equals(draft.getAddressType())) {
-            builder.addressType(AddressMetadata.AddressType.NEW);
-        }
-
-        // ALWAYS populate legacy fields if they exist (regardless of addressType)
-        // This ensures both structures are returned when both are provided
-        if (draft.getProvinceId() != null) {
-            builder.legacyProvinceId(draft.getProvinceId().intValue());
-            // Fetch and populate province name
-            legacyProvinceRepository.findById(draft.getProvinceId().intValue())
-                    .ifPresent(province -> builder.legacyProvinceName(province.getName()));
-        }
-        if (draft.getDistrictId() != null) {
-            builder.legacyDistrictId(draft.getDistrictId().intValue());
-            // Fetch and populate district name
-            legacyDistrictRepository.findById(draft.getDistrictId().intValue())
-                    .ifPresent(district -> builder.legacyDistrictName(district.getName()));
-        }
-        if (draft.getWardId() != null) {
-            builder.legacyWardId(draft.getWardId().intValue());
-            // Fetch and populate ward name
-            legacyWardRepository.findById(draft.getWardId().intValue())
-                    .ifPresent(ward -> builder.legacyWardName(ward.getName()));
-        }
-
-        // ALWAYS populate new address fields if they exist (regardless of addressType)
-        // This ensures both structures are returned when both are provided
-        if (draft.getProvinceCode() != null) {
-            builder.newProvinceCode(draft.getProvinceCode());
-            // Fetch and populate province name
-            provinceRepository.findByCode(draft.getProvinceCode())
-                    .ifPresent(province -> builder.newProvinceName(province.getName()));
-        }
-        if (draft.getWardCode() != null) {
-            builder.newWardCode(draft.getWardCode());
-            // Fetch and populate ward name
-            wardRepository.findByCode(draft.getWardCode())
-                    .ifPresent(ward -> builder.newWardName(ward.getName()));
-        }
-
-        // ALWAYS populate both street fields if they exist (regardless of addressType)
-        // This ensures both structures are returned when both are provided
-        if (draft.getStreet() != null) {
-            builder.legacyStreet(draft.getStreet());
-        }
-        if (draft.getNewStreet() != null) {
-            builder.newStreet(draft.getNewStreet());
-        }
-
-        // Build fullAddress from legacy structure if exists
-        if (draft.getProvinceId() != null || draft.getDistrictId() != null || draft.getWardId() != null) {
-            String fullAddress = buildLegacyFullAddressFromDraft(draft);
-            builder.fullAddress(fullAddress);
-        }
-
-        // Build fullNewAddress from new structure if exists
-        if (draft.getProvinceCode() != null || draft.getWardCode() != null) {
-            String fullNewAddress = buildNewFullAddressFromDraft(draft);
-            builder.fullNewAddress(fullNewAddress);
+        if ("NEW".equals(draft.getAddressType())) {
+            // New structure (34 provinces, 2-tier)
+            if (draft.getProvinceCode() != null) {
+                builder.provinceCode(draft.getProvinceCode());
+                provinceRepository.findByCode(draft.getProvinceCode())
+                        .ifPresent(province -> builder.provinceName(province.getName()));
+            }
+            if (draft.getWardCode() != null) {
+                builder.wardCode(draft.getWardCode());
+                wardRepository.findByCode(draft.getWardCode())
+                        .ifPresent(ward -> builder.wardName(ward.getName()));
+            }
+            if (draft.getNewStreet() != null) {
+                builder.street(draft.getNewStreet());
+            }
+            if (draft.getProvinceCode() != null || draft.getWardCode() != null) {
+                builder.fullAddress(buildNewFullAddressFromDraft(draft));
+            }
+        } else {
+            // Legacy structure (63 provinces, 3-tier)
+            if (draft.getProvinceId() != null) {
+                builder.provinceCode(String.valueOf(draft.getProvinceId().intValue()));
+                legacyProvinceRepository.findById(draft.getProvinceId().intValue())
+                        .ifPresent(province -> builder.provinceName(province.getName()));
+            }
+            if (draft.getDistrictId() != null) {
+                builder.districtCode(String.valueOf(draft.getDistrictId().intValue()));
+                legacyDistrictRepository.findById(draft.getDistrictId().intValue())
+                        .ifPresent(district -> builder.districtName(district.getName()));
+            }
+            if (draft.getWardId() != null) {
+                builder.wardCode(String.valueOf(draft.getWardId().intValue()));
+                legacyWardRepository.findById(draft.getWardId().intValue())
+                        .ifPresent(ward -> builder.wardName(ward.getName()));
+            }
+            if (draft.getStreet() != null) {
+                builder.street(draft.getStreet());
+            }
+            if (draft.getProvinceId() != null || draft.getDistrictId() != null || draft.getWardId() != null) {
+                builder.fullAddress(buildLegacyFullAddressFromDraft(draft));
+            }
         }
 
         return builder.build();

@@ -36,52 +36,48 @@ public class AddressMapperImpl implements AddressMapper {
 
         AddressResponse.AddressResponseBuilder builder = AddressResponse.builder()
                 .addressId(address.getAddressId())
-                .fullAddress(address.getFullAddress())
+                .fullAddress(address.getDisplayAddress())
                 .fullNewAddress(address.getFullNewAddress())
+                .addressType(address.getAddressType() != null ? address.getAddressType().name() : null)
                 .latitude(address.getLatitude())
-                .longitude(address.getLongitude())
-                .addressType(address.getAddressType());
+                .longitude(address.getLongitude());
 
-        // Map legacy address components (Old structure: 63 provinces, 3-tier)
-        if (address.getLegacyProvinceId() != null) {
-            builder.legacyProvinceId(address.getLegacyProvinceId());
-            legacyProvinceRepository.findById(address.getLegacyProvinceId())
-                    .ifPresent(province -> builder.legacyProvinceName(province.getName()));
+        if (address.isNewStructure() && address.hasNewComponents()) {
+            // New structure (34 provinces, 2-tier): province → ward (no district)
+            if (address.getNewProvinceCode() != null) {
+                builder.provinceCode(address.getNewProvinceCode());
+                provinceRepository.findByCode(address.getNewProvinceCode())
+                        .ifPresent(province -> builder.provinceName(province.getName()));
+            }
+            if (address.getNewWardCode() != null) {
+                builder.wardCode(address.getNewWardCode());
+                wardRepository.findByCode(address.getNewWardCode())
+                        .ifPresent(ward -> builder.wardName(ward.getName()));
+            }
+            if (address.getNewStreet() != null) {
+                builder.street(address.getNewStreet());
+            }
+        } else {
+            // Legacy structure (63 provinces, 3-tier): province → district → ward
+            if (address.getLegacyProvinceId() != null) {
+                builder.provinceCode(String.valueOf(address.getLegacyProvinceId()));
+                legacyProvinceRepository.findById(address.getLegacyProvinceId())
+                        .ifPresent(province -> builder.provinceName(province.getName()));
+            }
+            if (address.getLegacyDistrictId() != null) {
+                builder.districtCode(String.valueOf(address.getLegacyDistrictId()));
+                legacyDistrictRepository.findById(address.getLegacyDistrictId())
+                        .ifPresent(district -> builder.districtName(district.getName()));
+            }
+            if (address.getLegacyWardId() != null) {
+                builder.wardCode(String.valueOf(address.getLegacyWardId()));
+                legacyWardRepository.findById(address.getLegacyWardId())
+                        .ifPresent(ward -> builder.wardName(ward.getName()));
+            }
+            if (address.getLegacyStreet() != null) {
+                builder.street(address.getLegacyStreet());
+            }
         }
-
-        if (address.getLegacyDistrictId() != null) {
-            builder.legacyDistrictId(address.getLegacyDistrictId());
-            legacyDistrictRepository.findById(address.getLegacyDistrictId())
-                    .ifPresent(district -> builder.legacyDistrictName(district.getName()));
-        }
-
-        if (address.getLegacyWardId() != null) {
-            builder.legacyWardId(address.getLegacyWardId());
-            legacyWardRepository.findById(address.getLegacyWardId())
-                    .ifPresent(ward -> builder.legacyWardName(ward.getName()));
-        }
-
-        if (address.getLegacyStreet() != null) {
-            builder.legacyStreet(address.getLegacyStreet());
-        }
-
-        // Map new address components (New structure: 34 provinces, 2-tier)
-        if (address.getNewProvinceCode() != null) {
-            builder.newProvinceCode(address.getNewProvinceCode());
-            provinceRepository.findByCode(address.getNewProvinceCode())
-                    .ifPresent(province -> builder.newProvinceName(province.getName()));
-        }
-
-        if (address.getNewWardCode() != null) {
-            builder.newWardCode(address.getNewWardCode());
-            wardRepository.findByCode(address.getNewWardCode())
-                    .ifPresent(ward -> builder.newWardName(ward.getName()));
-        }
-
-        if (address.getNewStreet() != null) {
-            builder.newStreet(address.getNewStreet());
-        }
-
 
         return builder.build();
     }

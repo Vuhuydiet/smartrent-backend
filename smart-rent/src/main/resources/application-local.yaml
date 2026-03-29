@@ -65,6 +65,7 @@ application:
         - "/v1/payments/ipn/**"
         - "/v1/verification/**"
         - "/v1/listings/stats/provinces/**"
+        - "/v1/listings/stats/categories"
         - "/v1/ai/**"
         - "/v1/listings/*/reports"
         - "/v1/ai/listings/**"

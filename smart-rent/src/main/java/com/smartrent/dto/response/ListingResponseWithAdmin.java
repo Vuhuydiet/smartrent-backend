@@ -47,9 +47,6 @@ public class ListingResponseWithAdmin {
     @Schema(description = "Whether listing is verified")
     Boolean verified;
 
-    @Schema(description = "Whether listing is being verified")
-    Boolean isVerify;
-
     @Schema(description = "Whether listing is expired")
     Boolean expired;
 
