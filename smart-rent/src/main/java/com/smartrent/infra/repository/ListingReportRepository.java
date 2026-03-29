@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -74,5 +75,14 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
      * Find reports resolved by a specific admin with pagination
      */
     Page<ListingReport> findByResolvedByOrderByResolvedAtDesc(String adminId, Pageable pageable);
-}
 
+    @Query(value = "SELECT DATE(r.created_at) AS label, COUNT(*) AS cnt " +
+            "FROM listing_reports r WHERE r.created_at BETWEEN :start AND :end " +
+            "GROUP BY DATE(r.created_at) ORDER BY label ASC", nativeQuery = true)
+    List<Object[]> countReportsByDay(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT DATE_FORMAT(r.created_at, '%Y-%m') AS label, COUNT(*) AS cnt " +
+            "FROM listing_reports r WHERE r.created_at BETWEEN :start AND :end " +
+            "GROUP BY DATE_FORMAT(r.created_at, '%Y-%m') ORDER BY label ASC", nativeQuery = true)
+    List<Object[]> countReportsByMonth(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+}
