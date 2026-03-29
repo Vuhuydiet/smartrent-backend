@@ -2,6 +2,7 @@ package com.smartrent.infra.repository;
 
 import com.smartrent.infra.repository.entity.Listing;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -332,4 +333,16 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.expired = false
     """)
     Page<Listing> findPublicListings(Pageable pageable);
+
+    @Query(value = "SELECT DATE(l.created_at) AS label, COUNT(*) AS cnt " +
+            "FROM listings l WHERE l.created_at BETWEEN :start AND :end " +
+            "AND l.is_draft = false AND l.is_shadow = false " +
+            "GROUP BY DATE(l.created_at) ORDER BY label ASC", nativeQuery = true)
+    List<Object[]> countNewListingsByDay(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT DATE_FORMAT(l.created_at, '%Y-%m') AS label, COUNT(*) AS cnt " +
+            "FROM listings l WHERE l.created_at BETWEEN :start AND :end " +
+            "AND l.is_draft = false AND l.is_shadow = false " +
+            "GROUP BY DATE_FORMAT(l.created_at, '%Y-%m') ORDER BY label ASC", nativeQuery = true)
+    List<Object[]> countNewListingsByMonth(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Getter
@@ -14,11 +13,9 @@ import java.util.List;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class RevenueOverTimeResponse {
+public class TimeSeriesResponse {
 
-    List<RevenueDataPoint> dataPoints;
-    BigDecimal grandTotal;
-    Long totalTransactions;
-    List<RevenueByTypeItem> revenueByType;
+    List<TimeSeriesDataPoint> dataPoints;
+    Long total;
     String granularity;
 }

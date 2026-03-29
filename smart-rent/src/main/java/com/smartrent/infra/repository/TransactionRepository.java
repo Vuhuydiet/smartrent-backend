@@ -68,5 +68,11 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
             "WHERE t.status = 'COMPLETED' AND t.created_at BETWEEN :startDate AND :endDate " +
             "GROUP BY t.transaction_type ORDER BY total_amount DESC", nativeQuery = true)
     List<Object[]> findRevenueGroupedByType(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Query(value = "SELECT DATE_FORMAT(t.created_at, '%Y-%m') AS revenue_month, SUM(t.amount) AS total_amount, COUNT(*) AS tx_count " +
+            "FROM transactions t " +
+            "WHERE t.status = 'COMPLETED' AND t.created_at BETWEEN :startDate AND :endDate " +
+            "GROUP BY DATE_FORMAT(t.created_at, '%Y-%m') ORDER BY revenue_month ASC", nativeQuery = true)
+    List<Object[]> findMonthlyRevenue(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 }
 
