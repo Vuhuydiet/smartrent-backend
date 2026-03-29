@@ -1,6 +1,7 @@
 package com.smartrent.config.cache;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -26,6 +27,7 @@ public class CacheConfiguration {
   public RedisCacheConfiguration customRedisCacheConfiguration() {
     ObjectMapper objectMapper = new ObjectMapper();
     objectMapper.registerModule(new JavaTimeModule());
+    objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     objectMapper.activateDefaultTyping(
         objectMapper.getPolymorphicTypeValidator(),
         ObjectMapper.DefaultTyping.NON_FINAL,
@@ -63,12 +65,12 @@ public class CacheConfiguration {
 
     @Override
     public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
-      log.warn("Unable to get from cache", exception);
+      log.error("Cache GET failed [cache={}, key={}]: {}", cache.getName(), key, exception.getMessage(), exception);
     }
 
     @Override
     public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
-      log.warn("Unable to put from cache", exception);
+      log.error("Cache PUT failed [cache={}, key={}]: {}", cache.getName(), key, exception.getMessage(), exception);
     }
 
     @Override

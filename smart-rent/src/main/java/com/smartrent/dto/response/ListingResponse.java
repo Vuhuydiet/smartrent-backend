@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -12,7 +13,6 @@ import lombok.experimental.SuperBuilder;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 @Getter
 @Setter
@@ -20,6 +20,7 @@ import java.util.Set;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Schema(description = "Listing details response")
 public class ListingResponse {
     @Schema(description = "Listing ID", example = "1")
@@ -34,18 +35,6 @@ public class ListingResponse {
     @Schema(description = "User information of the listing owner")
     UserCreationResponse user;
 
-    @Schema(description = "Owner's contact phone number for Zalo or other messaging", example = "0912345678")
-    String ownerContactPhoneNumber;
-
-    @Schema(description = "Whether the owner's contact phone number has been verified", example = "true")
-    Boolean ownerContactPhoneVerified;
-
-    @Schema(description = "Direct Zalo link to contact owner", example = "https://zalo.me/0912345678")
-    String ownerZaloLink;
-
-    @Schema(description = "Whether owner has contact available (phone present AND verified)")
-    Boolean contactAvailable;
-
     @Schema(description = "Post date")
     LocalDateTime postDate;
 
@@ -57,9 +46,6 @@ public class ListingResponse {
 
     @Schema(description = "Whether listing is verified")
     Boolean verified;
-
-    @Schema(description = "Whether listing is being verified")
-    Boolean isVerify;
 
     @Schema(description = "Whether listing is expired")
     Boolean expired;
@@ -88,7 +74,7 @@ public class ListingResponse {
 
     String priceUnit;
 
-    @Schema(description = "Full address information with nested legacy/new structure")
+    @Schema(description = "Full address information")
     AddressResponse address;
 
     Float area;
@@ -115,15 +101,23 @@ public class ListingResponse {
     @Schema(description = "Service fee information", example = "200000 VND/month")
     String serviceFee;
 
+    @Schema(description = "Owner's contact phone number", example = "0901234567")
+    String ownerContactPhoneNumber;
+
+    @Schema(description = "Whether the owner's contact phone number has been verified")
+    Boolean ownerContactPhoneVerified;
+
+    @Schema(description = "Owner's Zalo link", example = "https://zalo.me/0901234567")
+    String ownerZaloLink;
+
+    @Schema(description = "Whether contact information is available")
+    Boolean contactAvailable;
+
     @Schema(description = "List of amenities associated with this listing")
     List<AmenityResponse> amenities;
 
     @Schema(description = "List of media (images/videos) for this listing, ordered by sort_order")
     List<MediaResponse> media;
-
-
-    @Schema(description = "Location-based pricing information for this listing and similar listings in the same area")
-    LocationPricingResponse locationPricing;
 
     LocalDateTime createdAt;
 

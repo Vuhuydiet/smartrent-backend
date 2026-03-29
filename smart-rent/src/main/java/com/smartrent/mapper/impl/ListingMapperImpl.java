@@ -97,6 +97,12 @@ public class ListingMapperImpl implements ListingMapper {
                     .collect(Collectors.toList());
         }
 
+        // Derive owner contact fields from user
+        String ownerContactPhone = user != null ? user.getContactPhoneNumber() : null;
+        Boolean ownerContactVerified = user != null ? user.getContactPhoneVerified() : null;
+        String ownerZaloLink = ownerContactPhone != null ? "https://zalo.me/" + ownerContactPhone : null;
+        Boolean contactAvailable = ownerContactPhone != null && !ownerContactPhone.isBlank();
+
         return ListingResponse.builder()
                 .listingId(entity.getListingId())
                 .title(entity.getTitle())
@@ -106,7 +112,6 @@ public class ListingMapperImpl implements ListingMapper {
                 .expiryDate(entity.getExpiryDate())
                 .listingType(entity.getListingType() != null ? entity.getListingType().name() : null)
                 .verified(entity.getVerified())
-                .isVerify(entity.getIsVerify())
                 .isDraft(entity.getIsDraft())
                 .listingStatus(entity.computeListingStatus().name())
                 .expired(entity.getExpired())
@@ -126,6 +131,10 @@ public class ListingMapperImpl implements ListingMapper {
                 .electricityPrice(entity.getElectricityPrice())
                 .internetPrice(entity.getInternetPrice())
                 .serviceFee(entity.getServiceFee())
+                .ownerContactPhoneNumber(ownerContactPhone)
+                .ownerContactPhoneVerified(ownerContactVerified)
+                .ownerZaloLink(ownerZaloLink)
+                .contactAvailable(contactAvailable)
                 .amenities(amenityResponses)
                 .media(mediaResponses)
                 .createdAt(entity.getCreatedAt())
@@ -205,7 +214,6 @@ public class ListingMapperImpl implements ListingMapper {
                 .expiryDate(entity.getExpiryDate())
                 .listingType(entity.getListingType() != null ? entity.getListingType().name() : null)
                 .verified(entity.getVerified())
-                .isVerify(entity.getIsVerify())
                 .expired(entity.getExpired())
                 .listingStatus(entity.computeListingStatus().name())
                 .vipType(entity.getVipType() != null ? entity.getVipType().name() : null)
@@ -258,17 +266,26 @@ public class ListingMapperImpl implements ListingMapper {
         }
 
 
+        // Derive owner contact fields from user
+        String ownerPhone = user != null ? user.getContactPhoneNumber() : null;
+        Boolean ownerPhoneVerified = user != null ? user.getContactPhoneVerified() : null;
+        String zaloLink = ownerPhone != null ? "https://zalo.me/" + ownerPhone : null;
+        Boolean contactAvail = ownerPhone != null && !ownerPhone.isBlank();
+
         return ListingResponseForOwner.builder()
                 // Base fields from ListingResponse
                 .listingId(entity.getListingId())
                 .title(entity.getTitle())
                 .description(entity.getDescription())
                 .user(user)
+                .ownerContactPhoneNumber(ownerPhone)
+                .ownerContactPhoneVerified(ownerPhoneVerified)
+                .ownerZaloLink(zaloLink)
+                .contactAvailable(contactAvail)
                 .postDate(entity.getPostDate())
                 .expiryDate(entity.getExpiryDate())
                 .listingType(entity.getListingType() != null ? entity.getListingType().name() : null)
                 .verified(entity.getVerified())
-                .isVerify(entity.getIsVerify())
                 .expired(entity.getExpired())
                 .isDraft(entity.getIsDraft())
                 .listingStatus(entity.computeListingStatus().name())
