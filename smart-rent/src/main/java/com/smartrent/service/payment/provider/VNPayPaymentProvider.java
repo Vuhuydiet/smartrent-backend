@@ -579,29 +579,19 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
     }
 
     /**
-     * Build hash data for payment creation (WITH URL encoding for VALUES only)
+     * Build hash data for payment creation (WITHOUT URL encoding)
      * Used when creating payment URL to send to VNPay
      *
      * IMPORTANT: VNPay requires:
-     * 1. Keys are NOT URL encoded (vnp_Amount, not vnp%5FAmount)
-     * 2. Values ARE URL encoded with spaces as '+' (not %20)
-     * 3. Hash data format must match query string format exactly
+     * 1. Hash data uses RAW (un-encoded) values
+     * 2. Parameters are sorted alphabetically by key
+     * 3. Only the query string (URL) should have URL-encoded values
      */
     private String buildHashData(Map<String, String> params) {
         return params.entrySet().stream()
                 .filter(entry -> entry.getValue() != null && !entry.getValue().isEmpty())
                 .sorted(Map.Entry.comparingByKey())
-                .map(entry -> {
-                    try {
-                        // Key is NOT encoded, only value is encoded
-                        // URLEncoder.encode uses '+' for spaces which is what VNPay expects
-                        return entry.getKey() + "="
-                            + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8.toString());
-                    } catch (UnsupportedEncodingException e) {
-                        log.error("Error encoding hash parameter: {}", entry.getKey(), e);
-                        return entry.getKey() + "=" + entry.getValue();
-                    }
-                })
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
                 .collect(Collectors.joining("&"));
     }
 
