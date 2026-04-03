@@ -146,10 +146,10 @@ spring:
         "[listing.detail]": 3m
 
 application:
-  client-url: "https://www.smartrent.io.vn"
-  admin-url: "https://smartrent-fe-admin.vercel.app"
+  client-url: "${CLIENT_URL:http://localhost:3000}"
+  admin-url: "${ADMIN_URL:http://localhost:3000/admin}"
   cors:
-    allowed-origins: "https://smartrent-fe.vercel.app"
+    allowed-origins: "${CORS_ALLOWED_ORIGINS:http://localhost:3000}"
   admin:
     contact-phone-number: "${ADMIN_CONTACT_PHONE}"
   authorize-ignored:
