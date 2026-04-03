@@ -552,47 +552,59 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             String expireDate = vietnamNow.plusMinutes(timeout).format(VN_DATE_FORMATTER);
             vnpParams.put("vnp_ExpireDate", expireDate);
 
-            // Build hash data (BEFORE adding secure hash to params)
-            String hashData = buildHashData(vnpParams);
+            // === Build hash data and query string using VNPay's official Java sample approach ===
+            // Both hashData and query MUST use the same encoding format
+            List<String> fieldNames = new ArrayList<>(vnpParams.keySet());
+            Collections.sort(fieldNames);
+
+            StringBuilder hashData = new StringBuilder();
+            StringBuilder query = new StringBuilder();
+            Iterator<String> itr = fieldNames.iterator();
+            while (itr.hasNext()) {
+                String fieldName = itr.next();
+                String fieldValue = vnpParams.get(fieldName);
+                if (fieldValue != null && fieldValue.length() > 0) {
+                    // Build hash data (matching VNPay official Java sample)
+                    hashData.append(fieldName);
+                    hashData.append('=');
+                    hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                    // Build query
+                    query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString()));
+                    query.append('=');
+                    query.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                    if (itr.hasNext()) {
+                        query.append('&');
+                        hashData.append('&');
+                    }
+                }
+            }
+
+            String queryUrl = query.toString();
+            String hashDataStr = hashData.toString();
+
+            // Debug logging
+            log.info("VNPay hashData: {}", hashDataStr);
+            log.info("VNPay hashSecret length: {}, first4: {}",
+                    vnpayConfig.getHashSecret().length(),
+                    vnpayConfig.getHashSecret().substring(0, 4));
 
             // Generate secure hash
-            String secureHash = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
+            String secureHash = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashDataStr);
 
-            // Build query string (with URL encoding)
-            String queryUrl = buildQueryString(vnpParams);
+            log.info("VNPay secureHash: {}", secureHash);
 
-            // Build final payment URL (use paymentUrl property, fallback to url)
+            // Build final payment URL
             String paymentUrl = vnpayConfig.getPaymentUrl() != null ? vnpayConfig.getPaymentUrl() : vnpayConfig.getUrl();
-            if (!paymentUrl.endsWith("?")) {
-                paymentUrl += "?";
-            }
-            // Append query string and secure hash (secure hash is NOT URL encoded)
-            paymentUrl += queryUrl + "&vnp_SecureHash=" + secureHash;
+            queryUrl += "&vnp_SecureHash=" + secureHash;
+            paymentUrl = paymentUrl + "?" + queryUrl;
 
-            log.debug("VNPay payment URL generated for txnRef: {}", transaction.getTransactionId());
+            log.info("VNPay payment URL generated for txnRef: {}", transaction.getTransactionId());
             return paymentUrl;
 
         } catch (Exception e) {
             log.error("Error building VNPay payment URL", e);
             throw new PaymentProviderException("Failed to generate VNPay payment URL", e);
         }
-    }
-
-    /**
-     * Build hash data for payment creation (WITHOUT URL encoding)
-     * Used when creating payment URL to send to VNPay
-     *
-     * IMPORTANT: VNPay requires:
-     * 1. Hash data uses RAW (un-encoded) values
-     * 2. Parameters are sorted alphabetically by key
-     * 3. Only the query string (URL) should have URL-encoded values
-     */
-    private String buildHashData(Map<String, String> params) {
-        return params.entrySet().stream()
-                .filter(entry -> entry.getValue() != null && !entry.getValue().isEmpty())
-                .sorted(Map.Entry.comparingByKey())
-                .map(entry -> entry.getKey() + "=" + entry.getValue())
-                .collect(Collectors.joining("&"));
     }
 
     /**
@@ -605,21 +617,6 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                 .filter(entry -> entry.getValue() != null && !entry.getValue().isEmpty())
                 .sorted(Map.Entry.comparingByKey())
                 .map(entry -> entry.getKey() + "=" + entry.getValue())
-                .collect(Collectors.joining("&"));
-    }
-
-    private String buildQueryString(Map<String, String> params) {
-        return params.entrySet().stream()
-                .filter(entry -> entry.getValue() != null && !entry.getValue().isEmpty())
-                .sorted(Map.Entry.comparingByKey())
-                .map(entry -> {
-                    try {
-                        return entry.getKey() + "=" + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8.toString());
-                    } catch (UnsupportedEncodingException e) {
-                        log.error("Error encoding URL parameter: {}", entry.getKey(), e);
-                        return entry.getKey() + "=" + entry.getValue();
-                    }
-                })
                 .collect(Collectors.joining("&"));
     }
 
@@ -728,8 +725,23 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         queryParams.put("vnp_CreateDate", createDate);
         queryParams.put("vnp_IpAddr", ipAddress);
 
-        // Build hash data and generate signature
-        String hashData = buildHashData(queryParams);
+        // Build hash data and generate signature (same approach as VNPay official sample)
+        StringBuilder qHashData = new StringBuilder();
+        List<String> qFieldNames = new ArrayList<>(queryParams.keySet());
+        Collections.sort(qFieldNames);
+        Iterator<String> qItr = qFieldNames.iterator();
+        while (qItr.hasNext()) {
+            String fn = qItr.next();
+            String fv = queryParams.get(fn);
+            if (fv != null && fv.length() > 0) {
+                qHashData.append(fn).append('=')
+                        .append(URLEncoder.encode(fv, StandardCharsets.US_ASCII));
+                if (qItr.hasNext()) {
+                    qHashData.append('&');
+                }
+            }
+        }
+        String hashData = qHashData.toString();
         String secureHash = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
 
         return VNPayQueryRequest.builder()
