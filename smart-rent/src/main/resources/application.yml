@@ -302,6 +302,17 @@ vnpay:
   order-type: "other"
   timeout-minutes: 15
 
+# ZaloPay Payment Gateway Configuration
+zalopay:
+  app-id: ${ZALOPAY_APP_ID}
+  key1: ${ZALOPAY_KEY1}
+  key2: ${ZALOPAY_KEY2}
+  create-order-url: ${ZALOPAY_CREATE_ORDER_URL:https://sb-openapi.zalopay.vn/v2/create}
+  query-order-url: ${ZALOPAY_QUERY_ORDER_URL:https://sb-openapi.zalopay.vn/v2/query}
+  return-url: ${ZALOPAY_RETURN_URL}
+  ipn-url: ${ZALOPAY_IPN_URL:https://dev.api.smartrent.io.vn/v1/payments/callback/ZALOPAY}
+  timeout-minutes: ${ZALOPAY_TIMEOUT_MINUTES:15}
+
 # Resilience4j Configuration for Circuit Breaker and Retry patterns
 resilience4j:
   circuitbreaker:

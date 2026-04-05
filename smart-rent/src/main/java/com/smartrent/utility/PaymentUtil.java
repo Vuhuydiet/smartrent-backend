@@ -159,5 +159,31 @@ public class PaymentUtil {
             throw new RuntimeException("Failed to generate HMAC-SHA512", e);
         }
     }
+
+    /**
+     * Generate HMAC-SHA256 hash
+     */
+    public static String hmacSHA256(String key, String data) {
+        try {
+            Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSHA256.init(secretKeySpec);
+            byte[] hash = hmacSHA256.doFinal(data.getBytes(StandardCharsets.UTF_8));
+
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+
+            return hexString.toString();
+        } catch (Exception e) {
+            log.error("Error generating HMAC-SHA256", e);
+            throw new RuntimeException("Failed to generate HMAC-SHA256", e);
+        }
+    }
 }
 

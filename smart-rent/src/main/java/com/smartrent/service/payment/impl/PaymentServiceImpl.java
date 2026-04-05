@@ -210,6 +210,8 @@ public class PaymentServiceImpl implements PaymentService {
             return PaymentProvider.PAYPAL;
         } else if (transactionRef.startsWith("MOMO_")) {
             return PaymentProvider.MOMO;
+        } else if (transactionRef.startsWith("ZALOPAY_")) {
+            return PaymentProvider.ZALOPAY;
         }
 
         // Fallback: check database for payment record
@@ -225,6 +227,7 @@ public class PaymentServiceImpl implements PaymentService {
             case VNPAY -> params.get("vnp_TxnRef");
             case PAYPAL -> params.get("token");
             case MOMO -> params.get("orderId");
+            case ZALOPAY -> params.get("apptransid");
         };
     }
 
