@@ -11,7 +11,8 @@ import lombok.experimental.FieldDefaults;
 public enum PaymentProvider {
     VNPAY("vnpay", "VNPay Payment Gateway"),
     PAYPAL("paypal", "PayPal Payment Gateway"),
-    MOMO("momo", "MoMo Payment Gateway");
+    MOMO("momo", "MoMo Payment Gateway"),
+    ZALOPAY("zalopay", "ZaloPay Payment Gateway");
 
     String code;
     String displayName;

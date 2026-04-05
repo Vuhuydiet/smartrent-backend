@@ -51,5 +51,10 @@ public interface PaymentRepository extends JpaRepository<Transaction, String> {
      * Find transaction by provider transaction ID
      */
     Optional<Transaction> findByProviderTransactionId(String providerTransactionId);
+
+    /**
+     * Find transaction by additional info content
+     */
+    Optional<Transaction> findByAdditionalInfoContaining(String query);
 }
 
