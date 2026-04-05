@@ -1,6 +1,7 @@
 package com.smartrent.dto.response;
 
 import com.smartrent.enums.NewsCategory;
+import com.smartrent.enums.NewsStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -43,6 +44,9 @@ public class NewsSummaryResponse {
     @Schema(description = "Thumbnail image URL")
     String thumbnailUrl;
 
+    @Schema(description = "Publication status", example = "PUBLISHED")
+    NewsStatus status;
+
     @Schema(description = "Publication date and time")
     LocalDateTime publishedAt;
 
@@ -55,4 +59,3 @@ public class NewsSummaryResponse {
     @Schema(description = "Creation timestamp")
     LocalDateTime createdAt;
 }
-
