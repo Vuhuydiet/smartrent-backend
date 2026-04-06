@@ -113,6 +113,12 @@ public class ListingResponse {
     @Schema(description = "Whether contact information is available")
     Boolean contactAvailable;
 
+    @Schema(description = "Contact person name (owner's full name)", example = "Nguyễn Văn A")
+    String contactName;
+
+    @Schema(description = "Contact phone number", example = "0901234567")
+    String contactPhone;
+
     @Schema(description = "List of amenities associated with this listing")
     List<AmenityResponse> amenities;
 
