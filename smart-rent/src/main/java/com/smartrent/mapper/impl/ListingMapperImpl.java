@@ -103,6 +103,15 @@ public class ListingMapperImpl implements ListingMapper {
         String ownerZaloLink = ownerContactPhone != null ? "https://zalo.me/" + ownerContactPhone : null;
         Boolean contactAvailable = ownerContactPhone != null && !ownerContactPhone.isBlank();
 
+        // Flat contact fields for AI service consumption
+        String contactName = null;
+        if (user != null) {
+            String first = user.getFirstName() != null ? user.getFirstName() : "";
+            String last = user.getLastName() != null ? user.getLastName() : "";
+            contactName = (last + " " + first).trim();
+        }
+        String contactPhone = ownerContactPhone;
+
         return ListingResponse.builder()
                 .listingId(entity.getListingId())
                 .title(entity.getTitle())
@@ -135,6 +144,8 @@ public class ListingMapperImpl implements ListingMapper {
                 .ownerContactPhoneVerified(ownerContactVerified)
                 .ownerZaloLink(ownerZaloLink)
                 .contactAvailable(contactAvailable)
+                .contactName(contactName)
+                .contactPhone(contactPhone)
                 .amenities(amenityResponses)
                 .media(mediaResponses)
                 .createdAt(entity.getCreatedAt())
