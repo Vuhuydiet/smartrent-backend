@@ -1,163 +1,90 @@
-# ZaloPay Integration Guide
+# ZaloPay Integration Guide for Frontend
 
-This document explains how to integrate **ZaloPay** payment in the frontend application.
+This guide describes how to integrate ZaloPay payment into the SmartRent frontend application.
 
-## Payment Flow Overview
+## 1. Overview of Payment Flow
 
-The ZaloPay integration follows the standard redirect-based payment flow:
-
-```mermaid
-sequenceDiagram
-    participant F as Frontend
-    participant B as Backend
-    participant Z as ZaloPay
-    participant U as User
-
-    U->>F: Click "Pay with ZaloPay"
-    F->>B: POST /v1/memberships/initiate-purchase
-    B-->>F: Return { paymentUrl, transactionRef }
-    F->>U: Redirect to paymentUrl (ZaloPay)
-    U->>Z: Complete Payment
-    Z-->>F: Redirect to returnUrl (Frontend) with params
-    F->>B: GET /v1/payments/callback/ZALOPAY?{params}
-    B-->>F: Return result (PaymentCallbackResponse)
-    F->>U: Show success/failure screen
-```
+1.  **Initiate Payment**: Frontend calls the backend API to create a membership transaction and obtain a ZaloPay payment URL.
+2.  **Redirect**: Frontend redirects the user to the `paymentUrl` provided in the response.
+3.  **Payment on ZaloPay**: The user completes the payment on the ZaloPay sandbox gateway.
+4.  **Redirect Back**: ZaloPay redirects the user back to the `return_url` (configured in the backend as `https://www.smartrent.io.vn/payment/result`).
+5.  **IPN Callback**: ZaloPay sends a server-to-server notification (IPN) to the backend to confirm the payment status.
 
 ---
 
-## Step 1: Create Payment
+## 2. API Endpoints
 
-Call the initiate purchase endpoint with `paymentProvider: "ZALOPAY"`.
+### Initiate Membership Purchase
 
-### Endpoint
-`POST /v1/memberships/initiate-purchase`
+Create a new membership transaction and get the ZaloPay payment URL.
 
-### Request Body
-```json
-{
-  "membershipId": 1,
-  "paymentProvider": "ZALOPAY"
-}
-```
-
-### Response Example
-```json
-{
-  "code": "200000",
-  "message": "success",
-  "data": {
-    "transactionRef": "23484944-37b6-4327-a60e-f2d16f0851c0",
-    "paymentUrl": "https://qc-openapi.zalopay.vn/v2/checkout?order_token=...",
-    "provider": "ZALOPAY",
-    "amount": 700000,
-    "currency": "VND",
-    "createdAt": "2026-04-05T16:00:19Z",
-    "expiresAt": "2026-04-05T16:15:19Z"
-  }
-}
-```
-
----
-
-## Step 2: Redirect to ZaloPay
-
-Use the `paymentUrl` from the response to redirect the user to ZaloPay's checkout page.
-
-```javascript
-window.location.href = result.data.paymentUrl;
-```
-
----
-
-## Step 3: Handle Payment Result (Callback)
-
-After the user completes the payment, ZaloPay will redirect the user back to your frontend `returnUrl` (e.g., `https://www.smartrent.io.vn/payment/result`).
-
-ZaloPay will append several query parameters to this URL:
-- `appid`
-- `apptransid`
-- `zp_trans_id`
-- `status`
-- `checksum`
-- etc.
-
-### Implementation in Frontend
-
-You should capture **all query parameters** and send them to the backend callback endpoint.
-
-#### Endpoint
-`GET /v1/payments/callback/ZALOPAY`
-
-#### Example (Next.js/React)
-```typescript
-// pages/payment/result.tsx
-import { useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
-
-export default function ZaloPayResult() {
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    const processCallback = async () => {
-      // Capture all params
-      const queryString = searchParams.toString();
-      
-      try {
-        const response = await fetch(`/v1/payments/callback/ZALOPAY?${queryString}`);
-        const result = await response.json();
-        
-        if (result.data.success) {
-          // Show success message
-        } else {
-          // Show error message (e.g., User cancelled)
-        }
-      } catch (error) {
-        console.error("Callback error", error);
-      }
-    };
-
-    if (searchParams.has('apptransid')) {
-      processCallback();
+*   **URL**: `/v1/memberships/initiate-purchase`
+*   **Method**: `POST`
+*   **Authentication**: Bearer Token required
+*   **Request Body**:
+    ```json
+    {
+      "membershipId": 1,
+      "paymentProvider": "ZALOPAY"
     }
-  }, [searchParams]);
+    ```
 
-  return <div>Processing ZaloPay result...</div>;
-}
-```
-
----
-
-## Important Notes
-
-### 1. Transaction Mapping
-ZaloPay uses an `apptransid` (formatted as `yyMMdd_transactionId`). 
-- On the backend, we map this back to our internal `transaction_id`.
-- The frontend doesn't need to worry about this mapping; just pass the `apptransid` as part of the query string to the callback API.
-
-### 2. Status Codes
-Common ZaloPay redirect statuses:
-- `1`: Success
-- `-1`: Failed
-- `2`: User cancelled (or other errors)
-
-The backend handles these status codes and returns a unified `PaymentCallbackResponse`.
+*   **Success Response (200 OK)**:
+    ```json
+    {
+      "code": "0000",
+      "message": "Success",
+      "data": {
+        "transactionRef": "cf2ba785-fe91-412b-9ed1-1e32773e9166",
+        "paymentUrl": "https://sb-openapi.zalopay.vn/v2/create/order/...",
+        "provider": "ZALOPAY",
+        "amount": 700000,
+        "currency": "VND",
+        "createdAt": "2026-04-05T23:20:40",
+        "expiresAt": "2026-04-05T23:35:40"
+      }
+    }
+    ```
 
 ---
 
-## API Reference: Callback Response
+## 3. Frontend Implementation Steps
 
-```json
-{
-  "code": "200000",
-  "message": "Payment completed successfully",
-  "data": {
-    "transactionRef": "23484944-37b6-4327-a60e-f2d16f0851c0",
-    "providerTransactionId": "240405_zp_12345",
-    "status": "COMPLETED",
-    "success": true,
-    "signatureValid": true,
-    "message": "Payment successful"
-  }
-}
-```
+1.  **Call API**: Execute the `POST` request to `/v1/memberships/initiate-purchase`.
+2.  **Handle Response**: Extract the `paymentUrl` from the response.
+3.  **Redirect**:
+    ```javascript
+    if (response.data.paymentUrl) {
+      window.location.href = response.data.paymentUrl;
+    }
+    ```
+4.  **Handle Result Page**: The user will be redirected to `https://www.smartrent.io.vn/payment/result?orderId=...&amount=...&resultCode=...`
+    *   `resultCode = 1`: Success
+    *   `resultCode = 2`: Failed
+    *   Frontend should show a success/failure message based on these parameters and can call a backend API to verify the transaction status if needed.
+
+---
+
+## 4. Sandbox Testing
+
+To test ZaloPay in the sandbox environment:
+
+1.  **App**: Download the **ZaloPay Sandbox** app on your phone (or use the web interface provided by the redirect).
+2.  **Test Account**: Use the official ZaloPay sandbox test accounts or cards.
+    *   **Card Number**: `970433` (then any 10-13 digits)
+    *   **OTP**: `123456`
+3.  **Environment Variables**: Ensure your `.env` contains:
+    *   `ZALOPAY_APP_ID=2554`
+    *   `ZALOPAY_KEY1=sdngKKJmqEMzvh5QQcdD2A9XBSKUNaYn`
+    *   `ZALOPAY_KEY2=trMrHtvjo6myautxDUiAcYsVtaeQ8nhf`
+
+---
+
+## 5. Troubleshooting (Backend Logs)
+
+If you encounter errors during testing, check the backend logs for:
+- `ZaloPay MAC source`: The raw data being signed.
+- `return_code`: 
+    - `1`: Success
+    - `2`: Transaction failed (usually due to invalid parameters or MAC)
+- `app_trans_id`: Must be unique and format `yyMMdd_XXXX` (limit 40 chars).
