@@ -54,12 +54,14 @@ public interface MediaRepository extends JpaRepository<Media, Long> {
     List<Media> findExpiredPendingUploads(@Param("expiryTime") LocalDateTime expiryTime);
 
     /**
-     * Find orphan media (ACTIVE media without listing after expiry time)
-     * These are media that were uploaded but never attached to a listing
+     * Find orphan media (ACTIVE media without listing after expiry time).
+     * Avatar uploads live under users/{userId}/avatar/... and stay listing-less forever, so
+     * they must be excluded or the cron would delete every user's avatar 24h after upload.
      */
     @Query("SELECT m FROM media m WHERE m.status = 'ACTIVE' " +
            "AND m.listing IS NULL " +
            "AND m.sourceType = 'UPLOAD' " +
+           "AND (m.storageKey IS NULL OR m.storageKey NOT LIKE 'users/%/avatar/%') " +
            "AND m.createdAt < :expiryTime")
     List<Media> findOrphanActiveMedia(@Param("expiryTime") LocalDateTime expiryTime);
 
