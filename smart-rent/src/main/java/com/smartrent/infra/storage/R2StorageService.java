@@ -13,8 +13,12 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -25,6 +29,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.net.URI;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -71,19 +76,24 @@ public class R2StorageService {
     }
 
     /**
-     * Generate pre-signed upload URL
+     * Generate pre-signed upload URL with Content-Type and Content-Length constraints.
+     * Note: Content-Length signing is best-effort; strict enforcement happens via HeadObject
+     * check after upload in confirmUpload.
      */
-    public PresignedUrlResponse generateUploadUrl(String key, String contentType) {
+    public PresignedUrlResponse generateUploadUrl(String key, String contentType, Long contentLength) {
         try {
-            PutObjectRequest putRequest = PutObjectRequest.builder()
+            PutObjectRequest.Builder putBuilder = PutObjectRequest.builder()
                     .bucket(config.getBucketName())
                     .key(key)
-                    .contentType(contentType)
-                    .build();
+                    .contentType(contentType);
+
+            if (contentLength != null && contentLength > 0) {
+                putBuilder.contentLength(contentLength);
+            }
 
             PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
                     .signatureDuration(Duration.ofMinutes(config.getUploadUrlTtlMinutes()))
-                    .putObjectRequest(putRequest)
+                    .putObjectRequest(putBuilder.build())
                     .build();
 
             PresignedPutObjectRequest presignedRequest = presigner.presignPutObject(presignRequest);
@@ -198,6 +208,28 @@ public class R2StorageService {
     }
 
     /**
+     * Call HeadObject to verify an object exists and inspect its metadata.
+     * Returns empty if the object does not exist.
+     */
+    public Optional<HeadObjectResponse> headObject(String key) {
+        try {
+            HeadObjectResponse response = s3Client.headObject(HeadObjectRequest.builder()
+                    .bucket(config.getBucketName())
+                    .key(key)
+                    .build());
+            return Optional.of(response);
+        } catch (NoSuchKeyException e) {
+            return Optional.empty();
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404) {
+                return Optional.empty();
+            }
+            log.error("HeadObject failed for key: {}", key, e);
+            throw new RuntimeException("Failed to inspect object on storage", e);
+        }
+    }
+
+    /**
      * Delete object from storage
      */
     public void deleteObject(String key) {
@@ -216,35 +248,89 @@ public class R2StorageService {
     }
 
     /**
-     * Generate storage key for media
-     * @param userId User ID (UUID string)
-     * @param filename Original filename
-     * @return Storage key in format: media/{userId}/{uuid}_{sanitized_filename}
+     * Generate storage key for listing media.
+     * Format: listings/{listingId}/{userId}/{uuid}.{ext}
      */
-    public String generateStorageKey(String userId, String filename) {
-        // Sanitize filename: keep only alphanumeric, dots, underscores, and hyphens
-        String sanitized = filename.replaceAll("[^a-zA-Z0-9._-]", "_");
-        String uuid = UUID.randomUUID().toString();
-        return String.format("media/%s/%s_%s", userId, uuid, sanitized);
+    public String generateListingStorageKey(Long listingId, String userId, String filename, String contentType) {
+        String ext = resolveExtension(filename, contentType);
+        return String.format("listings/%d/%s/%s%s", listingId, userId, UUID.randomUUID(), ext);
     }
 
     /**
-     * Get public URL for a key (CDN URL)
+     * Generate storage key for avatar.
+     * Format: users/{userId}/avatar/{uuid}.{ext}
+     */
+    public String generateAvatarStorageKey(String userId, String filename, String contentType) {
+        String ext = resolveExtension(filename, contentType);
+        return String.format("users/%s/avatar/%s%s", userId, UUID.randomUUID(), ext);
+    }
+
+    /**
+     * Generate a generic storage key for uploads without a specific purpose context.
+     * Format: media/{userId}/{uuid}.{ext}
+     */
+    public String generateGenericStorageKey(String userId, String filename, String contentType) {
+        String ext = resolveExtension(filename, contentType);
+        return String.format("media/%s/%s%s", userId, UUID.randomUUID(), ext);
+    }
+
+    private String resolveExtension(String filename, String contentType) {
+        if (filename != null) {
+            int dot = filename.lastIndexOf('.');
+            if (dot >= 0 && dot < filename.length() - 1) {
+                String raw = filename.substring(dot + 1).toLowerCase();
+                String sanitized = raw.replaceAll("[^a-z0-9]", "");
+                if (!sanitized.isEmpty() && sanitized.length() <= 8) {
+                    return "." + sanitized;
+                }
+            }
+        }
+        if (contentType != null) {
+            switch (contentType.toLowerCase()) {
+                case "image/jpeg": return ".jpg";
+                case "image/png": return ".png";
+                case "image/webp": return ".webp";
+                case "video/mp4": return ".mp4";
+                case "video/webm": return ".webm";
+                case "video/quicktime": return ".mov";
+                default: return "";
+            }
+        }
+        return "";
+    }
+
+    /**
+     * Get public URL for a key (public R2 URL or CDN)
      */
     public String getPublicUrl(String key) {
-        if (config.getPublicUrl() != null && !config.getPublicUrl().isEmpty()) {
-            return config.getPublicUrl() + "/" + key;
+        if (config.getPublicBaseUrl() != null && !config.getPublicBaseUrl().isEmpty()) {
+            String base = config.getPublicBaseUrl();
+            if (base.endsWith("/")) {
+                base = base.substring(0, base.length() - 1);
+            }
+            return base + "/" + key;
         }
         // Fallback to endpoint URL if no public URL configured
         return config.getEndpoint() + "/" + config.getBucketName() + "/" + key;
     }
 
     /**
-     * Validate file size
+     * Validate file size against per-media-type limits.
+     *
+     * @param fileSize file size in bytes
+     * @param isImage  true for images, false for videos
      */
-    public boolean isValidFileSize(Long fileSize) {
-        long maxSizeBytes = config.getMaxFileSizeMB() * 1024L * 1024L;
-        return fileSize > 0 && fileSize <= maxSizeBytes;
+    public boolean isValidFileSize(Long fileSize, boolean isImage) {
+        if (fileSize == null || fileSize <= 0) {
+            return false;
+        }
+        int maxMB = isImage ? config.getMaxImageSizeMB() : config.getMaxVideoSizeMB();
+        long maxBytes = maxMB * 1024L * 1024L;
+        return fileSize <= maxBytes;
+    }
+
+    public int getMaxSizeMB(boolean isImage) {
+        return isImage ? config.getMaxImageSizeMB() : config.getMaxVideoSizeMB();
     }
 
     /**
