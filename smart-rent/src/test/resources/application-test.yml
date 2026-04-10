@@ -42,12 +42,12 @@ SENDER_NAME: "Test Sender"
 CLIENT_ID: "test-client-id"
 CLIENT_SECRET: "test-client-secret"
 GOOGLE_AUTH_CLIENT_REDIRECT_URI: "http://localhost:8080/v1/auth/google"
-S3_ENDPOINT: "https://test-endpoint.com"
-S3_REGION: "us-east-1"
-S3_ACCESS_KEY: "test-access-key"
-S3_SECRET_KEY: "test-secret-key"
-S3_BUCKET: "test-bucket"
-S3_PUBLIC_URL: "https://test-public-url.com"
+R2_ENDPOINT: "https://test-endpoint.com"
+R2_REGION: "auto"
+R2_ACCESS_KEY_ID: "test-access-key"
+R2_SECRET_ACCESS_KEY: "test-secret-key"
+R2_BUCKET_NAME: "test-bucket"
+R2_PUBLIC_BASE_URL: "https://test-public-url.com"
 VNPAY_TMN_CODE: "TESTCODE"
 VNPAY_HASH_SECRET: "TESTSECRET"
 VNPAY_PAYMENT_URL: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
@@ -143,10 +143,22 @@ logging:
 
 open:
   storage:
-    s3:
+    r2:
       endpoint: "https://test-endpoint.com"
-      region: "us-east-1"
+      region: "auto"
       accessKey: "test-access-key"
       secretKey: "test-secret-key"
       bucketName: "test-bucket"
-      publicUrl: "https://test-public-url.com"
+      publicBaseUrl: "https://test-public-url.com"
+      maxImageSizeMB: 10
+      maxVideoSizeMB: 100
+      uploadUrlTtlMinutes: 10
+      downloadUrlTtlMinutes: 60
+      allowedImageTypes:
+        - image/jpeg
+        - image/png
+        - image/webp
+      allowedVideoTypes:
+        - video/mp4
+        - video/webm
+        - video/quicktime
