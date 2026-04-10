@@ -8,6 +8,7 @@ import com.smartrent.dto.response.MediaResponse;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AdminRepository;
+import com.smartrent.infra.repository.ListingDraftRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.UserRepository;
@@ -28,8 +29,11 @@ import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,6 +45,7 @@ public class MediaServiceImpl implements MediaService {
     private final UserRepository userRepository;
     private final AdminRepository adminRepository;
     private final ListingRepository listingRepository;
+    private final ListingDraftRepository listingDraftRepository;
     private final R2StorageService storageService;
     private final MediaMapper mediaMapper;
 
@@ -461,21 +466,41 @@ public class MediaServiceImpl implements MediaService {
     }
 
     /**
-     * Cleanup orphan media (ACTIVE media without listing after 24 hours)
-     * This handles cases where user uploaded media but never created a listing
-     * Runs every 6 hours
+     * Cleanup orphan media (ACTIVE media without listing after 24 hours).
+     *
+     * A media record is only a true orphan if it is neither attached to a listing nor
+     * referenced by any draft. Drafts can be long-lived (users save a draft and come back
+     * days or weeks later to publish), so media IDs that appear in any listing_drafts.media_ids
+     * string must be preserved even if the media row itself has listing_id = NULL.
      */
     @Transactional
     @Scheduled(cron = "0 0 */6 * * *") // Run every 6 hours
     public void cleanupOrphanMedia() {
         log.info("Starting cleanup of orphan media (ACTIVE media without listing)");
 
-        // Find ACTIVE media without listing, older than 24 hours
         LocalDateTime expiryTime = LocalDateTime.now().minusHours(24);
-        List<Media> orphanMedia = mediaRepository.findOrphanActiveMedia(expiryTime);
+        List<Media> candidates = mediaRepository.findOrphanActiveMedia(expiryTime);
+
+        if (candidates.isEmpty()) {
+            log.info("No orphan media found");
+            return;
+        }
+
+        Set<Long> draftReferencedIds = loadDraftReferencedMediaIds();
+        List<Media> orphanMedia = draftReferencedIds.isEmpty()
+                ? candidates
+                : candidates.stream()
+                    .filter(m -> !draftReferencedIds.contains(m.getMediaId()))
+                    .collect(Collectors.toList());
+
+        int protectedByDraft = candidates.size() - orphanMedia.size();
+        if (protectedByDraft > 0) {
+            log.info("Protected {} orphan candidate(s) from cleanup because they are still referenced by drafts",
+                    protectedByDraft);
+        }
 
         if (orphanMedia.isEmpty()) {
-            log.info("No orphan media found");
+            log.info("All orphan candidates are referenced by drafts; nothing to clean up");
             return;
         }
 
@@ -501,6 +526,36 @@ public class MediaServiceImpl implements MediaService {
         }
 
         log.info("Orphan media cleanup completed. Processed {} items", orphanMedia.size());
+    }
+
+    /**
+     * Parse every listing_drafts.media_ids string into a single Set of media IDs. Entries are
+     * stored as comma-separated strings, so this walks each row once and ignores malformed
+     * tokens rather than failing the cron over a single bad draft.
+     */
+    private Set<Long> loadDraftReferencedMediaIds() {
+        List<String> raw = listingDraftRepository.findAllDraftMediaIdsStrings();
+        if (raw == null || raw.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Long> ids = new HashSet<>();
+        for (String csv : raw) {
+            if (csv == null || csv.isBlank()) {
+                continue;
+            }
+            for (String token : csv.split(",")) {
+                String trimmed = token.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                try {
+                    ids.add(Long.parseLong(trimmed));
+                } catch (NumberFormatException e) {
+                    log.warn("Ignoring malformed draft media id token: '{}'", trimmed);
+                }
+            }
+        }
+        return ids;
     }
 
     // ==================== Admin Methods ====================
