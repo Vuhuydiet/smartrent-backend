@@ -60,4 +60,58 @@ public class AddressResponse {
 
     @Schema(description = "Loại địa chỉ", example = "NEW", allowableValues = {"OLD", "NEW"})
     String addressType;
+
+    // ===== Legacy structure fields (63 provinces) =====
+
+    @Schema(description = "Legacy province ID", example = "79")
+    Integer legacyProvinceId;
+
+    @Schema(description = "Legacy province name", example = "Tỉnh Đồng Tháp")
+    String legacyProvinceName;
+
+    @Schema(description = "Legacy district ID", example = "624")
+    Integer legacyDistrictId;
+
+    @Schema(description = "Legacy district name", example = "Huyện Lấp Vò")
+    String legacyDistrictName;
+
+    @Schema(description = "Legacy ward ID", example = "9286")
+    Integer legacyWardId;
+
+    @Schema(description = "Legacy ward name", example = "Xã Bình Thạnh Trung")
+    String legacyWardName;
+
+    @Schema(description = "Legacy street", example = "Nguyễn Trãi")
+    String legacyStreet;
+
+    // ===== New structure fields (34 provinces) =====
+
+    @Schema(description = "New province code", example = "87")
+    String newProvinceCode;
+
+    @Schema(description = "New province name", example = "Đồng Tháp")
+    String newProvinceName;
+
+    @Schema(description = "New ward code", example = "30196")
+    String newWardCode;
+
+    @Schema(description = "New ward name", example = "Xã Bình Thạnh")
+    String newWardName;
+
+    @Schema(description = "New street", example = "Nguyễn Trãi")
+    String newStreet;
+
+    // ===== Optional project/street metadata =====
+
+    @Schema(description = "Street ID", example = "123")
+    Integer streetId;
+
+    @Schema(description = "Street name", example = "Nguyễn Trãi")
+    String streetName;
+
+    @Schema(description = "Project ID", example = "45")
+    Integer projectId;
+
+    @Schema(description = "Project name", example = "Khu đô thị ABC")
+    String projectName;
 }

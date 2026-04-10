@@ -14,6 +14,7 @@ import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.CategoryListingStatsResponse;
+import com.smartrent.dto.response.AddressConversionResponse;
 import com.smartrent.dto.response.DraftListingResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingListResponse;
@@ -57,6 +58,7 @@ import com.smartrent.service.quota.QuotaService;
 import com.smartrent.service.payment.PaymentService;
 import com.smartrent.service.transaction.TransactionService;
 import com.smartrent.service.address.AddressCreationService;
+import com.smartrent.service.address.AddressService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -116,6 +118,7 @@ public class ListingServiceImpl implements ListingService {
     VipTierDetailRepository vipTierDetailRepository;
     PaymentService paymentService;
     AddressCreationService addressCreationService;
+    AddressService addressService;
     ListingRequestCacheService listingRequestCacheService;
     ListingQueryService listingQueryService;
     com.smartrent.service.moderation.ListingModerationService listingModerationService;
@@ -2117,62 +2120,306 @@ public class ListingServiceImpl implements ListingService {
      * Build AddressResponse from ListingDraft address fields (unified format)
      */
     private com.smartrent.dto.response.AddressResponse buildAddressResponseFromDraft(ListingDraft draft) {
-        if (draft.getAddressType() == null) {
+        Integer legacyProvinceId = draft.getProvinceId() != null ? draft.getProvinceId().intValue() : null;
+        Integer legacyDistrictId = draft.getDistrictId() != null ? draft.getDistrictId().intValue() : null;
+        Integer legacyWardId = draft.getWardId() != null ? draft.getWardId().intValue() : null;
+
+        String legacyStreet = trimToNull(draft.getStreet());
+        String newStreet = trimToNull(draft.getNewStreet());
+        if (!hasText(newStreet)) {
+            newStreet = legacyStreet;
+        }
+
+        String newProvinceCode = trimToNull(draft.getProvinceCode());
+        String newWardCode = trimToNull(draft.getWardCode());
+
+        LegacyProvince legacyProvince = null;
+        District legacyDistrict = null;
+        LegacyWard legacyWard = null;
+        Province newProvince = null;
+        Ward newWard = null;
+        AddressMapping resolvedMapping = null;
+        AddressConversionResponse conversionResponse = null;
+
+        if (legacyProvinceId != null) {
+            legacyProvince = legacyProvinceRepository.findById(legacyProvinceId).orElse(null);
+        }
+        if (legacyDistrictId != null) {
+            legacyDistrict = legacyDistrictRepository.findById(legacyDistrictId).orElse(null);
+        }
+        if (legacyWardId != null) {
+            legacyWard = legacyWardRepository.findById(legacyWardId).orElse(null);
+        }
+
+        // If draft only has legacy triplet, auto-convert to new structure for FE mapping.
+        if ((!hasText(newProvinceCode) || !hasText(newWardCode))
+                && legacyProvinceId != null
+                && legacyDistrictId != null
+                && legacyWardId != null) {
+            try {
+                conversionResponse = addressService.convertLegacyToNew(
+                        legacyProvinceId,
+                        legacyDistrictId,
+                        legacyWardId);
+
+                if (conversionResponse != null
+                        && conversionResponse.getNewAddress() != null) {
+                    if (!hasText(newProvinceCode)
+                            && conversionResponse.getNewAddress().getProvince() != null) {
+                        newProvinceCode = trimToNull(
+                                conversionResponse.getNewAddress().getProvince().getId());
+                    }
+                    if (!hasText(newWardCode)
+                            && conversionResponse.getNewAddress().getWard() != null) {
+                        newWardCode = trimToNull(
+                                conversionResponse.getNewAddress().getWard().getCode());
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("Could not convert legacy draft {} to new address codes: {}",
+                        draft.getDraftId(), ex.getMessage());
+            }
+
+            // Fallback to direct mapping lookup if conversion service cannot provide data.
+            if ((!hasText(newProvinceCode) || !hasText(newWardCode))
+                    && legacyProvince != null
+                    && legacyDistrict != null
+                    && legacyWard != null) {
+                AddressMapping bestMapping = addressMappingRepository
+                        .findBestByLegacyAddress(
+                                legacyProvince.getCode(),
+                                legacyDistrict.getCode(),
+                                legacyWard.getCode())
+                        .orElse(null);
+
+                if (bestMapping != null) {
+                    resolvedMapping = bestMapping;
+                    if (!hasText(newProvinceCode)) {
+                        newProvinceCode = trimToNull(bestMapping.getNewProvinceCode());
+                    }
+                    if (!hasText(newWardCode)) {
+                        newWardCode = trimToNull(bestMapping.getNewWardCode());
+                    }
+                }
+            }
+        }
+
+        // If draft only has new structure, backfill legacy IDs for compatibility.
+        if ((legacyProvinceId == null || legacyDistrictId == null || legacyWardId == null)
+                && hasText(newProvinceCode)
+                && hasText(newWardCode)) {
+            AddressMapping reverseMapping = addressMappingRepository
+                    .findDefaultByNewAddress(newProvinceCode, newWardCode)
+                    .orElse(null);
+
+            if (reverseMapping == null) {
+                reverseMapping = addressMappingRepository
+                        .findByNewAddress(newProvinceCode, newWardCode)
+                        .stream()
+                        .findFirst()
+                        .orElse(null);
+            }
+
+            if (reverseMapping != null) {
+                resolvedMapping = resolvedMapping != null ? resolvedMapping : reverseMapping;
+
+                if (legacyProvinceId == null && reverseMapping.getLegacyProvince() != null) {
+                    legacyProvinceId = reverseMapping.getLegacyProvince().getId();
+                }
+                if (legacyDistrictId == null && reverseMapping.getLegacyDistrict() != null) {
+                    legacyDistrictId = reverseMapping.getLegacyDistrict().getId();
+                }
+                if (legacyWardId == null && reverseMapping.getLegacyWard() != null) {
+                    legacyWardId = reverseMapping.getLegacyWard().getId();
+                }
+            }
+        }
+
+        if (legacyProvince == null && legacyProvinceId != null) {
+            legacyProvince = legacyProvinceRepository.findById(legacyProvinceId).orElse(null);
+        }
+        if (legacyDistrict == null && legacyDistrictId != null) {
+            legacyDistrict = legacyDistrictRepository.findById(legacyDistrictId).orElse(null);
+        }
+        if (legacyWard == null && legacyWardId != null) {
+            legacyWard = legacyWardRepository.findById(legacyWardId).orElse(null);
+        }
+
+        if (hasText(newProvinceCode)) {
+            newProvince = provinceRepository.findByCode(newProvinceCode).orElse(null);
+        }
+        if (hasText(newWardCode)) {
+            newWard = wardRepository.findByCode(newWardCode).orElse(null);
+        }
+
+        String legacyProvinceName = legacyProvince != null
+                ? legacyProvince.getName()
+                : (resolvedMapping != null ? trimToNull(resolvedMapping.getLegacyProvinceName()) : null);
+        String legacyDistrictName = legacyDistrict != null
+                ? legacyDistrict.getName()
+                : (resolvedMapping != null ? trimToNull(resolvedMapping.getLegacyDistrictName()) : null);
+        String legacyWardName = legacyWard != null
+                ? legacyWard.getName()
+                : (resolvedMapping != null ? trimToNull(resolvedMapping.getLegacyWardName()) : null);
+
+        String convertedNewProvinceName =
+            conversionResponse != null
+                && conversionResponse.getNewAddress() != null
+                && conversionResponse.getNewAddress().getProvince() != null
+                ? trimToNull(conversionResponse.getNewAddress().getProvince().getName())
+                : null;
+        String convertedNewWardName =
+            conversionResponse != null
+                && conversionResponse.getNewAddress() != null
+                && conversionResponse.getNewAddress().getWard() != null
+                ? trimToNull(conversionResponse.getNewAddress().getWard().getName())
+                : null;
+
+        String newProvinceName = newProvince != null
+                ? newProvince.getName()
+            : (hasText(convertedNewProvinceName)
+                ? convertedNewProvinceName
+                : (resolvedMapping != null ? trimToNull(resolvedMapping.getNewProvinceName()) : null));
+        String newWardName = newWard != null
+                ? newWard.getName()
+            : (hasText(convertedNewWardName)
+                ? convertedNewWardName
+                : (resolvedMapping != null ? trimToNull(resolvedMapping.getNewWardName()) : null));
+
+        String fullAddress = joinAddressParts(
+                legacyStreet,
+                legacyWardName,
+                legacyDistrictName,
+                legacyProvinceName);
+
+        if (!hasText(fullAddress) && (legacyProvinceId != null || legacyDistrictId != null || legacyWardId != null)) {
+            ListingDraft legacySource = ListingDraft.builder()
+                    .provinceId(legacyProvinceId != null ? legacyProvinceId.longValue() : null)
+                    .districtId(legacyDistrictId != null ? legacyDistrictId.longValue() : null)
+                    .wardId(legacyWardId != null ? legacyWardId.longValue() : null)
+                    .street(legacyStreet)
+                    .projectId(draft.getProjectId())
+                    .build();
+            fullAddress = trimToNull(buildLegacyFullAddressFromDraft(legacySource));
+        }
+
+        String fullNewAddress = joinAddressParts(
+                newStreet,
+                newWardName,
+                newProvinceName);
+
+        if (!hasText(fullNewAddress) && (hasText(newProvinceCode) || hasText(newWardCode))) {
+            ListingDraft newSource = ListingDraft.builder()
+                    .provinceCode(newProvinceCode)
+                    .wardCode(newWardCode)
+                    .newStreet(newStreet)
+                    .projectId(draft.getProjectId())
+                    .build();
+            fullNewAddress = trimToNull(buildNewFullAddressFromDraft(newSource));
+        }
+
+        boolean hasLegacyData = legacyProvinceId != null || legacyDistrictId != null || legacyWardId != null || hasText(legacyStreet);
+        boolean hasNewData = hasText(newProvinceCode) || hasText(newWardCode) || hasText(newStreet);
+        boolean hasCoordinates = draft.getLatitude() != null || draft.getLongitude() != null;
+
+        if (!hasLegacyData && !hasNewData && !hasCoordinates) {
             return null;
         }
 
-        com.smartrent.dto.response.AddressResponse.AddressResponseBuilder builder =
-                com.smartrent.dto.response.AddressResponse.builder();
-
-        if (draft.getLatitude() != null && draft.getLongitude() != null) {
-            builder.latitude(java.math.BigDecimal.valueOf(draft.getLatitude()))
-                   .longitude(java.math.BigDecimal.valueOf(draft.getLongitude()));
-        }
-
-        if ("NEW".equals(draft.getAddressType())) {
-            // New structure (34 provinces, 2-tier)
-            if (draft.getProvinceCode() != null) {
-                builder.provinceCode(draft.getProvinceCode());
-                provinceRepository.findByCode(draft.getProvinceCode())
-                        .ifPresent(province -> builder.provinceName(province.getName()));
-            }
-            if (draft.getWardCode() != null) {
-                builder.wardCode(draft.getWardCode());
-                wardRepository.findByCode(draft.getWardCode())
-                        .ifPresent(ward -> builder.wardName(ward.getName()));
-            }
-            if (draft.getNewStreet() != null) {
-                builder.street(draft.getNewStreet());
-            }
-            if (draft.getProvinceCode() != null || draft.getWardCode() != null) {
-                builder.fullAddress(buildNewFullAddressFromDraft(draft));
-            }
+        String effectiveAddressType;
+        if (hasNewData) {
+            effectiveAddressType = "NEW";
+        } else if (hasLegacyData) {
+            effectiveAddressType = "OLD";
         } else {
-            // Legacy structure (63 provinces, 3-tier)
-            if (draft.getProvinceId() != null) {
-                builder.provinceCode(String.valueOf(draft.getProvinceId().intValue()));
-                legacyProvinceRepository.findById(draft.getProvinceId().intValue())
-                        .ifPresent(province -> builder.provinceName(province.getName()));
-            }
-            if (draft.getDistrictId() != null) {
-                builder.districtCode(String.valueOf(draft.getDistrictId().intValue()));
-                legacyDistrictRepository.findById(draft.getDistrictId().intValue())
-                        .ifPresent(district -> builder.districtName(district.getName()));
-            }
-            if (draft.getWardId() != null) {
-                builder.wardCode(String.valueOf(draft.getWardId().intValue()));
-                legacyWardRepository.findById(draft.getWardId().intValue())
-                        .ifPresent(ward -> builder.wardName(ward.getName()));
-            }
-            if (draft.getStreet() != null) {
-                builder.street(draft.getStreet());
-            }
-            if (draft.getProvinceId() != null || draft.getDistrictId() != null || draft.getWardId() != null) {
-                builder.fullAddress(buildLegacyFullAddressFromDraft(draft));
-            }
+            effectiveAddressType = hasText(draft.getAddressType()) ? draft.getAddressType() : "OLD";
         }
 
-        return builder.build();
+        String unifiedProvinceCode = "NEW".equals(effectiveAddressType) && hasText(newProvinceCode)
+            ? newProvinceCode
+            : (legacyProvinceId != null ? String.valueOf(legacyProvinceId) : newProvinceCode);
+        String unifiedProvinceName = "NEW".equals(effectiveAddressType) && hasText(newProvinceName)
+            ? newProvinceName
+            : (hasText(legacyProvinceName) ? legacyProvinceName : newProvinceName);
+        String unifiedDistrictCode = "NEW".equals(effectiveAddressType)
+            ? null
+            : (legacyDistrictId != null ? String.valueOf(legacyDistrictId) : null);
+        String unifiedDistrictName = "NEW".equals(effectiveAddressType)
+            ? null
+            : legacyDistrictName;
+        String unifiedWardCode = "NEW".equals(effectiveAddressType) && hasText(newWardCode)
+            ? newWardCode
+            : (legacyWardId != null ? String.valueOf(legacyWardId) : newWardCode);
+        String unifiedWardName = "NEW".equals(effectiveAddressType) && hasText(newWardName)
+            ? newWardName
+            : (hasText(legacyWardName) ? legacyWardName : newWardName);
+        String unifiedStreet = "NEW".equals(effectiveAddressType) ? newStreet : legacyStreet;
+        if (!hasText(unifiedStreet)) {
+            unifiedStreet = hasText(newStreet) ? newStreet : legacyStreet;
+        }
+
+        Integer projectId = draft.getProjectId() != null ? draft.getProjectId().intValue() : null;
+        String projectName = null;
+        if (projectId != null) {
+            projectName = projectRepository.findById(projectId)
+                    .map(Project::getName)
+                    .orElse(null);
+        }
+
+        return com.smartrent.dto.response.AddressResponse.builder()
+                .addressId(null)
+                .fullAddress(trimToNull(fullAddress))
+                .fullNewAddress(trimToNull(fullNewAddress))
+                .latitude(draft.getLatitude() != null ? java.math.BigDecimal.valueOf(draft.getLatitude()) : null)
+                .longitude(draft.getLongitude() != null ? java.math.BigDecimal.valueOf(draft.getLongitude()) : null)
+                .provinceCode(trimToNull(unifiedProvinceCode))
+                .provinceName(trimToNull(unifiedProvinceName))
+                .districtCode(trimToNull(unifiedDistrictCode))
+                .districtName(trimToNull(unifiedDistrictName))
+                .wardCode(trimToNull(unifiedWardCode))
+                .wardName(trimToNull(unifiedWardName))
+                .street(trimToNull(unifiedStreet))
+                .addressType(effectiveAddressType)
+                .legacyProvinceId(legacyProvinceId)
+                .legacyProvinceName(trimToNull(legacyProvinceName))
+                .legacyDistrictId(legacyDistrictId)
+                .legacyDistrictName(trimToNull(legacyDistrictName))
+                .legacyWardId(legacyWardId)
+                .legacyWardName(trimToNull(legacyWardName))
+                .legacyStreet(trimToNull(legacyStreet))
+                .newProvinceCode(trimToNull(newProvinceCode))
+                .newProvinceName(trimToNull(newProvinceName))
+                .newWardCode(trimToNull(newWardCode))
+                .newWardName(trimToNull(newWardName))
+                .newStreet(trimToNull(newStreet))
+                .streetId(draft.getStreetId() != null ? draft.getStreetId().intValue() : null)
+                .streetName(trimToNull(unifiedStreet))
+                .projectId(projectId)
+                .projectName(trimToNull(projectName))
+                .build();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String joinAddressParts(String... parts) {
+        List<String> normalized = new ArrayList<>();
+        for (String part : parts) {
+            String value = trimToNull(part);
+            if (value != null) {
+                normalized.add(value);
+            }
+        }
+        return normalized.isEmpty() ? null : String.join(", ", normalized);
     }
 
     /**
