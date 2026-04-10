@@ -404,9 +404,36 @@ public class UserController {
         .build();
   }
 
+  @PatchMapping(value = "/profile", consumes = {"application/json"})
+  @Operation(
+      summary = "Update user profile (JSON)",
+      description = """
+          Updates the authenticated user's profile fields in JSON format. Avatar updates go
+          through the presigned upload flow: client calls POST /v1/media/upload-url with
+          purpose=AVATAR, PUTs the file to R2, calls POST /v1/media/{mediaId}/confirm, then
+          passes the resulting mediaId as `avatarMediaId` here.
+
+          Replacing the avatar soft-deletes the previous avatar media record; the cleanup job
+          will later reclaim the underlying R2 object.
+          """,
+      security = @SecurityRequirement(name = "Bearer Authentication")
+  )
+  public ApiResponse<GetUserResponse> updateUserProfileJson(
+      @Valid @RequestBody UserProfileUpdateRequest request
+  ) {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    String userId = authentication.getName();
+
+    GetUserResponse response = userService.updateUserProfile(userId, request);
+    return ApiResponse.<GetUserResponse>builder()
+        .data(response)
+        .build();
+  }
+
+  @Deprecated
   @PatchMapping(value = "/profile", consumes = {"multipart/form-data"})
   @Operation(
-      summary = "Update user profile",
+      summary = "Update user profile (multipart — DEPRECATED)",
       description = """
           Updates the authenticated user's profile information including avatar.
 

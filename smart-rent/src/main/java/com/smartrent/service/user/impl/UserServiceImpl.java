@@ -23,6 +23,8 @@ import com.smartrent.service.authentication.OtpCacheService;
 import com.smartrent.service.authentication.domain.OtpData;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.model.DomainCode;
+import com.smartrent.infra.repository.MediaRepository;
+import com.smartrent.infra.repository.entity.Media;
 import com.smartrent.infra.storage.R2StorageService;
 import com.smartrent.service.email.VerificationEmailService;
 import com.smartrent.service.user.UserService;
@@ -63,6 +65,8 @@ public class UserServiceImpl implements UserService {
   OtpCacheService otpCacheService;
 
   R2StorageService storageService;
+
+  MediaRepository mediaRepository;
 
   @Override
   @Transactional
@@ -236,6 +240,94 @@ public class UserServiceImpl implements UserService {
     log.info("Successfully updated profile for user {}", userId);
 
     return userMapper.mapFromUserEntityToGetUserResponse(user);
+  }
+
+  @Override
+  @Transactional
+  @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId")
+  public GetUserResponse updateUserProfile(String userId, UserProfileUpdateRequest request) {
+    log.info("Updating profile (JSON) for user {}", userId);
+
+    User user = userRepository.findById(userId)
+        .orElseThrow(UserNotFoundException::new);
+
+    if (request != null) {
+      if (request.getFirstName() != null) {
+        user.setFirstName(request.getFirstName());
+      }
+      if (request.getLastName() != null) {
+        user.setLastName(request.getLastName());
+      }
+      if (request.getIdDocument() != null && !request.getIdDocument().equals(user.getIdDocument())) {
+        if (userRepository.existsByIdDocument(request.getIdDocument())) {
+          throw new DocumentExistingException();
+        }
+        user.setIdDocument(request.getIdDocument());
+      }
+      if (request.getTaxNumber() != null && !request.getTaxNumber().equals(user.getTaxNumber())) {
+        if (userRepository.existsByTaxNumber(request.getTaxNumber())) {
+          throw new TaxNumberExisting();
+        }
+        user.setTaxNumber(request.getTaxNumber());
+      }
+      if (request.getContactPhoneNumber() != null) {
+        user.setContactPhoneNumber(request.getContactPhoneNumber());
+        user.setContactPhoneVerified(false);
+      }
+      if (request.getAvatarMediaId() != null) {
+        applyAvatarMedia(user, request.getAvatarMediaId());
+      }
+    }
+
+    user = userRepository.saveAndFlush(user);
+    log.info("Successfully updated profile (JSON) for user {}", userId);
+
+    return userMapper.mapFromUserEntityToGetUserResponse(user);
+  }
+
+  /**
+   * Resolve an avatarMediaId coming from the presigned upload flow, verify ownership and
+   * media type, soft-delete the previous avatar media record if any, and copy the public URL
+   * onto the user entity.
+   */
+  private void applyAvatarMedia(User user, Long avatarMediaId) {
+    Media media = mediaRepository.findByMediaIdAndUserId(avatarMediaId, user.getUserId())
+        .orElseThrow(() -> new AppException(DomainCode.UNAUTHORIZED,
+            "Avatar media not found or not owned by user"));
+
+    if (media.getStatus() != Media.MediaStatus.ACTIVE || !Boolean.TRUE.equals(media.getUploadConfirmed())) {
+      throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+          "Avatar media is not confirmed. Call /v1/media/" + avatarMediaId + "/confirm first.");
+    }
+    if (media.getMediaType() != Media.MediaType.IMAGE) {
+      throw new AppException(DomainCode.BAD_REQUEST_ERROR, "Avatar media must be an IMAGE");
+    }
+    if (media.getSourceType() != Media.MediaSourceType.UPLOAD) {
+      throw new AppException(DomainCode.BAD_REQUEST_ERROR, "Avatar media must be an uploaded file");
+    }
+
+    // Replace the previous avatar: mark DB record DELETED and best-effort remove the R2 object
+    // inline so storage doesn't accumulate orphaned avatars. Inline delete must fail silently
+    // — the new avatar is already active and the user-facing operation must not be blocked by
+    // a transient storage error.
+    Long previousMediaId = user.getAvatarMediaId();
+    if (previousMediaId != null && !previousMediaId.equals(avatarMediaId)) {
+      mediaRepository.findById(previousMediaId).ifPresent(previous -> {
+        previous.setStatus(Media.MediaStatus.DELETED);
+        mediaRepository.save(previous);
+        if (previous.getStorageKey() != null) {
+          try {
+            storageService.deleteObject(previous.getStorageKey());
+          } catch (Exception e) {
+            log.warn("Failed to delete previous avatar object from R2 (key={}). "
+                + "Cleanup job will retry later.", previous.getStorageKey(), e);
+          }
+        }
+      });
+    }
+
+    user.setAvatarMediaId(media.getMediaId());
+    user.setAvatarUrl(media.getUrl());
   }
 
   /**

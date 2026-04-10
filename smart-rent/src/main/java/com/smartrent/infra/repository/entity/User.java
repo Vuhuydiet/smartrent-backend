@@ -51,4 +51,7 @@ public class User extends AbstractUser{
   @Column(name = "avatar_url")
   String avatarUrl;
 
+  @Column(name = "avatar_media_id")
+  Long avatarMediaId;
+
 }

@@ -75,6 +75,7 @@ public class UserMapperImpl implements UserMapper {
         .contactPhoneNumber(user.getContactPhoneNumber())
         .contactPhoneVerified(user.getContactPhoneVerified())
         .avatarUrl(user.getAvatarUrl())
+        .avatarMediaId(user.getAvatarMediaId())
         .build();
   }
 }

@@ -24,6 +24,8 @@ public interface UserService {
 
   GetUserResponse updateUserProfile(String userId, UserProfileUpdateRequest request, MultipartFile avatarFile);
 
+  GetUserResponse updateUserProfile(String userId, UserProfileUpdateRequest request);
+
   GetUserResponse updateUser(String userId, UserUpdateRequest request);
 
   void deleteUser(String userId);
