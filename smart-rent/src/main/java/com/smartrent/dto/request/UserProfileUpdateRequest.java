@@ -47,5 +47,12 @@ public class UserProfileUpdateRequest {
       example = "0912345678"
   )
   String contactPhoneNumber;
+
+  @Schema(
+      description = "Media ID of a confirmed avatar upload (generated via /v1/media/upload-url with purpose=AVATAR). "
+          + "Send null to keep current avatar, send a valid ID to replace it.",
+      example = "12345"
+  )
+  Long avatarMediaId;
 }
 

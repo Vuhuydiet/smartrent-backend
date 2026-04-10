@@ -86,4 +86,10 @@ public class GetUserResponse implements Serializable {
       example = "https://lh3.googleusercontent.com/a/example"
   )
   String avatarUrl;
+
+  @Schema(
+      description = "Media record ID backing the avatar (null for legacy avatars or external OAuth avatars)",
+      example = "12345"
+  )
+  Long avatarMediaId;
 }
