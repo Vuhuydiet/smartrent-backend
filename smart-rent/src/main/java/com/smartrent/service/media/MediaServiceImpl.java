@@ -74,19 +74,26 @@ public class MediaServiceImpl implements MediaService {
         String storageKey;
 
         if (purpose == GenerateUploadUrlRequest.Purpose.LISTING) {
-            if (request.getListingId() == null) {
-                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
-                        "listingId is required when purpose is LISTING");
-            }
-            listing = listingRepository.findById(request.getListingId())
-                    .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
+            // listingId is optional on LISTING uploads to support the create-post flow,
+            // where the client uploads media before the listing record exists. When a
+            // listingId is provided (edit flow), verify ownership and use a listing-scoped
+            // storage key. Otherwise fall back to a generic user-scoped key; the media will
+            // be associated to a listing later (via the listing create/update endpoint) and
+            // the cleanupOrphanMedia job sweeps unassociated ACTIVE media after 24 hours.
+            if (request.getListingId() != null) {
+                listing = listingRepository.findById(request.getListingId())
+                        .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
 
-            if (!listing.getUserId().equals(userId)) {
-                throw new AppException(DomainCode.UNAUTHORIZED,
-                        "You don't have permission to add media to this listing");
+                if (!listing.getUserId().equals(userId)) {
+                    throw new AppException(DomainCode.UNAUTHORIZED,
+                            "You don't have permission to add media to this listing");
+                }
+                storageKey = storageService.generateListingStorageKey(
+                        listing.getListingId(), userId, request.getFilename(), request.getContentType());
+            } else {
+                storageKey = storageService.generateGenericStorageKey(
+                        userId, request.getFilename(), request.getContentType());
             }
-            storageKey = storageService.generateListingStorageKey(
-                    listing.getListingId(), userId, request.getFilename(), request.getContentType());
         } else if (purpose == GenerateUploadUrlRequest.Purpose.AVATAR) {
             if (request.getListingId() != null) {
                 throw new AppException(DomainCode.BAD_REQUEST_ERROR,
