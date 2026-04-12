@@ -311,7 +311,7 @@ zalopay:
   key2: ${ZALOPAY_KEY2}
   create-order-url: ${ZALOPAY_CREATE_ORDER_URL:https://sb-openapi.zalopay.vn/v2/create}
   query-order-url: ${ZALOPAY_QUERY_ORDER_URL:https://sb-openapi.zalopay.vn/v2/query}
-  return-url: ${ZALOPAY_RETURN_URL}
+  return-url: ${ZALOPAY_RETURN_URL:https://www.smartrent.io.vn/payment/result}
   ipn-url: ${ZALOPAY_IPN_URL:https://dev.api.smartrent.io.vn/v1/payments/callback/ZALOPAY}
   timeout-minutes: ${ZALOPAY_TIMEOUT_MINUTES:15}
 
