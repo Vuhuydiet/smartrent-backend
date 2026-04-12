@@ -155,6 +155,7 @@ application:
         - "/v1/push-details/**"
         - "/v1/support/contact"
         - "/v1/listings/reports/reasons"
+        - "/v1/recommendations/similar/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
@@ -162,6 +163,7 @@ application:
         - "/v1/verification/**"
         - "/v1/payments/ipn/**"
         - "/otp/**"
+        - "/v1/recently-viewed/**"
         - "/v1/listings/*/reports"
         - "/v1/listings/search"
         - "/v1/ai/listings/verify"

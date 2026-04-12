@@ -24,4 +24,10 @@ public interface SmartRentAiConnector {
 
   @PostMapping(value = "/api/v1/completion/", consumes = MediaType.APPLICATION_JSON_VALUE)
   CompletionResponseModel generateCompletion(@RequestBody CompletionRequestModel request);
+
+  @PostMapping(value = "/api/v1/recommendations/similar", consumes = MediaType.APPLICATION_JSON_VALUE)
+  java.util.List<com.smartrent.dto.response.RecommendationItemDto> getSimilarListings(@RequestBody com.smartrent.dto.request.AIRecommendationRequest.SimilarListingAiRequest request);
+
+  @PostMapping(value = "/api/v1/recommendations/personalized", consumes = MediaType.APPLICATION_JSON_VALUE)
+  java.util.List<com.smartrent.dto.response.RecommendationItemDto> getPersonalizedFeed(@RequestBody com.smartrent.dto.request.AIRecommendationRequest.PersonalizedFeedAiRequest request);
 }

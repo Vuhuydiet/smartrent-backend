@@ -37,15 +37,15 @@ public class SavedListingServiceImpl implements SavedListingService {
     public SavedListingResponse saveListing(SavedListingRequest request) {
         String userId = getCurrentUserId();
         log.info("Saving listing {} for user {}", request.getListingId(), userId);
-        
+
         // Check if already saved
         if (savedListingRepository.existsByIdUserIdAndIdListingId(userId, request.getListingId())) {
             throw new RuntimeException("Listing is already saved by this user");
         }
-        
+
         SavedListing savedListing = savedListingMapper.toEntity(request, userId);
         SavedListing saved = savedListingRepository.save(savedListing);
-        
+
         log.info("Successfully saved listing {} for user {}", request.getListingId(), userId);
         return savedListingMapper.toResponse(saved);
     }
@@ -55,12 +55,12 @@ public class SavedListingServiceImpl implements SavedListingService {
     public void unsaveListing(Long listingId) {
         String userId = getCurrentUserId();
         log.info("Unsaving listing {} for user {}", listingId, userId);
-        
+
         SavedListingId id = new SavedListingId(userId, listingId);
         if (!savedListingRepository.existsById(id)) {
             throw new RuntimeException("Saved listing not found");
         }
-        
+
         savedListingRepository.deleteByIdUserIdAndIdListingId(userId, listingId);
         log.info("Successfully unsaved listing {} for user {}", listingId, userId);
     }

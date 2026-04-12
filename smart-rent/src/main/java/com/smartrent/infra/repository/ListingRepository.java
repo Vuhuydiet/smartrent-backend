@@ -240,4 +240,97 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
           AND (l.isVerify = false OR l.isVerify IS NULL)
     """)
     List<Listing> findListingsNeedingAiVerification();
+
+    @Query("""
+        SELECT l FROM listings l
+        WHERE l.productType = :productType
+        AND l.listingType = :listingType
+        AND l.expired = false
+        AND l.verified = true
+        AND l.isDraft = false AND l.isShadow = false
+        AND l.listingId != :excludeId
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForSimilarGlobal(
+        @Param("productType") Listing.ProductType productType,
+        @Param("listingType") Listing.ListingType listingType,
+        @Param("excludeId") Long excludeId,
+        Pageable pageable
+    );
+
+    /**
+     * Candidates for Similar Listings
+     */
+    @Query("""
+        SELECT l FROM listings l
+        WHERE (l.address.legacyProvinceId = :provinceId OR l.address.newProvinceCode = :provinceCode)
+        AND l.productType = :productType
+        AND l.listingType = :listingType
+        AND l.expired = false
+        AND l.verified = true
+        AND l.isDraft = false AND l.isShadow = false
+        AND l.listingId != :excludeId
+        ORDER BY 
+            CASE l.vipType 
+                WHEN 'DIAMOND' THEN 4 
+                WHEN 'GOLD' THEN 3 
+                WHEN 'SILVER' THEN 2 
+                ELSE 1 
+            END DESC,
+            l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForSimilar(
+        @Param("provinceId") Integer provinceId,
+        @Param("provinceCode") String provinceCode,
+        @Param("productType") Listing.ProductType productType,
+        @Param("listingType") Listing.ListingType listingType,
+        @Param("excludeId") Long excludeId,
+        Pageable pageable
+    );
+
+    @Query("""
+        SELECT l FROM listings l
+        WHERE l.expired = false
+        AND l.verified = true
+        AND l.isDraft = false AND l.isShadow = false
+        AND l.listingId NOT IN :excludeIds
+        ORDER BY 
+            CASE l.vipType 
+                WHEN 'DIAMOND' THEN 4 
+                WHEN 'GOLD' THEN 3 
+                WHEN 'SILVER' THEN 2 
+                ELSE 1 
+            END DESC,
+            l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForPersonalizedGlobal(
+        @Param("excludeIds") List<Long> excludeIds,
+        Pageable pageable
+    );
+
+    /**
+     * Candidates for Personalized Feed
+     */
+    @Query("""
+        SELECT l FROM listings l
+        WHERE (l.address.legacyProvinceId = :provinceId OR l.address.newProvinceCode = :provinceCode)
+        AND l.expired = false
+        AND l.verified = true
+        AND l.isDraft = false AND l.isShadow = false
+        AND l.listingId NOT IN :excludeIds
+        ORDER BY 
+            CASE l.vipType 
+                WHEN 'DIAMOND' THEN 4 
+                WHEN 'GOLD' THEN 3 
+                WHEN 'SILVER' THEN 2 
+                ELSE 1 
+            END DESC,
+            l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForPersonalized(
+        @Param("provinceId") Integer provinceId,
+        @Param("provinceCode") String provinceCode,
+        @Param("excludeIds") List<Long> excludeIds,
+        Pageable pageable
+    );
 }

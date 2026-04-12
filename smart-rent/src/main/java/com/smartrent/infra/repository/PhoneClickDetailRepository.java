@@ -108,5 +108,11 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
             @Param("ownerId") String ownerId,
             @Param("titleKeyword") String titleKeyword,
             Pageable pageable);
+
+    /**
+     * Get phone clicks by listing IDs
+     */
+    @Query("SELECT pc FROM phone_clicks pc WHERE pc.listing.listingId IN :listingIds")
+    List<PhoneClickDetail> findByListingIdIn(@Param("listingIds") List<Long> listingIds);
 }
 

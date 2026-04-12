@@ -24,4 +24,7 @@ public interface SavedListingRepository extends JpaRepository<SavedListing, Save
     List<SavedListing> findByUserIdOrderByCreatedAtDesc(@Param("userId") String userId);
     
     long countByIdUserId(String userId);
+
+    @Query("SELECT sl FROM saved_listings sl WHERE sl.id.listingId IN :listingIds")
+    List<SavedListing> findByIdListingIdIn(@Param("listingIds") List<Long> listingIds);
 }

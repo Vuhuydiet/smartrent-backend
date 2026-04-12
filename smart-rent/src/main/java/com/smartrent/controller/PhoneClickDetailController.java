@@ -31,372 +31,247 @@ import java.util.List;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
-@Tag(
-        name = "Phone Click Detail Tracking",
-        description = """
+@Tag(name = "Phone Click Detail Tracking", description = """
                 APIs for tracking and managing phone number clicks on listings.
-                
+
                 **Features:**
                 - Track when users click on phone numbers in listing details
                 - Prompt users to input their contact phone if not provided
                 - View users who are interested in your listings
                 - Get statistics about phone clicks
-                
+
                 **Use Cases:**
                 - User clicks phone number → System tracks interest
                 - Renter views listing management → See who clicked phone numbers
                 - Analytics and engagement tracking
-                """
-)
+                """)
 public class PhoneClickDetailController {
 
-    PhoneClickDetailService phoneClickDetailService;
+        PhoneClickDetailService phoneClickDetailService;
 
-    @PostMapping
-    @Operation(
-            summary = "Track phone number click",
-            description = """
-                    Track when a user clicks on a phone number in a listing detail page.
-                    
-                    **Behavior:**
-                    - Requires authentication (user must be logged in)
-                    - If user doesn't have contact phone, frontend should prompt for it
-                    - Records the click with timestamp, IP, and user agent
-                    - Multiple clicks by same user are tracked separately
-                    
-                    **Returns:**
-                    - Phone click record with user details
-                    """,
-            security = @SecurityRequirement(name = "Bearer Authentication"),
-            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Phone click tracking request",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = PhoneClickRequest.class),
-                            examples = @ExampleObject(
-                                    name = "Track Phone Click",
-                                    value = """
-                                            {
-                                              "listingId": 123
-                                            }
-                                            """
-                            )
-                    )
-            )
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "Phone click tracked successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "Listing not found"
-            )
-    })
-    public ApiResponse<PhoneClickResponse> trackPhoneClick(
-            @Valid @RequestBody PhoneClickRequest request,
-            HttpServletRequest httpRequest
-    ) {
-        // Get authenticated user ID from JWT token
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userId = authentication.getName();
+        @PostMapping
+        @Operation(summary = "Track phone number click", description = """
+                        Track when a user clicks on a phone number in a listing detail page.
 
-        // Extract IP address
-        String ipAddress = extractIpAddress(httpRequest);
-        
-        // Extract user agent
-        String userAgent = httpRequest.getHeader("User-Agent");
+                        **Behavior:**
+                        - Requires authentication (user must be logged in)
+                        - If user doesn't have contact phone, frontend should prompt for it
+                        - Records the click with timestamp, IP, and user agent
+                        - Multiple clicks by same user are tracked separately
 
-        log.info("Tracking phone click for listing {} by user {} from IP {}", 
-                request.getListingId(), userId, ipAddress);
+                        **Returns:**
+                        - Phone click record with user details
+                        """, security = @SecurityRequirement(name = "Bearer Authentication"), requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Phone click tracking request", required = true, content = @Content(mediaType = "application/json", schema = @Schema(implementation = PhoneClickRequest.class), examples = @ExampleObject(name = "Track Phone Click", value = """
+                        {
+                          "listingId": 123
+                        }
+                        """))))
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Phone click tracked successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - User not authenticated"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Listing not found")
+        })
+        public ApiResponse<PhoneClickResponse> trackPhoneClick(
+                        @Valid @RequestBody PhoneClickRequest request,
+                        HttpServletRequest httpRequest) {
+                // Get authenticated user ID from JWT token
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                String userId = authentication.getName();
 
-        PhoneClickResponse response = phoneClickDetailService.trackPhoneClick(
-                request, userId, ipAddress, userAgent);
+                // Extract IP address
+                String ipAddress = extractIpAddress(httpRequest);
 
-        return ApiResponse.<PhoneClickResponse>builder()
-                .code("999999")
-                .data(response)
-                .build();
-    }
+                // Extract user agent
+                String userAgent = httpRequest.getHeader("User-Agent");
 
-    @GetMapping("/listing/{listingId}")
-    @Operation(
-            summary = "Get users who clicked on listing's phone number",
-            description = """
-                    Get all users who clicked on a specific listing's phone number (paginated).
-                    Returns unique users with their contact details.
+                log.info("Tracking phone click for listing {} by user {} from IP {}",
+                                request.getListingId(), userId, ipAddress);
 
-                    **Use Case:**
-                    - Renter views listing management page
-                    - See which users are interested in the listing
-                    """,
-            security = @SecurityRequirement(name = "Bearer Authentication")
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "Successfully retrieved phone clicks",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "Listing not found"
-            )
-    })
-    public ApiResponse<PageResponse<PhoneClickResponse>> getPhoneClicksByListing(
-            @Parameter(description = "Listing ID", example = "123")
-            @PathVariable Long listingId,
-            @Parameter(description = "Page number (1-indexed)", example = "1")
-            @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "Number of items per page", example = "10")
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        log.info("Getting phone clicks for listing {} - page: {}, size: {}", listingId, page, size);
+                PhoneClickResponse response = phoneClickDetailService.trackPhoneClick(
+                                request, userId, ipAddress, userAgent);
 
-        PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksByListing(listingId, page, size);
-
-        return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
-                .code("999999")
-                .data(responses)
-                .build();
-    }
-
-    @GetMapping("/my-clicks")
-    @Operation(
-            summary = "Get my phone click history",
-            description = """
-                    Get all listings the authenticated user has clicked phone numbers on (paginated).
-
-                    **Use Case:**
-                    - User views their browsing history
-                    - See which listings they showed interest in
-                    """,
-            security = @SecurityRequirement(name = "Bearer Authentication")
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "Successfully retrieved user's phone clicks",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
-            )
-    })
-    public ApiResponse<PageResponse<PhoneClickResponse>> getMyPhoneClicks(
-            @Parameter(description = "Page number (1-indexed)", example = "1")
-            @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "Number of items per page", example = "10")
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        // Get authenticated user ID from JWT token
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userId = authentication.getName();
-
-        log.info("Getting phone clicks for user {} - page: {}, size: {}", userId, page, size);
-
-        PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksByUser(userId, page, size);
-
-        return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
-                .code("999999")
-                .data(responses)
-                .build();
-    }
-
-    @GetMapping("/listing/{listingId}/stats")
-    @Operation(
-            summary = "Get phone click statistics for a listing",
-            description = """
-                    Get statistics about phone clicks for a specific listing.
-                    Includes total clicks and unique users count.
-                    
-                    **Use Case:**
-                    - Renter views listing analytics
-                    - Track engagement metrics
-                    """,
-            security = @SecurityRequirement(name = "Bearer Authentication")
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "Successfully retrieved statistics",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "Listing not found"
-            )
-    })
-    public ApiResponse<PhoneClickStatsResponse> getPhoneClickStats(
-            @Parameter(description = "Listing ID", example = "123")
-            @PathVariable Long listingId
-    ) {
-        log.info("Getting phone click stats for listing {}", listingId);
-
-        PhoneClickStatsResponse response = phoneClickDetailService.getPhoneClickStats(listingId);
-
-        return ApiResponse.<PhoneClickStatsResponse>builder()
-                .code("999999")
-                .data(response)
-                .build();
-    }
-
-    @GetMapping("/my-listings")
-    @Operation(
-            summary = "Get phone clicks for my listings",
-            description = """
-                    Get all phone clicks for listings owned by the authenticated user (paginated).
-                    This is used in the renter's listing management page to see who is interested.
-
-                    **Use Case:**
-                    - Renter views listing management dashboard
-                    - See all users who clicked on any of their listings
-                    - Contact interested users
-                    """,
-            security = @SecurityRequirement(name = "Bearer Authentication")
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "Successfully retrieved phone clicks for owner's listings",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
-            )
-    })
-    public ApiResponse<PageResponse<PhoneClickResponse>> getPhoneClicksForMyListings(
-            @Parameter(description = "Page number (1-indexed)", example = "1")
-            @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "Number of items per page", example = "10")
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        // Get authenticated user ID from JWT token
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userId = authentication.getName();
-
-        log.info("Getting phone clicks for all listings owned by user {} - page: {}, size: {}", userId, page, size);
-
-        PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksForOwnerListings(userId, page, size);
-
-        return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
-                .code("999999")
-                .data(responses)
-                .build();
-    }
-
-    @GetMapping("/my-listings/search")
-    @Operation(
-            summary = "Search phone clicks for my listings by title",
-            description = """
-                    Search for users who clicked on phone numbers in listings owned by the authenticated user,
-                    filtered by listing title keyword (paginated).
-
-                    **Use Case:**
-                    - Renter wants to find who clicked on a specific listing
-                    - Search by listing title to narrow down results
-                    - See interested users for specific properties
-
-                    **Search Behavior:**
-                    - Case-insensitive partial match on listing title
-                    - Returns phone clicks with user details and listing title
-                    """,
-            security = @SecurityRequirement(name = "Bearer Authentication")
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "Successfully retrieved search results",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ApiResponse.class)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "400",
-                    description = "Bad request - Invalid parameters"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized - User not authenticated"
-            )
-    })
-    public ApiResponse<PageResponse<PhoneClickResponse>> searchPhoneClicksByListingTitle(
-            @Parameter(description = "Listing title keyword to search for", example = "apartment", required = true)
-            @RequestParam String title,
-            @Parameter(description = "Page number (1-indexed)", example = "1")
-            @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "Number of items per page", example = "10")
-            @RequestParam(defaultValue = "10") int size
-    ) {
-        // Get authenticated user ID from JWT token
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String userId = authentication.getName();
-
-        log.info("Searching phone clicks for listings owned by user {} with title keyword '{}' - page: {}, size: {}",
-                userId, title, page, size);
-
-        PageResponse<PhoneClickResponse> responses = phoneClickDetailService.searchPhoneClicksByListingTitle(
-                userId, title, page, size);
-
-        return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
-                .code("999999")
-                .data(responses)
-                .build();
-    }
-
-    /**
-     * Extract IP address from HTTP request, handling proxy headers
-     */
-    private String extractIpAddress(HttpServletRequest request) {
-        String ipAddress = request.getHeader("X-Forwarded-For");
-        
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
-            ipAddress = request.getHeader("X-Real-IP");
+                return ApiResponse.<PhoneClickResponse>builder()
+                                .code("999999")
+                                .data(response)
+                                .build();
         }
-        
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
-            ipAddress = request.getRemoteAddr();
+
+        @GetMapping("/listing/{listingId}")
+        @Operation(summary = "Get users who clicked on listing's phone number", description = """
+                        Get all users who clicked on a specific listing's phone number (paginated).
+                        Returns unique users with their contact details.
+
+                        **Use Case:**
+                        - Renter views listing management page
+                        - See which users are interested in the listing
+                        """, security = @SecurityRequirement(name = "Bearer Authentication"))
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully retrieved phone clicks", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - User not authenticated"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Listing not found")
+        })
+        public ApiResponse<PageResponse<PhoneClickResponse>> getPhoneClicksByListing(
+                        @Parameter(description = "Listing ID", example = "123") @PathVariable Long listingId,
+                        @Parameter(description = "Page number (1-indexed)", example = "1") @RequestParam(defaultValue = "1") int page,
+                        @Parameter(description = "Number of items per page", example = "10") @RequestParam(defaultValue = "10") int size) {
+                log.info("Getting phone clicks for listing {} - page: {}, size: {}", listingId, page, size);
+
+                PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksByListing(listingId,
+                                page, size);
+
+                return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
+                                .code("999999")
+                                .data(responses)
+                                .build();
         }
-        
-        // X-Forwarded-For can contain multiple IPs, take the first one
-        if (ipAddress != null && ipAddress.contains(",")) {
-            ipAddress = ipAddress.split(",")[0].trim();
+
+        @GetMapping("/my-clicks")
+        @Operation(summary = "Get my phone click history", description = """
+                        Get all listings the authenticated user has clicked phone numbers on (paginated).
+
+                        **Use Case:**
+                        - User views their browsing history
+                        - See which listings they showed interest in
+                        """, security = @SecurityRequirement(name = "Bearer Authentication"))
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully retrieved user's phone clicks", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - User not authenticated")
+        })
+        public ApiResponse<PageResponse<PhoneClickResponse>> getMyPhoneClicks(
+                        @Parameter(description = "Page number (1-indexed)", example = "1") @RequestParam(defaultValue = "1") int page,
+                        @Parameter(description = "Number of items per page", example = "10") @RequestParam(defaultValue = "10") int size) {
+                // Get authenticated user ID from JWT token
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                String userId = authentication.getName();
+
+                log.info("Getting phone clicks for user {} - page: {}, size: {}", userId, page, size);
+
+                PageResponse<PhoneClickResponse> responses = phoneClickDetailService.getPhoneClicksByUser(userId, page,
+                                size);
+
+                return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
+                                .code("999999")
+                                .data(responses)
+                                .build();
         }
-        
-        return ipAddress;
-    }
+
+        @GetMapping("/listing/{listingId}/stats")
+        @Operation(summary = "Get phone click statistics for a listing", description = """
+                        Get statistics about phone clicks for a specific listing.
+                        Includes total clicks and unique users count.
+
+                        **Use Case:**
+                        - Renter views listing analytics
+                        - Track engagement metrics
+                        """, security = @SecurityRequirement(name = "Bearer Authentication"))
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully retrieved statistics", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - User not authenticated"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Listing not found")
+        })
+        public ApiResponse<PhoneClickStatsResponse> getPhoneClickStats(
+                        @Parameter(description = "Listing ID", example = "123") @PathVariable Long listingId) {
+                log.info("Getting phone click stats for listing {}", listingId);
+
+                PhoneClickStatsResponse response = phoneClickDetailService.getPhoneClickStats(listingId);
+
+                return ApiResponse.<PhoneClickStatsResponse>builder()
+                                .code("999999")
+                                .data(response)
+                                .build();
+        }
+
+        @GetMapping("/my-listings")
+        @Operation(summary = "Get phone clicks for my listings", description = """
+                        Get all phone clicks for listings owned by the authenticated user (paginated).
+                        This is used in the renter's listing management page to see who is interested.
+
+                        **Use Case:**
+                        - Renter views listing management dashboard
+                        - See all users who clicked on any of their listings
+                        - Contact interested users
+                        """, security = @SecurityRequirement(name = "Bearer Authentication"))
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully retrieved phone clicks for owner's listings", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - User not authenticated")
+        })
+        public ApiResponse<PageResponse<PhoneClickResponse>> getPhoneClicksForMyListings(
+                        @Parameter(description = "Page number (1-indexed)", example = "1") @RequestParam(defaultValue = "1") int page,
+                        @Parameter(description = "Number of items per page", example = "10") @RequestParam(defaultValue = "10") int size) {
+                // Get authenticated user ID from JWT token
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                String userId = authentication.getName();
+
+                log.info("Getting phone clicks for all listings owned by user {} - page: {}, size: {}", userId, page,
+                                size);
+
+                PageResponse<PhoneClickResponse> responses = phoneClickDetailService
+                                .getPhoneClicksForOwnerListings(userId, page, size);
+
+                return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
+                                .code("999999")
+                                .data(responses)
+                                .build();
+        }
+
+        @GetMapping("/my-listings/search")
+        @Operation(summary = "Search phone clicks for my listings by title", description = """
+                        Search for users who clicked on phone numbers in listings owned by the authenticated user,
+                        filtered by listing title keyword (paginated).
+
+                        **Use Case:**
+                        - Renter wants to find who clicked on a specific listing
+                        - Search by listing title to narrow down results
+                        - See interested users for specific properties
+
+                        **Search Behavior:**
+                        - Case-insensitive partial match on listing title
+                        - Returns phone clicks with user details and listing title
+                        """, security = @SecurityRequirement(name = "Bearer Authentication"))
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully retrieved search results", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Bad request - Invalid parameters"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - User not authenticated")
+        })
+        public ApiResponse<PageResponse<PhoneClickResponse>> searchPhoneClicksByListingTitle(
+                        @Parameter(description = "Listing title keyword to search for", example = "apartment", required = true) @RequestParam String title,
+                        @Parameter(description = "Page number (1-indexed)", example = "1") @RequestParam(defaultValue = "1") int page,
+                        @Parameter(description = "Number of items per page", example = "10") @RequestParam(defaultValue = "10") int size) {
+                // Get authenticated user ID from JWT token
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                String userId = authentication.getName();
+
+                log.info("Searching phone clicks for listings owned by user {} with title keyword '{}' - page: {}, size: {}",
+                                userId, title, page, size);
+
+                PageResponse<PhoneClickResponse> responses = phoneClickDetailService.searchPhoneClicksByListingTitle(
+                                userId, title, page, size);
+
+                return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
+                                .code("999999")
+                                .data(responses)
+                                .build();
+        }
+
+        /**
+         * Extract IP address from HTTP request, handling proxy headers
+         */
+        private String extractIpAddress(HttpServletRequest request) {
+                String ipAddress = request.getHeader("X-Forwarded-For");
+
+                if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+                        ipAddress = request.getHeader("X-Real-IP");
+                }
+
+                if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+                        ipAddress = request.getRemoteAddr();
+                }
+
+                // X-Forwarded-For can contain multiple IPs, take the first one
+                if (ipAddress != null && ipAddress.contains(",")) {
+                        ipAddress = ipAddress.split(",")[0].trim();
+                }
+
+                return ipAddress;
+        }
 }
-
