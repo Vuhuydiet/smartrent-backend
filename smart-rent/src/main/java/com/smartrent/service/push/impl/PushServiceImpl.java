@@ -65,6 +65,8 @@ public class PushServiceImpl implements PushService {
             throw new RuntimeException("Listing does not belong to user");
         }
 
+        validateListingCanBePushed(listing);
+
         // Check if user wants to use quota
         boolean useQuota = Boolean.TRUE.equals(request.getUseMembershipQuota());
 
@@ -170,6 +172,8 @@ public class PushServiceImpl implements PushService {
         Long listingId = Long.parseLong(transaction.getReferenceId());
         Listing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> new RuntimeException("Listing not found: " + listingId));
+
+        validateListingCanBePushed(listing);
 
         // Create push history with DIRECT_PAYMENT source
         PushHistory pushHistory = PushHistory.builder()
@@ -524,6 +528,13 @@ public class PushServiceImpl implements PushService {
         } catch (Exception e) {
             log.error("Failed to push shadow listing for {}: {}",
                     mainListing.getListingId(), e.getMessage());
+        }
+    }
+
+    private void validateListingCanBePushed(Listing listing) {
+        ListingStatus listingStatus = listing.computeListingStatus();
+        if (listingStatus != ListingStatus.DISPLAYING) {
+            throw new RuntimeException("Only displaying listings can be pushed. Current status: " + listingStatus);
         }
     }
 
