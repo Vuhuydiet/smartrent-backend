@@ -23,7 +23,7 @@ public class UserMapperImpl implements UserMapper {
         .phoneCode(userCreationRequest.getPhoneCode())
         .phoneNumber(userCreationRequest.getPhoneNumber())
         .contactPhoneNumber(userCreationRequest.getContactPhoneNumber())
-        .contactPhoneVerified(false) // New users start with unverified contact phone
+        .contactPhoneVerified(false)
         .build();
   }
 
@@ -39,7 +39,7 @@ public class UserMapperImpl implements UserMapper {
         .phoneCode(userCreationRequest.getPhoneCode())
         .phoneNumber(userCreationRequest.getPhoneNumber())
         .contactPhoneNumber(userCreationRequest.getContactPhoneNumber())
-        .contactPhoneVerified(false) // New users start with unverified contact phone
+        .contactPhoneVerified(false)
         .avatarUrl(userCreationRequest.getAvatarUrl())
         .build();
   }
@@ -76,6 +76,12 @@ public class UserMapperImpl implements UserMapper {
         .contactPhoneVerified(user.getContactPhoneVerified())
         .avatarUrl(user.getAvatarUrl())
         .avatarMediaId(user.getAvatarMediaId())
+        // Broker badge fields
+        .isBroker(user.isBroker())
+        .brokerVerificationStatus(
+            user.getBrokerVerificationStatus() != null
+                ? user.getBrokerVerificationStatus().name()
+                : null)
         .build();
   }
 }

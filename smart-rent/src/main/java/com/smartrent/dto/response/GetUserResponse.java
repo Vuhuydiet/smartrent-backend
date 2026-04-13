@@ -92,4 +92,19 @@ public class GetUserResponse implements Serializable {
       example = "12345"
   )
   Long avatarMediaId;
+
+  // ============ BROKER BADGE FIELDS ============
+
+  @Schema(
+      description = "Whether this user is a verified broker. Null means not available (backward compat).",
+      example = "false"
+  )
+  Boolean isBroker;
+
+  @Schema(
+      description = "Current broker verification status: NONE | PENDING | APPROVED | REJECTED",
+      example = "NONE",
+      allowableValues = {"NONE", "PENDING", "APPROVED", "REJECTED"}
+  )
+  String brokerVerificationStatus;
 }

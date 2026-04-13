@@ -235,6 +235,9 @@ public class ListingFilterRequest {
     @Schema(description = "Only show listings with verified owner phone number", example = "true")
     Boolean ownerPhoneVerified;
 
+    @Schema(description = "Filter by broker status – true: only listings from approved brokers, false: only non-broker owners, null: no filter", example = "true")
+    Boolean isBroker;
+
     // ============ TIME FILTERS ============
     @Schema(description = "Show only listings posted within last X days", example = "7")
     Integer postedWithinDays;

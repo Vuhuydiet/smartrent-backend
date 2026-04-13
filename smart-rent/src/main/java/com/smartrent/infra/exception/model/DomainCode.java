@@ -122,7 +122,10 @@ public enum DomainCode {
   MODERATION_REASON_REQUIRED("16002", HttpStatus.BAD_REQUEST, "Reason is required for rejection or revision request"),
   RESUBMIT_NOT_ALLOWED("16003", HttpStatus.BAD_REQUEST, "Listing cannot be resubmitted in its current state"),
   NOT_LISTING_OWNER("16004", HttpStatus.FORBIDDEN, "You are not the owner of this listing"),
-  UPDATE_NOT_ALLOWED("16005", HttpStatus.BAD_REQUEST, "Listing cannot be updated in its current state")
+  UPDATE_NOT_ALLOWED("16005", HttpStatus.BAD_REQUEST, "Listing cannot be updated in its current state"),
+  //    Broker Error 17xxx
+  BROKER_REJECTION_REASON_REQUIRED("17001", HttpStatus.BAD_REQUEST, "Rejection reason is required when rejecting broker verification"),
+  BROKER_INVALID_ACTION("17002", HttpStatus.BAD_REQUEST, "Invalid broker verification action: %s")
   ;
 
   private final String value;

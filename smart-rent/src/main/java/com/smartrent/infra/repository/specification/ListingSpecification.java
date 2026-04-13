@@ -558,6 +558,39 @@ public class ListingSpecification {
                 predicates.add(root.get("userId").in(userSubquery));
             }
 
+            // Broker owner filter
+            // isBroker=true: only listings from users with is_broker=true AND brokerVerificationStatus=APPROVED
+            // isBroker=false: only listings from non-broker users
+            // isBroker=null: no filter (all users)
+            if (filter.getIsBroker() != null) {
+                Subquery<String> brokerSubquery = query.subquery(String.class);
+                var brokerUserRoot = brokerSubquery.from(User.class);
+
+                if (Boolean.TRUE.equals(filter.getIsBroker())) {
+                    brokerSubquery.select(brokerUserRoot.get("userId"))
+                            .where(criteriaBuilder.and(
+                                    criteriaBuilder.equal(brokerUserRoot.get("userId"), root.get("userId")),
+                                    criteriaBuilder.equal(brokerUserRoot.get("isBroker"), true),
+                                    criteriaBuilder.equal(
+                                            brokerUserRoot.get("brokerVerificationStatus"),
+                                            com.smartrent.enums.BrokerVerificationStatus.APPROVED)
+                            ));
+                    predicates.add(root.get("userId").in(brokerSubquery));
+                } else {
+                    // isBroker=false: exclude listings whose owner is an approved broker
+                    Subquery<String> approvedBrokerSubquery = query.subquery(String.class);
+                    var approvedBrokerRoot = approvedBrokerSubquery.from(User.class);
+                    approvedBrokerSubquery.select(approvedBrokerRoot.get("userId"))
+                            .where(criteriaBuilder.and(
+                                    criteriaBuilder.equal(approvedBrokerRoot.get("isBroker"), true),
+                                    criteriaBuilder.equal(
+                                            approvedBrokerRoot.get("brokerVerificationStatus"),
+                                            com.smartrent.enums.BrokerVerificationStatus.APPROVED)
+                            ));
+                    predicates.add(criteriaBuilder.not(root.get("userId").in(approvedBrokerSubquery)));
+                }
+            }
+
             // ============ TIME FILTERS ============
             // Posted within days filter
             if (filter.getPostedWithinDays() != null && filter.getPostedWithinDays() > 0) {
