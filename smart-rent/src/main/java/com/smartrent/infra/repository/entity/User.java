@@ -95,4 +95,22 @@ public class User extends AbstractUser {
    */
   @Column(name = "broker_verification_source", length = 255)
   String brokerVerificationSource;
+
+  // ============ BROKER DOCUMENT FIELDS ============
+
+  /** Media ID for the front side of the user's CCCD (National ID). */
+  @Column(name = "broker_cccd_front_media_id")
+  Long brokerCccdFrontMediaId;
+
+  /** Media ID for the back side of the user's CCCD (National ID). */
+  @Column(name = "broker_cccd_back_media_id")
+  Long brokerCccdBackMediaId;
+
+  /** Media ID for the front side of the practising certificate. */
+  @Column(name = "broker_cert_front_media_id")
+  Long brokerCertFrontMediaId;
+
+  /** Media ID for the back side of the practising certificate. */
+  @Column(name = "broker_cert_back_media_id")
+  Long brokerCertBackMediaId;
 }

@@ -61,4 +61,30 @@ public class BrokerStatusResponse {
             example = "https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20"
     )
     String brokerVerificationSource;
+
+    // ============ DOCUMENT VIEWING URLS (presigned, short-lived) ============
+
+    @Schema(
+            description = "Presigned download URL for CCCD front image (only present when documents have been submitted)",
+            example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
+    )
+    String cccdFrontUrl;
+
+    @Schema(
+            description = "Presigned download URL for CCCD back image",
+            example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
+    )
+    String cccdBackUrl;
+
+    @Schema(
+            description = "Presigned download URL for practising certificate front image",
+            example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
+    )
+    String certFrontUrl;
+
+    @Schema(
+            description = "Presigned download URL for practising certificate back image",
+            example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
+    )
+    String certBackUrl;
 }

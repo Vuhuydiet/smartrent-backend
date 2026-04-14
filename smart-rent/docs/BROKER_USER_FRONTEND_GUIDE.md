@@ -8,48 +8,100 @@
 ## 1. Business Overview
 
 ### User Journey
-1. **Normal user** opens their profile page.
-2. Clicks **"Register as Broker"** CTA → `POST /v1/users/broker/register`.
-3. Status becomes **`PENDING`** → show "Verification in Progress" badge.
-4. Admin manually verifies at [nangluchdxd.gov.vn](https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20).
-5. **Approved** → `isBroker=true`, status `APPROVED` → show "Verified Broker ✓" badge everywhere.
-6. **Rejected** → status `REJECTED` + rejection reason → show rejection message + "Re-apply" CTA.
+1. **Normal user** opens their profile page and clicks **"Register as Broker"**.
+2. **Upload documents** — user uploads 4 identity images using the presigned URL flow.
+3. **Submit registration** — `POST /v1/users/broker/register` with the 4 media IDs.
+4. Status becomes **`PENDING`** → show "Verification in Progress" badge.
+5. **Admin manually verifies** at [nangluchdxd.gov.vn](https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20).
+6. **Approved** → `isBroker=true` → "✓ Verified Broker" badge everywhere.
+7. **Rejected** → rejection reason shown → "Re-apply" CTA (must re-upload docs).
 
-### What changes for the user once approved
-- Profile page shows green "Verified Broker ✓" badge.
-- All listing cards posted by this user show a "Broker" badge next to the owner name.
-- Other users can filter listings with `isBroker=true` to find broker listings.
+### Required Documents
+| Slot | Field | Description |
+|---|---|---|
+| 1 | `cccdFrontMediaId` | CCCD (National ID) — front side |
+| 2 | `cccdBackMediaId` | CCCD — back side |
+| 3 | `certFrontMediaId` | Practising certificate — front side |
+| 4 | `certBackMediaId` | Practising certificate — back side |
 
 ---
 
 ## 2. State Machine
 
 ```
-NONE ──(register)──▶ PENDING ──(admin approves)──▶ APPROVED
-                        │
-                   (admin rejects)
-                        │
-                        ▼
-                    REJECTED ──(re-register)──▶ PENDING
+NONE ──(upload docs + register)──▶ PENDING ──(admin approves)──▶ APPROVED
+                                       │
+                                  (admin rejects)
+                                       │
+                                       ▼
+                                   REJECTED ──(re-upload + re-register)──▶ PENDING
 ```
-
-| `brokerVerificationStatus` | `isBroker` | Meaning |
-|---|---|---|
-| `NONE` | `false` | Never applied |
-| `PENDING` | `false` | Waiting for admin review |
-| `APPROVED` | `true` | Verified broker |
-| `REJECTED` | `false` | Application rejected; can re-apply |
 
 ---
 
 ## 3. API Contracts
 
-### 3.1 POST /v1/users/broker/register
+### Step 1 — Upload a Document (repeat ×4)
 
-**Auth:** Bearer token (logged-in user)  
-**Body:** None
+**`POST /v1/media/upload-url`**  
+Auth: Bearer token
 
-**Response 200:**
+Request:
+```json
+{
+  "purpose": "BROKER_DOCUMENT",
+  "mediaType": "IMAGE",
+  "filename": "cccd-front.jpg",
+  "contentType": "image/jpeg",
+  "fileSize": 204800
+}
+```
+
+Response:
+```json
+{
+  "code": "999999",
+  "data": {
+    "mediaId": 101,
+    "uploadUrl": "https://r2.example.com/bucket/users/.../broker/...jpg?X-Amz-Signature=...",
+    "expiresIn": 600,
+    "storageKey": "users/user-abc/broker/uuid.jpg"
+  }
+}
+```
+
+### Step 2 — Upload to R2 (repeat ×4)
+```
+PUT <uploadUrl>
+Content-Type: image/jpeg
+Content-Length: 204800
+[binary file body]
+```
+> No auth header needed — the presigned URL is self-authenticating.
+
+### Step 3 — Confirm Upload (repeat ×4)
+
+**`POST /v1/media/{mediaId}/confirm`**  
+Auth: Bearer token, Body: `{}`
+
+Response: `{ "data": { "mediaId": 101, "status": "ACTIVE", "url": "...", ... } }`
+
+### Step 4 — Submit Registration
+
+**`POST /v1/users/broker/register`**  
+Auth: Bearer token
+
+Request:
+```json
+{
+  "cccdFrontMediaId": 101,
+  "cccdBackMediaId": 102,
+  "certFrontMediaId": 103,
+  "certBackMediaId": 104
+}
+```
+
+Response 200:
 ```json
 {
   "code": "999999",
@@ -60,59 +112,46 @@ NONE ──(register)──▶ PENDING ──(admin approves)──▶ APPROVED
     "brokerRegisteredAt": "2024-01-15T10:30:00",
     "brokerVerifiedAt": null,
     "brokerRejectionReason": null,
-    "brokerVerificationSource": null
+    "brokerVerificationSource": null,
+    "cccdFrontUrl": "https://r2.example.com/...?sig=...",
+    "cccdBackUrl": "https://r2.example.com/...?sig=...",
+    "certFrontUrl": "https://r2.example.com/...?sig=...",
+    "certBackUrl": "https://r2.example.com/...?sig=..."
   }
 }
 ```
 
-**Idempotent behavior:** Calling this when status is already `PENDING` or `APPROVED` returns the current state unchanged — no error thrown.
-
-**Errors:**
-| Code | HTTP | Meaning |
+**Document validation errors:**
+| Code | Meaning | When |
 |---|---|---|
-| `5001` | 401 | JWT missing or expired |
-| `4001` | 404 | User not found |
+| `17003` | Document field missing | `null` mediaId sent |
+| `17004` | Document media not found | Wrong mediaId or not owned by user |
+| `17005` | Document not confirmed yet | Upload not confirmed before registering |
+| `17006` | Document not an image | Wrong file type |
+
+**Idempotent behavior:** PENDING or APPROVED → returns current state unchanged (no document re-processing).
 
 ---
 
-### 3.2 GET /v1/users/broker/status
+### 3.5 GET /v1/users/broker/status
 
-**Auth:** Bearer token  
-**Body:** None
+Auth: Bearer token, No body.
 
-**Response 200:** Same shape as register response above.
-
-**When to call:** On profile page load and after registering to get the latest state.
+Response: Same shape as register response (includes document URLs).
 
 ---
 
-### 3.3 POST /v1/listings/search — broker filter
-
-Add `isBroker` to filter only broker-owned listings:
-
+### 3.6 POST /v1/listings/search — broker filter
 ```json
-{
-  "isBroker": true,
-  "page": 1,
-  "size": 20
-}
+{ "isBroker": true, "page": 1, "size": 20 }
 ```
 
-| Value | Effect |
-|---|---|
-| `true` | Only listings from approved brokers |
-| `false` | Only listings from non-brokers |
-| `null` / omitted | No filter — all listings |
-
 ---
 
-### 3.4 GET /v1/users — profile endpoint
-
-After broker approval, the user's profile response includes:
+### 3.7 GET /v1/users (profile endpoint)
 ```json
 {
   "userId": "user-abc-123",
-  "firstName": "Nguyen",
   "isBroker": true,
   "brokerVerificationStatus": "APPROVED"
 }
@@ -133,6 +172,33 @@ export interface BrokerStatusResponse {
   brokerVerifiedAt?: string | null;
   brokerRejectionReason?: string | null;
   brokerVerificationSource?: string | null;
+  // Presigned document URLs (present only when docs were submitted)
+  cccdFrontUrl?: string | null;
+  cccdBackUrl?: string | null;
+  certFrontUrl?: string | null;
+  certBackUrl?: string | null;
+}
+
+export interface BrokerRegisterRequest {
+  cccdFrontMediaId: number;
+  cccdBackMediaId: number;
+  certFrontMediaId: number;
+  certBackMediaId: number;
+}
+
+export interface UploadUrlRequest {
+  purpose: 'BROKER_DOCUMENT';
+  mediaType: 'IMAGE';
+  filename: string;
+  contentType: string;
+  fileSize: number;
+}
+
+export interface UploadUrlResponse {
+  mediaId: number;
+  uploadUrl: string;
+  expiresIn: number;
+  storageKey: string;
 }
 
 export interface User {
@@ -140,81 +206,79 @@ export interface User {
   firstName: string;
   lastName: string;
   email?: string;
-  phoneNumber?: string;
   avatarUrl?: string;
-  // Present in broker-enabled backend versions; may be absent in older deployments
   isBroker?: boolean | null;
   brokerVerificationStatus?: BrokerVerificationStatus | null;
 }
 
 export interface ListingFilterPayload {
+  isBroker?: boolean | null;
   page?: number;
   size?: number;
-  isBroker?: boolean | null;   // null = no filter
-  provinceCode?: string;
-  categoryId?: number;
-  minPrice?: number;
-  maxPrice?: number;
-  keyword?: string;
-  // ... other filters
+  [key: string]: unknown;
 }
 ```
 
 ---
 
-## 5. UI Requirements
-
-### Profile Page
-
-| Status | What to show |
-|---|---|
-| `NONE` | "Register as Broker" button |
-| `PENDING` | "🕐 Verification in Progress" info badge; button disabled |
-| `APPROVED` | "✓ Verified Broker" green badge; no CTA |
-| `REJECTED` | Warning with `brokerRejectionReason`; "Re-apply" button |
-| Loading | Skeleton / spinner |
-| Error | "Failed to load. Retry?" with retry button |
-
-### Listing Card Broker Badge
-
-Show only when **both** conditions are true:
-```typescript
-const showBrokerBadge = user?.isBroker === true
-  && user?.brokerVerificationStatus === 'APPROVED';
-```
-
-### Listing Filter Panel
-
-```
-[ ] Broker listings only
-```
-Maps to `isBroker: true` in payload when checked; omit `isBroker` when unchecked.
-
----
-
-## 6. Integration Flows (React)
-
-### Flow A: Register as Broker
+## 5. Full Registration Flow (React)
 
 ```typescript
+// hooks/useBrokerDocumentUpload.ts
+export async function uploadBrokerDocument(file: File): Promise<number> {
+  // Step 1: Get presigned URL
+  const urlRes = await apiClient.post<ApiResponse<UploadUrlResponse>>('/v1/media/upload-url', {
+    purpose: 'BROKER_DOCUMENT',
+    mediaType: 'IMAGE',
+    filename: file.name,
+    contentType: file.type,
+    fileSize: file.size,
+  });
+  const { mediaId, uploadUrl } = urlRes.data.data;
+
+  // Step 2: Upload directly to R2
+  await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  });
+
+  // Step 3: Confirm upload
+  await apiClient.post(`/v1/media/${mediaId}/confirm`, {});
+
+  return mediaId;
+}
+
 // hooks/useBrokerRegistration.ts
 export function useBrokerRegistration() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      apiClient.post<ApiResponse<BrokerStatusResponse>>('/v1/users/broker/register')
-        .then(r => r.data.data),
+    mutationFn: async (files: {
+      cccdFront: File; cccdBack: File;
+      certFront: File; certBack: File;
+    }) => {
+      // Upload all 4 documents in parallel
+      const [cccdFrontMediaId, cccdBackMediaId, certFrontMediaId, certBackMediaId] =
+        await Promise.all([
+          uploadBrokerDocument(files.cccdFront),
+          uploadBrokerDocument(files.cccdBack),
+          uploadBrokerDocument(files.certFront),
+          uploadBrokerDocument(files.certBack),
+        ]);
+
+      // Submit registration
+      return apiClient
+        .post<ApiResponse<BrokerStatusResponse>>('/v1/users/broker/register', {
+          cccdFrontMediaId, cccdBackMediaId, certFrontMediaId, certBackMediaId,
+        })
+        .then(r => r.data.data);
+    },
     onSuccess: () => {
-      // Refetch broker status so profile updates immediately
       queryClient.invalidateQueries({ queryKey: ['broker-status'] });
     },
   });
 }
-```
 
-### Flow B: Get / Poll Status
-
-```typescript
 // hooks/useBrokerStatus.ts
 export function useBrokerStatus() {
   return useQuery({
@@ -222,28 +286,39 @@ export function useBrokerStatus() {
     queryFn: () =>
       apiClient.get<ApiResponse<BrokerStatusResponse>>('/v1/users/broker/status')
         .then(r => r.data.data),
-    // Auto-poll while PENDING; stop when resolved
     refetchInterval: (query) =>
       query.state.data?.brokerVerificationStatus === 'PENDING' ? 30_000 : false,
   });
 }
 ```
 
-### Flow C: Broker Listing Filter
+---
 
-```typescript
-// In your listing search service / hook
-const searchListings = (filters: ListingFilterPayload) =>
-  apiClient.post('/v1/listings/search', {
-    ...filters,
-    // Send isBroker only when explicitly set; omit when null
-    ...(filters.isBroker != null ? { isBroker: filters.isBroker } : {}),
-  }).then(r => r.data.data);
+## 6. UI Requirements
 
-// Filter toggle handler
-const handleBrokerToggle = (checked: boolean) =>
-  setFilters(prev => ({ ...prev, isBroker: checked ? true : null }));
-```
+### Registration Form
+
+| Step | What to show |
+|---|---|
+| Before upload | 4 file inputs labelled CCCD Front, CCCD Back, Cert Front, Cert Back |
+| Uploading | Per-file progress bar / spinner |
+| Upload error | Per-file error message with retry |
+| All uploaded | "Submit Registration" button becomes enabled |
+| Submitting | Full-form loading overlay |
+| Success | "Under Review" badge; hide form |
+
+### Document Preview (after submission)
+
+Show thumbnail/link for each document on the profile page. URLs come from `cccdFrontUrl`, `cccdBackUrl`, `certFrontUrl`, `certBackUrl` in the status response. These are presigned and short-lived (regenerated each time status is fetched).
+
+### Profile Status Badges
+
+| Status | What to show |
+|---|---|
+| `NONE` | "Register as Broker" CTA |
+| `PENDING` | "🕐 Verification in Progress"; disable re-submit |
+| `APPROVED` | "✓ Verified Broker" green badge |
+| `REJECTED` | Warning + `brokerRejectionReason`; "Re-apply" CTA (user must re-upload docs) |
 
 ---
 
@@ -251,70 +326,55 @@ const handleBrokerToggle = (checked: boolean) =>
 
 | Scenario | Behavior |
 |---|---|
-| Register when already PENDING | API 200 with current state; show "Already under review" toast |
-| Register when APPROVED | API 200 with current state; show "You are already a verified broker" toast |
-| Re-apply after rejection | Clears old rejection data; status → PENDING; show success toast |
-| `isBroker` field absent in response | Treat as `false`; hide badge (backward compat) |
-| JWT expired mid-flow | 401 → redirect to login, preserve current page in return URL |
-| Network error | Show error toast; do not change local state |
+| Image too large | Validate client-side before upload (`fileSize` > limit); show error |
+| Non-image file | Show "Only image files are accepted" before upload |
+| Upload fails mid-flow | Per-document error; allow individual retry; do not disable other docs |
+| Confirm fails (not uploaded) | API 400 code `17005`; show "Upload failed, please re-select the file" |
+| Register when PENDING | API returns current state; show "Your application is already under review" |
+| Register when APPROVED | API returns current state; show "You are already a verified broker" |
+| Re-apply after rejection | Must re-select all 4 documents (new media IDs required) |
+| Presigned URL expired | `cccdFrontUrl` etc. will be null or 403; refetch status to get fresh URLs |
 
 ---
 
-## 8. Notifications (in-app)
-
-The user receives in-app notifications automatically on status changes:
-
-| Event | Title | Message |
-|---|---|---|
-| Admin approves | "Đăng ký môi giới được chấp thuận" | Congratulations message |
-| Admin rejects | "Đăng ký môi giới bị từ chối" | Includes rejection reason |
-
-Listen for new notifications via your existing WebSocket/polling mechanism and refresh broker status when a `BROKER_APPROVED` or `BROKER_REJECTED` notification arrives.
-
----
-
-## 9. Microcopy (EN / VI)
+## 8. Microcopy (EN / VI)
 
 | Element | English | Vietnamese |
 |---|---|---|
-| Register CTA | "Register as Broker" | "Đăng ký làm môi giới" |
+| CCCD front label | "National ID — Front Side" | "CCCD — Mặt trước" |
+| CCCD back label | "National ID — Back Side" | "CCCD — Mặt sau" |
+| Cert front label | "Practising Certificate — Front" | "Chứng chỉ hành nghề — Mặt trước" |
+| Cert back label | "Practising Certificate — Back" | "Chứng chỉ hành nghề — Mặt sau" |
+| Upload CTA | "Choose File" | "Chọn tệp" |
+| Uploading state | "Uploading…" | "Đang tải lên…" |
+| Register CTA | "Submit Application" | "Nộp đơn đăng ký" |
 | Pending badge | "🕐 Verification in Progress" | "🕐 Đang xác minh" |
-| Pending description | "Your application is under review. We'll notify you once processed." | "Đơn của bạn đang được xem xét. Chúng tôi sẽ thông báo khi có kết quả." |
 | Approved badge | "✓ Verified Broker" | "✓ Môi giới được xác nhận" |
 | Rejected badge | "Registration Rejected" | "Đơn bị từ chối" |
-| Rejected hint | "Your application was not approved: {reason}. You may re-apply." | "Đơn chưa được chấp thuận: {reason}. Bạn có thể nộp lại đơn." |
-| Re-apply CTA | "Re-apply" | "Nộp lại đơn" |
-| Listing filter toggle | "Broker listings only" | "Chỉ hiện tin môi giới" |
-| Listing card badge | "Broker" | "Môi giới" |
+| Re-apply CTA | "Re-apply with New Documents" | "Nộp lại đơn với hồ sơ mới" |
 
 ---
 
-## 10. Backward Compatibility
+## 9. Backward Compatibility
 
-Fields `isBroker` and `brokerVerificationStatus` are absent in older backend versions. Always guard:
-
+Document URL fields (`cccdFrontUrl`, etc.) are absent in older backend versions. Guard:
 ```typescript
-function BrokerBadge({ user }: { user: User }) {
-  if (!user.isBroker || user.brokerVerificationStatus !== 'APPROVED') return null;
-  return <span className="broker-badge">✓ Môi giới</span>;
-}
+const hasDocs = status?.cccdFrontUrl != null;
 ```
 
 ---
 
-## 11. QA Checklist
+## 10. QA Checklist
 
 | # | Test | Pass |
 |---|---|---|
-| 1 | Register (NONE → PENDING) → badge shows "Verification in Progress" | [ ] |
-| 2 | Register again (PENDING) → toast "Already under review" | [ ] |
-| 3 | Register (APPROVED) → toast "Already a broker" | [ ] |
-| 4 | Status endpoint returns correct fields | [ ] |
-| 5 | Approved → "✓ Verified Broker" badge on profile | [ ] |
-| 6 | Approved → "Broker" badge on listing cards | [ ] |
-| 7 | Rejected → rejection reason displayed + Re-apply CTA | [ ] |
-| 8 | Re-apply after rejection → back to PENDING | [ ] |
-| 9 | Filter `isBroker=true` returns only broker listings | [ ] |
-| 10 | Filter cleared → `isBroker` omitted from payload | [ ] |
-| 11 | Unauthenticated register → redirected to login | [ ] |
-| 12 | `isBroker` field absent → no badge shown | [ ] |
+| 1 | Upload 4 docs → submit → status = PENDING | [ ] |
+| 2 | Missing any doc → 400 code 17003 | [ ] |
+| 3 | Unconfirmed media → 400 code 17005 | [ ] |
+| 4 | Wrong user's media → 404 code 17004 | [ ] |
+| 5 | Register when PENDING → idempotent | [ ] |
+| 6 | Register when APPROVED → idempotent | [ ] |
+| 7 | Re-apply after rejection (new docs) → PENDING | [ ] |
+| 8 | Status response includes presigned document URLs | [ ] |
+| 9 | Broker badge shows after APPROVED | [ ] |
+| 10 | `isBroker=true` filter returns only broker listings | [ ] |

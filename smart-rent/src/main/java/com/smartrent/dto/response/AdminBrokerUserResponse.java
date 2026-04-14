@@ -61,4 +61,21 @@ public class AdminBrokerUserResponse {
 
     @Schema(description = "Rejection reason (only present when REJECTED)", example = "License not found")
     String brokerRejectionReason;
+
+    // ============ DOCUMENT VIEWING URLS (presigned, short-lived) ============
+
+    @Schema(
+            description = "Presigned download URL for CCCD front image",
+            example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
+    )
+    String cccdFrontUrl;
+
+    @Schema(description = "Presigned download URL for CCCD back image")
+    String cccdBackUrl;
+
+    @Schema(description = "Presigned download URL for practising certificate front image")
+    String certFrontUrl;
+
+    @Schema(description = "Presigned download URL for practising certificate back image")
+    String certBackUrl;
 }
