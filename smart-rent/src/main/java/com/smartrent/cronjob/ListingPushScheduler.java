@@ -1,5 +1,6 @@
 package com.smartrent.cronjob;
 
+import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.service.push.PushService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.time.LocalDateTime;
 public class ListingPushScheduler {
 
     PushService pushService;
+    ListingRepository listingRepository;
 
     /**
      * Execute scheduled pushes at the start of every hour.
@@ -47,6 +49,18 @@ public class ListingPushScheduler {
             log.info("=== Completed scheduled push execution. Pushed {} listings ===", pushedCount);
         } catch (Exception e) {
             log.error("=== Error during scheduled push execution: {} ===", e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Mark listings whose expiryDate has passed as expired.
+     * Runs every hour, aligned with the push scheduler.
+     */
+    @Scheduled(cron = "0 0 * * * *")
+    public void expireListings() {
+        int count = listingRepository.markExpiredListings(LocalDateTime.now());
+        if (count > 0) {
+            log.info("Marked {} listings as expired", count);
         }
     }
 
