@@ -4,6 +4,7 @@ import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.response.AddressResponse;
 import com.smartrent.dto.response.AdminVerificationInfo;
 import com.smartrent.dto.response.AmenityResponse;
+import com.smartrent.dto.response.ListingCardResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingResponseForOwner;
@@ -153,6 +154,62 @@ public class ListingMapperImpl implements ListingMapper {
                 .build();
     }
 
+
+    @Override
+    public ListingCardResponse toCardResponse(Listing entity, UserCreationResponse user, AddressResponse address) {
+        List<ListingCardResponse.MediaCard> mediaCards = null;
+        if (entity.getMedia() != null && !entity.getMedia().isEmpty()) {
+            mediaCards = entity.getMedia().stream()
+                    .filter(m -> m.getStatus() == Media.MediaStatus.ACTIVE)
+                    .sorted((m1, m2) -> {
+                        if (m1.getIsPrimary() && !m2.getIsPrimary()) return -1;
+                        if (!m1.getIsPrimary() && m2.getIsPrimary()) return 1;
+                        return m1.getSortOrder().compareTo(m2.getSortOrder());
+                    })
+                    .map(m -> ListingCardResponse.MediaCard.builder()
+                            .mediaType(m.getMediaType() != null ? m.getMediaType().name() : null)
+                            .url(m.getUrl())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
+        ListingCardResponse.AddressCard addressCard = null;
+        if (address != null) {
+            addressCard = ListingCardResponse.AddressCard.builder()
+                    .fullNewAddress(address.getFullNewAddress())
+                    .fullAddress(address.getFullAddress())
+                    .build();
+        }
+
+        ListingCardResponse.UserCard userCard = null;
+        if (user != null) {
+            userCard = ListingCardResponse.UserCard.builder()
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .build();
+        }
+
+        return ListingCardResponse.builder()
+                .listingId(entity.getListingId())
+                .title(entity.getTitle())
+                .description(entity.getDescription())
+                .price(entity.getPrice())
+                .priceUnit(entity.getPriceUnit() != null ? entity.getPriceUnit().name() : null)
+                .area(entity.getArea())
+                .bedrooms(entity.getBedrooms())
+                .bathrooms(entity.getBathrooms())
+                .verified(entity.getVerified())
+                .vipType(entity.getVipType() != null ? entity.getVipType().name() : null)
+                .productType(entity.getProductType() != null ? entity.getProductType().name() : null)
+                .furnishing(entity.getFurnishing() != null ? entity.getFurnishing().name() : null)
+                .direction(entity.getDirection() != null ? entity.getDirection().name() : null)
+                .roomCapacity(entity.getRoomCapacity())
+                .postDate(entity.getPostDate())
+                .address(addressCard)
+                .media(mediaCards)
+                .user(userCard)
+                .build();
+    }
 
     @Override
     public ListingCreationResponse toCreationResponse(Listing entity) {

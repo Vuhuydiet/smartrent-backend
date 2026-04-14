@@ -2,6 +2,7 @@ package com.smartrent.mapper;
 
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.response.AddressResponse;
+import com.smartrent.dto.response.ListingCardResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseForOwner;
@@ -24,6 +25,12 @@ public interface ListingMapper {
      * @return ListingResponse
      */
     ListingResponse toResponse(Listing entity, UserCreationResponse user, AddressResponse address);
+
+    /**
+     * Map Listing entity to the minimal ListingCardResponse for public card display.
+     * Skips amenities, contact fields, and all detail-only fields.
+     */
+    ListingCardResponse toCardResponse(Listing entity, UserCreationResponse user, AddressResponse address);
 
     ListingCreationResponse toCreationResponse(Listing entity);
 

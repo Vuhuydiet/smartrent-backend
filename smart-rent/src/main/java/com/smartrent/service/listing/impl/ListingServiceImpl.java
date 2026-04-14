@@ -17,6 +17,8 @@ import com.smartrent.dto.response.CategoryListingStatsResponse;
 import com.smartrent.dto.response.AddressConversionResponse;
 import com.smartrent.dto.response.DraftListingResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
+import com.smartrent.dto.response.ListingCardListResponse;
+import com.smartrent.dto.response.ListingCardResponse;
 import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
@@ -879,6 +881,41 @@ public class ListingServiceImpl implements ListingService {
                 .collect(Collectors.toList());
     }
 
+    private List<ListingCardResponse> batchMapCardListings(List<Listing> listings) {
+        if (listings.isEmpty()) return Collections.emptyList();
+
+        List<Listing> validListings = listings.stream()
+                .filter(l -> l.getListingId() != null)
+                .collect(Collectors.toList());
+        listings = validListings;
+
+        List<Long> listingIds = listings.stream()
+                .map(Listing::getListingId)
+                .collect(Collectors.toList());
+
+        // 1 query: batch-load users
+        Set<String> userIds = listings.stream()
+                .map(Listing::getUserId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<String, User> userMap = userIds.isEmpty() ? Collections.emptyMap()
+                : userRepository.findAllById(userIds).stream()
+                        .collect(Collectors.toMap(User::getUserId, Function.identity()));
+
+        // 1 query: batch-load media (no amenities needed for cards)
+        listingRepository.findByIdsWithMedia(listingIds);
+
+        return listings.stream()
+                .map(listing -> {
+                    User user = userMap.get(listing.getUserId());
+                    com.smartrent.dto.response.UserCreationResponse userResponse =
+                            user != null ? userMapper.mapFromUserEntityToUserCreationResponse(user) : null;
+                    com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(listing.getAddress());
+                    return listingMapper.toCardResponse(listing, userResponse, addressResponse);
+                })
+                .collect(Collectors.toList());
+    }
+
     @Override
     @Transactional
     public ListingCreationResponse completeListingCreationAfterPayment(String transactionId) {
@@ -1195,7 +1232,7 @@ public class ListingServiceImpl implements ListingService {
     @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_SEARCH,
             key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
             unless = "#result == null")
-    public ListingListResponse searchListings(ListingFilterRequest filter) {
+    public ListingCardListResponse searchListings(ListingFilterRequest filter) {
         log.info("Unified search - UserId: {}, Category: {}, Province: {}/{}, isDraft: {}, Page: {}, Size: {}",
                 filter.getUserId(), filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCodes(),
                 filter.getIsDraft(), filter.getPage(), filter.getSize());
@@ -1203,13 +1240,12 @@ public class ListingServiceImpl implements ListingService {
         String normalizedKeyword = TextNormalizer.normalize(filter.getKeyword());
         if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()
                 && (normalizedKeyword == null || normalizedKeyword.length() < 3)) {
-            return ListingListResponse.builder()
+            return ListingCardListResponse.builder()
                     .listings(Collections.emptyList())
                     .totalCount(0L)
                     .currentPage(1)
                     .pageSize(filter.getSize() != null ? filter.getSize() : 20)
                     .totalPages(0)
-                    .filterCriteria(filter)
                     .build();
         }
 
@@ -1267,22 +1303,21 @@ public class ListingServiceImpl implements ListingService {
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
 
-        // Batch-load all relationships and map to DTOs (4 queries total)
-        List<ListingResponse> listings = batchMapListings(page.getContent());
+        // Batch-load relationships and map to card DTOs (3 queries: users + media, no amenities)
+        List<ListingCardResponse> listings = batchMapCardListings(page.getContent());
 
-        return ListingListResponse.builder()
+        return ListingCardListResponse.builder()
                 .listings(listings)
                 .totalCount(page.getTotalElements())
-                .currentPage(page.getNumber() + 1)  // Convert from 0-based (Spring Data) to 1-based (frontend)
+                .currentPage(page.getNumber() + 1)
                 .pageSize(page.getSize())
                 .totalPages(page.getTotalPages())
-                .filterCriteria(filter)
                 .build();
     }
 
             @Override
             @Transactional(readOnly = true)
-            public ListingListResponse getTopSavedListingsByUser(String userId, int limit) {
+            public ListingCardListResponse getTopSavedListingsByUser(String userId, int limit) {
             int safeLimit = Math.min(Math.max(limit, 1), 20);
 
             List<Object[]> rows = savedListingRepository.findTopSavedListingIdsForOwner(
@@ -1291,13 +1326,12 @@ public class ListingServiceImpl implements ListingService {
             );
 
             if (rows.isEmpty()) {
-                return ListingListResponse.builder()
+                return ListingCardListResponse.builder()
                     .listings(Collections.emptyList())
                     .totalCount(0L)
                     .currentPage(1)
                     .pageSize(safeLimit)
                     .totalPages(0)
-                    .filterCriteria(Map.of("userId", userId, "sortBy", "MOST_SAVED"))
                     .build();
             }
 
@@ -1314,15 +1348,14 @@ public class ListingServiceImpl implements ListingService {
                 .filter(java.util.Objects::nonNull)
                 .collect(Collectors.toList());
 
-            List<ListingResponse> listingResponses = batchMapListings(orderedListings);
+            List<ListingCardResponse> listingResponses = batchMapCardListings(orderedListings);
 
-            return ListingListResponse.builder()
+            return ListingCardListResponse.builder()
                 .listings(listingResponses)
                 .totalCount((long) listingResponses.size())
                 .currentPage(1)
                 .pageSize(safeLimit)
                 .totalPages(listingResponses.isEmpty() ? 0 : 1)
-                .filterCriteria(Map.of("userId", userId, "sortBy", "MOST_SAVED"))
                 .build();
             }
 

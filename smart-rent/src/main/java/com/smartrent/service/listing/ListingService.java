@@ -10,6 +10,7 @@ import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.AdminListingListResponse;
 import com.smartrent.dto.response.CategoryListingStatsResponse;
 import com.smartrent.dto.response.DraftListingResponse;
+import com.smartrent.dto.response.ListingCardListResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
@@ -75,7 +76,7 @@ public interface ListingService {
      *               - If userId is provided: user's listings (includes drafts if isDraft filter allows)
      * @return Paginated listing response with total count
      */
-    ListingListResponse searchListings(ListingFilterRequest filter);
+    ListingCardListResponse searchListings(ListingFilterRequest filter);
 
     /**
      * Public endpoint data source: get top saved listings for a specific seller.
@@ -83,9 +84,9 @@ public interface ListingService {
      *
      * @param userId Seller user ID
      * @param limit Max listings to return (recommended default: 5)
-     * @return Listing list response for top saved listings
+     * @return Listing card list response for top saved listings
      */
-    ListingListResponse getTopSavedListingsByUser(String userId, int limit);
+    ListingCardListResponse getTopSavedListingsByUser(String userId, int limit);
 
     /**
      * Autocomplete listings by title prefix (normalized).
