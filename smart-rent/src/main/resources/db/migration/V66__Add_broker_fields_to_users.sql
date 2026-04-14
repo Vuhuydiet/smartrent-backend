@@ -25,7 +25,7 @@ SET @col_exists := (
       AND COLUMN_NAME = 'broker_verification_status'
 );
 SET @sql := IF(@col_exists = 0,
-    "ALTER TABLE users ADD COLUMN broker_verification_status VARCHAR(20) NOT NULL DEFAULT 'NONE'",
+    'ALTER TABLE users ADD COLUMN broker_verification_status VARCHAR(20) NOT NULL DEFAULT ''NONE''',
     'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
