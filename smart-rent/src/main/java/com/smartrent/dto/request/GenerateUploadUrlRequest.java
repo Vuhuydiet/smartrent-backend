@@ -51,6 +51,9 @@ public class GenerateUploadUrlRequest {
     }
 
     public enum Purpose {
-        LISTING, AVATAR
+        LISTING,
+        AVATAR,
+        /** Broker identity and certificate documents (CCCD front/back, certificate front/back). */
+        BROKER_DOCUMENT
     }
 }

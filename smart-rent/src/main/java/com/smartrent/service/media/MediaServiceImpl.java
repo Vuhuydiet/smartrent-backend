@@ -110,6 +110,17 @@ public class MediaServiceImpl implements MediaService {
             }
             storageKey = storageService.generateAvatarStorageKey(
                     userId, request.getFilename(), request.getContentType());
+        } else if (purpose == GenerateUploadUrlRequest.Purpose.BROKER_DOCUMENT) {
+            if (request.getListingId() != null) {
+                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                        "listingId must not be provided when purpose is BROKER_DOCUMENT");
+            }
+            if (!isImage) {
+                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                        "Broker document upload requires mediaType=IMAGE");
+            }
+            storageKey = storageService.generateBrokerDocumentStorageKey(
+                    userId, request.getFilename(), request.getContentType());
         } else {
             throw new AppException(DomainCode.BAD_REQUEST_ERROR, "Unsupported purpose");
         }

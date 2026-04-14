@@ -68,7 +68,11 @@ The admin can only meaningfully act on `PENDING` users, but the API accepts any 
         "brokerRegisteredAt": "2024-01-15T10:30:00",
         "brokerVerifiedAt": null,
         "brokerVerifiedByAdminId": null,
-        "brokerRejectionReason": null
+        "brokerRejectionReason": null,
+        "cccdFrontUrl": "https://r2.example.com/users/.../broker/....jpg?sig=...",
+        "cccdBackUrl": "https://r2.example.com/users/.../broker/....jpg?sig=...",
+        "certFrontUrl": "https://r2.example.com/users/.../broker/....jpg?sig=...",
+        "certBackUrl": "https://r2.example.com/users/.../broker/....jpg?sig=..."
       }
     ]
   }
@@ -148,6 +152,11 @@ export interface AdminBrokerUserResponse {
   brokerVerifiedAt?: string | null;
   brokerVerifiedByAdminId?: string | null;
   brokerRejectionReason?: string | null;
+  // Presigned document URLs (short-lived, regenerated on each fetch)
+  cccdFrontUrl?: string | null;
+  cccdBackUrl?: string | null;
+  certFrontUrl?: string | null;
+  certBackUrl?: string | null;
 }
 
 export interface BrokerVerificationRequest {
@@ -197,6 +206,37 @@ export interface PagedResponse<T> {
 - Submit → call PATCH with `action: REJECT`
 - On 400 (code 17001): show "Reason is required" under the textarea
 - On success: remove row from list, show toast "Broker rejected"
+
+### Document Viewer
+
+Each row in the pending list must expose the 4 identity images for the admin to review **before** making a decision. The URLs are presigned and included directly in the `GET /v1/admin/users/broker-pending` response.
+
+```tsx
+function BrokerDocumentViewer({ user }: { user: AdminBrokerUserResponse }) {
+  const docs = [
+    { label: 'CCCD — Mặt trước', url: user.cccdFrontUrl },
+    { label: 'CCCD — Mặt sau',   url: user.cccdBackUrl },
+    { label: 'Chứng chỉ — Mặt trước', url: user.certFrontUrl },
+    { label: 'Chứng chỉ — Mặt sau',   url: user.certBackUrl },
+  ];
+  return (
+    <div className="broker-docs-grid">
+      {docs.map(({ label, url }) =>
+        url ? (
+          <a key={label} href={url} target="_blank" rel="noopener noreferrer">
+            <img src={url} alt={label} className="broker-doc-thumb" />
+            <span>{label}</span>
+          </a>
+        ) : (
+          <span key={label} className="broker-doc-missing">{label}: Not submitted</span>
+        )
+      )}
+    </div>
+  );
+}
+```
+
+**Important:** Presigned URLs expire (typically 60 minutes). If an image returns 403, call `GET /v1/admin/users/broker-pending` again to refresh them. Do not cache the URLs on the client beyond the page lifetime.
 
 ### Admin Notification Badge
 When the admin receives a `BROKER_REGISTRATION_RECEIVED` notification:
@@ -312,6 +352,9 @@ function handleNotification(notification: Notification) {
 | 10 | Non-admin JWT → 403, redirect to login | [ ] |
 | 11 | `BROKER_REGISTRATION_RECEIVED` notification increments bell | [ ] |
 | 12 | External verification URL link opens correctly | [ ] |
+| 13 | Document images load in viewer for each pending user | [ ] |
+| 14 | Presigned URLs expire gracefully (403 → refetch) | [ ] |
+| 15 | "Not submitted" placeholder shown when a doc URL is null | [ ] |
 
 ---
 

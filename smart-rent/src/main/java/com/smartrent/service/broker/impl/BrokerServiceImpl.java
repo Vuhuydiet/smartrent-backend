@@ -1,6 +1,7 @@
 package com.smartrent.service.broker.impl;
 
 import com.smartrent.config.Constants;
+import com.smartrent.dto.request.BrokerRegisterRequest;
 import com.smartrent.dto.request.BrokerVerificationRequest;
 import com.smartrent.dto.response.AdminBrokerUserResponse;
 import com.smartrent.dto.response.BrokerStatusResponse;
@@ -8,11 +9,15 @@ import com.smartrent.dto.response.PageResponse;
 import com.smartrent.enums.BrokerVerificationStatus;
 import com.smartrent.enums.NotificationType;
 import com.smartrent.enums.RecipientType;
+import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.UserNotFoundException;
 import com.smartrent.infra.exception.model.DomainCode;
+import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.UserRepository;
+import com.smartrent.infra.repository.entity.Media;
 import com.smartrent.infra.repository.entity.User;
+import com.smartrent.infra.storage.R2StorageService;
 import com.smartrent.service.broker.BrokerService;
 import com.smartrent.service.notification.NotificationService;
 import jakarta.transaction.Transactional;
@@ -39,6 +44,8 @@ public class BrokerServiceImpl implements BrokerService {
             "https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20";
 
     UserRepository userRepository;
+    MediaRepository mediaRepository;
+    R2StorageService storageService;
     NotificationService notificationService;
 
     // ──────────────────────────────────────────────────────────────────
@@ -48,7 +55,7 @@ public class BrokerServiceImpl implements BrokerService {
     @Override
     @Transactional
     @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId")
-    public BrokerStatusResponse registerBroker(String userId) {
+    public BrokerStatusResponse registerBroker(String userId, BrokerRegisterRequest request) {
         log.info("Broker registration request for user={}", userId);
 
         User user = userRepository.findById(userId)
@@ -66,12 +73,23 @@ public class BrokerServiceImpl implements BrokerService {
             return toStatusResponse(user);
         }
 
+        // Validate all four document images (must exist, be owned by user, and be confirmed)
+        validateBrokerDocument(userId, request.getCccdFrontMediaId(), "CCCD front");
+        validateBrokerDocument(userId, request.getCccdBackMediaId(), "CCCD back");
+        validateBrokerDocument(userId, request.getCertFrontMediaId(), "Certificate front");
+        validateBrokerDocument(userId, request.getCertBackMediaId(), "Certificate back");
+
         // NONE or REJECTED → transition to PENDING
         user.setBroker(false);
         user.setBrokerVerificationStatus(BrokerVerificationStatus.PENDING);
         if (user.getBrokerRegisteredAt() == null) {
             user.setBrokerRegisteredAt(LocalDateTime.now());
         }
+        // Store document references
+        user.setBrokerCccdFrontMediaId(request.getCccdFrontMediaId());
+        user.setBrokerCccdBackMediaId(request.getCccdBackMediaId());
+        user.setBrokerCertFrontMediaId(request.getCertFrontMediaId());
+        user.setBrokerCertBackMediaId(request.getCertBackMediaId());
         // Clear previous rejection data on re-registration
         user.setBrokerRejectionReason(null);
         user.setBrokerVerifiedAt(null);
@@ -86,7 +104,7 @@ public class BrokerServiceImpl implements BrokerService {
         notificationService.sendToAllAdmins(
                 NotificationType.BROKER_REGISTRATION_RECEIVED,
                 "Yêu cầu đăng ký môi giới mới",
-                "Người dùng " + fullName + " đã gửi yêu cầu đăng ký làm môi giới. Vui lòng xem xét và xác minh.",
+                "Người dùng " + fullName + " đã gửi yêu cầu đăng ký làm môi giới kèm hồ sơ. Vui lòng xem xét và xác minh.",
                 null,
                 "USER"
         );
@@ -126,14 +144,12 @@ public class BrokerServiceImpl implements BrokerService {
             userRepository.save(user);
             log.info("Broker APPROVED for user={} by admin={}", userId, adminId);
 
-            // Notify the user about approval
             notificationService.sendNotification(
                     userId, RecipientType.USER,
                     NotificationType.BROKER_APPROVED,
                     "Đăng ký môi giới được chấp thuận",
                     "Chúc mừng! Đăng ký môi giới của bạn đã được xác nhận. Bạn giờ là môi giới được xác nhận trên SmartRent.",
-                    null,
-                    "USER"
+                    null, "USER"
             );
 
         } else if ("REJECT".equalsIgnoreCase(action)) {
@@ -152,15 +168,13 @@ public class BrokerServiceImpl implements BrokerService {
             log.info("Broker REJECTED for user={} by admin={}, reason={}",
                     userId, adminId, request.getRejectionReason());
 
-            // Notify the user about rejection
             notificationService.sendNotification(
                     userId, RecipientType.USER,
                     NotificationType.BROKER_REJECTED,
                     "Đăng ký môi giới bị từ chối",
                     "Đăng ký môi giới của bạn đã bị từ chối. Lý do: " + request.getRejectionReason()
                             + " Bạn có thể nộp lại đơn sau khi đã bổ sung thông tin.",
-                    null,
-                    "USER"
+                    null, "USER"
             );
 
         } else {
@@ -194,6 +208,40 @@ public class BrokerServiceImpl implements BrokerService {
     // Private helpers
     // ──────────────────────────────────────────────────────────────────
 
+    /**
+     * Validates a broker document media record:
+     * - Must exist
+     * - Must be owned by the user
+     * - Must be ACTIVE (upload confirmed)
+     * - Must be an image
+     */
+    private void validateBrokerDocument(String userId, Long mediaId, String docName) {
+        if (mediaId == null) {
+            throw new DomainException(DomainCode.BROKER_DOCUMENT_REQUIRED, docName);
+        }
+        Media media = mediaRepository.findByMediaIdAndUserId(mediaId, userId)
+                .orElseThrow(() -> new DomainException(DomainCode.BROKER_DOCUMENT_NOT_FOUND, docName));
+        if (media.getStatus() != Media.MediaStatus.ACTIVE || !Boolean.TRUE.equals(media.getUploadConfirmed())) {
+            throw new DomainException(DomainCode.BROKER_DOCUMENT_NOT_CONFIRMED, docName);
+        }
+        if (media.getMediaType() != Media.MediaType.IMAGE) {
+            throw new DomainException(DomainCode.BROKER_DOCUMENT_INVALID_TYPE, docName);
+        }
+    }
+
+    /**
+     * Generates a short-lived presigned download URL for a broker document.
+     * Returns null if the media ID is null or the record is unavailable.
+     */
+    private String resolveDocumentUrl(Long mediaId) {
+        if (mediaId == null) return null;
+        return mediaRepository.findById(mediaId)
+                .filter(m -> m.getStatus() == Media.MediaStatus.ACTIVE)
+                .filter(m -> m.getStorageKey() != null)
+                .map(m -> storageService.generateDownloadUrl(m.getStorageKey()).getUrl())
+                .orElse(null);
+    }
+
     private BrokerStatusResponse toStatusResponse(User user) {
         return BrokerStatusResponse.builder()
                 .userId(user.getUserId())
@@ -206,6 +254,11 @@ public class BrokerServiceImpl implements BrokerService {
                 .brokerVerifiedAt(user.getBrokerVerifiedAt())
                 .brokerRejectionReason(user.getBrokerRejectionReason())
                 .brokerVerificationSource(user.getBrokerVerificationSource())
+                // Document viewing URLs (presigned, generated on demand)
+                .cccdFrontUrl(resolveDocumentUrl(user.getBrokerCccdFrontMediaId()))
+                .cccdBackUrl(resolveDocumentUrl(user.getBrokerCccdBackMediaId()))
+                .certFrontUrl(resolveDocumentUrl(user.getBrokerCertFrontMediaId()))
+                .certBackUrl(resolveDocumentUrl(user.getBrokerCertBackMediaId()))
                 .build();
     }
 
@@ -226,6 +279,11 @@ public class BrokerServiceImpl implements BrokerService {
                 .brokerVerifiedAt(user.getBrokerVerifiedAt())
                 .brokerVerifiedByAdminId(user.getBrokerVerifiedByAdminId())
                 .brokerRejectionReason(user.getBrokerRejectionReason())
+                // Document viewing URLs (presigned, generated on demand for admin)
+                .cccdFrontUrl(resolveDocumentUrl(user.getBrokerCccdFrontMediaId()))
+                .cccdBackUrl(resolveDocumentUrl(user.getBrokerCccdBackMediaId()))
+                .certFrontUrl(resolveDocumentUrl(user.getBrokerCertFrontMediaId()))
+                .certBackUrl(resolveDocumentUrl(user.getBrokerCertBackMediaId()))
                 .build();
     }
 }

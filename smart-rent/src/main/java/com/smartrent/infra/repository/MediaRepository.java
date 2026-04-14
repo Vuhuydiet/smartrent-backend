@@ -61,7 +61,8 @@ public interface MediaRepository extends JpaRepository<Media, Long> {
     @Query("SELECT m FROM media m WHERE m.status = 'ACTIVE' " +
            "AND m.listing IS NULL " +
            "AND m.sourceType = 'UPLOAD' " +
-           "AND (m.storageKey IS NULL OR m.storageKey NOT LIKE 'users/%/avatar/%') " +
+           "AND (m.storageKey IS NULL OR " +
+           "     (m.storageKey NOT LIKE 'users/%/avatar/%' AND m.storageKey NOT LIKE 'users/%/broker/%')) " +
            "AND m.createdAt < :expiryTime")
     List<Media> findOrphanActiveMedia(@Param("expiryTime") LocalDateTime expiryTime);
 

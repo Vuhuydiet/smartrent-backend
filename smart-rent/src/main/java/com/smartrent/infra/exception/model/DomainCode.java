@@ -125,7 +125,11 @@ public enum DomainCode {
   UPDATE_NOT_ALLOWED("16005", HttpStatus.BAD_REQUEST, "Listing cannot be updated in its current state"),
   //    Broker Error 17xxx
   BROKER_REJECTION_REASON_REQUIRED("17001", HttpStatus.BAD_REQUEST, "Rejection reason is required when rejecting broker verification"),
-  BROKER_INVALID_ACTION("17002", HttpStatus.BAD_REQUEST, "Invalid broker verification action: %s")
+  BROKER_INVALID_ACTION("17002", HttpStatus.BAD_REQUEST, "Invalid broker verification action: %s"),
+  BROKER_DOCUMENT_REQUIRED("17003", HttpStatus.BAD_REQUEST, "Broker document is required: %s"),
+  BROKER_DOCUMENT_NOT_FOUND("17004", HttpStatus.NOT_FOUND, "Broker document not found: %s"),
+  BROKER_DOCUMENT_NOT_CONFIRMED("17005", HttpStatus.BAD_REQUEST, "Broker document must be uploaded and confirmed: %s"),
+  BROKER_DOCUMENT_INVALID_TYPE("17006", HttpStatus.BAD_REQUEST, "Broker document must be an image file: %s")
   ;
 
   private final String value;

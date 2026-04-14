@@ -266,6 +266,16 @@ public class R2StorageService {
     }
 
     /**
+     * Generate storage key for broker identity/certificate documents.
+     * Format: users/{userId}/broker/{uuid}.{ext}
+     * These paths are excluded from orphan media cleanup.
+     */
+    public String generateBrokerDocumentStorageKey(String userId, String filename, String contentType) {
+        String ext = resolveExtension(filename, contentType);
+        return String.format("users/%s/broker/%s%s", userId, UUID.randomUUID(), ext);
+    }
+
+    /**
      * Generate a generic storage key for uploads without a specific purpose context.
      * Format: media/{userId}/{uuid}.{ext}
      */
