@@ -10,9 +10,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpecificationExecutor<Listing> {
@@ -333,6 +335,12 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.expired = false
     """)
     Page<Listing> findPublicListings(Pageable pageable);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE listings l SET l.expired = true " +
+           "WHERE l.expiryDate IS NOT NULL AND l.expiryDate < :now AND l.expired = false")
+    int markExpiredListings(@Param("now") LocalDateTime now);
 
     @Query(value = "SELECT DATE(l.created_at) AS label, COUNT(*) AS cnt " +
             "FROM listings l WHERE l.created_at BETWEEN :start AND :end " +

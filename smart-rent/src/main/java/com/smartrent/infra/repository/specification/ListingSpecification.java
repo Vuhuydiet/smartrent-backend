@@ -80,8 +80,14 @@ public class ListingSpecification {
             if (filter.getExpired() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("expired"), filter.getExpired()));
             } else if (Boolean.TRUE.equals(filter.getExcludeExpired())) {
-                // Exclude expired by default if not explicitly filtered
-                predicates.add(criteriaBuilder.equal(root.get("expired"), false));
+                LocalDateTime now = LocalDateTime.now();
+                predicates.add(criteriaBuilder.and(
+                    criteriaBuilder.equal(root.get("expired"), false),
+                    criteriaBuilder.or(
+                        criteriaBuilder.isNull(root.get("expiryDate")),
+                        criteriaBuilder.greaterThan(root.get("expiryDate"), now)
+                    )
+                ));
             }
 
             // Listing Status filter (owner-specific computed status)
@@ -818,8 +824,15 @@ public class ListingSpecification {
                 predicates.add(criteriaBuilder.equal(root.get("verified"), true));
             }
 
-            // Exclude expired listings
-            predicates.add(criteriaBuilder.equal(root.get("expired"), false));
+            // Exclude expired listings (flag AND date check)
+            LocalDateTime mapNow = LocalDateTime.now();
+            predicates.add(criteriaBuilder.and(
+                criteriaBuilder.equal(root.get("expired"), false),
+                criteriaBuilder.or(
+                    criteriaBuilder.isNull(root.get("expiryDate")),
+                    criteriaBuilder.greaterThan(root.get("expiryDate"), mapNow)
+                )
+            ));
 
             // Optional category filter
             if (categoryId != null) {
