@@ -2,6 +2,7 @@ package com.smartrent.controller;
 
 import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.dto.request.MapBoundsRequest;
+import com.smartrent.dto.response.ListingCardListResponse;
 import com.smartrent.dto.response.*;
 import com.smartrent.service.listing.ListingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -147,7 +148,7 @@ public class ListingSearchController {
             )
         }
     )
-    public ApiResponse<ListingListResponse> searchListings(
+    public ApiResponse<ListingCardListResponse> searchListings(
             @RequestBody(required = false) ListingFilterRequest filter,
             Authentication authentication) {
 
@@ -164,8 +165,8 @@ public class ListingSearchController {
             }
         }
 
-        ListingListResponse response = listingService.searchListings(filter);
-        return ApiResponse.<ListingListResponse>builder().data(response).build();
+        ListingCardListResponse response = listingService.searchListings(filter);
+        return ApiResponse.<ListingCardListResponse>builder().data(response).build();
     }
 
     @GetMapping("/sellers/{userId}/diamond")
@@ -173,7 +174,7 @@ public class ListingSearchController {
         summary = "[PUBLIC API] Seller DIAMOND listings",
         description = "Get paginated DIAMOND listings for a public seller profile section."
     )
-    public ApiResponse<ListingListResponse> getSellerDiamondListings(
+    public ApiResponse<ListingCardListResponse> getSellerDiamondListings(
             @PathVariable String userId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "12") Integer size,
@@ -186,7 +187,7 @@ public class ListingSearchController {
         summary = "[PUBLIC API] Seller GOLD listings",
         description = "Get paginated GOLD listings for a public seller profile section."
     )
-    public ApiResponse<ListingListResponse> getSellerGoldListings(
+    public ApiResponse<ListingCardListResponse> getSellerGoldListings(
             @PathVariable String userId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "12") Integer size,
@@ -199,7 +200,7 @@ public class ListingSearchController {
         summary = "[PUBLIC API] Seller SILVER listings",
         description = "Get paginated SILVER listings for a public seller profile section."
     )
-    public ApiResponse<ListingListResponse> getSellerSilverListings(
+    public ApiResponse<ListingCardListResponse> getSellerSilverListings(
             @PathVariable String userId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "12") Integer size,
@@ -212,7 +213,7 @@ public class ListingSearchController {
         summary = "[PUBLIC API] Seller NORMAL listings",
         description = "Get paginated NORMAL listings for a public seller profile section."
     )
-    public ApiResponse<ListingListResponse> getSellerNormalListings(
+    public ApiResponse<ListingCardListResponse> getSellerNormalListings(
             @PathVariable String userId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "12") Integer size,
@@ -225,15 +226,15 @@ public class ListingSearchController {
         summary = "[PUBLIC API] Seller top saved listings",
         description = "Get top listings with most saves for a public seller profile."
     )
-    public ApiResponse<ListingListResponse> getSellerTopSavedListings(
+    public ApiResponse<ListingCardListResponse> getSellerTopSavedListings(
             @PathVariable String userId,
             @RequestParam(defaultValue = "5") Integer limit) {
         int safeLimit = limit != null && limit > 0 ? Math.min(limit, 20) : 5;
-        ListingListResponse response = listingService.getTopSavedListingsByUser(userId, safeLimit);
-        return ApiResponse.<ListingListResponse>builder().data(response).build();
+        ListingCardListResponse response = listingService.getTopSavedListingsByUser(userId, safeLimit);
+        return ApiResponse.<ListingCardListResponse>builder().data(response).build();
     }
 
-    private ApiResponse<ListingListResponse> searchSellerListingsByVipType(
+    private ApiResponse<ListingCardListResponse> searchSellerListingsByVipType(
             String userId,
             String vipType,
             Integer page,
@@ -247,8 +248,8 @@ public class ListingSearchController {
                 .sortBy(sortBy)
                 .build();
 
-        ListingListResponse response = listingService.searchListings(filter);
-        return ApiResponse.<ListingListResponse>builder().data(response).build();
+        ListingCardListResponse response = listingService.searchListings(filter);
+        return ApiResponse.<ListingCardListResponse>builder().data(response).build();
     }
 
     @GetMapping("/autocomplete")
