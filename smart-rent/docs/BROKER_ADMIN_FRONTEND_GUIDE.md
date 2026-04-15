@@ -71,8 +71,7 @@ The admin can only meaningfully act on `PENDING` users, but the API accepts any 
         "brokerRejectionReason": null,
         "cccdFrontUrl": "https://r2.example.com/users/.../broker/....jpg?sig=...",
         "cccdBackUrl": "https://r2.example.com/users/.../broker/....jpg?sig=...",
-        "certFrontUrl": "https://r2.example.com/users/.../broker/....jpg?sig=...",
-        "certBackUrl": "https://r2.example.com/users/.../broker/....jpg?sig=..."
+        "certUrl": "https://r2.example.com/users/.../broker/....jpg?sig=..."
       }
     ]
   }
@@ -155,8 +154,7 @@ export interface AdminBrokerUserResponse {
   // Presigned document URLs (short-lived, regenerated on each fetch)
   cccdFrontUrl?: string | null;
   cccdBackUrl?: string | null;
-  certFrontUrl?: string | null;
-  certBackUrl?: string | null;
+  certUrl?: string | null;
 }
 
 export interface BrokerVerificationRequest {
@@ -209,15 +207,14 @@ export interface PagedResponse<T> {
 
 ### Document Viewer
 
-Each row in the pending list must expose the 4 identity images for the admin to review **before** making a decision. The URLs are presigned and included directly in the `GET /v1/admin/users/broker-pending` response.
+Each row in the pending list must expose the 3 identity images for the admin to review **before** making a decision. The URLs are presigned and included directly in the `GET /v1/admin/users/broker-pending` response.
 
 ```tsx
 function BrokerDocumentViewer({ user }: { user: AdminBrokerUserResponse }) {
   const docs = [
     { label: 'CCCD — Mặt trước', url: user.cccdFrontUrl },
     { label: 'CCCD — Mặt sau',   url: user.cccdBackUrl },
-    { label: 'Chứng chỉ — Mặt trước', url: user.certFrontUrl },
-    { label: 'Chứng chỉ — Mặt sau',   url: user.certBackUrl },
+    { label: 'Chứng chỉ hành nghề', url: user.certUrl },
   ];
   return (
     <div className="broker-docs-grid">

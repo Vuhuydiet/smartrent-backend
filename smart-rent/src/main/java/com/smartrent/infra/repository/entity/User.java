@@ -106,11 +106,11 @@ public class User extends AbstractUser {
   @Column(name = "broker_cccd_back_media_id")
   Long brokerCccdBackMediaId;
 
-  /** Media ID for the front side of the practising certificate. */
+  /** Media ID for the practising certificate image (single required image). */
   @Column(name = "broker_cert_front_media_id")
   Long brokerCertFrontMediaId;
 
-  /** Media ID for the back side of the practising certificate. */
+  /** Legacy media ID for historical back-side certificate data. */
   @Column(name = "broker_cert_back_media_id")
   Long brokerCertBackMediaId;
 }

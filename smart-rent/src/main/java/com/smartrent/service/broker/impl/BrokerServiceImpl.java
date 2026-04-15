@@ -73,11 +73,10 @@ public class BrokerServiceImpl implements BrokerService {
             return toStatusResponse(user);
         }
 
-        // Validate all four document images (must exist, be owned by user, and be confirmed)
+        // Validate all three document images (must exist, be owned by user, and be confirmed)
         validateBrokerDocument(userId, request.getCccdFrontMediaId(), "CCCD front");
         validateBrokerDocument(userId, request.getCccdBackMediaId(), "CCCD back");
-        validateBrokerDocument(userId, request.getCertFrontMediaId(), "Certificate front");
-        validateBrokerDocument(userId, request.getCertBackMediaId(), "Certificate back");
+        validateBrokerDocument(userId, request.getCertMediaId(), "Certificate");
 
         // NONE or REJECTED → transition to PENDING
         user.setBroker(false);
@@ -88,8 +87,8 @@ public class BrokerServiceImpl implements BrokerService {
         // Store document references
         user.setBrokerCccdFrontMediaId(request.getCccdFrontMediaId());
         user.setBrokerCccdBackMediaId(request.getCccdBackMediaId());
-        user.setBrokerCertFrontMediaId(request.getCertFrontMediaId());
-        user.setBrokerCertBackMediaId(request.getCertBackMediaId());
+        user.setBrokerCertFrontMediaId(request.getCertMediaId());
+        user.setBrokerCertBackMediaId(null);
         // Clear previous rejection data on re-registration
         user.setBrokerRejectionReason(null);
         user.setBrokerVerifiedAt(null);
@@ -242,6 +241,16 @@ public class BrokerServiceImpl implements BrokerService {
                 .orElse(null);
     }
 
+    /**
+     * Uses the current single-certificate field and falls back to historical back-side data.
+     */
+    private Long resolveCertificateMediaId(User user) {
+        if (user.getBrokerCertFrontMediaId() != null) {
+            return user.getBrokerCertFrontMediaId();
+        }
+        return user.getBrokerCertBackMediaId();
+    }
+
     private BrokerStatusResponse toStatusResponse(User user) {
         return BrokerStatusResponse.builder()
                 .userId(user.getUserId())
@@ -257,8 +266,7 @@ public class BrokerServiceImpl implements BrokerService {
                 // Document viewing URLs (presigned, generated on demand)
                 .cccdFrontUrl(resolveDocumentUrl(user.getBrokerCccdFrontMediaId()))
                 .cccdBackUrl(resolveDocumentUrl(user.getBrokerCccdBackMediaId()))
-                .certFrontUrl(resolveDocumentUrl(user.getBrokerCertFrontMediaId()))
-                .certBackUrl(resolveDocumentUrl(user.getBrokerCertBackMediaId()))
+                .certUrl(resolveDocumentUrl(resolveCertificateMediaId(user)))
                 .build();
     }
 
@@ -282,8 +290,7 @@ public class BrokerServiceImpl implements BrokerService {
                 // Document viewing URLs (presigned, generated on demand for admin)
                 .cccdFrontUrl(resolveDocumentUrl(user.getBrokerCccdFrontMediaId()))
                 .cccdBackUrl(resolveDocumentUrl(user.getBrokerCccdBackMediaId()))
-                .certFrontUrl(resolveDocumentUrl(user.getBrokerCertFrontMediaId()))
-                .certBackUrl(resolveDocumentUrl(user.getBrokerCertBackMediaId()))
+                .certUrl(resolveDocumentUrl(resolveCertificateMediaId(user)))
                 .build();
     }
 }

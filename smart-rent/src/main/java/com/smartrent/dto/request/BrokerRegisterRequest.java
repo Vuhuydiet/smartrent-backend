@@ -1,5 +1,6 @@
 package com.smartrent.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.AccessLevel;
@@ -20,10 +21,10 @@ import lombok.experimental.FieldDefaults;
         Request body for broker registration.
 
         **Upload flow (do this before calling /register):**
-        1. Call `POST /v1/media/upload-url` four times with `purpose=BROKER_DOCUMENT, mediaType=IMAGE`.
+        1. Call `POST /v1/media/upload-url` three times with `purpose=BROKER_DOCUMENT, mediaType=IMAGE`.
         2. PUT each file to the returned presigned URL.
         3. Call `POST /v1/media/{mediaId}/confirm` for each upload.
-        4. Submit the four confirmed mediaIds here.
+        4. Submit the three confirmed mediaIds here.
         """)
 public class BrokerRegisterRequest {
 
@@ -43,19 +44,12 @@ public class BrokerRegisterRequest {
     )
     Long cccdBackMediaId;
 
-    @NotNull(message = "Practising certificate front image is required")
+    @NotNull(message = "Practising certificate image is required")
+    @JsonAlias("certFrontMediaId")
     @Schema(
-            description = "Media ID of the confirmed practising certificate front-side image",
+            description = "Media ID of the confirmed practising certificate image. Backward compatible alias: certFrontMediaId",
             example = "103",
             requiredMode = Schema.RequiredMode.REQUIRED
     )
-    Long certFrontMediaId;
-
-    @NotNull(message = "Practising certificate back image is required")
-    @Schema(
-            description = "Media ID of the confirmed practising certificate back-side image",
-            example = "104",
-            requiredMode = Schema.RequiredMode.REQUIRED
-    )
-    Long certBackMediaId;
+    Long certMediaId;
 }
