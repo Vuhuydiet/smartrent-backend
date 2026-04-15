@@ -23,8 +23,11 @@ public class PriceUpdateRequest {
     @Positive(message = "Price must be positive")
     BigDecimal newPrice;
 
-    @NotNull(message = "Price unit is required")
+    // Optional — if omitted, inherits the listing's current price unit
     String priceUnit; // MONTH, DAY, YEAR
 
     String changeReason;
+
+    // Optional ISO 8601 timestamp — if provided, overrides the auto-generated changedAt
+    String effectiveAt;
 }

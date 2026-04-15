@@ -8,8 +8,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.CreationTimestamp;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -71,8 +69,7 @@ public class PricingHistory {
     @Column(name = "change_reason", length = 500)
     String changeReason;
 
-    @CreationTimestamp
-    @Column(name = "changed_at", updatable = false)
+    @Column(name = "changed_at", nullable = false)
     LocalDateTime changedAt;
 
     // Enums

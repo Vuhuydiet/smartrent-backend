@@ -62,6 +62,9 @@ logging:
 spring:
   application:
     name: smart-rent
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
   cloud:
     compatibility-verifier:
       enabled: false

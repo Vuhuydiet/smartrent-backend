@@ -7,7 +7,6 @@ import com.smartrent.dto.response.PricingHistoryResponse;
 import com.smartrent.service.pricing.PricingHistoryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -84,7 +82,7 @@ public class PricingHistoryController {
     @GetMapping("/{listingId}/pricing-history")
     @Operation(
         summary = "Get full pricing history for a listing",
-        description = "Returns pricing history for a listing with pagination",
+        description = "Returns all pricing history records sorted by changedAt ascending",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
@@ -98,23 +96,18 @@ public class PricingHistoryController {
                             {
                               "code": "999999",
                               "message": null,
-                              "data": {
-                                "page": 1,
-                                "size": 10,
-                                "totalElements": 15,
-                                "totalPages": 2,
-                                "data": [
-                                  {
-                                    "priceHistoryId": 1,
-                                    "listingId": 123,
-                                    "oldPrice": 1000.00,
-                                    "newPrice": 1200.00,
-                                    "changeType": "INCREASE",
-                                    "changePercentage": 20.00,
-                                    "changedAt": "2024-01-01T00:00:00"
-                                  }
-                                ]
-                              }
+                              "data": [
+                                {
+                                  "id": 1,
+                                  "listingId": 123,
+                                  "oldPrice": null,
+                                  "newPrice": 8500000,
+                                  "changeType": "INITIAL",
+                                  "changePercentage": 0,
+                                  "changedAt": "2024-01-01T00:00:00",
+                                  "current": false
+                                }
+                              ]
                             }
                             """
                     )
@@ -122,14 +115,9 @@ public class PricingHistoryController {
             )
         }
     )
-    ApiResponse<PageResponse<PricingHistoryResponse>> getPricingHistory(
-            @PathVariable Long listingId,
-            @Parameter(description = "Page number (1-indexed)", example = "1")
-            @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "Number of items per page", example = "10")
-            @RequestParam(defaultValue = "10") int size) {
-        PageResponse<PricingHistoryResponse> response = pricingHistoryService.getPricingHistoryByListingId(listingId, page, size);
-        return ApiResponse.<PageResponse<PricingHistoryResponse>>builder()
+    ApiResponse<List<PricingHistoryResponse>> getPricingHistory(@PathVariable Long listingId) {
+        List<PricingHistoryResponse> response = pricingHistoryService.getPricingHistoryByListingId(listingId);
+        return ApiResponse.<List<PricingHistoryResponse>>builder()
                 .data(response)
                 .build();
     }
@@ -158,54 +146,24 @@ public class PricingHistoryController {
     @GetMapping("/{listingId}/pricing-history/date-range")
     @Operation(
         summary = "Get pricing history within a date range",
-        description = "Returns pricing history for a listing within a date range with pagination",
+        description = "Returns pricing history sorted by changedAt ascending. Dates must be ISO 8601 (e.g. 2024-01-01T00:00:00)",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
                 description = "Pricing history for date range returned",
                 content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = ApiResponse.class),
-                    examples = @ExampleObject(
-                        name = "Success Response",
-                        value = """
-                            {
-                              "code": "999999",
-                              "message": null,
-                              "data": {
-                                "page": 1,
-                                "size": 10,
-                                "totalElements": 8,
-                                "totalPages": 1,
-                                "data": [
-                                  {
-                                    "priceHistoryId": 1,
-                                    "listingId": 123,
-                                    "oldPrice": 1000.00,
-                                    "newPrice": 1200.00,
-                                    "changeType": "INCREASE",
-                                    "changePercentage": 20.00,
-                                    "changedAt": "2024-01-01T00:00:00"
-                                  }
-                                ]
-                              }
-                            }
-                            """
-                    )
+                    schema = @Schema(implementation = ApiResponse.class)
                 )
             )
         }
     )
-    ApiResponse<PageResponse<PricingHistoryResponse>> getPricingHistoryByDateRange(
+    ApiResponse<List<PricingHistoryResponse>> getPricingHistoryByDateRange(
             @PathVariable Long listingId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate,
-            @Parameter(description = "Page number (1-indexed)", example = "1")
-            @RequestParam(defaultValue = "1") int page,
-            @Parameter(description = "Number of items per page", example = "10")
-            @RequestParam(defaultValue = "10") int size) {
-        PageResponse<PricingHistoryResponse> response = pricingHistoryService.getPricingHistoryByDateRange(listingId, startDate, endDate, page, size);
-        return ApiResponse.<PageResponse<PricingHistoryResponse>>builder()
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+        List<PricingHistoryResponse> response = pricingHistoryService.getPricingHistoryByDateRange(listingId, startDate, endDate);
+        return ApiResponse.<List<PricingHistoryResponse>>builder()
                 .data(response)
                 .build();
     }

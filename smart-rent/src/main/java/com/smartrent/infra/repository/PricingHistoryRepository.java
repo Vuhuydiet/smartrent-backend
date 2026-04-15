@@ -15,14 +15,21 @@ import java.util.Optional;
 @Repository
 public interface PricingHistoryRepository extends JpaRepository<PricingHistory, Long> {
 
-    // Get all pricing history for a listing, ordered by date
+    // Get all pricing history for a listing, ordered by date (newest first)
     List<PricingHistory> findByListingListingIdOrderByChangedAtDesc(Long listingId);
+
+    // Get all pricing history for a listing, ordered by date (oldest first — for charts)
+    List<PricingHistory> findByListingListingIdOrderByChangedAtAsc(Long listingId);
 
     // Get current price for a listing
     Optional<PricingHistory> findByListingListingIdAndIsCurrentTrue(Long listingId);
 
-    // Get pricing history within date range
+    // Get pricing history within date range (newest first)
     List<PricingHistory> findByListingListingIdAndChangedAtBetweenOrderByChangedAtDesc(
+            Long listingId, LocalDateTime startDate, LocalDateTime endDate);
+
+    // Get pricing history within date range (oldest first — for charts)
+    List<PricingHistory> findByListingListingIdAndChangedAtBetweenOrderByChangedAtAsc(
             Long listingId, LocalDateTime startDate, LocalDateTime endDate);
 
     // Get price changes by change type

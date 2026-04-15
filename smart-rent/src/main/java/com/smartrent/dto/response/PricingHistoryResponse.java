@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,6 +28,7 @@ public class PricingHistoryResponse {
     String changeType;
     BigDecimal changePercentage;
     BigDecimal changeAmount;
+    @JsonProperty("current")
     boolean isCurrent;
     String changedBy;
     String changeReason;
