@@ -193,6 +193,11 @@ public class AiListingVerificationController {
     public ResponseEntity<ApiResponse<AiListingVerificationResponse>> verifyListing(
             @Valid @RequestBody AiListingVerificationRequest request) {
         
+        // TEMPORARILY LOCKED AS PER USER REQUEST
+        if (true) {
+            throw new DomainException(DomainCode.AI_SERVICE_UNAVAILABLE);
+        }
+
         log.info("Received AI verification request for listing: {}", request.getTitle());
         
         AiListingVerificationResponse response = aiListingVerificationService.verifyListing(request);

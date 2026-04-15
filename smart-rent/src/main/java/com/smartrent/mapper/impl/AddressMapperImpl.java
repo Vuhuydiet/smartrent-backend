@@ -31,7 +31,18 @@ public class AddressMapperImpl implements AddressMapper {
                 .fullNewAddress(address.getFullNewAddress())
                 .latitude(address.getLatitude())
                 .longitude(address.getLongitude())
-                // Note: Metadata fields should be populated from AddressMetadata if needed
+                .addressType(address.getAddressType())
+                // Legacy components
+                .legacyProvinceId(address.getLegacyProvinceId())
+                .legacyDistrictId(address.getLegacyDistrictId())
+                .legacyWardId(address.getLegacyWardId())
+                .legacyStreet(address.getLegacyStreet())
+                // New structure components
+                .newProvinceCode(address.getNewProvinceCode())
+                .newWardCode(address.getNewWardCode())
+                .newStreet(address.getNewStreet())
+                // Common metadata
+                .projectId(address.getProjectId())
                 .build();
     }
 

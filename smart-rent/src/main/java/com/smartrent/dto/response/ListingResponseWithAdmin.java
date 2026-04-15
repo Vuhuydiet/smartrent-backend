@@ -38,6 +38,9 @@ public class ListingResponseWithAdmin {
     @Schema(description = "Post date")
     LocalDateTime postDate;
 
+    @Schema(description = "Last push date (affects ranking)")
+    LocalDateTime pushedAt;
+
     @Schema(description = "Expiry date")
     LocalDateTime expiryDate;
 

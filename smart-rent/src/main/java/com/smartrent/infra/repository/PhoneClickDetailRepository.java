@@ -114,5 +114,12 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
      */
     @Query("SELECT pc FROM phone_clicks pc WHERE pc.listing.listingId IN :listingIds")
     List<PhoneClickDetail> findByListingIdIn(@Param("listingIds") List<Long> listingIds);
+
+    /**
+     * Get recent phone clicks from ALL users (for CF global interactions).
+     * Ordered by clickedAt desc so we get the freshest signal.
+     */
+    @Query("SELECT pc FROM phone_clicks pc ORDER BY pc.clickedAt DESC")
+    List<PhoneClickDetail> findRecentGlobalPhoneClicks(org.springframework.data.domain.Pageable pageable);
 }
 

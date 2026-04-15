@@ -3,6 +3,7 @@ package com.smartrent.service.listing.impl;
 import com.smartrent.dto.request.SavedListingRequest;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.SavedListingResponse;
+import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.SavedListingRepository;
 import com.smartrent.infra.repository.entity.SavedListing;
 import com.smartrent.infra.repository.entity.SavedListingId;
@@ -31,6 +32,7 @@ public class SavedListingServiceImpl implements SavedListingService {
 
     SavedListingRepository savedListingRepository;
     SavedListingMapper savedListingMapper;
+    ListingRepository listingRepository;
 
     @Override
     @Transactional
@@ -41,6 +43,11 @@ public class SavedListingServiceImpl implements SavedListingService {
         // Check if already saved
         if (savedListingRepository.existsByIdUserIdAndIdListingId(userId, request.getListingId())) {
             throw new RuntimeException("Listing is already saved by this user");
+        }
+
+        // Check if listing exists
+        if (!listingRepository.existsById(request.getListingId())) {
+            throw new RuntimeException("Listing not found");
         }
 
         SavedListing savedListing = savedListingMapper.toEntity(request, userId);

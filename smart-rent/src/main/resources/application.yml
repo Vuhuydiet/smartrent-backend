@@ -156,6 +156,8 @@ application:
         - "/v1/support/contact"
         - "/v1/listings/reports/reasons"
         - "/v1/recommendations/similar/**"
+        - "/v1/recommendations/personalized"
+        - "/v1/recently-viewed/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"

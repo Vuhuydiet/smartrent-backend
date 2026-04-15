@@ -86,6 +86,12 @@ public class AIRecommendationRequest {
         
         @JsonProperty("alpha")
         Double alpha;
+
+        @JsonProperty("user_interactions")
+        List<InteractionEntryDto> userInteractions; // Optional: null for anonymous users
+
+        @JsonProperty("interaction_features")
+        List<ListingFeatureDto> interactionFeatures;
     }
 
     @Getter
@@ -112,5 +118,8 @@ public class AIRecommendationRequest {
         
         @JsonProperty("alpha")
         Double alpha;
+
+        @JsonProperty("interaction_features")
+        List<ListingFeatureDto> interactionFeatures;
     }
 }

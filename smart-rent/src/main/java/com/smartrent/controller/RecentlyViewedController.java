@@ -5,7 +5,6 @@ import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.RecentlyViewedItemResponse;
 import com.smartrent.service.recentlyviewed.RecentlyViewedService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -26,19 +25,27 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
 @Tag(name = "Recently Viewed", description = "Endpoints for user browsing history")
-@SecurityRequirement(name = "Bearer Authentication")
 public class RecentlyViewedController {
 
     RecentlyViewedService recentlyViewedService;
 
     @PostMapping("/sync")
-    @Operation(summary = "Sync recently viewed listings", description = "Sync local browsing history with server")
+    @Operation(summary = "Sync recently viewed listings", description = "Sync local browsing history with server. (Test mode: Accepts optional userId query param)")
     public ResponseEntity<ApiResponse<List<RecentlyViewedItemResponse>>> sync(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String userId,
             @Valid @RequestBody RecentlyViewedSyncRequest request) {
         
-        String userId = jwt.getSubject();
-        List<RecentlyViewedItemResponse> updatedHistory = recentlyViewedService.sync(userId, request);
+        String finalUserId = (jwt != null) ? jwt.getSubject() : userId;
+
+        if (finalUserId == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.<List<RecentlyViewedItemResponse>>builder()
+                    .code(String.valueOf(HttpStatus.BAD_REQUEST.value()))
+                    .message("User ID must be provided")
+                    .build());
+        }
+
+        List<RecentlyViewedItemResponse> updatedHistory = recentlyViewedService.sync(finalUserId, request);
 
         return ResponseEntity.ok(ApiResponse.<List<RecentlyViewedItemResponse>>builder()
                 .code(String.valueOf(HttpStatus.OK.value()))
@@ -48,12 +55,21 @@ public class RecentlyViewedController {
     }
 
     @GetMapping
-    @Operation(summary = "Get recently viewed listings", description = "Retrieve user's latest browsing history")
+    @Operation(summary = "Get recently viewed listings", description = "Retrieve user's latest browsing history. (Test mode: Accepts optional userId query param)")
     public ResponseEntity<ApiResponse<List<RecentlyViewedItemResponse>>> getRecentlyViewed(
-            @AuthenticationPrincipal Jwt jwt) {
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String userId) {
         
-        String userId = jwt.getSubject();
-        List<RecentlyViewedItemResponse> history = recentlyViewedService.get(userId);
+        String finalUserId = (jwt != null) ? jwt.getSubject() : userId;
+
+        if (finalUserId == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.<List<RecentlyViewedItemResponse>>builder()
+                    .code(String.valueOf(HttpStatus.BAD_REQUEST.value()))
+                    .message("User ID must be provided")
+                    .build());
+        }
+
+        List<RecentlyViewedItemResponse> history = recentlyViewedService.get(finalUserId);
 
         return ResponseEntity.ok(ApiResponse.<List<RecentlyViewedItemResponse>>builder()
                 .code(String.valueOf(HttpStatus.OK.value()))

@@ -258,12 +258,13 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         Pageable pageable
     );
 
-    /**
-     * Candidates for Similar Listings
-     */
+    @Query("SELECT l FROM listings l LEFT JOIN FETCH l.address WHERE l.listingId = :id")
+    Optional<Listing> findByIdWithAddress(@Param("id") Long id);
+
     @Query("""
         SELECT l FROM listings l
-        WHERE (l.address.legacyProvinceId = :provinceId OR l.address.newProvinceCode = :provinceCode)
+        INNER JOIN FETCH l.address a
+        WHERE ((:provinceId IS NOT NULL AND a.legacyProvinceId = :provinceId) OR (:provinceCode IS NOT NULL AND a.newProvinceCode = :provinceCode))
         AND l.productType = :productType
         AND l.listingType = :listingType
         AND l.expired = false
@@ -290,6 +291,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
 
     @Query("""
         SELECT l FROM listings l
+        JOIN FETCH l.address a
         WHERE l.expired = false
         AND l.verified = true
         AND l.isDraft = false AND l.isShadow = false
@@ -313,7 +315,8 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      */
     @Query("""
         SELECT l FROM listings l
-        WHERE (l.address.legacyProvinceId = :provinceId OR l.address.newProvinceCode = :provinceCode)
+        JOIN FETCH l.address a
+        WHERE ((:provinceId IS NOT NULL AND a.legacyProvinceId = :provinceId) OR (:provinceCode IS NOT NULL AND a.newProvinceCode = :provinceCode))
         AND l.expired = false
         AND l.verified = true
         AND l.isDraft = false AND l.isShadow = false

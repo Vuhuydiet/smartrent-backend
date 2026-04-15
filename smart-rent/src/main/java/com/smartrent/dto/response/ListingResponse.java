@@ -49,10 +49,13 @@ public class ListingResponse {
     @Schema(description = "Post date")
     LocalDateTime postDate;
 
+    @Schema(description = "Last push date (affects ranking)")
+    LocalDateTime pushedAt;
+
     @Schema(description = "Expiry date")
     LocalDateTime expiryDate;
 
-    @Schema(description = "Listing type", example = "RENT", allowableValues = {"RENT", "SALE", "SHARE"})
+    @Schema(description = "Listing type", example = "RENT", allowableValues = { "RENT", "SALE", "SHARE" })
     String listingType;
 
     @Schema(description = "Whether listing is verified")
@@ -67,21 +70,18 @@ public class ListingResponse {
     @Schema(description = "Whether listing is a draft (incomplete, not yet published)")
     Boolean isDraft;
 
-    @Schema(description = "Computed listing status for owner view",
-            example = "DISPLAYING",
-            allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED"})
+    @Schema(description = "Computed listing status for owner view", example = "DISPLAYING", allowableValues = {
+            "EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED" })
     String listingStatus;
 
-    @Schema(
-        description = "VIP tier: NORMAL, SILVER, GOLD, DIAMOND",
-        example = "SILVER",
-        allowableValues = {"NORMAL", "SILVER", "GOLD", "DIAMOND"}
-    )
+    @Schema(description = "VIP tier: NORMAL, SILVER, GOLD, DIAMOND", example = "SILVER", allowableValues = { "NORMAL",
+            "SILVER", "GOLD", "DIAMOND" })
     String vipType;
 
     Long categoryId;
 
-    @Schema(description = "Product type (loại bất động sản)", example = "APARTMENT", allowableValues = {"ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO"})
+    @Schema(description = "Product type (loại bất động sản)", example = "APARTMENT", allowableValues = { "ROOM",
+            "APARTMENT", "HOUSE", "OFFICE", "STUDIO" })
     String productType;
 
     BigDecimal price;
@@ -121,11 +121,19 @@ public class ListingResponse {
     @Schema(description = "List of media (images/videos) for this listing, ordered by sort_order")
     List<MediaResponse> media;
 
-
     @Schema(description = "Location-based pricing information for this listing and similar listings in the same area")
     LocationPricingResponse locationPricing;
 
     LocalDateTime createdAt;
 
     LocalDateTime updatedAt;
+
+    @Schema(description = "Overall recommendation score")
+    Double recommendationScore;
+
+    @Schema(description = "Personalization (taste) match score")
+    Double personalizationScore;
+
+    @Schema(description = "Content-based similarity score")
+    Double similarityScore;
 }
