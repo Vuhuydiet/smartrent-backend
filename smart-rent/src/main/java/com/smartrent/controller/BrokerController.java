@@ -38,17 +38,16 @@ public class BrokerController {
             description = """
                     Authenticated user submits a broker registration request.
 
-                    **Before calling this endpoint, upload 4 identity document images:**
-                    1. `POST /v1/media/upload-url` with `purpose=BROKER_DOCUMENT, mediaType=IMAGE` — repeat ×4
+                    **Before calling this endpoint, upload 3 identity document images:**
+                    1. `POST /v1/media/upload-url` with `purpose=BROKER_DOCUMENT, mediaType=IMAGE` — repeat ×3
                     2. `PUT <presignedUrl>` — upload each file directly
-                    3. `POST /v1/media/{mediaId}/confirm` — confirm each upload ×4
-                    4. Call this endpoint with the 4 confirmed `mediaId`s in the body
+                    3. `POST /v1/media/{mediaId}/confirm` — confirm each upload ×3
+                    4. Call this endpoint with the 3 confirmed `mediaId`s in the body
 
                     **Required documents:**
                     - `cccdFrontMediaId` — CCCD (Vietnamese National ID) front side
                     - `cccdBackMediaId` — CCCD back side
-                    - `certFrontMediaId` — Practising certificate front side
-                    - `certBackMediaId` — Practising certificate back side
+                    - `certMediaId` — Practising certificate image
 
                     **Idempotent behavior:**
                     - Already `PENDING` → returns current status (documents are not updated)
@@ -59,7 +58,7 @@ public class BrokerController {
                     """,
             security = @SecurityRequirement(name = "Bearer Authentication"),
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Four confirmed media IDs for identity/certificate images",
+                    description = "Three confirmed media IDs for identity/certificate images",
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
@@ -70,8 +69,7 @@ public class BrokerController {
                                             {
                                               "cccdFrontMediaId": 101,
                                               "cccdBackMediaId": 102,
-                                              "certFrontMediaId": 103,
-                                              "certBackMediaId": 104
+                                              "certMediaId": 103
                                             }
                                             """
                             )
@@ -100,8 +98,7 @@ public class BrokerController {
                                                 "brokerVerificationSource": null,
                                                 "cccdFrontUrl": "https://r2.example.com/users/.../broker/...jpg?sig=...",
                                                 "cccdBackUrl": "https://r2.example.com/users/.../broker/...jpg?sig=...",
-                                                "certFrontUrl": "https://r2.example.com/users/.../broker/...jpg?sig=...",
-                                                "certBackUrl": "https://r2.example.com/users/.../broker/...jpg?sig=..."
+                                                "certUrl": "https://r2.example.com/users/.../broker/...jpg?sig=..."
                                               }
                                             }
                                             """
@@ -163,8 +160,7 @@ public class BrokerController {
                                                 "brokerVerificationSource": "https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20",
                                                 "cccdFrontUrl": "https://r2.example.com/...?sig=...",
                                                 "cccdBackUrl": "https://r2.example.com/...?sig=...",
-                                                "certFrontUrl": "https://r2.example.com/...?sig=...",
-                                                "certBackUrl": "https://r2.example.com/...?sig=..."
+                                                "certUrl": "https://r2.example.com/...?sig=..."
                                               }
                                             }
                                             """

@@ -77,14 +77,8 @@ public class BrokerStatusResponse {
     String cccdBackUrl;
 
     @Schema(
-            description = "Presigned download URL for practising certificate front image",
+            description = "Presigned download URL for practising certificate image",
             example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
     )
-    String certFrontUrl;
-
-    @Schema(
-            description = "Presigned download URL for practising certificate back image",
-            example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
-    )
-    String certBackUrl;
+    String certUrl;
 }

@@ -73,9 +73,6 @@ public class AdminBrokerUserResponse {
     @Schema(description = "Presigned download URL for CCCD back image")
     String cccdBackUrl;
 
-    @Schema(description = "Presigned download URL for practising certificate front image")
-    String certFrontUrl;
-
-    @Schema(description = "Presigned download URL for practising certificate back image")
-    String certBackUrl;
+    @Schema(description = "Presigned download URL for practising certificate image")
+    String certUrl;
 }
