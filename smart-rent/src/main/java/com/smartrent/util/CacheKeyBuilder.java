@@ -14,6 +14,7 @@ public final class CacheKeyBuilder {
             return "null";
         }
         StringBuilder sb = new StringBuilder(256);
+        sb.append("v2|");
 
         append(sb, "userId", filter.getUserId());
         append(sb, "isDraft", filter.getIsDraft());
@@ -79,6 +80,7 @@ public final class CacheKeyBuilder {
         append(sb, "keyword", TextNormalizer.normalize(filter.getKeyword()));
 
         append(sb, "ownerPhoneVerified", filter.getOwnerPhoneVerified());
+        append(sb, "isBroker", filter.getIsBroker());
         append(sb, "postedWithinDays", filter.getPostedWithinDays());
         append(sb, "updatedWithinDays", filter.getUpdatedWithinDays());
 
