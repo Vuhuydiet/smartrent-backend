@@ -71,12 +71,4 @@ public class MembershipPackageBenefit {
         return benefitType == BenefitType.PUSH;
     }
 
-    public boolean isAutoApproveBenefit() {
-        return benefitType == BenefitType.AUTO_APPROVE;
-    }
-
-    public boolean isBadgeBenefit() {
-        return benefitType == BenefitType.BADGE;
-    }
 }
-
