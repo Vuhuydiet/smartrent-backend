@@ -30,13 +30,13 @@ public class AiListingVerificationRequest {
 
     @JsonProperty("title")
     @NotBlank(message = "Title is required")
-    @Size(min = 1, max = 200, message = "Title must be between 1 and 200 characters")
+    @Size(min = 1, max = 500, message = "Title must be between 1 and 500 characters")
     @Schema(description = "Listing title", example = "Cho thuê căn hộ 2PN Vinhomes Central Park", required = true)
     private String title;
 
     @JsonProperty("description")
     @NotBlank(message = "Description is required")
-    @Size(min = 10, max = 5000, message = "Description must be between 10 and 5000 characters")
+    @Size(min = 10, max = 50000, message = "Description must be between 10 and 50000 characters")
     @Schema(description = "Listing description", example = "Căn hộ 2 phòng ngủ, đầy đủ nội thất, view sông đẹp", required = true)
     private String description;
 

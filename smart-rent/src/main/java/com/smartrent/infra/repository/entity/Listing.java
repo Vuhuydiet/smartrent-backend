@@ -43,7 +43,7 @@ public class Listing {
     Long listingId;
 
     // Core Information
-    @Column(name = "title", nullable = false, length = 200)
+    @Column(name = "title", nullable = false, length = 500)
     String title;
 
     @Column(name = "description", columnDefinition = "LONGTEXT")

@@ -43,7 +43,7 @@ public class ListingDraft {
     String userId;
 
     // Core Information - all optional
-    @Column(name = "title", length = 200)
+    @Column(name = "title", length = 500)
     String title;
 
     @Column(name = "description", columnDefinition = "LONGTEXT")
