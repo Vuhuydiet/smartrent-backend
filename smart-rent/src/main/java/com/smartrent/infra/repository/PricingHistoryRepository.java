@@ -36,9 +36,10 @@ public interface PricingHistoryRepository extends JpaRepository<PricingHistory, 
     List<PricingHistory> findByListingListingIdAndChangeTypeOrderByChangedAtDesc(
             Long listingId, PricingHistory.PriceChangeType changeType);
 
-    // Get listings with price changes in last N days
+    // Get listings with real price changes in last N days (excludes INITIAL and ADJUSTED)
     @Query("SELECT DISTINCT ph.listing.listingId FROM pricing_histories ph " +
-           "WHERE ph.changedAt >= :sinceDate AND ph.changeType != 'INITIAL'")
+           "WHERE ph.changedAt >= :sinceDate " +
+           "AND ph.changeType NOT IN ('INITIAL', 'ADJUSTED')")
     List<Long> findDistinctListingIdsByChangedAtAfterAndChangeTypeNot(
             @Param("sinceDate") LocalDateTime sinceDate);
 

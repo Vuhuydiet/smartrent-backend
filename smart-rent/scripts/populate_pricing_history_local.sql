@@ -1,34 +1,48 @@
 -- ============================================================================
 -- Script: populate_pricing_history_local.sql
--- Purpose: Populate realistic multi-step pricing history for ALL non-draft
---          listings based on the same CRC32-seeded approach as populate_listings.sql
+-- Purpose: Populate realistic pricing history for ALL non-draft listings with
+--          district-aware behavior and ~60-day interval data points.
 -- Usage:   Run manually via mysql client — NOT via Flyway
 --          mysql -u <user> -p smartrent < scripts/populate_pricing_history_local.sql
 --
--- Design:
---   Each listing gets 3 or 4 history records driven by CRC32(listing_id) seeds.
---   Three scenarios, distributed by listing:
---     50% UPWARD    — started cheaper, gradually rose to current price
---     30% VOLATILE  — price moved up/down before settling at current
---     20% DOWNWARD  — started expensive, owner kept dropping to current
+-- ── CONFIG ──────────────────────────────────────────────────────────────────
+--   @use_listing_dates = FALSE  →  local dev: fixed 14–26 month window
+--   @use_listing_dates = TRUE   →  production: anchored to listing post_date
+-- ────────────────────────────────────────────────────────────────────────────
 --
---   Price change magnitude per step (by category):
---     Room        : 4–10%   (1.5M–5M/month range)
---     Apartment   : 5–13%   (5M–25M/month range)
---     House       : 5–14%   (8M–30M/month range)
---     Office      : 7–18%   (5M–50M/month range)
---     Commercial  : 10–25%  (10M–100M/month range)
+-- Record types per listing:
+--   INITIAL    — first price when listing was created
+--   INCREASE   — owner deliberately raised the price
+--   DECREASE   — owner deliberately lowered the price
+--   ADJUSTED   — synthetic 60-day interpolated point (for chart density)
 --
---   Date range:
---     t0 (INITIAL) = listing post_date, or 30 months ago if older
---     t3 (current) = 1–5 months ago, always after t0
---     t1, t2 = evenly spaced between t0 and t3
+-- Structure:
+--   Anchor points (3 or 4) define the price trajectory via CRC32-seeded
+--   UPWARD / VOLATILE / DOWNWARD scenarios, same as before.
+--   ADJUSTED records are inserted between consecutive anchors at every
+--   60-day mark using linear interpolation.
 --
--- Safe to re-run: TRUNCATEs pricing_histories first.
--- Estimated runtime: ~5s for 1k listings, ~3–5 min for 50k listings.
+--   Expected records per listing: 7–13
+--   (3-4 anchors + ~4-8 ADJUSTED across all gaps)
+--
+-- District-aware layer (HCMC only):
+--   v_volatility — step size multiplier    (>1 = wider price swings)
+--   v_trend_bias — scenario override       (+1 upward, -1 downward, 0 neutral)
+--
+-- Price step — additive, proportional to listing price:
+--   step_vnd = GREATEST(ROUND(price × pct% / 100k) × 100k, 100k)
+--   Minimum 100 000 VND gap on every anchor-to-anchor move.
+--
+-- Only processes listings with ≤ 1 existing pricing history row.
+-- Safe to re-run: deletes only history for listings it will repopulate.
 -- ============================================================================
 
 USE smartrent;
+
+-- ============================================================================
+-- CONFIG
+-- ============================================================================
+SET @use_listing_dates = FALSE;   -- FALSE = local dev,  TRUE = production
 
 -- ============================================================================
 -- Stored procedure
@@ -40,39 +54,57 @@ DELIMITER //
 CREATE PROCEDURE populate_pricing_history()
 BEGIN
     -- ---- Cursor fields ----
-    DECLARE done        INT DEFAULT FALSE;
+    DECLARE done          INT DEFAULT FALSE;
     DECLARE v_listing_id  BIGINT;
     DECLARE v_user_id     VARCHAR(36);
     DECLARE v_price       DECIMAL(15,0);
     DECLARE v_price_unit  VARCHAR(10);
     DECLARE v_category_id INT;
     DECLARE v_post_date   DATETIME;
+    DECLARE v_district_id INT;
 
     -- ---- CRC32 seeds ----
-    DECLARE h_main  BIGINT;   -- scenario / steps / reasons
-    DECLARE h_date  BIGINT;   -- date placement
-    DECLARE h_mag   BIGINT;   -- magnitude variation
+    DECLARE h_main  BIGINT;
+    DECLARE h_date  BIGINT;
+    DECLARE h_mag   BIGINT;
 
     -- ---- Scenario & structure ----
-    DECLARE v_scenario  INT;          -- 0=upward, 1=volatile, 2=downward
-    DECLARE v_steps     INT;          -- 3 or 4 records total
-    DECLARE v_pct       DECIMAL(5,2); -- per-step % magnitude
+    DECLARE v_scenario  INT;
+    DECLARE v_steps     INT;
+    DECLARE v_pct       DECIMAL(5,2);
 
-    -- ---- Prices at each step ----
-    DECLARE v_p0  DECIMAL(15,0);  -- INITIAL price
-    DECLARE v_p1  DECIMAL(15,0);  -- after step 1
-    DECLARE v_p2  DECIMAL(15,0);  -- after step 2 (steps=4 only)
-    DECLARE v_p3  DECIMAL(15,0);  -- current price = l.price
+    -- ---- District behavior ----
+    DECLARE v_volatility  DECIMAL(5,2);
+    DECLARE v_trend_bias  INT;
 
-    -- ---- Timestamps ----
-    DECLARE v_t0        DATETIME;
-    DECLARE v_t1        DATETIME;
-    DECLARE v_t2        DATETIME;
-    DECLARE v_t3        DATETIME;
+    -- ---- Step size ----
+    DECLARE v_step_vnd  DECIMAL(15,0);
+
+    -- ---- Anchor prices ----
+    DECLARE v_p0  DECIMAL(15,0);
+    DECLARE v_p1  DECIMAL(15,0);
+    DECLARE v_p2  DECIMAL(15,0);
+    DECLARE v_p3  DECIMAL(15,0);
+
+    -- ---- Anchor timestamps ----
+    DECLARE v_t0  DATETIME;
+    DECLARE v_t1  DATETIME;
+    DECLARE v_t2  DATETIME;
+    DECLARE v_t3  DATETIME;
     DECLARE v_span_days INT;
 
+    -- ---- Interpolation (ADJUSTED records) ----
+    DECLARE v_gap_days      INT;
+    DECLARE v_num_adj       INT;
+    DECLARE v_adj_i         INT;
+    DECLARE v_t_adj         DATETIME;
+    DECLARE v_p_adj         DECIMAL(15,0);
+    DECLARE v_t_gap_start   DATETIME;
+    DECLARE v_p_gap_start   DECIMAL(15,0);
+    DECLARE v_p_gap_end     DECIMAL(15,0);
+
     -- ---- INSERT helpers ----
-    DECLARE v_prev_price  DECIMAL(15,0);
+    DECLARE v_last_price  DECIMAL(15,0);  -- price of the previous inserted row
     DECLARE v_amt_val     DECIMAL(15,0);
     DECLARE v_pct_val     DECIMAL(5,2);
     DECLARE v_reason_idx  INT;
@@ -81,178 +113,224 @@ BEGIN
     DECLARE v_total INT DEFAULT 0;
     DECLARE v_batch INT DEFAULT 0;
 
-    -- ---- Cursor ----
+    -- ---- Cursor: listings with ≤ 1 existing pricing history row ----
     DECLARE cur CURSOR FOR
-        SELECT listing_id, user_id, price, price_unit, category_id, post_date
-        FROM   listings
-        WHERE  is_draft = FALSE;
+        SELECT l.listing_id,
+               l.user_id,
+               l.price,
+               l.price_unit,
+               l.category_id,
+               l.post_date,
+               COALESCE(a.legacy_district_id, 0)
+        FROM   listings l
+        LEFT  JOIN addresses a ON a.address_id = l.address_id
+        WHERE  l.is_draft = FALSE
+          AND  (SELECT COUNT(*) FROM pricing_histories ph
+                WHERE  ph.listing_id = l.listing_id) <= 1;
 
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
-
-    -- ----------------------------------------------------------------
-    -- Clean slate
-    -- ----------------------------------------------------------------
-    TRUNCATE TABLE pricing_histories;
 
     SET autocommit = 0;
     OPEN cur;
 
     read_loop: LOOP
         FETCH cur INTO v_listing_id, v_user_id, v_price, v_price_unit,
-                       v_category_id, v_post_date;
+                       v_category_id, v_post_date, v_district_id;
         IF done THEN LEAVE read_loop; END IF;
 
-        -- ---- Seeds (independent per attribute, same as populate_listings.sql style) ----
+        -- Delete any existing 0–1 row for this listing
+        DELETE FROM pricing_histories
+        WHERE  listing_id = v_listing_id AND listing_id > 0;
+
+        -- ---- Seeds ----
         SET h_main = CRC32(CONCAT(v_listing_id, ':ph_main'));
         SET h_date = CRC32(CONCAT(v_listing_id, ':ph_date'));
         SET h_mag  = CRC32(CONCAT(v_listing_id, ':ph_mag'));
 
-        -- ----------------------------------------------------------------
-        -- Scenario: 0=upward (50%), 1=volatile (30%), 2=downward (20%)
-        -- ----------------------------------------------------------------
+        -- ---- Scenario ----
         IF    h_main % 10 < 5 THEN SET v_scenario = 0;
         ELSEIF h_main % 10 < 8 THEN SET v_scenario = 1;
         ELSE                        SET v_scenario = 2;
         END IF;
 
-        -- ----------------------------------------------------------------
-        -- Steps: 3 (60%) or 4 (40%)
-        -- ----------------------------------------------------------------
+        -- ---- Steps ----
         SET v_steps = IF((h_main >> 4) % 5 < 3, 3, 4);
 
-        -- ----------------------------------------------------------------
-        -- Per-step % magnitude, tied to category price range
-        -- ----------------------------------------------------------------
+        -- ---- Category-based pct ----
         CASE v_category_id
-            WHEN 1 THEN SET v_pct = 4  + (h_mag % 7);   -- room:       4–10%
-            WHEN 2 THEN SET v_pct = 5  + (h_mag % 9);   -- apartment:  5–13%
-            WHEN 3 THEN SET v_pct = 5  + (h_mag % 10);  -- house:      5–14%
-            WHEN 4 THEN SET v_pct = 7  + (h_mag % 12);  -- office:     7–18%
-            WHEN 5 THEN SET v_pct = 10 + (h_mag % 16);  -- commercial: 10–25%
+            WHEN 1 THEN SET v_pct = 4  + (h_mag % 7);
+            WHEN 2 THEN SET v_pct = 5  + (h_mag % 9);
+            WHEN 3 THEN SET v_pct = 5  + (h_mag % 10);
+            WHEN 4 THEN SET v_pct = 7  + (h_mag % 12);
+            WHEN 5 THEN SET v_pct = 10 + (h_mag % 16);
             ELSE         SET v_pct = 5  + (h_mag % 8);
         END CASE;
 
-        -- ----------------------------------------------------------------
-        -- Date range
-        --   t0 = listing's post_date (floored at 30 months ago)
-        --   t3 = 1–5 months ago (always in the past, always after t0)
-        -- ----------------------------------------------------------------
-        SET v_t0 = GREATEST(v_post_date, DATE_SUB(NOW(), INTERVAL 30 MONTH));
-        SET v_t3 = DATE_SUB(NOW(), INTERVAL (1 + h_date % 5) MONTH);
+        -- ---- District behavior ----
+        SET v_volatility = 1.00;
+        SET v_trend_bias = 0;
 
-        -- Ensure t3 is after t0 by at least 30 days
-        IF v_t3 <= DATE_ADD(v_t0, INTERVAL 30 DAY) THEN
-            SET v_t3 = DATE_ADD(v_t0, INTERVAL 30 DAY);
+        CASE v_district_id
+            WHEN 760 THEN SET v_volatility = 0.70; SET v_trend_bias =  0;  -- Quận 1
+            WHEN 770 THEN SET v_volatility = 0.75; SET v_trend_bias =  0;  -- Quận 3
+            WHEN 768 THEN SET v_volatility = 0.80; SET v_trend_bias =  0;  -- Phú Nhuận
+            WHEN 765 THEN SET v_volatility = 1.00; SET v_trend_bias =  1;  -- Bình Thạnh
+            WHEN 778 THEN SET v_volatility = 1.10; SET v_trend_bias =  1;  -- Quận 7
+            WHEN 774 THEN SET v_volatility = 1.00; SET v_trend_bias =  1;  -- Quận 4
+            WHEN 775 THEN SET v_volatility = 0.85; SET v_trend_bias =  0;  -- Quận 5
+            WHEN 771 THEN SET v_volatility = 0.90; SET v_trend_bias =  0;  -- Quận 10
+            WHEN 772 THEN SET v_volatility = 0.90; SET v_trend_bias =  0;  -- Quận 11
+            WHEN 766 THEN SET v_volatility = 0.90; SET v_trend_bias =  0;  -- Tân Bình
+            WHEN 764 THEN SET v_volatility = 1.00; SET v_trend_bias =  0;  -- Gò Vấp
+            WHEN 767 THEN SET v_volatility = 1.10; SET v_trend_bias =  0;  -- Tân Phú
+            WHEN 776 THEN SET v_volatility = 1.00; SET v_trend_bias =  0;  -- Quận 6
+            WHEN 777 THEN SET v_volatility = 1.10; SET v_trend_bias =  1;  -- Quận 8
+            WHEN 761 THEN SET v_volatility = 1.20; SET v_trend_bias =  1;  -- Quận 12
+            WHEN 773 THEN SET v_volatility = 1.25; SET v_trend_bias =  1;  -- Bình Tân
+            WHEN 769 THEN SET v_volatility = 1.50; SET v_trend_bias =  1;  -- TP. Thủ Đức
+            WHEN 785 THEN SET v_volatility = 1.35; SET v_trend_bias =  1;  -- Bình Chánh
+            WHEN 784 THEN SET v_volatility = 1.30; SET v_trend_bias =  1;  -- Hóc Môn
+            WHEN 783 THEN SET v_volatility = 1.20; SET v_trend_bias =  0;  -- Củ Chi
+            WHEN 786 THEN SET v_volatility = 1.20; SET v_trend_bias =  1;  -- Nhà Bè
+            WHEN 787 THEN SET v_volatility = 0.80; SET v_trend_bias =  0;  -- Cần Giờ
+            ELSE           SET v_volatility = 1.00; SET v_trend_bias =  0;
+        END CASE;
+
+        IF v_trend_bias =  1 AND v_scenario = 2 THEN SET v_scenario = 0; END IF;
+        IF v_trend_bias = -1 AND v_scenario = 0 THEN SET v_scenario = 2; END IF;
+
+        -- ---- Step size ----
+        SET v_step_vnd = GREATEST(
+            ROUND(v_price * v_pct / 100 / 100000) * 100000, 100000);
+        SET v_step_vnd = GREATEST(
+            ROUND(v_step_vnd * v_volatility / 100000) * 100000, 100000);
+
+        -- ---- Date range ----
+        IF @use_listing_dates = TRUE THEN
+            SET v_t0 = v_post_date;
+            SET v_t3 = DATE_SUB(NOW(), INTERVAL (1 + (h_date >> 8) % 3) MONTH);
+            IF v_t3 <= DATE_ADD(v_t0, INTERVAL 30 DAY) THEN
+                SET v_t3 = DATE_ADD(v_t0, INTERVAL 30 DAY);
+            END IF;
+        ELSE
+            SET v_t0 = DATE_SUB(NOW(), INTERVAL (14 + h_date % 13)       MONTH);
+            SET v_t3 = DATE_SUB(NOW(), INTERVAL (1  + (h_date >> 8) % 3) MONTH);
         END IF;
-        -- Cap at yesterday so "current" record is never in the future
-        IF v_t3 >= NOW() THEN
-            SET v_t3 = DATE_SUB(NOW(), INTERVAL 1 DAY);
-        END IF;
 
-        SET v_span_days = GREATEST(1, DATEDIFF(v_t3, v_t0));
+        SET v_span_days = DATEDIFF(v_t3, v_t0);
 
-        -- Intermediate timestamps
         IF v_steps = 4 THEN
             SET v_t1 = DATE_ADD(v_t0, INTERVAL ROUND(v_span_days / 3)     DAY);
             SET v_t2 = DATE_ADD(v_t0, INTERVAL ROUND(v_span_days * 2 / 3) DAY);
         ELSE
             SET v_t1 = DATE_ADD(v_t0, INTERVAL ROUND(v_span_days / 2)     DAY);
-            SET v_t2 = v_t3; -- unused for steps=3 except as alias
+            SET v_t2 = v_t3;
         END IF;
 
-        -- ----------------------------------------------------------------
-        -- Price trajectory (all prices rounded to nearest 100,000 VND)
-        -- ----------------------------------------------------------------
+        -- ---- Anchor price trajectory ----
         CASE v_scenario
-
-            WHEN 0 THEN -- UPWARD: started cheaper, each step is an increase
-                -- p0 = current / (1+pct)^(steps-1)
-                SET v_p0 = ROUND(v_price / POW(1 + v_pct / 100, v_steps - 1) / 100000) * 100000;
-                IF v_steps = 4 THEN
-                    SET v_p1 = ROUND(v_p0 * (1 + v_pct / 100) / 100000) * 100000;
-                    SET v_p2 = ROUND(v_p1 * (1 + v_pct / 100) / 100000) * 100000;
-                ELSE
-                    SET v_p1 = ROUND(v_p0 * (1 + v_pct / 100) / 100000) * 100000;
-                    SET v_p2 = v_price; -- unused
-                END IF;
-
-            WHEN 1 THEN -- VOLATILE: dip then recovery, or spike then pullback
+            WHEN 0 THEN
+                SET v_p0 = v_price - (v_steps - 1) * v_step_vnd;
+                SET v_p1 = v_p0 + v_step_vnd;
+                SET v_p2 = v_p1 + v_step_vnd;
+            WHEN 1 THEN
                 IF (h_main >> 8) % 2 = 0 THEN
-                    -- Started higher → dropped → recovered to current
-                    SET v_p0 = ROUND(v_price * (1 + v_pct         / 100) / 100000) * 100000;
-                    SET v_p1 = ROUND(v_p0   * (1 - v_pct * 1.8   / 100) / 100000) * 100000;
-                    IF v_steps = 4 THEN
-                        SET v_p2 = ROUND(v_p1 * (1 + v_pct * 0.6 / 100) / 100000) * 100000;
+                    IF v_steps = 3 THEN
+                        SET v_p0 = v_price + v_step_vnd;
+                        SET v_p1 = v_price - v_step_vnd;
+                        SET v_p2 = 0;
                     ELSE
-                        SET v_p2 = v_price;
+                        SET v_p0 = v_price + 2 * v_step_vnd;
+                        SET v_p1 = v_price + v_step_vnd;
+                        SET v_p2 = v_price - v_step_vnd;
                     END IF;
                 ELSE
-                    -- Started lower → rose sharply → slight pullback to current
-                    SET v_p0 = ROUND(v_price * (1 - v_pct         / 100) / 100000) * 100000;
-                    SET v_p1 = ROUND(v_p0   * (1 + v_pct * 2     / 100) / 100000) * 100000;
-                    IF v_steps = 4 THEN
-                        SET v_p2 = ROUND(v_p1 * (1 - v_pct * 0.4 / 100) / 100000) * 100000;
+                    IF v_steps = 3 THEN
+                        SET v_p0 = v_price - v_step_vnd;
+                        SET v_p1 = v_price + v_step_vnd;
+                        SET v_p2 = 0;
                     ELSE
-                        SET v_p2 = v_price;
+                        SET v_p0 = v_price - v_step_vnd;
+                        SET v_p1 = v_price + v_step_vnd;
+                        SET v_p2 = v_price + 2 * v_step_vnd;
                     END IF;
                 END IF;
-
-            ELSE -- DOWNWARD: started high, owner progressively reduced to current
-                SET v_p0 = ROUND(v_price * POW(1 + v_pct / 100, v_steps - 1) / 100000) * 100000;
-                IF v_steps = 4 THEN
-                    SET v_p1 = ROUND(v_p0 * (1 - v_pct       / 100) / 100000) * 100000;
-                    SET v_p2 = ROUND(v_p1 * (1 - v_pct       / 100) / 100000) * 100000;
-                ELSE
-                    SET v_p1 = ROUND(v_p0 * (1 - v_pct * 1.5 / 100) / 100000) * 100000;
-                    SET v_p2 = v_price;
-                END IF;
-
+            ELSE
+                SET v_p0 = v_price + (v_steps - 1) * v_step_vnd;
+                SET v_p1 = v_p0 - v_step_vnd;
+                SET v_p2 = v_p1 - v_step_vnd;
         END CASE;
 
-        SET v_p3 = v_price; -- final record always lands on the listing's stored price
+        SET v_p3 = v_price;
 
-        -- Floor all prices at 100,000 VND
         IF v_p0 < 100000 THEN SET v_p0 = 100000; END IF;
         IF v_p1 < 100000 THEN SET v_p1 = 100000; END IF;
         IF v_p2 < 100000 THEN SET v_p2 = 100000; END IF;
 
-        -- ----------------------------------------------------------------
-        -- INSERT — Record 1: INITIAL
-        -- ----------------------------------------------------------------
+        -- ================================================================
+        -- INSERT all records interleaved with ADJUSTED points
+        -- v_last_price tracks the new_price of the most recently inserted row
+        -- ================================================================
+
+        -- ── INITIAL ──────────────────────────────────────────────────────
         INSERT INTO pricing_histories (
-            listing_id, old_price, new_price,
-            old_price_unit, new_price_unit,
+            listing_id, old_price, new_price, old_price_unit, new_price_unit,
             change_type, change_percentage, change_amount,
             is_current, changed_by, change_reason, changed_at
         ) VALUES (
             v_listing_id, NULL, v_p0, NULL, v_price_unit,
-            'INITIAL', 0, 0,
-            FALSE, v_user_id, 'Giá ban đầu khi đăng tin',
-            v_t0
+            'INITIAL', 0, 0, FALSE, v_user_id,
+            'Giá ban đầu khi đăng tin', v_t0
         );
+        SET v_last_price = v_p0;
 
-        -- ----------------------------------------------------------------
-        -- INSERT — Record 2: p0 → p1
-        -- ----------------------------------------------------------------
-        SET v_amt_val = v_p1 - v_p0;
+        -- ── ADJUSTED: gap t0 → t1 ────────────────────────────────────────
+        SET v_gap_days    = DATEDIFF(v_t1, v_t0);
+        SET v_num_adj     = GREATEST(FLOOR(v_gap_days / 60) - 1, 0);
+        SET v_t_gap_start = v_t0;
+        SET v_p_gap_start = v_p0;
+        SET v_p_gap_end   = v_p1;
+        SET v_adj_i = 1;
+        WHILE v_adj_i <= v_num_adj DO
+            SET v_t_adj = DATE_ADD(v_t_gap_start, INTERVAL v_adj_i * 60 DAY);
+            SET v_p_adj = GREATEST(
+                ROUND((v_p_gap_start + (v_p_gap_end - v_p_gap_start)
+                       * (v_adj_i * 60.0) / NULLIF(v_gap_days, 1)) / 100000) * 100000,
+                100000);
+            SET v_amt_val = v_p_adj - v_last_price;
+            SET v_pct_val = GREATEST(-99.99, LEAST(99.99,
+                ROUND(v_amt_val / NULLIF(v_last_price, 0) * 100, 2)));
+            INSERT INTO pricing_histories (
+                listing_id, old_price, new_price, old_price_unit, new_price_unit,
+                change_type, change_percentage, change_amount,
+                is_current, changed_by, change_reason, changed_at
+            ) VALUES (
+                v_listing_id, v_last_price, v_p_adj, v_price_unit, v_price_unit,
+                'ADJUSTED', v_pct_val, v_amt_val, FALSE, v_user_id,
+                ELT(CRC32(CONCAT(v_listing_id, ':a0:', v_adj_i)) % 4 + 1,
+                    'Điều chỉnh định kỳ theo thị trường',
+                    'Cập nhật giá theo biến động khu vực',
+                    'Điều chỉnh nhẹ phù hợp nhu cầu thuê',
+                    'Theo dõi và cập nhật định kỳ'),
+                v_t_adj);
+            SET v_last_price = v_p_adj;
+            SET v_adj_i = v_adj_i + 1;
+        END WHILE;
+
+        -- ── Anchor t1 ────────────────────────────────────────────────────
+        SET v_amt_val = v_p1 - v_last_price;
         SET v_pct_val = GREATEST(-99.99, LEAST(99.99,
-                            ROUND(v_amt_val / NULLIF(v_p0, 0) * 100, 2)));
-
-        SET v_reason_idx = IF(v_p1 >= v_p0,
-            (h_main >> 12) % 5 + 1,
-            (h_main >> 12) % 4 + 6
-        );
-
+            ROUND(v_amt_val / NULLIF(v_last_price, 0) * 100, 2)));
+        SET v_reason_idx = IF(v_p1 >= v_last_price,
+            (h_main >> 12) % 5 + 1, (h_main >> 12) % 4 + 6);
         INSERT INTO pricing_histories (
-            listing_id, old_price, new_price,
-            old_price_unit, new_price_unit,
+            listing_id, old_price, new_price, old_price_unit, new_price_unit,
             change_type, change_percentage, change_amount,
             is_current, changed_by, change_reason, changed_at
         ) VALUES (
-            v_listing_id, v_p0, v_p1, v_price_unit, v_price_unit,
-            IF(v_p1 >= v_p0, 'INCREASE', 'DECREASE'),
-            v_pct_val, v_amt_val,
-            FALSE, v_user_id,
+            v_listing_id, v_last_price, v_p1, v_price_unit, v_price_unit,
+            IF(v_p1 > v_last_price, 'INCREASE', IF(v_p1 < v_last_price, 'DECREASE', 'CORRECTION')),
+            v_pct_val, v_amt_val, FALSE, v_user_id,
             ELT(v_reason_idx,
                 'Điều chỉnh giá theo thị trường',
                 'Trang bị thêm nội thất mới',
@@ -262,34 +340,57 @@ BEGIN
                 'Giảm giá để tìm khách nhanh hơn',
                 'Điều chỉnh cạnh tranh với khu xung quanh',
                 'Khuyến mãi hợp đồng dài hạn',
-                'Giảm do phòng trống quá lâu'
-            ),
-            v_t1
-        );
+                'Giảm do phòng trống quá lâu'),
+            v_t1);
+        SET v_last_price = v_p1;
 
-        -- ----------------------------------------------------------------
-        -- INSERT — Record 3: p1 → p2  (only when steps = 4)
-        -- ----------------------------------------------------------------
+        -- ── ADJUSTED + Anchor t2 (steps = 4 only) ────────────────────────
         IF v_steps = 4 THEN
-            SET v_amt_val = v_p2 - v_p1;
+            SET v_gap_days    = DATEDIFF(v_t2, v_t1);
+            SET v_num_adj     = GREATEST(FLOOR(v_gap_days / 60) - 1, 0);
+            SET v_t_gap_start = v_t1;
+            SET v_p_gap_start = v_p1;
+            SET v_p_gap_end   = v_p2;
+            SET v_adj_i = 1;
+            WHILE v_adj_i <= v_num_adj DO
+                SET v_t_adj = DATE_ADD(v_t_gap_start, INTERVAL v_adj_i * 60 DAY);
+                SET v_p_adj = GREATEST(
+                    ROUND((v_p_gap_start + (v_p_gap_end - v_p_gap_start)
+                           * (v_adj_i * 60.0) / NULLIF(v_gap_days, 1)) / 100000) * 100000,
+                    100000);
+                SET v_amt_val = v_p_adj - v_last_price;
+                SET v_pct_val = GREATEST(-99.99, LEAST(99.99,
+                    ROUND(v_amt_val / NULLIF(v_last_price, 0) * 100, 2)));
+                INSERT INTO pricing_histories (
+                    listing_id, old_price, new_price, old_price_unit, new_price_unit,
+                    change_type, change_percentage, change_amount,
+                    is_current, changed_by, change_reason, changed_at
+                ) VALUES (
+                    v_listing_id, v_last_price, v_p_adj, v_price_unit, v_price_unit,
+                    'ADJUSTED', v_pct_val, v_amt_val, FALSE, v_user_id,
+                    ELT(CRC32(CONCAT(v_listing_id, ':a1:', v_adj_i)) % 4 + 1,
+                        'Điều chỉnh định kỳ theo thị trường',
+                        'Cập nhật giá theo biến động khu vực',
+                        'Điều chỉnh nhẹ phù hợp nhu cầu thuê',
+                        'Theo dõi và cập nhật định kỳ'),
+                    v_t_adj);
+                SET v_last_price = v_p_adj;
+                SET v_adj_i = v_adj_i + 1;
+            END WHILE;
+
+            SET v_amt_val = v_p2 - v_last_price;
             SET v_pct_val = GREATEST(-99.99, LEAST(99.99,
-                                ROUND(v_amt_val / NULLIF(v_p1, 0) * 100, 2)));
-
-            SET v_reason_idx = IF(v_p2 >= v_p1,
-                (h_date >> 12) % 5 + 1,
-                (h_date >> 12) % 4 + 6
-            );
-
+                ROUND(v_amt_val / NULLIF(v_last_price, 0) * 100, 2)));
+            SET v_reason_idx = IF(v_p2 >= v_last_price,
+                (h_date >> 12) % 5 + 1, (h_date >> 12) % 4 + 6);
             INSERT INTO pricing_histories (
-                listing_id, old_price, new_price,
-                old_price_unit, new_price_unit,
+                listing_id, old_price, new_price, old_price_unit, new_price_unit,
                 change_type, change_percentage, change_amount,
                 is_current, changed_by, change_reason, changed_at
             ) VALUES (
-                v_listing_id, v_p1, v_p2, v_price_unit, v_price_unit,
-                IF(v_p2 >= v_p1, 'INCREASE', 'DECREASE'),
-                v_pct_val, v_amt_val,
-                FALSE, v_user_id,
+                v_listing_id, v_last_price, v_p2, v_price_unit, v_price_unit,
+                IF(v_p2 > v_last_price, 'INCREASE', IF(v_p2 < v_last_price, 'DECREASE', 'CORRECTION')),
+                v_pct_val, v_amt_val, FALSE, v_user_id,
                 ELT(v_reason_idx,
                     'Điều chỉnh giá theo thị trường',
                     'Cải tạo, nâng cấp hoàn tất',
@@ -299,48 +400,70 @@ BEGIN
                     'Giảm ưu đãi thêm 1 tháng miễn phí',
                     'Điều chỉnh cạnh tranh',
                     'Hỗ trợ khách thuê mùa thấp điểm',
-                    'Ưu đãi ký hợp đồng 12 tháng'
-                ),
-                v_t2
-            );
+                    'Ưu đãi ký hợp đồng 12 tháng'),
+                v_t2);
+            SET v_last_price = v_p2;
         END IF;
 
-        -- ----------------------------------------------------------------
-        -- INSERT — Final record (is_current = TRUE): prev → v_p3
-        -- ----------------------------------------------------------------
-        SET v_prev_price = IF(v_steps = 4, v_p2, v_p1);
-        SET v_amt_val    = v_p3 - v_prev_price;
-        SET v_pct_val    = GREATEST(-99.99, LEAST(99.99,
-                               ROUND(v_amt_val / NULLIF(v_prev_price, 0) * 100, 2)));
+        -- ── ADJUSTED: gap (last anchor) → t3 ─────────────────────────────
+        SET v_t_gap_start = IF(v_steps = 4, v_t2, v_t1);
+        SET v_p_gap_start = IF(v_steps = 4, v_p2, v_p1);
+        SET v_p_gap_end   = v_p3;
+        SET v_gap_days    = DATEDIFF(v_t3, v_t_gap_start);
+        SET v_num_adj     = GREATEST(FLOOR(v_gap_days / 60) - 1, 0);
+        SET v_adj_i = 1;
+        WHILE v_adj_i <= v_num_adj DO
+            SET v_t_adj = DATE_ADD(v_t_gap_start, INTERVAL v_adj_i * 60 DAY);
+            SET v_p_adj = GREATEST(
+                ROUND((v_p_gap_start + (v_p_gap_end - v_p_gap_start)
+                       * (v_adj_i * 60.0) / NULLIF(v_gap_days, 1)) / 100000) * 100000,
+                100000);
+            SET v_amt_val = v_p_adj - v_last_price;
+            SET v_pct_val = GREATEST(-99.99, LEAST(99.99,
+                ROUND(v_amt_val / NULLIF(v_last_price, 0) * 100, 2)));
+            INSERT INTO pricing_histories (
+                listing_id, old_price, new_price, old_price_unit, new_price_unit,
+                change_type, change_percentage, change_amount,
+                is_current, changed_by, change_reason, changed_at
+            ) VALUES (
+                v_listing_id, v_last_price, v_p_adj, v_price_unit, v_price_unit,
+                'ADJUSTED', v_pct_val, v_amt_val, FALSE, v_user_id,
+                ELT(CRC32(CONCAT(v_listing_id, ':a2:', v_adj_i)) % 4 + 1,
+                    'Điều chỉnh định kỳ theo thị trường',
+                    'Cập nhật giá theo biến động khu vực',
+                    'Điều chỉnh nhẹ phù hợp nhu cầu thuê',
+                    'Theo dõi và cập nhật định kỳ'),
+                v_t_adj);
+            SET v_last_price = v_p_adj;
+            SET v_adj_i = v_adj_i + 1;
+        END WHILE;
 
+        -- ── Final anchor (is_current = TRUE) ─────────────────────────────
+        SET v_amt_val = v_p3 - v_last_price;
+        SET v_pct_val = GREATEST(-99.99, LEAST(99.99,
+            ROUND(v_amt_val / NULLIF(v_last_price, 0) * 100, 2)));
         INSERT INTO pricing_histories (
-            listing_id, old_price, new_price,
-            old_price_unit, new_price_unit,
+            listing_id, old_price, new_price, old_price_unit, new_price_unit,
             change_type, change_percentage, change_amount,
             is_current, changed_by, change_reason, changed_at
         ) VALUES (
-            v_listing_id, v_prev_price, v_p3, v_price_unit, v_price_unit,
-            IF(v_p3 >= v_prev_price, 'INCREASE', 'DECREASE'),
-            v_pct_val, v_amt_val,
-            TRUE, v_user_id,
+            v_listing_id, v_last_price, v_p3, v_price_unit, v_price_unit,
+            IF(v_p3 > v_last_price, 'INCREASE', IF(v_p3 < v_last_price, 'DECREASE', 'CORRECTION')),
+            v_pct_val, v_amt_val, TRUE, v_user_id,
             ELT((h_mag >> 8) % 5 + 1,
                 'Ổn định giá theo thị trường hiện tại',
                 'Điều chỉnh giá sau đợt cải tạo',
                 'Giá cạnh tranh nhất khu vực',
                 'Cập nhật giá tháng mới',
-                'Điều chỉnh lần cuối theo thực tế'
-            ),
-            v_t3
-        );
+                'Điều chỉnh lần cuối theo thực tế'),
+            v_t3);
 
         -- ---- Batch commit ----
         SET v_total = v_total + 1;
         SET v_batch = v_batch + 1;
-
         IF v_batch >= 500 THEN
             COMMIT;
             SET v_batch = 0;
-
             IF v_total % 5000 = 0 THEN
                 SELECT CONCAT('Progress: ', v_total, ' listings processed') AS progress;
             END IF;
@@ -351,40 +474,32 @@ BEGIN
     CLOSE cur;
     COMMIT;
     SET autocommit = 1;
-
     SELECT CONCAT('Done. Pricing history populated for ', v_total, ' listings.') AS result;
 END //
 
 DELIMITER ;
 
 -- ============================================================================
--- Execute
+-- TRUNCATE first (local dev) then execute
+-- Comment out TRUNCATE if running on production
 -- ============================================================================
+TRUNCATE TABLE pricing_histories;
+
 CALL populate_pricing_history();
 
 DROP PROCEDURE IF EXISTS populate_pricing_history;
 
 -- ============================================================================
--- Verification
+-- Quick verification
 -- ============================================================================
-SELECT '=== SUMMARY ===' AS section;
 SELECT
-    COUNT(DISTINCT listing_id)          AS listings_with_history,
+    COUNT(DISTINCT listing_id)          AS listings,
     COUNT(*)                            AS total_rows,
-    SUM(is_current = TRUE)              AS current_rows,
+    ROUND(COUNT(*) / COUNT(DISTINCT listing_id), 1) AS avg_rows_per_listing,
     SUM(change_type = 'INITIAL')        AS initial_rows,
     SUM(change_type = 'INCREASE')       AS increase_rows,
     SUM(change_type = 'DECREASE')       AS decrease_rows,
+    SUM(change_type = 'ADJUSTED')       AS adjusted_rows,
     MIN(changed_at)                     AS earliest,
     MAX(changed_at)                     AS latest
 FROM pricing_histories;
-
-SELECT '=== ROWS PER LISTING (distribution) ===' AS section;
-SELECT records, COUNT(*) AS listing_count
-FROM (
-    SELECT listing_id, COUNT(*) AS records
-    FROM   pricing_histories
-    GROUP  BY listing_id
-) t
-GROUP BY records
-ORDER BY records;
