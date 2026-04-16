@@ -80,7 +80,11 @@ public class RecentlyViewedServiceImpl implements RecentlyViewedService {
 
     @Override
     public List<RecentlyViewedItemResponse> getRecentlyViewed() {
-        String userId = getCurrentUserId();
+        return getRecentlyViewed(getCurrentUserId());
+    }
+
+    @Override
+    public List<RecentlyViewedItemResponse> getRecentlyViewed(String userId) {
         String redisKey = buildKey(userId);
 
         log.info("Retrieving recently viewed listings for user: {}", userId);

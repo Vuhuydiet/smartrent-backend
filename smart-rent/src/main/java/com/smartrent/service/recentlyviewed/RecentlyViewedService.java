@@ -22,4 +22,10 @@ public interface RecentlyViewedService {
      * @return List of recently viewed listings sorted by most recent (up to 20 listings)
      */
     List<RecentlyViewedItemResponse> getRecentlyViewed();
+
+    /**
+     * Get user's recently viewed listings from Redis by userId (for internal usage like recommendations)
+     * @return List of recently viewed listings sorted by most recent (up to 20 listings)
+     */
+    List<RecentlyViewedItemResponse> getRecentlyViewed(String userId);
 }

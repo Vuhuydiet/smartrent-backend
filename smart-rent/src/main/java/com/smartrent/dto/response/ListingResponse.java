@@ -128,4 +128,16 @@ public class ListingResponse {
     LocalDateTime createdAt;
 
     LocalDateTime updatedAt;
+
+    @Schema(description = "Timestamp when the listing was last pushed (for freshness score)")
+    LocalDateTime pushedAt;
+
+    @Schema(description = "Final recommendation score (hybrid of AI scores + VIP + freshness)")
+    Double recommendationScore;
+
+    @Schema(description = "Personalization score (Collaborative Filtering)")
+    Double personalizationScore;
+
+    @Schema(description = "Similarity score (Content-Based Filtering)")
+    Double similarityScore;
 }

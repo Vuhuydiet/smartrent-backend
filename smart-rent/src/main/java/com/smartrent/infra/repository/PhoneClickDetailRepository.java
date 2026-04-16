@@ -217,5 +217,14 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
            nativeQuery = true)
     Page<Object[]> countClicksPerListingForOwnerPagedWithSearch(
             @Param("ownerId") String ownerId, @Param("keyword") String keyword, Pageable pageable);
+
+    // ─── Recommendation Signal Queries ───
+
+    /**
+     * Get recent phone clicks from ALL users (for CF global interactions).
+     * Ordered by clickedAt desc so we get the freshest signal.
+     */
+    @Query("SELECT pc FROM phone_clicks pc ORDER BY pc.clickedAt DESC")
+    List<PhoneClickDetail> findRecentGlobalPhoneClicks(Pageable pageable);
 }
 
