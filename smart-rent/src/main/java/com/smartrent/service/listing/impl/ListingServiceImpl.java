@@ -360,9 +360,6 @@ public class ListingServiceImpl implements ListingService {
                 listing.setPostSource(PostSource.QUOTA);
                 listing.setTransactionId(null);
 
-                // Check if user has AUTO_APPROVE benefit
-                // TODO: Implement auto-verification check
-
                 Listing saved = listingRepository.save(listing);
 
                 // Link media to listing if provided (within same transaction)

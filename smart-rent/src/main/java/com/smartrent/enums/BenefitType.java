@@ -24,16 +24,5 @@ public enum BenefitType {
     /**
      * Free push quota
      */
-    PUSH,
-
-    /**
-     * Auto-verify listings immediately
-     */
-    AUTO_APPROVE,
-
-    /**
-     * Trusted partner badge
-     */
-    BADGE
+    PUSH
 }
-

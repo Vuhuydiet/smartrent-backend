@@ -19,9 +19,9 @@ public class MembershipPackageBenefitResponse {
     Long benefitId;
 
     @Schema(
-        description = "Benefit type: POST_SILVER, POST_GOLD, POST_DIAMOND, PUSH, AUTO_APPROVE, BADGE",
+        description = "Benefit type: POST_SILVER, POST_GOLD, POST_DIAMOND, PUSH",
         example = "POST_SILVER",
-        allowableValues = {"POST_SILVER", "POST_GOLD", "POST_DIAMOND", "PUSH", "AUTO_APPROVE", "BADGE"}
+        allowableValues = {"POST_SILVER", "POST_GOLD", "POST_DIAMOND", "PUSH"}
     )
     String benefitType;
 
@@ -34,4 +34,3 @@ public class MembershipPackageBenefitResponse {
     @Schema(description = "Creation timestamp")
     LocalDateTime createdAt;
 }
-

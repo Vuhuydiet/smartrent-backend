@@ -1044,10 +1044,6 @@ public class MembershipServiceImpl implements MembershipService {
                 // Value based on push price per time
                 unitValue = PricingConstants.PUSH_PER_TIME;
                 break;
-            case AUTO_APPROVE:
-            case BADGE:
-                // Non-consumable benefits have no refund value
-                return BigDecimal.ZERO;
             default:
                 return BigDecimal.ZERO;
         }
@@ -1055,4 +1051,3 @@ public class MembershipServiceImpl implements MembershipService {
         return unitValue.multiply(new BigDecimal(quantity));
     }
 }
-
