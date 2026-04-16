@@ -58,6 +58,11 @@ public class UserMapperImpl implements UserMapper {
         .contactPhoneNumber(user.getContactPhoneNumber())
         .contactPhoneVerified(user.getContactPhoneVerified())
         .avatarUrl(user.getAvatarUrl())
+        .isBroker(user.isBroker())
+        .brokerVerificationStatus(
+          user.getBrokerVerificationStatus() != null
+            ? user.getBrokerVerificationStatus().name()
+            : null)
         .build();
   }
 

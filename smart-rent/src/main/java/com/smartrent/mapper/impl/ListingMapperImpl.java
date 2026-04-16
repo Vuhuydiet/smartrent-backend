@@ -184,8 +184,14 @@ public class ListingMapperImpl implements ListingMapper {
         ListingCardResponse.UserCard userCard = null;
         if (user != null) {
             userCard = ListingCardResponse.UserCard.builder()
+                    .userId(user.getUserId())
                     .firstName(user.getFirstName())
                     .lastName(user.getLastName())
+                    .contactPhoneNumber(user.getContactPhoneNumber())
+                    .contactPhoneVerified(user.getContactPhoneVerified())
+                    .avatarUrl(user.getAvatarUrl())
+                    .isBroker(user.getIsBroker())
+                    .brokerVerificationStatus(user.getBrokerVerificationStatus())
                     .build();
         }
 
