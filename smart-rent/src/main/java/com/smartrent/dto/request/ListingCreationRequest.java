@@ -32,7 +32,7 @@ public class ListingCreationRequest {
     String userId;
 
     // Fields that can be optional for draft listings
-    @Size(max = 200)
+    @Size(max = 500)
     String title;
 
     String description;

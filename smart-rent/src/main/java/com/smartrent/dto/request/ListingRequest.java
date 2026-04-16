@@ -24,11 +24,11 @@ import java.util.Set;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Schema(description = "Request to update or filter listings")
 public class ListingRequest {
-    @Size(max = 200)
+    @Size(max = 500)
     @Schema(description = "Listing title", example = "Cho thuê căn hộ 2PN Q7")
     String title;
 
-    @Size(max = 10000)
+    @Size(max = 50000)
     @Schema(description = "Detailed description", example = "Căn hộ đẹp, view sông")
     String description;
 

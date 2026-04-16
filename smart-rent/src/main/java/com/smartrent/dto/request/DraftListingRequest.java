@@ -37,7 +37,7 @@ public class DraftListingRequest {
     @Schema(hidden = true)
     String userId;
 
-    @Size(max = 200)
+    @Size(max = 500)
     @Schema(description = "Listing title", example = "Căn hộ 2 phòng ngủ")
     String title;
 
