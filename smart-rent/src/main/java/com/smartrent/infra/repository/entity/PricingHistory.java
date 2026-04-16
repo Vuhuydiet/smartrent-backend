@@ -78,7 +78,8 @@ public class PricingHistory {
         INCREASE, // Price went up
         DECREASE, // Price went down
         UNIT_CHANGE, // Price unit changed (e.g., from monthly to daily)
-        CORRECTION // Manual correction/adjustment
+        CORRECTION, // Same price, manual correction
+        ADJUSTED // Synthetic interpolated point for chart density (~60-day cadence)
     }
 
     // Helper methods

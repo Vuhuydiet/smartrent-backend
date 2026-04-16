@@ -189,7 +189,12 @@ public class PricingHistoryServiceImpl implements PricingHistoryService {
     public PriceStatistics getPriceStatistics(Long listingId) {
         log.info("Getting price statistics for listing: {}", listingId);
 
-        List<PricingHistory> allPricing = pricingHistoryRepository.findByListingListingIdOrderByChangedAtDesc(listingId);
+        // Exclude synthetic ADJUSTED records from all statistics calculations
+        List<PricingHistory> allPricing = pricingHistoryRepository
+                .findByListingListingIdOrderByChangedAtDesc(listingId)
+                .stream()
+                .filter(ph -> ph.getChangeType() != PricingHistory.PriceChangeType.ADJUSTED)
+                .collect(Collectors.toList());
 
         if (allPricing.isEmpty()) {
             throw new RuntimeException("No pricing history found for listing: " + listingId);
@@ -210,7 +215,10 @@ public class PricingHistoryServiceImpl implements PricingHistoryService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .divide(BigDecimal.valueOf(allPricing.size()), RoundingMode.HALF_UP);
 
-        int totalChanges = allPricing.size() - 1; // Exclude initial pricing
+        // totalChanges = real owner decisions only (excludes INITIAL and ADJUSTED)
+        int totalChanges = (int) allPricing.stream()
+                .filter(ph -> ph.getChangeType() != PricingHistory.PriceChangeType.INITIAL)
+                .count();
         int priceIncreases = (int) allPricing.stream()
                 .filter(PricingHistory::isPriceIncrease)
                 .count();

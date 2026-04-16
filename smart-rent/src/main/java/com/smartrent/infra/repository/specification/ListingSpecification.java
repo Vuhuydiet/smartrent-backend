@@ -389,6 +389,10 @@ public class ListingSpecification {
                                 criteriaBuilder.notEqual(
                                     priceHistoryRoot.get("changeType"),
                                     PricingHistory.PriceChangeType.INITIAL
+                                ),
+                                criteriaBuilder.notEqual(
+                                    priceHistoryRoot.get("changeType"),
+                                    PricingHistory.PriceChangeType.ADJUSTED
                                 )
                         ));
 
