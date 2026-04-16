@@ -71,7 +71,13 @@ public class ListingCardResponse {
     @AllArgsConstructor
     @FieldDefaults(level = AccessLevel.PRIVATE)
     public static class UserCard {
+        String userId;
         String firstName;
         String lastName;
+        String contactPhoneNumber;
+        Boolean contactPhoneVerified;
+        String avatarUrl;
+        Boolean isBroker;
+        String brokerVerificationStatus;
     }
 }

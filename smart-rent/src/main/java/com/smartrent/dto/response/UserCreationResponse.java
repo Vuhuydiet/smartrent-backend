@@ -85,4 +85,16 @@ public class UserCreationResponse {
       example = "https://lh3.googleusercontent.com/a/example"
   )
   String avatarUrl;
+
+  @Schema(
+      description = "Whether this user is an approved broker",
+      example = "false"
+  )
+  Boolean isBroker;
+
+  @Schema(
+      description = "Broker verification lifecycle status",
+      example = "APPROVED"
+  )
+  String brokerVerificationStatus;
 }
