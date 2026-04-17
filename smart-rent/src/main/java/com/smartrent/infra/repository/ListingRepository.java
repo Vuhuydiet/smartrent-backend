@@ -353,4 +353,111 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
             "AND l.is_draft = false AND l.is_shadow = false " +
             "GROUP BY DATE_FORMAT(l.created_at, '%Y-%m') ORDER BY label ASC", nativeQuery = true)
     List<Object[]> countNewListingsByMonth(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    // ─── Recommendation Queries ───
+
+    /**
+     * Fetch a single listing with its address eagerly loaded (used by recommendation engine).
+     */
+    @Query("SELECT l FROM listings l LEFT JOIN FETCH l.address WHERE l.listingId = :id")
+    Optional<Listing> findByIdWithAddress(@Param("id") Long id);
+
+    /**
+     * Fetch listings by IDs with address eagerly loaded (for recommendation feature extraction).
+     */
+    @Query("SELECT l FROM listings l LEFT JOIN FETCH l.address WHERE l.listingId IN :ids")
+    List<Listing> findWithAddressByListingIds(@Param("ids") Collection<Long> ids);
+
+    /**
+     * Candidate pool for "similar listings": same province (legacyProvinceId or newProvinceCode),
+     * same productType and listingType, excluding the target listing itself.
+     * Active, verified, non-draft, non-expired listings only.
+     */
+    @Query("""
+        SELECT l FROM listings l LEFT JOIN FETCH l.address a
+        WHERE (
+            (:provinceId IS NOT NULL AND a.legacyProvinceId = :provinceId)
+            OR (:provinceCode IS NOT NULL AND a.newProvinceCode = :provinceCode)
+        )
+        AND l.productType = :productType
+        AND l.listingType = :listingType
+        AND l.listingId <> :excludeId
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForSimilar(
+        @Param("provinceId") Integer provinceId,
+        @Param("provinceCode") String provinceCode,
+        @Param("productType") Listing.ProductType productType,
+        @Param("listingType") Listing.ListingType listingType,
+        @Param("excludeId") Long excludeId,
+        Pageable pageable
+    );
+
+    /**
+     * Global fallback candidate pool for "similar listings" (no province filter).
+     */
+    @Query("""
+        SELECT l FROM listings l LEFT JOIN FETCH l.address
+        WHERE l.productType = :productType
+        AND l.listingType = :listingType
+        AND l.listingId <> :excludeId
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForSimilarGlobal(
+        @Param("productType") Listing.ProductType productType,
+        @Param("listingType") Listing.ListingType listingType,
+        @Param("excludeId") Long excludeId,
+        Pageable pageable
+    );
+
+    /**
+     * Candidate pool for personalized feed: preferred province (legacyProvinceId or newProvinceCode),
+     * excluding already-interacted listings.
+     */
+    @Query("""
+        SELECT l FROM listings l LEFT JOIN FETCH l.address a
+        WHERE (
+            (:provinceId IS NOT NULL AND a.legacyProvinceId = :provinceId)
+            OR (:provinceCode IS NOT NULL AND a.newProvinceCode = :provinceCode)
+        )
+        AND l.listingId NOT IN :excludedIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForPersonalized(
+        @Param("provinceId") Integer provinceId,
+        @Param("provinceCode") String provinceCode,
+        @Param("excludedIds") java.util.List<Long> excludedIds,
+        Pageable pageable
+    );
+
+    /**
+     * Global candidate pool for personalized feed (no province filter).
+     * Used as Stage-2 top-up or full fallback.
+     */
+    @Query("""
+        SELECT l FROM listings l LEFT JOIN FETCH l.address
+        WHERE l.listingId NOT IN :excludedIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForPersonalizedGlobal(
+        @Param("excludedIds") java.util.List<Long> excludedIds,
+        Pageable pageable
+    );
 }
+

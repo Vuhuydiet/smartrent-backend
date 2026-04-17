@@ -23,23 +23,11 @@ public interface SavedListingRepository extends JpaRepository<SavedListing, Save
     
     void deleteByIdUserIdAndIdListingId(String userId, Long listingId);
     
-    @Query("SELECT DISTINCT sl FROM saved_listings sl " +
-           "LEFT JOIN FETCH sl.user u " +
-           "LEFT JOIN FETCH sl.listing l " +
-           "LEFT JOIN FETCH l.address a " +
-           "LEFT JOIN FETCH l.media m " +
-           "LEFT JOIN FETCH l.amenities am " +
-           "WHERE sl.id.userId = :userId " +
-           "ORDER BY sl.createdAt DESC")
+    @Query("SELECT sl FROM saved_listings sl WHERE sl.id.userId = :userId ORDER BY sl.createdAt DESC")
     List<SavedListing> findByUserIdOrderByCreatedAtDesc(@Param("userId") String userId);
 
-    @Query(value = "SELECT DISTINCT sl FROM saved_listings sl " +
-           "LEFT JOIN FETCH sl.user u " +
-           "LEFT JOIN FETCH sl.listing l " +
-           "LEFT JOIN FETCH l.address a " +
-           "WHERE sl.id.userId = :userId " +
-           "ORDER BY sl.createdAt DESC",
-           countQuery = "SELECT COUNT(DISTINCT sl) FROM saved_listings sl WHERE sl.id.userId = :userId")
+    @Query(value = "SELECT sl FROM saved_listings sl WHERE sl.id.userId = :userId ORDER BY sl.createdAt DESC",
+           countQuery = "SELECT COUNT(sl) FROM saved_listings sl WHERE sl.id.userId = :userId")
     org.springframework.data.domain.Page<SavedListing> findByUserIdWithDetails(
             @Param("userId") String userId,
             org.springframework.data.domain.Pageable pageable);
@@ -105,4 +93,13 @@ public interface SavedListingRepository extends JpaRepository<SavedListing, Save
             nativeQuery = true)
     Page<Object[]> countSavesPerListingForOwnerPagedWithSearch(
             @Param("ownerId") String ownerId, @Param("keyword") String keyword, Pageable pageable);
+
+    // ─── Recommendation Signal Queries ───
+
+    /**
+     * Get recent saved listings from ALL users (for CF global interactions).
+     * Ordered by createdAt desc so we get the freshest signal.
+     */
+    @Query("SELECT sl FROM saved_listings sl ORDER BY sl.createdAt DESC")
+    List<SavedListing> findRecentGlobalSavedListings(Pageable pageable);
 }

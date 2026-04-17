@@ -1,9 +1,11 @@
 package com.smartrent.infra.connector;
 
+import com.smartrent.dto.request.AIRecommendationRequest;
 import com.smartrent.dto.request.ChatRequest;
 import com.smartrent.dto.request.HousingPredictorRequest;
 import com.smartrent.dto.response.ChatResponse;
 import com.smartrent.dto.response.HousingPredictorResponse;
+import com.smartrent.dto.response.RecommendationItemDto;
 import com.smartrent.infra.connector.model.ChatRequestModel;
 import com.smartrent.infra.connector.model.ChatResponseModel;
 import com.smartrent.infra.connector.model.CompletionRequestModel;
@@ -13,8 +15,11 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.util.List;
+
 @FeignClient(name = "smartrent-ai", url = "${feign.client.config.smartrent-ai.url}")
 public interface SmartRentAiConnector {
+
   /**
    * Housing price prediction endpoint
    */
@@ -32,5 +37,21 @@ public interface SmartRentAiConnector {
 
   @PostMapping(value = "/api/v1/completion/", consumes = MediaType.APPLICATION_JSON_VALUE)
   CompletionResponseModel generateCompletion(@RequestBody CompletionRequestModel request);
+
+  /**
+   * Get similar listings via AI content-based filtering.
+   * Optionally personalized if user_interactions is provided.
+   */
+  @PostMapping(value = "/api/v1/recommendations/similar", consumes = MediaType.APPLICATION_JSON_VALUE)
+  List<RecommendationItemDto> getSimilarListings(
+      @RequestBody AIRecommendationRequest.SimilarListingAiRequest request);
+
+  /**
+   * Get personalized feed via AI hybrid CF+CBF.
+   */
+  @PostMapping(value = "/api/v1/recommendations/personalized", consumes = MediaType.APPLICATION_JSON_VALUE)
+  List<RecommendationItemDto> getPersonalizedFeed(
+      @RequestBody AIRecommendationRequest.PersonalizedFeedAiRequest request);
 }
+
 

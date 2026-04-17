@@ -77,9 +77,9 @@ spring:
       file-size-threshold: 2MB # Threshold after which files are written to disk
   datasource:
     driverClassName: com.mysql.cj.jdbc.Driver
-    url: ${IDENTITY_SERVICE_DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${IDENTITY_SERVICE_DB_URL:jdbc:mysql://localhost:3306/smartrent?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
     hikari:
       maximum-pool-size: ${HIKARI_MAX_POOL:30}
       minimum-idle: ${HIKARI_MIN_IDLE:10}
@@ -183,6 +183,7 @@ application:
         - "/v1/payments/callback/**"
         - "/v1/news"
         - "/v1/news/**"
+        - "/v1/recommendations/similar/**"
       post:
         - "/v1/auth/**"
         - "/v1/users"
