@@ -22,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -219,6 +220,69 @@ public class AdminBrokerController {
         log.info("Admin {} reviewing broker for user={}, action={}", adminId, userId, request.getAction());
 
         BrokerStatusResponse response = brokerService.reviewBroker(userId, adminId, request);
+        return ApiResponse.<BrokerStatusResponse>builder().data(response).build();
+    }
+
+    @DeleteMapping("/{userId}/broker")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    @Operation(
+            summary = "Remove broker role from a user (Admin only)",
+            description = """
+                    Removes broker privileges for a user.
+
+                    **Permissions:** Super Admin (SA), User Admin (UA), and Support Admin (SPA) only.
+
+                    **Effect:** Sets `isBroker=false`, updates verification status to `REJECTED`,
+                    and records admin action metadata.
+                    """,
+            parameters = {
+                    @Parameter(name = "userId", description = "ID of the user", required = true,
+                            example = "user-123e4567-e89b-12d3-a456-426614174000")
+            }
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Broker role removed successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Broker role removed",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "data": {
+                                                "userId": "user-123",
+                                                "isBroker": false,
+                                                "brokerVerificationStatus": "REJECTED",
+                                                "brokerRegisteredAt": "2024-01-15T10:30:00",
+                                                "brokerVerifiedAt": "2024-01-16T09:00:00",
+                                                "brokerRejectionReason": "Broker role removed by admin",
+                                                "brokerVerificationSource": "https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20"
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401",
+                    description = "Unauthorized", content = @Content(mediaType = "application/json")),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403",
+                    description = "Forbidden – admin role required", content = @Content(mediaType = "application/json")),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404",
+                    description = "User not found", content = @Content(mediaType = "application/json",
+                    examples = @ExampleObject(value = """
+                            {"code":"4001","message":"User not found","data":null}
+                            """)))
+    })
+    public ApiResponse<BrokerStatusResponse> removeBrokerRole(@PathVariable String userId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String adminId = auth.getName();
+
+        log.info("Admin {} removing broker role for user={}", adminId, userId);
+
+        BrokerStatusResponse response = brokerService.removeBrokerRole(userId, adminId);
         return ApiResponse.<BrokerStatusResponse>builder().data(response).build();
     }
 }

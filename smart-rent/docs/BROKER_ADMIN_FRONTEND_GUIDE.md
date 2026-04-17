@@ -15,6 +15,7 @@
    👉 **[https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20](https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20)**
 5. Call `PATCH /v1/admin/users/{userId}/broker-verification` to record the decision.
 6. User receives an in-app notification automatically.
+7. If an approved broker must be revoked later, call `DELETE /v1/admin/users/{userId}/broker`.
 
 ### Roles with access
 All three admin roles can manage broker verification: `ROLE_SA` (Super Admin), `ROLE_UA` (User Admin), `ROLE_SPA` (Support Admin).
@@ -26,6 +27,7 @@ All three admin roles can manage broker verification: `ROLE_SA` (Super Admin), `
 ```
 PENDING ──(APPROVE)──▶ APPROVED
 PENDING ──(REJECT)──▶  REJECTED
+APPROVED ──(DELETE /{userId}/broker)──▶ REJECTED
 ```
 
 The admin can only meaningfully act on `PENDING` users, but the API accepts any state (idempotent).
@@ -133,6 +135,37 @@ Results are ordered **oldest first** (FIFO) so admins process in submission orde
 
 ---
 
+### 3.3 DELETE /v1/admin/users/{userId}/broker
+
+**Auth:** Bearer admin token  
+**Roles required:** `ROLE_SA`, `ROLE_UA`, `ROLE_SPA`
+
+Use this endpoint to remove broker privileges from a user that is currently broker-approved.
+
+**Response 200:**
+```json
+{
+  "code": "999999",
+  "data": {
+    "userId": "user-abc-123",
+    "isBroker": false,
+    "brokerVerificationStatus": "REJECTED",
+    "brokerRegisteredAt": "2024-01-15T10:30:00",
+    "brokerVerifiedAt": "2024-01-20T14:00:00",
+    "brokerRejectionReason": "Broker role removed by admin",
+    "brokerVerificationSource": "https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20"
+  }
+}
+```
+
+**Errors:**
+| Code | HTTP | Meaning | FE action |
+|---|---|---|---|
+| `4001` | 404 | User not found | Show toast and refresh list |
+| `6001` | 403 | Insufficient role | Show "Access Denied" |
+
+---
+
 ## 4. TypeScript Data Model
 
 ```typescript
@@ -204,6 +237,12 @@ export interface PagedResponse<T> {
 - Submit → call PATCH with `action: REJECT`
 - On 400 (code 17001): show "Reason is required" under the textarea
 - On success: remove row from list, show toast "Broker rejected"
+
+### Remove Broker Button (for approved brokers)
+- Display on approved broker rows/details: label "Remove Broker"
+- Confirm dialog content: "Remove broker privileges for this user?"
+- Confirm action calls `DELETE /v1/admin/users/{userId}/broker`
+- On success: update row to non-broker / refresh page, show toast "Broker role removed"
 
 ### Document Viewer
 
