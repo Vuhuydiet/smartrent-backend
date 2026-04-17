@@ -42,6 +42,16 @@ public interface BrokerService {
     BrokerStatusResponse reviewBroker(String userId, String adminId, BrokerVerificationRequest request);
 
     /**
+     * Admin removes broker role from a user.
+     * Sets isBroker=false and marks broker verification as REJECTED.
+     *
+     * @param userId  ID of the target user
+     * @param adminId ID of the admin performing the action
+     * @return updated broker status
+     */
+    BrokerStatusResponse removeBrokerRole(String userId, String adminId);
+
+    /**
      * Admin: get paginated list of users with PENDING broker registration.
      * Ordered oldest-first (FIFO). Each entry includes presigned document URLs.
      *

@@ -271,6 +271,19 @@ application:
 
 Access comprehensive API documentation at: http://localhost:8080/swagger-ui.html
 
+### Broker Admin APIs
+
+Broker verification and broker-role management APIs are available for admin roles `SA`, `UA`, and `SPA`:
+
+- `GET /v1/admin/users/broker-pending` - list pending broker applications
+- `PATCH /v1/admin/users/{userId}/broker-verification` - approve or reject an application
+- `DELETE /v1/admin/users/{userId}/broker` - remove broker role from a user (`isBroker=false`)
+
+Integration details for frontend:
+
+- `docs/BROKER_ADMIN_FRONTEND_GUIDE.md`
+- `docs/BROKER_USER_FRONTEND_GUIDE.md`
+
 ### Response Format
 
 All API responses follow a consistent format:

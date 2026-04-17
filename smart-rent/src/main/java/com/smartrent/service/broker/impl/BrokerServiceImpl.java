@@ -184,6 +184,41 @@ public class BrokerServiceImpl implements BrokerService {
     }
 
     @Override
+    @Transactional
+    @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId")
+    public BrokerStatusResponse removeBrokerRole(String userId, String adminId) {
+        log.info("Admin={} removing broker role from user={}", adminId, userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
+
+        if (!user.isBroker() && user.getBrokerVerificationStatus() == BrokerVerificationStatus.REJECTED) {
+            log.info("User {} is already non-broker with REJECTED status; returning current state", userId);
+            return toStatusResponse(user);
+        }
+
+        user.setBroker(false);
+        user.setBrokerVerificationStatus(BrokerVerificationStatus.REJECTED);
+        user.setBrokerVerifiedAt(LocalDateTime.now());
+        user.setBrokerVerifiedByAdminId(adminId);
+        user.setBrokerRejectionReason("Broker role removed by admin");
+        user.setBrokerVerificationSource(BROKER_VERIFICATION_SOURCE);
+
+        userRepository.save(user);
+        log.info("Broker role removed for user={} by admin={}", userId, adminId);
+
+        notificationService.sendNotification(
+                userId, RecipientType.USER,
+                NotificationType.BROKER_REJECTED,
+                "Quyền môi giới đã bị gỡ",
+                "Quyền môi giới của bạn đã bị quản trị viên thu hồi. Bạn có thể đăng ký lại sau khi cập nhật hồ sơ.",
+                null, "USER"
+        );
+
+        return toStatusResponse(user);
+    }
+
+    @Override
     public PageResponse<AdminBrokerUserResponse> getPendingBrokers(int page, int size) {
         Pageable pageable = PageRequest.of(page - 1, size);
         Page<User> pageResult = userRepository
