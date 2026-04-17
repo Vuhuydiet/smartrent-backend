@@ -115,6 +115,8 @@ jobs:
 
       - name: Commit and push changes
         working-directory: smartrent-deploy
+        env:
+            COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
@@ -124,9 +126,11 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          
+      
           COMMIT_LINK="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
-          git commit -m "Deploy: ${{ github.event.head_commit.message }} (${COMMIT_LINK})"
+          printf "Deploy: %s\n\n(%s)" "$COMMIT_MSG" "$COMMIT_LINK" > .commit_msg
+          
+          git commit -F .commit_msg
           git push
 
   deploy:
