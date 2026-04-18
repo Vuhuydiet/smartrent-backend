@@ -29,6 +29,29 @@ public class ChatRequest {
   @Schema(description = "List of conversation messages", requiredMode = Schema.RequiredMode.REQUIRED)
   List<ChatMessageDTO> messages;
 
+  @Schema(description = "Authenticated user ID (injected by server)", hidden = true)
+  String user_id;
+
+  @Schema(description = "JWT auth token for AI service to call authenticated APIs", hidden = true)
+  String auth_token;
+
+  @Schema(description = "Listings from previous response for context reference")
+  List<LastListingRef> last_listings;
+
+  @Getter
+  @Setter
+  @Builder
+  @NoArgsConstructor
+  @AllArgsConstructor
+  @FieldDefaults(level = AccessLevel.PRIVATE)
+  @Schema(description = "Reference to a listing shown in previous response")
+  public static class LastListingRef {
+    int position;
+    String listingId;
+    @Builder.Default
+    String title = "";
+  }
+
   @Getter
   @Setter
   @Builder

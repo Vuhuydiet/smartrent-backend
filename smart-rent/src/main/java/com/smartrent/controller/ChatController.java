@@ -9,8 +9,11 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -122,7 +125,18 @@ public class ChatController {
           )
       }
   )
-  public ApiResponse<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
+  public ApiResponse<ChatResponse> chat(
+      @Valid @RequestBody ChatRequest request,
+      HttpServletRequest httpRequest) {
+    // Inject authenticated user context so AI service can call user-specific APIs
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+      request.setUser_id(auth.getName());
+      String authHeader = httpRequest.getHeader("Authorization");
+      if (authHeader != null && authHeader.startsWith("Bearer ")) {
+        request.setAuth_token(authHeader.substring(7));
+      }
+    }
     ChatResponse response = chatService.processChat(request);
     return ApiResponse.<ChatResponse>builder().data(response).build();
   }
