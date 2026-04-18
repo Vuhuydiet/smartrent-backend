@@ -2238,17 +2238,7 @@ public class ListingServiceImpl implements ListingService {
         if ((legacyProvinceId == null || legacyDistrictId == null || legacyWardId == null)
                 && hasText(newProvinceCode)
                 && hasText(newWardCode)) {
-            AddressMapping reverseMapping = addressMappingRepository
-                    .findDefaultByNewAddress(newProvinceCode, newWardCode)
-                    .orElse(null);
-
-            if (reverseMapping == null) {
-                reverseMapping = addressMappingRepository
-                        .findByNewAddress(newProvinceCode, newWardCode)
-                        .stream()
-                        .findFirst()
-                        .orElse(null);
-            }
+            AddressMapping reverseMapping = findBestReverseMappingForDraft(newProvinceCode, newWardCode);
 
             if (reverseMapping != null) {
                 resolvedMapping = resolvedMapping != null ? resolvedMapping : reverseMapping;
@@ -2276,10 +2266,10 @@ public class ListingServiceImpl implements ListingService {
         }
 
         if (hasText(newProvinceCode)) {
-            newProvince = provinceRepository.findByCode(newProvinceCode).orElse(null);
+            newProvince = findProvinceForDraft(newProvinceCode);
         }
         if (hasText(newWardCode)) {
-            newWard = wardRepository.findByCode(newWardCode).orElse(null);
+            newWard = findWardForDraft(newWardCode);
         }
 
         String legacyProvinceName = legacyProvince != null
@@ -2431,6 +2421,55 @@ public class ListingServiceImpl implements ListingService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    /**
+     * Address mapping can contain multiple rows per new address. Draft flow must pick a stable
+     * candidate instead of throwing non-unique result exceptions.
+     */
+    private AddressMapping findBestReverseMappingForDraft(String newProvinceCode, String newWardCode) {
+        List<AddressMapping> candidates = addressMappingRepository.findByNewAddress(newProvinceCode, newWardCode);
+        if (candidates.isEmpty()) {
+            return null;
+        }
+
+        List<AddressMapping> defaults = candidates.stream()
+                .filter(m -> Boolean.TRUE.equals(m.getIsDefaultNewWard()))
+                .collect(Collectors.toList());
+
+        if (defaults.size() > 1) {
+            log.warn("Found {} default address mappings for new address ({}, {}), using first",
+                    defaults.size(), newProvinceCode, newWardCode);
+            return defaults.get(0);
+        }
+
+        if (defaults.size() == 1) {
+            return defaults.get(0);
+        }
+
+        if (candidates.size() > 1) {
+            log.warn("Found {} address mappings for new address ({}, {}) without default, using first",
+                    candidates.size(), newProvinceCode, newWardCode);
+        }
+        return candidates.get(0);
+    }
+
+    private Province findProvinceForDraft(String provinceCode) {
+        List<Province> candidates = provinceRepository.findByCodeIn(Collections.singletonList(provinceCode));
+        if (candidates.size() > 1) {
+            log.warn("Found {} provinces for code {}, using first in draft response",
+                    candidates.size(), provinceCode);
+        }
+        return candidates.stream().findFirst().orElse(null);
+    }
+
+    private Ward findWardForDraft(String wardCode) {
+        List<Ward> candidates = wardRepository.findAllByCode(wardCode);
+        if (candidates.size() > 1) {
+            log.warn("Found {} wards for code {}, using first in draft response",
+                    candidates.size(), wardCode);
+        }
+        return candidates.stream().findFirst().orElse(null);
     }
 
     private String trimToNull(String value) {
@@ -2642,14 +2681,18 @@ public class ListingServiceImpl implements ListingService {
 
         // Add ward
         if (draft.getWardCode() != null && !draft.getWardCode().isEmpty()) {
-            wardRepository.findByCode(draft.getWardCode())
-                    .ifPresent(ward -> sb.append(ward.getName()).append(", "));
+            Ward ward = findWardForDraft(draft.getWardCode());
+            if (ward != null) {
+                sb.append(ward.getName()).append(", ");
+            }
         }
 
         // Add province
         if (draft.getProvinceCode() != null && !draft.getProvinceCode().isEmpty()) {
-            provinceRepository.findByCode(draft.getProvinceCode())
-                    .ifPresent(province -> sb.append(province.getName()));
+            Province province = findProvinceForDraft(draft.getProvinceCode());
+            if (province != null) {
+                sb.append(province.getName());
+            }
         }
 
         return sb.toString().trim();
