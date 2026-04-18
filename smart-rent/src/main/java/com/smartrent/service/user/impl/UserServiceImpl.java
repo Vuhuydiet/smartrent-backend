@@ -107,7 +107,6 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  @Cacheable(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#id")
   public GetUserResponse getUserById(String id) {
     User user = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
 

@@ -57,6 +57,7 @@ public class BrokerServiceImpl implements BrokerService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId"),
+            @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
@@ -132,6 +133,7 @@ public class BrokerServiceImpl implements BrokerService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId"),
+            @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
@@ -198,6 +200,7 @@ public class BrokerServiceImpl implements BrokerService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId"),
+            @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
