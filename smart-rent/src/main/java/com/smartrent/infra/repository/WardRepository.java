@@ -31,6 +31,10 @@ public interface WardRepository extends JpaRepository<Ward, Integer> {
 
     Optional<Ward> findByCode(String code);
 
+        // Defensive lookup used by draft flow to tolerate duplicate rows in dirty data.
+        @Query("SELECT w FROM Ward w WHERE w.code = :code ORDER BY w.id")
+        List<Ward> findAllByCode(@Param("code") String code);
+
     // Find all wards by province code (without pagination)
     @Query("SELECT w FROM Ward w WHERE w.provinceCode = :provinceCode ORDER BY w.name")
     List<Ward> findAllByProvinceCode(@Param("provinceCode") String provinceCode);
