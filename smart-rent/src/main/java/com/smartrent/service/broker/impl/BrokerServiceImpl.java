@@ -26,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -54,7 +55,12 @@ public class BrokerServiceImpl implements BrokerService {
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId"),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+    })
     public BrokerStatusResponse registerBroker(String userId, BrokerRegisterRequest request) {
         log.info("Broker registration request for user={}", userId);
 
@@ -124,7 +130,12 @@ public class BrokerServiceImpl implements BrokerService {
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId"),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+    })
     public BrokerStatusResponse reviewBroker(String userId, String adminId, BrokerVerificationRequest request) {
         String action = request.getAction();
         log.info("Admin={} performing broker action={} on user={}", adminId, action, userId);
@@ -185,7 +196,12 @@ public class BrokerServiceImpl implements BrokerService {
 
     @Override
     @Transactional
-    @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId")
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#userId"),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+    })
     public BrokerStatusResponse removeBrokerRole(String userId, String adminId) {
         log.info("Admin={} removing broker role from user={}", adminId, userId);
 
