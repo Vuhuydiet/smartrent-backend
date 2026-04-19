@@ -171,11 +171,13 @@ public class PaymentController {
                     .params(params)
                     .build();
             PaymentCallbackResponse response = paymentService.processIPN(callbackRequest, httpRequest);
+            boolean signatureValid = Boolean.TRUE.equals(response.getSignatureValid());
+            boolean paymentSuccess = Boolean.TRUE.equals(response.getSuccess());
 
             // If payment was successful, trigger business logic completion
             // Note: The transaction status has been updated to COMPLETED in processIPN
             // We need to trigger business logic in a separate transaction to ensure the status is committed
-            if (response.getSignatureValid() && response.getSuccess() && response.getTransactionRef() != null) {
+            if (signatureValid && paymentSuccess && response.getTransactionRef() != null) {
                 try {
                     log.info("Payment successful, triggering business logic for transaction: {}", response.getTransactionRef());
                     triggerBusinessLogicCompletion(response.getTransactionRef());
@@ -189,13 +191,13 @@ public class PaymentController {
             }
 
             // Return appropriate response based on result
-            if (!response.getSignatureValid()) {
+            if (!signatureValid) {
                 return ApiResponse.<PaymentCallbackResponse>builder()
                         .code("400001")
                         .message("Invalid signature")
                         .data(response)
                         .build();
-            } else if (response.getSuccess()) {
+            } else if (paymentSuccess) {
                 return ApiResponse.<PaymentCallbackResponse>builder()
                         .code("200000")
                         .message("Payment completed successfully")

@@ -84,8 +84,9 @@ public class ZaloPayPaymentProvider extends AbstractPaymentProvider {
             String item = "[]";
             
             Map<String, String> embedDataMap = new HashMap<>();
-            if (zaloPayConfig.getReturnUrl() != null) {
-                embedDataMap.put("redirecturl", zaloPayConfig.getReturnUrl());
+            String redirectUrl = firstNonBlank(request.getReturnUrl(), zaloPayConfig.getReturnUrl());
+            if (redirectUrl != null) {
+                embedDataMap.put("redirecturl", redirectUrl);
             }
             String embedDataStr = "{}";
             try {
@@ -151,40 +152,81 @@ public class ZaloPayPaymentProvider extends AbstractPaymentProvider {
     @Override
     public PaymentCallbackResponse processIPN(Map<String, String> params, HttpServletRequest httpRequest) {
         log.info("Processing ZaloPay IPN/Callback with params: {}", params);
-        
-        String status = params.get("status"); // redirect param
-        String appTransId = params.get("apptransid");
-        
+
+        String status = firstNonBlank(params.get("status"), params.get("resultCode"));
+        String appTransId = firstNonBlank(
+                params.get("apptransid"),
+                params.get("app_trans_id"),
+                params.get("orderId")
+        );
+
+        if (appTransId == null) {
+            return PaymentCallbackResponse.builder()
+                    .provider(PaymentProvider.ZALOPAY)
+                    .status(TransactionStatus.FAILED)
+                    .success(false)
+                    .signatureValid(true)
+                    .message("ZALOPAY_MISSING_APPTRANSID")
+                    .build();
+        }
+
         Optional<Transaction> txOpt = paymentRepository.findByAdditionalInfoContaining("zalo_app_trans_id=" + appTransId);
-        
+
         if (txOpt.isEmpty()) {
             return PaymentCallbackResponse.builder()
+                    .provider(PaymentProvider.ZALOPAY)
+                    .status(TransactionStatus.FAILED)
                     .success(false)
-                    .message("Transaction not found for app_trans_id: " + appTransId)
+                    .signatureValid(true)
+                    .message("ZALOPAY_ORDER_NOT_FOUND")
+                    .build();
+        }
+
+        if (status == null) {
+            return PaymentCallbackResponse.builder()
+                    .provider(PaymentProvider.ZALOPAY)
+                    .transactionRef(txOpt.get().getTransactionId())
+                    .status(TransactionStatus.FAILED)
+                    .success(false)
+                    .signatureValid(true)
+                    .message("ZALOPAY_MISSING_STATUS")
                     .build();
         }
 
         Transaction transaction = txOpt.get();
-        boolean success = "1".equals(status);
-        TransactionStatus txStatus = success ? TransactionStatus.COMPLETED : TransactionStatus.FAILED;
-        
+        String normalizedStatus = status.trim().toUpperCase();
+        boolean success = "1".equals(normalizedStatus) || "00".equals(normalizedStatus) || "SUCCESS".equals(normalizedStatus);
+        boolean cancelled = "2".equals(normalizedStatus) || "CANCELLED".equals(normalizedStatus) || "CANCELED".equals(normalizedStatus);
+        TransactionStatus txStatus = success
+                ? TransactionStatus.COMPLETED
+                : (cancelled ? TransactionStatus.CANCELLED : TransactionStatus.FAILED);
+
+        String providerTxnId = firstNonBlank(params.get("zp_trans_id"), params.get("zptranstoken"));
+        String paymentMethod = firstNonBlank(params.get("pmcid"), "ZALOPAY");
+        String bankCode = firstNonBlank(params.get("bankcode"), "ZALOPAY");
+        String bankTransactionId = firstNonBlank(params.get("zp_trans_id"), params.get("banktransid"));
+        String checksum = firstNonBlank(params.get("checksum"), params.get("mac"));
+
         updatePaymentWithProviderData(
                 transaction.getTransactionId(),
-                params.get("zp_trans_id"),
-                params.get("pmcid"),
-                params.get("bankcode"),
-                params.get("zp_trans_id"),
+                providerTxnId,
+                paymentMethod,
+                bankCode,
+                bankTransactionId,
                 txStatus,
-                status,
-                success ? "Success" : "Failed"
+                normalizedStatus,
+                success ? "Success" : (cancelled ? "Cancelled" : "Failed")
         );
 
         return PaymentCallbackResponse.builder()
+                .provider(PaymentProvider.ZALOPAY)
                 .transactionRef(transaction.getTransactionId())
-                .providerTransactionId(params.get("zp_trans_id"))
+                .providerTransactionId(providerTxnId)
                 .status(txStatus)
                 .success(success)
-                .signatureValid(validateSignature(params, params.get("checksum")))
+                .signatureValid(validateSignature(params, checksum))
+                .responseCode(normalizedStatus)
+                .message(success ? "Success" : (cancelled ? "Cancelled" : "Failed"))
                 .build();
     }
 
@@ -229,5 +271,19 @@ public class ZaloPayPaymentProvider extends AbstractPaymentProvider {
     @Override
     public PaymentProvider getProviderType() {
         return PaymentProvider.ZALOPAY;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+
+        return null;
     }
 }
