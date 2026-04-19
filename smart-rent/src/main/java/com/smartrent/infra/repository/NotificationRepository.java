@@ -17,6 +17,19 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     long countByRecipientIdAndRecipientTypeAndIsReadFalse(
             String recipientId, RecipientType recipientType);
 
+    boolean existsByIdAndRecipientIdAndRecipientType(
+            Long id, String recipientId, RecipientType recipientType);
+
+    @Modifying
+    @Query("UPDATE notifications n SET n.isRead = true " +
+           "WHERE n.id = :notificationId " +
+           "AND n.recipientId = :recipientId " +
+           "AND n.recipientType = :recipientType " +
+           "AND n.isRead = false")
+    int markAsRead(@Param("notificationId") Long notificationId,
+                   @Param("recipientId") String recipientId,
+                   @Param("recipientType") RecipientType recipientType);
+
     @Modifying
     @Query("UPDATE notifications n SET n.isRead = true " +
            "WHERE n.recipientId = :recipientId AND n.recipientType = :recipientType AND n.isRead = false")

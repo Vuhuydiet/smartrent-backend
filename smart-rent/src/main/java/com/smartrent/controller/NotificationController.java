@@ -56,7 +56,8 @@ public class NotificationController {
             @AuthenticationPrincipal Jwt jwt) {
 
         String recipientId = resolveRecipientId(jwt);
-        notificationService.markAsRead(id, recipientId);
+        RecipientType recipientType = resolveRecipientType(jwt);
+        notificationService.markAsRead(id, recipientId, recipientType);
         return ResponseEntity.ok().build();
     }
 

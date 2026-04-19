@@ -38,7 +38,7 @@ public interface NotificationService {
     /**
      * Mark a single notification as read.
      */
-    void markAsRead(Long notificationId, String recipientId);
+    void markAsRead(Long notificationId, String recipientId, RecipientType recipientType);
 
     /**
      * Mark all notifications as read for a recipient.

@@ -92,16 +92,27 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     @Transactional
-    public void markAsRead(Long notificationId, String recipientId) {
-        Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new DomainException(DomainCode.RESOURCE_NOT_FOUND, "Notification"));
+    public void markAsRead(Long notificationId, String recipientId, RecipientType recipientType) {
+        int updated = notificationRepository.markAsRead(notificationId, recipientId, recipientType);
+        if (updated > 0) {
+            return;
+        }
 
-        if (!notification.getRecipientId().equals(recipientId)) {
+        boolean exists = notificationRepository.existsById(notificationId);
+        if (!exists) {
+            throw new DomainException(DomainCode.RESOURCE_NOT_FOUND, "Notification");
+        }
+
+        boolean isOwner = notificationRepository.existsByIdAndRecipientIdAndRecipientType(
+                notificationId,
+                recipientId,
+                recipientType
+        );
+        if (!isOwner) {
             throw new DomainException(DomainCode.UNAUTHORIZED);
         }
 
-        notification.setIsRead(true);
-        notificationRepository.save(notification);
+        // No rows updated and owner matched -> already read, keep idempotent behavior.
     }
 
     @Override
