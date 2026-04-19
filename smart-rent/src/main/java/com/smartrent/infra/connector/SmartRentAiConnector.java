@@ -2,8 +2,10 @@ package com.smartrent.infra.connector;
 
 import com.smartrent.dto.request.AIRecommendationRequest;
 import com.smartrent.dto.request.ChatRequest;
+import com.smartrent.dto.request.DuplicateCheckRequest;
 import com.smartrent.dto.request.HousingPredictorRequest;
 import com.smartrent.dto.response.ChatResponse;
+import com.smartrent.dto.response.DuplicateCheckResponse;
 import com.smartrent.dto.response.HousingPredictorResponse;
 import com.smartrent.dto.response.RecommendationItemDto;
 import com.smartrent.infra.connector.model.ChatRequestModel;
@@ -37,6 +39,12 @@ public interface SmartRentAiConnector {
 
   @PostMapping(value = "/api/v1/completion/", consumes = MediaType.APPLICATION_JSON_VALUE)
   CompletionResponseModel generateCompletion(@RequestBody CompletionRequestModel request);
+
+  /**
+   * Check if a listing is a duplicate of any existing listing.
+   */
+  @PostMapping(value = "/api/v1/listings/check-duplicate", consumes = MediaType.APPLICATION_JSON_VALUE)
+  DuplicateCheckResponse checkDuplicate(@RequestBody DuplicateCheckRequest request);
 
   /**
    * Get similar listings via AI content-based filtering.
