@@ -1297,6 +1297,43 @@ public class ListingServiceImpl implements ListingService {
             log.info("Search province filter: provinceCodes={}, resolvedLegacyIds={}", filter.getProvinceCodes(), filter.getResolvedLegacyProvinceIds());
         }
 
+        // Reverse direction: resolve legacy provinceId → new province codes so the
+        // spec can also match listings stored under the new structure (their
+        // addresses.legacy_province_id may be a different merged-province ID, e.g.
+        // a Bình Dương listing whose new_province_code is HCM after the 2025 merger).
+        // Without this, filtering by old provinceId returns 0 for listings that
+        // only carry new_province_code.
+        if (filter.getProvinceId() != null && !filter.getProvinceId().isBlank()) {
+            try {
+                Integer legacyId = Integer.parseInt(filter.getProvinceId());
+                List<String> newCodes = addressMappingRepository
+                        .findNewProvinceCodesByLegacyProvinceIds(List.of(legacyId));
+                if (newCodes.isEmpty()) {
+                    // Fallback: address_mapping has no row for this legacy province.
+                    // Handles non-merged provinces whose code is unchanged (e.g. HCM '79' before/after).
+                    LegacyProvince lp = legacyProvinceRepository.findById(legacyId).orElse(null);
+                    if (lp != null) {
+                        List<String> direct = provinceRepository
+                                .findByCodeIn(java.util.Collections.singletonList(lp.getCode()))
+                                .stream().map(Province::getCode).distinct().toList();
+                        if (!direct.isEmpty()) {
+                            newCodes = direct;
+                            log.info("Resolved legacy provinceId {} (code {}) → new codes {} (via direct Province.findByCode fallback)",
+                                    legacyId, lp.getCode(), newCodes);
+                        }
+                    }
+                }
+                if (!newCodes.isEmpty()) {
+                    filter.setResolvedNewProvinceCodes(newCodes);
+                    log.info("Resolved legacy provinceId {} → new province codes {}", legacyId, newCodes);
+                } else {
+                    log.warn("No new province codes resolved for legacy provinceId {} — new-structure listings won't be matched", legacyId);
+                }
+            } catch (NumberFormatException ignored) {
+                log.warn("provinceId {} is not a valid integer — skipping legacy→new resolution", filter.getProvinceId());
+            }
+        }
+
         // Resolve newWardCode to legacy ward IDs so the spec can match old-structure
         // listings (whose addresses.new_ward_code is NULL because they predate the
         // 2-tier reform or weren't backfilled). Without this, filtering by newWardCode
@@ -1324,6 +1361,43 @@ public class ListingServiceImpl implements ListingService {
             } else {
                 log.warn("No legacy ward IDs resolved for newWardCode {} — old-structure listings won't be matched",
                         filter.getNewWardCode());
+            }
+        }
+
+        // Reverse direction: resolve legacy districtId → new ward codes so the
+        // spec can match new-structure listings (which have NULL legacy_district_id
+        // because the 2-tier reform removed the district level). Without this,
+        // any listing created in NEW mode is filtered out the moment user picks
+        // a district in LEGACY mode.
+        if (filter.getDistrictId() != null) {
+            List<String> newWardCodes = addressMappingRepository
+                    .findNewWardCodesByLegacyDistrictId(filter.getDistrictId());
+            if (!newWardCodes.isEmpty()) {
+                filter.setResolvedNewWardCodesForDistrict(newWardCodes);
+                log.info("Resolved legacy districtId {} → {} new ward codes (used for OR with new-structure listings)",
+                        filter.getDistrictId(), newWardCodes.size());
+            } else {
+                log.warn("No new ward codes resolved for legacy districtId {} — new-structure listings won't be matched",
+                        filter.getDistrictId());
+            }
+        }
+
+        // Reverse direction: resolve legacy wardId → new ward codes so the spec
+        // can also match listings stored under the new structure when FE filters
+        // by old-structure ward.
+        if (filter.getWardId() != null && !filter.getWardId().isBlank()) {
+            try {
+                Integer legacyWardIdInt = Integer.parseInt(filter.getWardId());
+                List<String> newWardCodes = addressMappingRepository
+                        .findNewWardCodesByLegacyWardIds(List.of(legacyWardIdInt));
+                if (!newWardCodes.isEmpty()) {
+                    filter.setResolvedNewWardCodes(newWardCodes);
+                    log.info("Resolved legacy wardId {} → new ward codes {}", legacyWardIdInt, newWardCodes);
+                } else {
+                    log.warn("No new ward codes resolved for legacy wardId {} — new-structure listings won't be matched", legacyWardIdInt);
+                }
+            } catch (NumberFormatException ignored) {
+                log.warn("wardId {} is not a valid integer — skipping legacy→new resolution", filter.getWardId());
             }
         }
 

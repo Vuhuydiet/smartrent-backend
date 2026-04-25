@@ -83,8 +83,16 @@ public class ListingFilterRequest {
     @Schema(hidden = true)
     List<Integer> resolvedLegacyProvinceIds; // Populated by service layer — NOT from API
 
+    @JsonIgnore
+    @Schema(hidden = true)
+    List<String> resolvedNewProvinceCodes; // Populated by service layer when legacy provinceId is sent — NOT from API
+
     @Schema(description = "District ID (OLD structure)", example = "5")
     Integer districtId;
+
+    @JsonIgnore
+    @Schema(hidden = true)
+    List<String> resolvedNewWardCodesForDistrict; // Populated by service layer when legacy districtId is sent — NOT from API
 
     @Schema(description = """
             Ward ID (OLD structure - 63 provinces).
@@ -102,6 +110,10 @@ public class ListingFilterRequest {
     @JsonIgnore
     @Schema(hidden = true)
     List<Integer> resolvedLegacyWardIds; // Populated by service layer — NOT from API
+
+    @JsonIgnore
+    @Schema(hidden = true)
+    List<String> resolvedNewWardCodes; // Populated by service layer when legacy wardId is sent — NOT from API
 
     @Schema(description = "Street ID", example = "10")
     Integer streetId;

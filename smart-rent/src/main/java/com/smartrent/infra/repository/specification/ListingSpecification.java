@@ -143,6 +143,14 @@ public class ListingSpecification {
                             provinceOrParts.add(criteriaBuilder.equal(
                                 addressJoin.get("legacyProvinceId"), provinceIdInt));
                         } catch (NumberFormatException ignored) {}
+
+                        // Also match new-structure listings via resolved new province codes
+                        // (populated by service when FE sends old provinceId in LEGACY mode)
+                        if (filter.getResolvedNewProvinceCodes() != null
+                                && !filter.getResolvedNewProvinceCodes().isEmpty()) {
+                            provinceOrParts.add(addressJoin.get("newProvinceCode")
+                                    .in(filter.getResolvedNewProvinceCodes()));
+                        }
                     }
 
                     // New structure: provinceCodes list + resolved legacy IDs
@@ -171,12 +179,24 @@ public class ListingSpecification {
                     }
                 }
 
-                // District filter (old structure)
+                // District filter — OR'd with resolved new ward codes so that
+                // listings created under the 2-tier NEW structure (with NULL
+                // legacy_district_id) are still matched when FE picks a district
+                // in LEGACY mode. The new ward codes were resolved by the
+                // service layer from this districtId.
                 if (filter.getDistrictId() != null) {
-                    predicates.add(criteriaBuilder.equal(
+                    List<Predicate> districtOrParts = new ArrayList<>();
+                    districtOrParts.add(criteriaBuilder.equal(
                         addressJoin.get("legacyDistrictId"),
                         filter.getDistrictId()
                     ));
+                    if (filter.getResolvedNewWardCodesForDistrict() != null
+                            && !filter.getResolvedNewWardCodesForDistrict().isEmpty()) {
+                        districtOrParts.add(addressJoin.get("newWardCode")
+                                .in(filter.getResolvedNewWardCodesForDistrict()));
+                    }
+                    predicates.add(criteriaBuilder.or(
+                            districtOrParts.toArray(new Predicate[0])));
                 }
 
                 // Ward filters — combine new-structure newWardCode with old-structure
@@ -191,6 +211,14 @@ public class ListingSpecification {
                             wardOrParts.add(criteriaBuilder.equal(
                                 addressJoin.get("legacyWardId"), wardIdInt));
                         } catch (NumberFormatException ignored) {}
+
+                        // Also match new-structure listings via resolved new ward codes
+                        // (populated by service when FE sends old wardId in LEGACY mode)
+                        if (filter.getResolvedNewWardCodes() != null
+                                && !filter.getResolvedNewWardCodes().isEmpty()) {
+                            wardOrParts.add(addressJoin.get("newWardCode")
+                                    .in(filter.getResolvedNewWardCodes()));
+                        }
                     }
 
                     if (filter.getNewWardCode() != null) {
