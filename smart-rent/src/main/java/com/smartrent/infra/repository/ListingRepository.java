@@ -235,9 +235,12 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isDraft = false
         AND l.isShadow = false
         AND l.expired = false
+        AND (:verifiedOnly = false OR l.verified = true)
         GROUP BY a.legacyProvinceId
     """)
-    List<Object[]> getListingStatsByProvinceIdsWithoutNewCode(@Param("provinceIds") List<Integer> provinceIds);
+    List<Object[]> getListingStatsByProvinceIdsWithoutNewCode(
+        @Param("provinceIds") List<Integer> provinceIds,
+        @Param("verifiedOnly") boolean verifiedOnly);
 
     /**
      * Get listing statistics grouped by province code (new structure)
@@ -255,9 +258,12 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isDraft = false
         AND l.isShadow = false
         AND l.expired = false
+        AND (:verifiedOnly = false OR l.verified = true)
         GROUP BY a.newProvinceCode
     """)
-    List<Object[]> getListingStatsByProvinceCodes(@Param("provinceCodes") List<String> provinceCodes);
+    List<Object[]> getListingStatsByProvinceCodes(
+        @Param("provinceCodes") List<String> provinceCodes,
+        @Param("verifiedOnly") boolean verifiedOnly);
 
     /**
      * Get listing statistics grouped by category
@@ -274,9 +280,12 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isDraft = false
         AND l.isShadow = false
         AND l.expired = false
+        AND (:verifiedOnly = false OR l.verified = true)
         GROUP BY l.categoryId
     """)
-    List<Object[]> getListingStatsByCategoryIds(@Param("categoryIds") List<Long> categoryIds);
+    List<Object[]> getListingStatsByCategoryIds(
+        @Param("categoryIds") List<Long> categoryIds,
+        @Param("verifiedOnly") boolean verifiedOnly);
 
     /**
      * Get owner statistics in a single query instead of 9 separate COUNT queries.

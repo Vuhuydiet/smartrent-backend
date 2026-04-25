@@ -1489,7 +1489,9 @@ public class ListingServiceImpl implements ListingService {
         }
 
         // Aggregate new-structure listings (addresses.new_province_code)
-        List<Object[]> newStats = listingRepository.getListingStatsByProvinceCodes(provinceCodes);
+        boolean verifiedOnly = Boolean.TRUE.equals(request.getVerifiedOnly());
+        List<Object[]> newStats = listingRepository.getListingStatsByProvinceCodes(
+                provinceCodes, verifiedOnly);
         for (Object[] row : newStats) {
             String code = (String) row[0];
             long[] acc = aggregated.get(code);
@@ -1503,7 +1505,8 @@ public class ListingServiceImpl implements ListingService {
         // Aggregate old-structure listings (addresses.legacy_province_id)
         // Exclude listings already counted via new_province_code to avoid double-counting
         if (!allLegacyIds.isEmpty()) {
-            List<Object[]> oldStats = listingRepository.getListingStatsByProvinceIdsWithoutNewCode(allLegacyIds);
+            List<Object[]> oldStats = listingRepository.getListingStatsByProvinceIdsWithoutNewCode(
+                    allLegacyIds, verifiedOnly);
             for (Object[] row : oldStats) {
                 Integer legacyId = ((Number) row[0]).intValue();
                 String code = legacyIdToCode.get(legacyId);
@@ -1566,7 +1569,9 @@ public class ListingServiceImpl implements ListingService {
         List<CategoryListingStatsResponse> results = new ArrayList<>();
 
         // Get stats from repository
-        List<Object[]> statsData = listingRepository.getListingStatsByCategoryIds(request.getCategoryIds());
+        boolean verifiedOnly = Boolean.TRUE.equals(request.getVerifiedOnly());
+        List<Object[]> statsData = listingRepository.getListingStatsByCategoryIds(
+                request.getCategoryIds(), verifiedOnly);
 
         // Batch-load all categories in 1 query (avoids N+1)
         Map<Long, Category> categoryMap = categoryRepository.findAllById(request.getCategoryIds())
