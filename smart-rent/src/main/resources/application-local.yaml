@@ -101,3 +101,10 @@ open:
       description: "Local Server."
     group:
       package-to-scan: "com.smartrent.controller"
+
+app:
+  push:
+    rate-limit:
+      enabled: true
+      max-pushes: 10
+      window-minutes: 60

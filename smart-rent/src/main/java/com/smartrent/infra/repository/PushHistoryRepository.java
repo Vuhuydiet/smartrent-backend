@@ -110,4 +110,14 @@ public interface PushHistoryRepository extends JpaRepository<PushHistory, Long> 
      * @return List of push history records ordered by pushedAt descending
      */
     List<PushHistory> findByListingIdInOrderByPushedAtDesc(List<Long> listingIds);
+    /**
+     * Find successful push times since a specific time, ordered by newest first.
+     * Use Pageable to limit the number of results.
+     *
+     * @param since The time to check from
+     * @param pageable Pagination info
+     * @return List of push times
+     */
+    @Query("SELECT ph.pushedAt FROM push_history ph WHERE ph.pushedAt >= :since AND ph.status = 'SUCCESS' ORDER BY ph.pushedAt DESC")
+    List<LocalDateTime> findRecentSuccessfulPushTimesSince(@Param("since") LocalDateTime since, org.springframework.data.domain.Pageable pageable);
 }
