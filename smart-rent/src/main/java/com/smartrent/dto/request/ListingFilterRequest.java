@@ -99,6 +99,10 @@ public class ListingFilterRequest {
             """, example = "00001")
     String newWardCode;
 
+    @JsonIgnore
+    @Schema(hidden = true)
+    List<Integer> resolvedLegacyWardIds; // Populated by service layer — NOT from API
+
     @Schema(description = "Street ID", example = "10")
     Integer streetId;
 
