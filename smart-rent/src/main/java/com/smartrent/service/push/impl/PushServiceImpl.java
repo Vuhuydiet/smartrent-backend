@@ -23,6 +23,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
+import lombok.experimental.NonFinal;
+import com.smartrent.infra.exception.DomainException;
+import com.smartrent.infra.exception.model.DomainCode;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -50,6 +54,18 @@ public class PushServiceImpl implements PushService {
     TransactionService transactionService;
     PaymentService paymentService;
 
+    @NonFinal
+    @Value("${app.push.limit.enabled:true}")
+    boolean limitEnabled;
+
+    @NonFinal
+    @Value("${app.push.limit.max-listings:10}")
+    int maxListings;
+
+    @NonFinal
+    @Value("${app.push.limit.window-minutes:60}")
+    int windowMinutes;
+
     // ========== Push Listing Methods ==========
 
     @Override
@@ -66,6 +82,7 @@ public class PushServiceImpl implements PushService {
         }
 
         validateListingCanBePushed(listing);
+        validateGlobalPushRateLimit();
 
         // Check if user wants to use quota
         boolean useQuota = Boolean.TRUE.equals(request.getUseMembershipQuota());
@@ -444,6 +461,13 @@ public class PushServiceImpl implements PushService {
             return;
         }
 
+        try {
+            validateGlobalPushRateLimit();
+        } catch (DomainException e) {
+            log.warn("Scheduled push delayed due to global rate limit. Schedule ID: {}", schedule.getScheduleId());
+            return; // Exit and retry later
+        }
+
         // Get listing
         Listing listing = listingRepository.findById(schedule.getListingId())
                 .orElseThrow(() -> new RuntimeException("Listing not found: " + schedule.getListingId()));
@@ -535,6 +559,33 @@ public class PushServiceImpl implements PushService {
         ListingStatus listingStatus = listing.computeListingStatus();
         if (listingStatus != ListingStatus.DISPLAYING) {
             throw new RuntimeException("Only displaying listings can be pushed. Current status: " + listingStatus);
+        }
+    }
+
+    private void validateGlobalPushRateLimit() {
+        if (!limitEnabled) {
+            return;
+        }
+
+        LocalDateTime since = LocalDateTime.now().minusMinutes(windowMinutes);
+        List<LocalDateTime> recentPushes = listingRepository.findRecentPushedTimesSince(
+                since, PageRequest.of(0, maxListings));
+
+        if (recentPushes.size() >= maxListings) {
+            // Get the oldest push in our limit window (last element)
+            LocalDateTime oldestPushInWindow = recentPushes.get(maxListings - 1);
+            
+            // Calculate when this slot will open
+            LocalDateTime slotOpensAt = oldestPushInWindow.plusMinutes(windowMinutes);
+            
+            // Calculate wait time in minutes
+            long waitMinutes = java.time.Duration.between(LocalDateTime.now(), slotOpensAt).toMinutes();
+            if (waitMinutes <= 0) {
+                waitMinutes = 1; // Minimum 1 minute display
+            }
+            
+            log.warn("Global push limit reached. Window full with {} listings. Wait time: {} minutes", maxListings, waitMinutes);
+            throw new DomainException(DomainCode.PUSH_LIMIT_EXCEEDED, waitMinutes);
         }
     }
 

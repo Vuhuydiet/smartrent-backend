@@ -129,7 +129,9 @@ public enum DomainCode {
   BROKER_DOCUMENT_REQUIRED("17003", HttpStatus.BAD_REQUEST, "Broker document is required: %s"),
   BROKER_DOCUMENT_NOT_FOUND("17004", HttpStatus.NOT_FOUND, "Broker document not found: %s"),
   BROKER_DOCUMENT_NOT_CONFIRMED("17005", HttpStatus.BAD_REQUEST, "Broker document must be uploaded and confirmed: %s"),
-  BROKER_DOCUMENT_INVALID_TYPE("17006", HttpStatus.BAD_REQUEST, "Broker document must be an image file: %s")
+  BROKER_DOCUMENT_INVALID_TYPE("17006", HttpStatus.BAD_REQUEST, "Broker document must be an image file: %s"),
+  //    Push Limit Error 18xxx
+  PUSH_LIMIT_EXCEEDED("18001", HttpStatus.TOO_MANY_REQUESTS, "Hệ thống đang quá tải yêu cầu đẩy tin. Vui lòng chờ %d phút nữa để tiếp tục đẩy tin.")
   ;
 
   private final String value;

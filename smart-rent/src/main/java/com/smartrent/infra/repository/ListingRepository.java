@@ -468,5 +468,12 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         @Param("excludedIds") java.util.List<Long> excludedIds,
         Pageable pageable
     );
+
+    /**
+     * Get the pushed_at timestamps of recently pushed listings for push limiting feature.
+     * Use Pageable to limit the results.
+     */
+    @Query("SELECT l.pushedAt FROM listings l WHERE l.pushedAt >= :since AND l.isDraft = false AND l.isShadow = false AND l.expired = false ORDER BY l.pushedAt DESC")
+    List<LocalDateTime> findRecentPushedTimesSince(@Param("since") LocalDateTime since, Pageable pageable);
 }
 
