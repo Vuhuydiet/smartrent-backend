@@ -128,6 +128,43 @@ public interface AddressMappingRepository extends JpaRepository<AddressMapping, 
     List<String> findNewProvinceCodesByLegacyProvinceCodes(@Param("legacyProvinceCodes") List<String> legacyProvinceCodes);
 
     /**
+     * Returns distinct new province codes that map to the given legacy province IDs.
+     * Joins AddressMapping → LegacyProvince on province_code, so we can pass the
+     * legacy_provinces.id (auto-increment) directly from the search filter.
+     * Used when FE sends old provinceId (legacy auto-id) in LEGACY mode and we
+     * need new_province_code matches to also pick up listings stored under the
+     * new structure.
+     */
+    @Query("SELECT DISTINCT am.newProvinceCode FROM AddressMapping am " +
+            "JOIN am.legacyProvince lp " +
+            "WHERE lp.id IN :legacyProvinceIds")
+    List<String> findNewProvinceCodesByLegacyProvinceIds(@Param("legacyProvinceIds") List<Integer> legacyProvinceIds);
+
+    /**
+     * Returns distinct new ward codes that map to the given legacy ward IDs.
+     * Joins AddressMapping → LegacyWard on ward_code, so we can pass the
+     * legacy_wards.id (auto-increment) directly from the search filter.
+     * Used when FE sends old wardId in LEGACY mode and we need new_ward_code
+     * matches to also pick up listings stored under the new structure.
+     */
+    @Query("SELECT DISTINCT am.newWardCode FROM AddressMapping am " +
+            "JOIN am.legacyWard lw " +
+            "WHERE lw.id IN :legacyWardIds")
+    List<String> findNewWardCodesByLegacyWardIds(@Param("legacyWardIds") List<Integer> legacyWardIds);
+
+    /**
+     * Returns distinct new ward codes that map to ANY legacy ward inside the
+     * given legacy district. NEW administrative structure (2-tier) has no
+     * district, so to honor a districtId filter against new-structure listings
+     * we expand the district into its constituent ward codes.
+     * Used when FE sends old districtId in LEGACY mode.
+     */
+    @Query("SELECT DISTINCT am.newWardCode FROM AddressMapping am " +
+            "JOIN am.legacyDistrict ld " +
+            "WHERE ld.id = :legacyDistrictId AND am.newWardCode IS NOT NULL")
+    List<String> findNewWardCodesByLegacyDistrictId(@Param("legacyDistrictId") Integer legacyDistrictId);
+
+    /**
      * Find all merged provinces
      */
     @Query("SELECT DISTINCT am FROM AddressMapping am WHERE am.isMergedProvince = TRUE")
