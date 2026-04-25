@@ -106,6 +106,19 @@ public interface AddressMappingRepository extends JpaRepository<AddressMapping, 
     List<Object[]> findNewCodeToLegacyIdPairs(@Param("newProvinceCodes") List<String> newProvinceCodes);
 
     /**
+     * Resolve a new ward code (optionally scoped by new province codes) into the
+     * legacy ward IDs that map to it. Used by listing search to also include
+     * old-structure listings when filtering by newWardCode.
+     */
+    @Query("SELECT DISTINCT lw.id FROM AddressMapping am JOIN am.legacyWard lw " +
+            "WHERE am.newWardCode = :newWardCode " +
+            "AND (:#{#newProvinceCodes == null || #newProvinceCodes.isEmpty()} = TRUE " +
+            "     OR am.newProvinceCode IN :newProvinceCodes)")
+    List<Integer> findLegacyWardIdsByNewWardCode(
+            @Param("newWardCode") String newWardCode,
+            @Param("newProvinceCodes") List<String> newProvinceCodes);
+
+    /**
      * Returns distinct new province codes that map to the given legacy province codes.
      * Scans all rows (any ward level).
      * Used when FE sends old provinceIds and we need to resolve to new province codes.

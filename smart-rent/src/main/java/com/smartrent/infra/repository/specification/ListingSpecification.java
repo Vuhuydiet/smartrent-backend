@@ -179,24 +179,37 @@ public class ListingSpecification {
                     ));
                 }
 
-                // Ward filters
-                if (filter.getWardId() != null) {
-                    // wardId is String in request but Integer in DB (old structure)
-                    try {
-                        Integer wardIdInt = Integer.parseInt(filter.getWardId());
-                        predicates.add(criteriaBuilder.equal(
-                            addressJoin.get("legacyWardId"),
-                            wardIdInt
-                        ));
-                    } catch (NumberFormatException e) {
-                        // Invalid wardId format, skip this filter
+                // Ward filters — combine new-structure newWardCode with old-structure
+                // legacyWardId as OR so listings from either address structure are included
+                {
+                    List<Predicate> wardOrParts = new ArrayList<>();
+
+                    // Old structure: explicit wardId (String → Integer)
+                    if (filter.getWardId() != null) {
+                        try {
+                            Integer wardIdInt = Integer.parseInt(filter.getWardId());
+                            wardOrParts.add(criteriaBuilder.equal(
+                                addressJoin.get("legacyWardId"), wardIdInt));
+                        } catch (NumberFormatException ignored) {}
                     }
-                }
-                if (filter.getNewWardCode() != null) {
-                    predicates.add(criteriaBuilder.equal(
-                        addressJoin.get("newWardCode"),
-                        filter.getNewWardCode()
-                    ));
+
+                    if (filter.getNewWardCode() != null) {
+                        // New-structure listings: direct match on new_ward_code
+                        wardOrParts.add(criteriaBuilder.equal(
+                            addressJoin.get("newWardCode"), filter.getNewWardCode()));
+
+                        // Old-structure listings: match via address_mapping-resolved legacy ward IDs
+                        if (filter.getResolvedLegacyWardIds() != null
+                                && !filter.getResolvedLegacyWardIds().isEmpty()) {
+                            wardOrParts.add(addressJoin.get("legacyWardId")
+                                    .in(filter.getResolvedLegacyWardIds()));
+                        }
+                    }
+
+                    if (!wardOrParts.isEmpty()) {
+                        predicates.add(criteriaBuilder.or(
+                                wardOrParts.toArray(new Predicate[0])));
+                    }
                 }
 
                 // Street filter (uses legacy_street on addresses table)

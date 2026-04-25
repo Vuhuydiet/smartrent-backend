@@ -1297,6 +1297,36 @@ public class ListingServiceImpl implements ListingService {
             log.info("Search province filter: provinceCodes={}, resolvedLegacyIds={}", filter.getProvinceCodes(), filter.getResolvedLegacyProvinceIds());
         }
 
+        // Resolve newWardCode to legacy ward IDs so the spec can match old-structure
+        // listings (whose addresses.new_ward_code is NULL because they predate the
+        // 2-tier reform or weren't backfilled). Without this, filtering by newWardCode
+        // returns 0 rows for any pre-existing legacy listing.
+        if (filter.getNewWardCode() != null && !filter.getNewWardCode().isBlank()) {
+            // Pass the same normalized province-code set we used for province resolution
+            List<String> wardScopeCodes = filter.getProvinceCodes();
+            if (wardScopeCodes != null && !wardScopeCodes.isEmpty()) {
+                Set<String> normalized = new java.util.LinkedHashSet<>();
+                for (String code : wardScopeCodes) {
+                    String stripped = code.replaceFirst("^0+(?!$)", "");
+                    normalized.add(stripped);
+                    try {
+                        normalized.add(String.format("%02d", Integer.parseInt(stripped)));
+                    } catch (NumberFormatException ignored) {}
+                }
+                wardScopeCodes = new ArrayList<>(normalized);
+            }
+            List<Integer> legacyWardIds = addressMappingRepository
+                    .findLegacyWardIdsByNewWardCode(filter.getNewWardCode(), wardScopeCodes);
+            if (!legacyWardIds.isEmpty()) {
+                filter.setResolvedLegacyWardIds(legacyWardIds);
+                log.info("Resolved newWardCode {} (provinces {}) → legacy ward IDs {}",
+                        filter.getNewWardCode(), wardScopeCodes, legacyWardIds);
+            } else {
+                log.warn("No legacy ward IDs resolved for newWardCode {} — old-structure listings won't be matched",
+                        filter.getNewWardCode());
+            }
+        }
+
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
 
