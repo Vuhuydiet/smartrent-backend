@@ -105,4 +105,25 @@ public final class CacheKeyBuilder {
             .map(String::valueOf)
             .collect(Collectors.joining(","));
     }
+
+    /**
+     * Cache key for {@code GET /v1/listings/search-suggestions}.
+     * Encodes: normalized query + provinceId + categoryId + limit.
+     *
+     * <p>The key is intentionally compact so it fits within Redis key-size limits
+     * and remains human-readable for debugging (e.g. via {@code redis-cli keys}).
+     *
+     * @param query      Raw input query (normalized internally)
+     * @param provinceId Optional province ID string (may be {@code null})
+     * @param categoryId Optional category ID (may be {@code null})
+     * @param limit      Requested result count (already clamped by service)
+     * @return Cache key string prefixed with {@code "sugg|"}
+     */
+    public static String suggestionKey(String query, String provinceId, Long categoryId, int limit) {
+        String norm = TextNormalizer.normalize(query);
+        return "sugg|q="  + Objects.toString(norm, "")
+             + "|p="      + Objects.toString(provinceId, "")
+             + "|c="      + Objects.toString(categoryId, "")
+             + "|l="      + limit;
+    }
 }

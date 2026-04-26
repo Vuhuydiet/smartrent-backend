@@ -5,12 +5,14 @@ import com.smartrent.dto.request.MapBoundsRequest;
 import com.smartrent.dto.response.ListingCardListResponse;
 import com.smartrent.dto.response.*;
 import com.smartrent.service.listing.ListingService;
+import com.smartrent.service.discovery.SearchSuggestionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -38,6 +40,7 @@ import java.util.List;
 public class ListingSearchController {
 
     private final ListingService listingService;
+    private final SearchSuggestionService searchSuggestionService;
 
     @PostMapping("/search")
     @Operation(
@@ -257,13 +260,113 @@ public class ListingSearchController {
         summary = "Autocomplete listing titles",
         description = "Returns lightweight listing suggestions by title prefix."
     )
-    public ApiResponse<List<ListingAutocompleteResponse>> autocompleteListings(
+    public com.smartrent.dto.response.ApiResponse<List<ListingAutocompleteResponse>> autocompleteListings(
             @Parameter(description = "Query prefix", required = true, example = "can ho")
             @RequestParam("q") String query,
             @Parameter(description = "Max results (1-20)", example = "10")
             @RequestParam(value = "limit", defaultValue = "10") int limit) {
         List<ListingAutocompleteResponse> results = listingService.autocompleteListings(query, limit);
-        return ApiResponse.<List<ListingAutocompleteResponse>>builder().data(results).build();
+        return com.smartrent.dto.response.ApiResponse.<List<ListingAutocompleteResponse>>builder().data(results).build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // GET /v1/listings/search-suggestions
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @GetMapping("/search-suggestions")
+    @Operation(
+        summary = "[PUBLIC API] Smart multi-source search suggestions",
+        description = """
+            **PUBLIC API — no authentication required.**
+
+            Returns a ranked list of search suggestions from three sources:
+            - **TITLE** — listing titles that begin with the normalized query.
+            - **LOCATION** — province / district / ward names that match the query.
+            - **POPULAR_QUERY** — historically popular search terms derived from click telemetry.
+
+            ### Normalization
+            The query is normalized with `TextNormalizer` (Vietnamese-safe: strips diacritics,
+            lowercases, collapses whitespace). Queries that are shorter than **2 characters**
+            after normalization return an empty suggestion list immediately.
+
+            ### Caching
+            Results are short-cached (2 minutes by default). The cache key includes the
+            normalized query, `provinceId`, `categoryId`, and `limit`.
+
+            ### Telemetry
+            Each call records an impression in `search_query_impressions`.
+            The `impressionId` field in the response should be passed back to
+            `POST /v1/listings/search-suggestions/click` when the user selects a suggestion.
+            """,
+        parameters = {
+            @Parameter(name = "q",          description = "Raw search query",                             required = true,  example = "căn hộ quận 1"),
+            @Parameter(name = "limit",      description = "Max suggestions to return (1-20)",             required = false, example = "8"),
+            @Parameter(name = "provinceId", description = "Legacy province ID for scoped filtering",      required = false, example = "79"),
+            @Parameter(name = "categoryId", description = "Category ID for scoped filtering",             required = false, example = "1"),
+            @Parameter(name = "X-Session-Id", description = "Optional opaque session token (header) for telemetry correlation", required = false, example = "sess_abc123")
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Suggestion list (may be empty if query is too short or no candidates found)",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        name = "Sample response",
+                        value = """
+                            {
+                              "code": 1000,
+                              "data": {
+                                "suggestions": [
+                                  { "type": "TITLE",    "text": "Căn hộ 2PN Quận 1 full nội thất", "listingId": 12345, "score": 1.5,  "metadata": { "address": "123 Nguyễn Trãi, Quận 1, TP.HCM" } },
+                                  { "type": "LOCATION", "text": "Quận 1, TP. Hồ Chí Minh",         "listingId": null,  "score": 1.0,  "metadata": { "provinceName": "TP. Hồ Chí Minh", "districtName": "Quận 1" } },
+                                  { "type": "POPULAR_QUERY", "text": "căn hộ 2 phòng ngủ",         "listingId": null,  "score": 0.8,  "metadata": { "hitCount": 42 } }
+                                ],
+                                "queryNorm": "can ho quan 1",
+                                "impressionId": 9876
+                              }
+                            }
+                            """
+                    )
+                )
+            )
+        }
+    )
+    public com.smartrent.dto.response.ApiResponse<SearchSuggestionsResponse> getSearchSuggestions(
+            @RequestParam("q") String query,
+            @RequestParam(value = "limit",      defaultValue = "8")  int    limit,
+            @RequestParam(value = "provinceId", required = false)     String provinceId,
+            @RequestParam(value = "categoryId", required = false)     Long   categoryId,
+            HttpServletRequest httpRequest) {
+
+        String clientIp   = extractClientIp(httpRequest);
+        String sessionId  = httpRequest.getHeader("X-Session-Id");
+
+        SearchSuggestionsResponse response = searchSuggestionService.getSuggestions(
+                query, limit, provinceId, categoryId, clientIp, sessionId);
+
+        return com.smartrent.dto.response.ApiResponse
+                .<SearchSuggestionsResponse>builder()
+                .data(response)
+                .build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Extracts the best-effort client IP from the incoming request.
+     * Checks {@code X-Forwarded-For} first (proxy / load-balancer scenario),
+     * then falls back to {@code RemoteAddr}.
+     */
+    private String extractClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            // X-Forwarded-For may contain a comma-separated list; first entry is the client
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 
     @PostMapping("/map-bounds")
