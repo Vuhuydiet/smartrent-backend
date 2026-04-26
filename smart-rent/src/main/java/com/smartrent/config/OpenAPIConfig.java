@@ -580,7 +580,9 @@ public class OpenAPIConfig {
                             .pathsToMatch(
                                             "/v1/listings/search",
                                             "/v1/listings/autocomplete",
-                                            "/v1/listings/map-bounds"
+                                            "/v1/listings/map-bounds",
+                                            "/v1/listings/search-suggestions",
+                                            "/v1/listings/search-suggestions/click"
                             )
                             .addOpenApiCustomizer(securityCustomizer())
                             .build();

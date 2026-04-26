@@ -475,5 +475,47 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      */
     @Query("SELECT l.pushedAt FROM listings l WHERE l.pushedAt >= :since AND l.isDraft = false AND l.isShadow = false AND l.expired = false ORDER BY l.pushedAt DESC")
     List<LocalDateTime> findRecentPushedTimesSince(@Param("since") LocalDateTime since, Pageable pageable);
+
+    /**
+     * Title-prefix suggestion candidates for the search-suggestions endpoint.
+     * <p>
+     * Uses a native query (projected columns only) for maximum performance —
+     * no full entity hydration, no JOIN FETCH overhead.
+     * <p>
+     * Public visibility is enforced at the query layer:
+     * excludes drafts, shadow listings, unverified, and expired listings.
+     *
+     * @param prefix     Normalized title prefix (output of {@code TextNormalizer.normalize})
+     * @param provinceId Legacy province ID integer; {@code null} means no province filter
+     * @param categoryId Category ID; {@code null} means no category filter
+     * @param limit      Maximum rows to return (already clamped by the service layer)
+     * @return Raw tuples: [listing_id, title, full_address, full_newaddress, legacy_province_id, new_province_code]
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT   l.listing_id,
+                 l.title,
+                 a.full_address,
+                 a.full_newaddress,
+                 a.legacy_province_id,
+                 a.new_province_code
+        FROM     listings l
+        JOIN     addresses a ON l.address_id = a.address_id
+        WHERE    l.title_norm      LIKE CONCAT(:prefix, '%')
+          AND    (:provinceId IS NULL OR a.legacy_province_id = :provinceId)
+          AND    (:categoryId IS NULL OR l.category_id        = :categoryId)
+          AND    l.is_draft  = false
+          AND    l.is_shadow = false
+          AND    l.verified  = true
+          AND    l.expired   = false
+        ORDER BY l.vip_type_sort_order ASC,
+                 l.pushed_at          DESC
+        LIMIT    :lim
+        """)
+    List<Object[]> findTitleSuggestions(
+        @Param("prefix")     String  prefix,
+        @Param("provinceId") Integer provinceId,
+        @Param("categoryId") Long    categoryId,
+        @Param("lim")        int     limit
+    );
 }
 
