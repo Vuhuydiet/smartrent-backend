@@ -44,6 +44,12 @@ public class AIRecommendationRequest {
         @JsonProperty("district_id")
         Integer districtId;
 
+        @JsonProperty("ward_id")
+        Integer wardId;
+
+        @JsonProperty("ward_code")
+        String newWardCode;
+
         @JsonProperty("vip_type")
         String vipType;
 

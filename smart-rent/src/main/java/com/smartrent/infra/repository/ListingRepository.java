@@ -432,7 +432,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * excluding already-interacted listings.
      */
     @Query("""
-        SELECT l FROM listings l LEFT JOIN FETCH l.address a
+        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
         WHERE (
             (:provinceId IS NOT NULL AND a.legacyProvinceId = :provinceId)
             OR (:provinceCode IS NOT NULL AND a.newProvinceCode = :provinceCode)
@@ -452,11 +452,53 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     );
 
     /**
+     * Candidate pool for personalized feed: Same Ward
+     */
+    @Query("""
+        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
+        WHERE (
+            (:wardId IS NOT NULL AND a.legacyWardId = :wardId)
+            OR (:wardCode IS NOT NULL AND a.newWardCode = :wardCode)
+        )
+        AND l.listingId NOT IN :excludedIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesByWard(
+        @Param("wardId") Integer wardId,
+        @Param("wardCode") String wardCode,
+        @Param("excludedIds") java.util.List<Long> excludedIds,
+        Pageable pageable
+    );
+
+    /**
+     * Candidate pool for personalized feed: Same District
+     */
+    @Query("""
+        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
+        WHERE a.legacyDistrictId = :districtId
+        AND l.listingId NOT IN :excludedIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesByDistrict(
+        @Param("districtId") Integer districtId,
+        @Param("excludedIds") java.util.List<Long> excludedIds,
+        Pageable pageable
+    );
+
+    /**
      * Global candidate pool for personalized feed (no province filter).
      * Used as Stage-2 top-up or full fallback.
      */
     @Query("""
-        SELECT l FROM listings l LEFT JOIN FETCH l.address
+        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address
         WHERE l.listingId NOT IN :excludedIds
         AND l.isDraft = false
         AND l.isShadow = false
