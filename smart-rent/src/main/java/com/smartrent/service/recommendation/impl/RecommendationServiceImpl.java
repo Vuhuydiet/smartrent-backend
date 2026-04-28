@@ -12,6 +12,7 @@ import com.smartrent.infra.repository.SavedListingRepository;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.PhoneClickDetail;
 import com.smartrent.infra.repository.entity.SavedListing;
+import com.smartrent.infra.repository.AddressMappingRepository;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.recommendation.RecommendationService;
 import com.smartrent.service.recentlyviewed.RecentlyViewedService;
@@ -39,6 +40,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     RecentlyViewedService recentlyViewedService;
     SmartRentAiConnector aiConnector;
     ListingService listingService;
+    AddressMappingRepository addressMappingRepository;
 
     // ─────────────────────────────────────────────
     // PUBLIC: Similar Listings
@@ -127,22 +129,27 @@ public class RecommendationServiceImpl implements RecommendationService {
 
     @Override
     public RecommendationResponse getPersonalizedFeed(String userId, int topN) {
-        // 1. Deduplicate interactions — keep MAX weight per listing
         Map<Long, Double> interactionWeightMap = new LinkedHashMap<>();
+        List<SavedListing> savedListings = savedListingRepository.findByUserIdOrderByCreatedAtDesc(userId);
 
-        for (SavedListing s : savedListingRepository.findByUserIdOrderByCreatedAtDesc(userId)) {
+        List<Long> clickedListingIds = phoneClickDetailRepository.findListingIdsByUserId(userId);
+        List<RecentlyViewedItemResponse> viewedListings = recentlyViewedService.getRecentlyViewed(userId);
+
+        for (SavedListing s : savedListings) {
             interactionWeightMap.merge(s.getId().getListingId(), 3.0, Math::max);
         }
-        for (Long lId : phoneClickDetailRepository.findListingIdsByUserId(userId)) {
+        for (Long lId : clickedListingIds) {
             interactionWeightMap.merge(lId, 2.5, Math::max);
         }
-        for (RecentlyViewedItemResponse rv : recentlyViewedService.getRecentlyViewed(userId)) {
+        for (RecentlyViewedItemResponse rv : viewedListings) {
             interactionWeightMap.merge(rv.getListing().getListingId(), 1.0, Math::max);
         }
 
-        if (interactionWeightMap.isEmpty()) {
+        boolean hasEnoughInteractions = !savedListings.isEmpty() || !clickedListingIds.isEmpty() || viewedListings.size() >= 3;
+        if (!hasEnoughInteractions) {
             return getColdStartFeed(topN);
         }
+
 
         List<AIRecommendationRequest.InteractionEntryDto> userInteractions = new ArrayList<>();
         for (Map.Entry<Long, Double> entry : interactionWeightMap.entrySet()) {
@@ -152,40 +159,159 @@ public class RecommendationServiceImpl implements RecommendationService {
         // 2. Feature extraction for user's interacted listings (for profile building)
         Set<Long> interactedListingIds = interactionWeightMap.keySet();
         List<Listing> interactedListings = listingRepository.findWithAddressByListingIds(interactedListingIds);
+
+        // Sort interactedListings so that the most recently viewed items come FIRST
+        List<Long> recencyOrder = recentlyViewedService.getRecentlyViewed(userId).stream()
+                .map(rv -> rv.getListing().getListingId())
+                .collect(Collectors.toList());
+        
+        interactedListings.sort((l1, l2) -> {
+            int idx1 = recencyOrder.indexOf(l1.getListingId());
+            int idx2 = recencyOrder.indexOf(l2.getListingId());
+            // If not in recent views, treat as older (push to back)
+            if (idx1 == -1) idx1 = Integer.MAX_VALUE;
+            if (idx2 == -1) idx2 = Integer.MAX_VALUE;
+            return Integer.compare(idx1, idx2);
+        });
+
         List<AIRecommendationRequest.ListingFeatureDto> interactionFeatures = interactedListings.stream()
                 .map(this::toFeatureDto).collect(Collectors.toList());
 
-        // 3. Location profiling: pick most frequent province from interactions
+        // 3. Location profiling
+        // 3.1 Find most frequent (preferred) locations
         String preferredProvinceCode = interactionFeatures.stream()
                 .filter(f -> f.getProvinceCode() != null && !f.getProvinceCode().equals("UNKNOWN"))
                 .collect(Collectors.groupingBy(AIRecommendationRequest.ListingFeatureDto::getProvinceCode, Collectors.counting()))
-                .entrySet().stream()
-                .max(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey)
-                .orElse(null);
+                .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
 
-        if (preferredProvinceCode != null) {
-            log.info("[Recommendation] User {} → preferred province: {}", userId, preferredProvinceCode);
+        String preferredWardCode = interactionFeatures.stream()
+                .filter(f -> f.getNewWardCode() != null)
+                .collect(Collectors.groupingBy(AIRecommendationRequest.ListingFeatureDto::getNewWardCode, Collectors.counting()))
+                .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+
+        Integer preferredDistrictId = interactionFeatures.stream()
+                .filter(f -> f.getDistrictId() != null)
+                .collect(Collectors.groupingBy(AIRecommendationRequest.ListingFeatureDto::getDistrictId, Collectors.counting()))
+                .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+
+        Integer preferredWardId = interactionFeatures.stream()
+                .filter(f -> f.getWardId() != null)
+                .collect(Collectors.groupingBy(AIRecommendationRequest.ListingFeatureDto::getWardId, Collectors.counting()))
+                .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+
+        // 3.2 Find latest interacted location (Discovery Zone)
+        // 3.2 Find latest interacted location (Discovery Zone)
+        Long latestListingId = null;
+        if (!viewedListings.isEmpty()) {
+            latestListingId = viewedListings.get(0).getListing().getListingId();
+        } else if (!savedListings.isEmpty()) {
+            latestListingId = savedListings.get(0).getId().getListingId();
+        } else if (!clickedListingIds.isEmpty()) {
+            latestListingId = clickedListingIds.get(0);
         }
 
-        // 4. Hybrid candidate pool (local-first)
+        String discoveryWardCode = null;
+        Integer discoveryWardId = null;
+        Integer discoveryDistrictId = null;
+        String discoveryProvinceCode = null;
+
+        if (latestListingId != null) {
+            Listing latestListing = listingRepository.findByIdWithAddress(latestListingId).orElse(null);
+            if (latestListing != null) {
+                AIRecommendationRequest.ListingFeatureDto latestFeature = toFeatureDto(latestListing);
+                discoveryProvinceCode = latestFeature.getProvinceCode();
+                discoveryWardCode = latestFeature.getNewWardCode();
+                discoveryWardId = latestFeature.getWardId();
+                discoveryDistrictId = latestFeature.getDistrictId();
+            }
+        }
+        log.info("[Recommendation Test] latestListingId = {}, discoveryProvinceCode = {}, preferredProvinceCode = {}", latestListingId, discoveryProvinceCode, preferredProvinceCode);
+
+
+
+        // 4. Hierarchical candidate pool (4-tier strategy)
         List<Listing> candidates = new ArrayList<>();
         Set<Long> excludedIds = new HashSet<>(interactedListingIds);
+        if (excludedIds.isEmpty()) excludedIds.add(-1L); // Prevent empty list error in SQL IN clause
 
-        // Stage 1: up to 200 from preferred province
+        // Tier 1: Same Ward (50 items)
+        if (preferredWardCode != null || preferredWardId != null) {
+            List<Listing> t1 = listingRepository.findCandidatesByWard(
+                    preferredWardId, preferredWardCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
+            candidates.addAll(t1);
+            t1.forEach(c -> excludedIds.add(c.getListingId()));
+        }
+
+        // Tier 2: Same District (100 items)
+        if (preferredDistrictId != null) {
+            List<Listing> t2 = listingRepository.findCandidatesByDistrict(
+                    preferredDistrictId, new ArrayList<>(excludedIds), PageRequest.of(0, 100));
+            candidates.addAll(t2);
+            t2.forEach(c -> excludedIds.add(c.getListingId()));
+        }
+
+        // Tier 3: Discovery Zone (up to 50 items from latest location - cascading Ward -> District -> Province)
+        boolean isShift = false;
+        if (discoveryProvinceCode != null && preferredProvinceCode != null && !discoveryProvinceCode.equals(preferredProvinceCode)) {
+            isShift = true;
+        } else if (discoveryDistrictId != null && preferredDistrictId != null && !discoveryDistrictId.equals(preferredDistrictId)) {
+            isShift = true;
+        } else if (discoveryWardCode != null && preferredWardCode != null && !discoveryWardCode.equals(preferredWardCode)) {
+            isShift = true;
+        } else if (discoveryWardId != null && preferredWardId != null && !discoveryWardId.equals(preferredWardId)) {
+            isShift = true;
+        }        log.info("[Recommendation Test] isShift evaluated to: {}", isShift);
+
+        if (isShift) {
+
+            
+            List<Listing> t3 = new ArrayList<>();
+            
+            // 1. Try Ward
+            if (discoveryWardCode != null || discoveryWardId != null) {
+                t3 = listingRepository.findCandidatesByWard(
+                        discoveryWardId, discoveryWardCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
+            }
+            
+            // 2. Try District (if not enough)
+            if (t3.size() < 10 && discoveryDistrictId != null) {
+                List<Listing> t3District = listingRepository.findCandidatesByDistrict(
+                        discoveryDistrictId, new ArrayList<>(excludedIds), PageRequest.of(0, 50 - t3.size()));
+                t3.addAll(t3District);
+            }
+            
+            // 3. Try Province (if still not enough)
+            if (t3.size() < 10 && discoveryProvinceCode != null) {
+                List<Listing> t3Province = listingRepository.findCandidatesForPersonalized(
+                        null, discoveryProvinceCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50 - t3.size()));
+                t3.addAll(t3Province);
+            }
+            
+            candidates.addAll(t3);
+            t3.forEach(c -> excludedIds.add(c.getListingId()));
+            log.info("[Recommendation] User {} → added {} discovery candidates cascading from ward/district/province", userId, t3.size());
+        }
+
+
+        // Tier 4: Same Province (up to 300 total)
         if (preferredProvinceCode != null) {
             Integer pId = null;
             try { pId = Integer.parseInt(preferredProvinceCode); } catch (Exception ignored) {}
-            List<Listing> local = listingRepository.findCandidatesForPersonalized(
-                    pId, preferredProvinceCode, new ArrayList<>(excludedIds), PageRequest.of(0, 200));
-            candidates.addAll(local);
-            local.forEach(c -> excludedIds.add(c.getListingId()));
+            int remaining = Math.max(0, 300 - candidates.size());
+            if (remaining > 0) {
+                List<Listing> t4 = listingRepository.findCandidatesForPersonalized(
+                        pId, preferredProvinceCode, new ArrayList<>(excludedIds), PageRequest.of(0, remaining));
+                candidates.addAll(t4);
+                t4.forEach(c -> excludedIds.add(c.getListingId()));
+            }
         }
 
-        // Stage 2: global top-up to reach ~300 candidates
-        int globalSize = Math.max(100, 300 - candidates.size());
-        candidates.addAll(listingRepository.findCandidatesForPersonalizedGlobal(
-                new ArrayList<>(excludedIds), PageRequest.of(0, globalSize)));
+        // Fallback global top-up if still less than 150
+        if (candidates.size() < 150) {
+            int globalSize = 300 - candidates.size();
+            candidates.addAll(listingRepository.findCandidatesForPersonalizedGlobal(
+                    new ArrayList<>(excludedIds), PageRequest.of(0, globalSize)));
+        }
 
         if (candidates.isEmpty()) {
             return getColdStartFeed(topN);
@@ -210,12 +336,20 @@ public class RecommendationServiceImpl implements RecommendationService {
             log.warn("[Recommendation] Could not fetch global interactions for CF signal", e);
         }
 
+        List<AIRecommendationRequest.ListingFeatureDto> distinctCandidates = new ArrayList<>();
+        Set<Long> seenCandidateIds = new HashSet<>();
+        for (Listing c : candidates) {
+            if (seenCandidateIds.add(c.getListingId())) {
+                distinctCandidates.add(toFeatureDto(c));
+            }
+        }
+
         AIRecommendationRequest.PersonalizedFeedAiRequest aiRequest =
                 AIRecommendationRequest.PersonalizedFeedAiRequest.builder()
                         .user_id(userId)
                         .user_interactions(userInteractions)
                         .all_interactions(allInteractions)
-                        .candidates(candidates.stream().map(this::toFeatureDto).collect(Collectors.toList()))
+                        .candidates(distinctCandidates)
                         .top_n(topN)
                         .alpha(0.5)
                         .interactionFeatures(interactionFeatures)
@@ -223,11 +357,218 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         try {
             List<RecommendationItemDto> result = aiConnector.getPersonalizedFeed(aiRequest);
-            return buildResponse(result, "personalized", false, true);
+            RecommendationResponse response = buildResponse(result, "personalized", false, true);
+
+            // Apply Discovery Shift slot pinning (Slots 8, 9, 10 for Discovery Zone)
+            isShift = false;
+            if (discoveryProvinceCode != null && preferredProvinceCode != null && !discoveryProvinceCode.equals(preferredProvinceCode)) {
+                isShift = true;
+            } else if (discoveryDistrictId != null && preferredDistrictId != null && !discoveryDistrictId.equals(preferredDistrictId)) {
+                isShift = true;
+            } else if (discoveryWardCode != null && preferredWardCode != null && !discoveryWardCode.equals(preferredWardCode)) {
+                isShift = true;
+            } else if (discoveryWardId != null && preferredWardId != null && !discoveryWardId.equals(preferredWardId)) {
+                isShift = true;
+            }
+
+
+            if (isShift && response.getListings() != null && response.getListings().size() >= 10) {
+                List<ListingResponse> originalListings = response.getListings();
+                List<ListingResponse> wardItems = new ArrayList<>();
+                List<ListingResponse> districtItems = new ArrayList<>();
+                List<ListingResponse> provinceItems = new ArrayList<>();
+                List<ListingResponse> otherItems = new ArrayList<>();
+
+                for (ListingResponse res : originalListings) {
+                    if (res.getAddress() != null) {
+                        String itemWardCode = res.getAddress().getWardCode();
+                        String itemDistrictCode = res.getAddress().getDistrictCode();
+                        String itemProvinceCode = res.getAddress().getProvinceCode();
+
+                        boolean isWardMatch = (discoveryWardCode != null && discoveryWardCode.equals(itemWardCode)) ||
+                                            (discoveryWardId != null && String.valueOf(discoveryWardId).equals(itemWardCode));
+                        
+                        boolean isDistrictMatch = false;
+                        if (!isWardMatch && discoveryDistrictId != null && itemDistrictCode != null) {
+                            if (String.valueOf(discoveryDistrictId).equals(itemDistrictCode)) {
+                                isDistrictMatch = true;
+                            }
+                        }
+
+                        boolean isProvinceMatch = false;
+                        if (!isWardMatch && !isDistrictMatch && discoveryProvinceCode != null && discoveryProvinceCode.equals(itemProvinceCode)) {
+                            isProvinceMatch = true;
+                        }
+
+                        if (isWardMatch) {
+                            wardItems.add(res);
+                        } else if (isDistrictMatch) {
+                            districtItems.add(res);
+                        } else if (isProvinceMatch) {
+                            provinceItems.add(res);
+                        } else {
+                            otherItems.add(res);
+                        }
+                    } else {
+                        otherItems.add(res);
+                    }
+                }
+
+                // Combine into discoveryItems with Priority: Ward > District > Province
+                List<ListingResponse> rawDiscoveryItems = new ArrayList<>();
+                rawDiscoveryItems.addAll(wardItems);
+                rawDiscoveryItems.addAll(districtItems);
+                rawDiscoveryItems.addAll(provinceItems);
+
+                List<ListingResponse> discoveryItems = new ArrayList<>();
+                Set<Long> seenDiscoveryIds = new HashSet<>();
+                for (ListingResponse res : rawDiscoveryItems) {
+                    if (seenDiscoveryIds.add(res.getListingId())) {
+                        discoveryItems.add(res);
+                    }
+                }
+
+                // HARD FALLBACK: If AI returned < 3 discovery items, fetch more directly from the database!
+                if (discoveryItems.size() < 3) {
+                    List<Long> existingIds = new ArrayList<>(seenDiscoveryIds);
+                    List<Long> queryExcludedIds = new ArrayList<>(interactedListingIds);
+                    queryExcludedIds.addAll(existingIds);
+                    if (queryExcludedIds.isEmpty()) queryExcludedIds.add(-1L);
+                    
+                    List<Listing> backupListings = new ArrayList<>();
+                    
+                    // 1. Try Ward
+                    if (discoveryWardCode != null || discoveryWardId != null) {
+                        List<Listing> bWard = listingRepository.findCandidatesByWard(
+                                discoveryWardId, discoveryWardCode, queryExcludedIds, PageRequest.of(0, 3));
+                        backupListings.addAll(bWard);
+                        bWard.forEach(b -> queryExcludedIds.add(b.getListingId()));
+                    }
+                    
+                    // 2. Try District
+                    if (backupListings.size() < 3 && discoveryDistrictId != null) {
+                        List<Listing> bDistrict = listingRepository.findCandidatesByDistrict(
+                                discoveryDistrictId, queryExcludedIds, PageRequest.of(0, 3 - backupListings.size()));
+                        backupListings.addAll(bDistrict);
+                        bDistrict.forEach(b -> queryExcludedIds.add(b.getListingId()));
+                    }
+                    
+                    // 3. Try Province
+                    if (backupListings.size() < 3 && discoveryProvinceCode != null) {
+                        Integer pId = null;
+                        try { pId = Integer.parseInt(discoveryProvinceCode); } catch (Exception ignored) {}
+                        List<Listing> bProvince = listingRepository.findCandidatesForPersonalized(
+                                pId, discoveryProvinceCode, queryExcludedIds, PageRequest.of(0, 3 - backupListings.size()));
+                        backupListings.addAll(bProvince);
+                    }
+                            
+                    if (!backupListings.isEmpty()) {
+                        Set<Long> backupIds = backupListings.stream().map(Listing::getListingId).collect(Collectors.toSet());
+                        List<ListingResponse> backupResponses = listingService.getListingsByIds(backupIds);
+                        
+                        // Map responses back to DB retrieval order
+                        Map<Long, ListingResponse> respMap = backupResponses.stream()
+                                .collect(Collectors.toMap(ListingResponse::getListingId, item -> item));
+                        
+                        for (Listing l : backupListings) {
+                            if (discoveryItems.size() >= 3) break;
+                            ListingResponse br = respMap.get(l.getListingId());
+                            if (br != null && seenDiscoveryIds.add(br.getListingId())) {
+                                discoveryItems.add(br);
+                            }
+                        }
+                    }
+                }
+                
+                // Re-sort discoveryItems by strict hierarchical priority (AI + Backup combined)
+                if (!discoveryItems.isEmpty()) {
+                    List<ListingResponse> finalWardItems = new ArrayList<>();
+                    List<ListingResponse> finalDistrictItems = new ArrayList<>();
+                    List<ListingResponse> finalProvinceItems = new ArrayList<>();
+                    
+                    for (ListingResponse res : discoveryItems) {
+                        if (res.getAddress() != null) {
+                            String itemWardCode = res.getAddress().getWardCode();
+                            String itemDistrictCode = res.getAddress().getDistrictCode();
+                            
+                            boolean isWardMatch = (discoveryWardCode != null && discoveryWardCode.equals(itemWardCode)) ||
+                                                 (discoveryWardId != null && String.valueOf(discoveryWardId).equals(itemWardCode));
+                            
+                            boolean isDistrictMatch = false;
+                            if (!isWardMatch && discoveryDistrictId != null && itemDistrictCode != null) {
+                                if (String.valueOf(discoveryDistrictId).equals(itemDistrictCode)) {
+                                    isDistrictMatch = true;
+                                }
+                            }
+                            
+                            if (isWardMatch) {
+                                finalWardItems.add(res);
+                            } else if (isDistrictMatch) {
+                                finalDistrictItems.add(res);
+                            } else {
+                                finalProvinceItems.add(res);
+                            }
+                        } else {
+                            finalProvinceItems.add(res);
+                        }
+                    }
+                    
+                    discoveryItems.clear();
+                    discoveryItems.addAll(finalWardItems);
+                    discoveryItems.addAll(finalDistrictItems);
+                    discoveryItems.addAll(finalProvinceItems);
+                }
+
+
+                // If we have discovery items, let's pin exactly 3 to slots 8, 9, 10
+                if (!discoveryItems.isEmpty()) {
+                    List<ListingResponse> pinnedListings = new ArrayList<>();
+                    Set<Long> finalSeenIds = new HashSet<>();
+                    
+                    // 1. Take the first 7 non-discovery items (Slots 1 to 7)
+                    int otherToTake = Math.min(7, otherItems.size());
+                    for (int i = 0; i < otherToTake; i++) {
+                        ListingResponse item = otherItems.get(i);
+                        if (finalSeenIds.add(item.getListingId())) {
+                            pinnedListings.add(item);
+                        }
+                    }
+                    
+                    // 2. Take up to 3 discovery items (Slots 8, 9, 10)
+                    int discoveryToTake = Math.min(3, discoveryItems.size());
+                    for (int i = 0; i < discoveryToTake; i++) {
+                        ListingResponse item = discoveryItems.get(i);
+                        if (finalSeenIds.add(item.getListingId())) {
+                            pinnedListings.add(item);
+                        }
+                    }
+                    
+                    // 3. Top-up with remaining items
+                    for (int i = otherToTake; i < otherItems.size(); i++) {
+                        ListingResponse item = otherItems.get(i);
+                        if (finalSeenIds.add(item.getListingId())) {
+                            pinnedListings.add(item);
+                        }
+                    }
+                    for (int i = discoveryToTake; i < discoveryItems.size(); i++) {
+                        ListingResponse item = discoveryItems.get(i);
+                        if (finalSeenIds.add(item.getListingId())) {
+                            pinnedListings.add(item);
+                        }
+                    }
+                    
+                    response.setListings(pinnedListings);
+                    response.setTotalReturned(pinnedListings.size());
+                    log.info("[Recommendation] Applied Discovery Shift Pinning for user {}: pinned {} items, final size {}", userId, discoveryToTake, pinnedListings.size());
+                }
+            }
+
+            return response;
         } catch (Exception e) {
             log.error("[Recommendation] AI service error for personalized feed (userId={})", userId, e);
             return getColdStartFeed(topN);
         }
+
     }
 
     // ─────────────────────────────────────────────
@@ -333,15 +674,38 @@ public class RecommendationServiceImpl implements RecommendationService {
         if (date != null) daysAgo = (int) ChronoUnit.DAYS.between(date, LocalDateTime.now());
 
         String pCode = "UNKNOWN";
+        String wCode = null;
         Integer dId = null;
+        Integer wId = null;
+
         if (listing.getAddress() != null) {
             var addr = listing.getAddress();
-            if (addr.getNewProvinceCode() != null && !addr.getNewProvinceCode().isEmpty()) {
-                pCode = addr.getNewProvinceCode();
-            } else if (addr.getLegacyProvinceId() != null) {
-                pCode = String.valueOf(addr.getLegacyProvinceId());
-            }
+            pCode = addr.getNewProvinceCode();
+            wCode = addr.getNewWardCode();
             dId = addr.getLegacyDistrictId();
+            wId = addr.getLegacyWardId();
+
+            // Fallback: If new codes are missing, try to resolve from mapping
+            if (pCode == null || pCode.isEmpty()) {
+                if (addr.getLegacyProvinceId() != null && dId != null && wId != null) {
+                    var mappingOpt = addressMappingRepository.findBestByLegacyAddress(
+                            String.format("%02d", addr.getLegacyProvinceId()),
+                            String.format("%03d", dId),
+                            String.format("%05d", wId));
+                    if (mappingOpt.isPresent()) {
+                        pCode = mappingOpt.get().getNewProvinceCode();
+                        wCode = mappingOpt.get().getNewWardCode();
+                    }
+                }
+                // If still missing, fallback to legacy province ID
+                if (pCode == null || pCode.isEmpty()) {
+                    if (addr.getLegacyProvinceId() != null) {
+                        pCode = String.valueOf(addr.getLegacyProvinceId());
+                    } else {
+                        pCode = "UNKNOWN";
+                    }
+                }
+            }
         }
 
         return AIRecommendationRequest.ListingFeatureDto.builder()
@@ -353,6 +717,8 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .bedrooms(listing.getBedrooms() != null ? listing.getBedrooms() : 0)
                 .provinceCode(pCode)
                 .districtId(dId)
+                .wardId(wId)
+                .newWardCode(wCode)
                 .vipType(listing.getVipType() != null ? listing.getVipType().name() : "NORMAL")
                 .postDateDaysAgo(Math.max(0, daysAgo))
                 .build();
