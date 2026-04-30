@@ -35,4 +35,28 @@ public interface LegacyWardRepository extends JpaRepository<LegacyWard, Integer>
     List<LegacyWard> findByDistrictCode(String districtCode);
 
     List<LegacyWard> findByProvinceCode(String provinceCode);
+
+    @Query("""
+        SELECT w FROM LegacyWard w
+        WHERE w.key LIKE CONCAT('%', :keyword, '%')
+           OR w.districtKey LIKE CONCAT('%', :keyword, '%')
+           OR w.provinceKey LIKE CONCAT('%', :keyword, '%')
+        ORDER BY w.provinceName ASC, w.districtName ASC, w.name ASC
+    """)
+    List<LegacyWard> findSuggestionCandidates(@Param("keyword") String keyword, Pageable pageable);
+
+    @Query("""
+        SELECT w FROM LegacyWard w
+        WHERE w.provinceCode = :provinceCode
+          AND (
+              w.key LIKE CONCAT('%', :keyword, '%')
+              OR w.districtKey LIKE CONCAT('%', :keyword, '%')
+              OR w.provinceKey LIKE CONCAT('%', :keyword, '%')
+          )
+        ORDER BY w.districtName ASC, w.name ASC
+    """)
+    List<LegacyWard> findSuggestionCandidatesByProvince(
+            @Param("provinceCode") String provinceCode,
+            @Param("keyword") String keyword,
+            Pageable pageable);
 }
