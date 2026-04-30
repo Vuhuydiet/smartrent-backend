@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -200,7 +201,7 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
         StringBuilder query = new StringBuilder();
         for (String word : normalized.split("\\s+")) {
-            if (word.isBlank()) continue;
+            if (word.length() < 3) continue;
             if (!query.isEmpty()) query.append(' ');
             query.append('+').append(word).append('*');
         }
@@ -219,13 +220,12 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     private List<SearchSuggestionItem> fetchLocationSuggestions(String normalized, String rawProvinceId) {
         try {
             List<LegacyWard> wards;
+            PageRequest page = PageRequest.of(0, MAX_LOCATION_CANDIDATES);
             if (rawProvinceId != null && !rawProvinceId.isBlank()) {
-                // Scoped: only wards within the requested province
-                wards = legacyWardRepository.findByProvinceCode(toProvinceCode(rawProvinceId));
+                wards = legacyWardRepository.findSuggestionCandidatesByProvince(
+                        toProvinceCode(rawProvinceId), normalized, page);
             } else {
-                // Full scan is expensive; limit by key prefix to keep it fast
-                // We rely on the application-layer limit imposed in mergeAndRank
-                wards = legacyWardRepository.findAll(); // filtered below
+                wards = legacyWardRepository.findSuggestionCandidates(normalized, page);
             }
 
             List<SearchSuggestionItem> items = new ArrayList<>();
