@@ -35,7 +35,7 @@ import java.util.Objects;
  *
  * <h3>Suggestion sources and weights</h3>
  * <ul>
- *   <li>TITLE        — 1.5 (listing title prefix match; highest confidence)</li>
+ *   <li>TITLE        — 1.5 (listing title full-text match; highest confidence)</li>
  *   <li>LOCATION     — 1.0 (province / district / ward name prefix match)</li>
  *   <li>POPULAR_QUERY— 0.8 (historically clicked terms)</li>
  * </ul>
@@ -155,8 +155,13 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     private List<SearchSuggestionItem> fetchTitleSuggestions(
             String normalized, Integer provinceIdInt, Long categoryId, int limit) {
         try {
+            String fulltextQuery = toBooleanFulltextQuery(normalized);
+            if (fulltextQuery == null) {
+                return Collections.emptyList();
+            }
+
             List<Object[]> rows = listingRepository.findTitleSuggestions(
-                    normalized, provinceIdInt, categoryId, limit);
+                    fulltextQuery, provinceIdInt, categoryId, limit);
 
             List<SearchSuggestionItem> items = new ArrayList<>(rows.size());
             for (int i = 0; i < rows.size(); i++) {
@@ -183,6 +188,24 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             log.warn("search-suggestions: title fetch failed: {}", e.getMessage(), e);
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * Converts normalized input into a MySQL boolean-mode query.
+     * Uses AND semantics across indexed terms and keeps prefix matching within each term,
+     * so "ho" no longer has to be the beginning of the whole title to match "can ho".
+     */
+    private String toBooleanFulltextQuery(String normalized) {
+        if (normalized == null || normalized.isBlank()) return null;
+
+        StringBuilder query = new StringBuilder();
+        for (String word : normalized.split("\\s+")) {
+            if (word.isBlank()) continue;
+            if (!query.isEmpty()) query.append(' ');
+            query.append('+').append(word).append('*');
+        }
+
+        return query.isEmpty() ? null : query.toString();
     }
 
     /**

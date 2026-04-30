@@ -519,7 +519,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     List<LocalDateTime> findRecentPushedTimesSince(@Param("since") LocalDateTime since, Pageable pageable);
 
     /**
-     * Title-prefix suggestion candidates for the search-suggestions endpoint.
+     * Full-text title suggestion candidates for the search-suggestions endpoint.
      * <p>
      * Uses a native query (projected columns only) for maximum performance —
      * no full entity hydration, no JOIN FETCH overhead.
@@ -527,7 +527,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * Public visibility is enforced at the query layer:
      * excludes drafts, shadow listings, unverified, and expired listings.
      *
-     * @param prefix     Normalized title prefix (output of {@code TextNormalizer.normalize})
+     * @param fulltextQuery MySQL boolean-mode full-text query generated from normalized user input
      * @param provinceId Legacy province ID integer; {@code null} means no province filter
      * @param categoryId Category ID; {@code null} means no category filter
      * @param limit      Maximum rows to return (already clamped by the service layer)
@@ -539,25 +539,27 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
                  a.full_address,
                  a.full_newaddress,
                  a.legacy_province_id,
-                 a.new_province_code
+                 a.new_province_code,
+                 MATCH(l.title_norm) AGAINST(:fulltextQuery IN BOOLEAN MODE) AS relevance
         FROM     listings l
         JOIN     addresses a ON l.address_id = a.address_id
-        WHERE    l.title_norm      LIKE CONCAT(:prefix, '%')
+        WHERE    MATCH(l.title_norm) AGAINST(:fulltextQuery IN BOOLEAN MODE) > 0
           AND    (:provinceId IS NULL OR a.legacy_province_id = :provinceId)
           AND    (:categoryId IS NULL OR l.category_id        = :categoryId)
           AND    l.is_draft  = false
           AND    l.is_shadow = false
           AND    l.verified  = true
           AND    l.expired   = false
-        ORDER BY l.vip_type_sort_order ASC,
+        ORDER BY relevance DESC,
+                 l.vip_type_sort_order ASC,
                  l.pushed_at          DESC
         LIMIT    :lim
         """)
     List<Object[]> findTitleSuggestions(
-        @Param("prefix")     String  prefix,
-        @Param("provinceId") Integer provinceId,
-        @Param("categoryId") Long    categoryId,
-        @Param("lim")        int     limit
+        @Param("fulltextQuery") String  fulltextQuery,
+        @Param("provinceId")    Integer provinceId,
+        @Param("categoryId")    Long    categoryId,
+        @Param("lim")           int     limit
     );
 }
 
