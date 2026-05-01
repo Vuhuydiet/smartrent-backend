@@ -3,10 +3,12 @@ package com.smartrent.service.discovery.impl;
 import com.smartrent.dto.response.SearchSuggestionItem;
 import com.smartrent.dto.response.SearchSuggestionsResponse;
 import com.smartrent.enums.SuggestionType;
+import com.smartrent.infra.repository.LegacyProvinceRepository;
 import com.smartrent.infra.repository.LegacyWardRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.SearchQueryImpressionRepository;
 import com.smartrent.infra.repository.SearchSuggestionClickRepository;
+import com.smartrent.infra.repository.entity.LegacyProvince;
 import com.smartrent.infra.repository.entity.LegacyWard;
 import com.smartrent.infra.repository.entity.SearchQueryImpression;
 import com.smartrent.infra.repository.entity.SearchSuggestionClick;
@@ -25,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -69,9 +72,23 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     /** Rolling window for popular-query aggregation (7 days). */
     private static final long POPULAR_QUERY_WINDOW_DAYS = 7;
 
+    /**
+     * Province codes returned as default LOCATION suggestions when the user
+     * focuses the search box without typing yet. Order is intentional and
+     * preserved in the response (TP. HCM first by convention).
+     */
+    private static final List<String> DEFAULT_TOP_PROVINCE_CODES = List.of(
+            "79", // TP. Hồ Chí Minh
+            "01", // Hà Nội
+            "48", // Đà Nẵng
+            "31", // Hải Phòng
+            "92"  // Cần Thơ
+    );
+
     // ── Dependencies ─────────────────────────────────────────────────────────
     ListingRepository             listingRepository;
     LegacyWardRepository          legacyWardRepository;
+    LegacyProvinceRepository      legacyProvinceRepository;
     SearchQueryImpressionRepository impressionRepository;
     SearchSuggestionClickRepository clickRepository;
 
@@ -103,13 +120,24 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             String clientIp,
             String sessionId) {
 
+        int safeLimit = Math.min(Math.max(limit, 1), 20);
+
         String normalized = TextNormalizer.normalize(query);
         if (normalized == null || normalized.length() < 2) {
-            log.debug("search-suggestions: query too short after normalization, returning empty");
-            return buildEmptyResponse(normalized);
+            // Empty / very short query → return curated top-city LOCATION
+            // suggestions so the dropdown is useful on focus before typing.
+            log.debug("search-suggestions: query too short, returning default top-city suggestions");
+            List<SearchSuggestionItem> defaults = fetchDefaultLocationSuggestions(safeLimit);
+            long impressionId = persistImpression(
+                    Objects.toString(normalized, ""), provinceId, categoryId,
+                    defaults.size(), clientIp, sessionId);
+            return SearchSuggestionsResponse.builder()
+                    .suggestions(defaults)
+                    .queryNorm(Objects.toString(normalized, ""))
+                    .impressionId(impressionId)
+                    .build();
         }
 
-        int safeLimit = Math.min(Math.max(limit, 1), 20);
         Integer provinceIdInt = parseProvinceId(provinceId);
 
         // ── Fetch candidates from all three sources ──────────────────────────
@@ -239,20 +267,37 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
                 if (!matchesWard && !matchesDistrict && !matchesProvince) continue;
 
-                // Build human-readable text and metadata
+                // Build human-readable text and metadata. The metadata carries the legacy
+                // numeric IDs the frontend needs to apply a real location filter (so a
+                // LOCATION pick filters by province/district/ward instead of by free text).
                 String displayText;
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("provinceName", ward.getProvinceName());
                 meta.put("districtName", ward.getDistrictName());
+                meta.put("provinceCode", ward.getProvinceCode());
+                meta.put("districtCode", ward.getDistrictCode());
 
+                Integer legacyProvinceId = safeLegacyProvinceId(ward);
+                Integer legacyDistrictId = safeLegacyDistrictId(ward);
+                if (legacyProvinceId != null) meta.put("legacyProvinceId", legacyProvinceId);
+
+                String matchType;
                 if (matchesWard) {
+                    matchType = "WARD";
                     displayText = ward.getName() + ", " + ward.getDistrictName() + ", " + ward.getProvinceName();
                     meta.put("wardName", ward.getName());
+                    meta.put("wardCode", ward.getCode());
+                    meta.put("legacyWardId", ward.getId());
+                    if (legacyDistrictId != null) meta.put("legacyDistrictId", legacyDistrictId);
                 } else if (matchesDistrict) {
+                    matchType = "DISTRICT";
                     displayText = ward.getDistrictName() + ", " + ward.getProvinceName();
+                    if (legacyDistrictId != null) meta.put("legacyDistrictId", legacyDistrictId);
                 } else {
+                    matchType = "PROVINCE";
                     displayText = ward.getProvinceName();
                 }
+                meta.put("matchType", matchType);
 
                 double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * items.size());
 
@@ -266,6 +311,57 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             return items;
         } catch (Exception e) {
             log.warn("search-suggestions: location fetch failed: {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Default LOCATION suggestions for empty / very short queries. Returns
+     * the configured top cities (HCM, HN, ĐN, …) in their declared order so
+     * the dropdown is useful as soon as the user focuses the search box.
+     *
+     * <p>Failures degrade silently to an empty list — this path runs on every
+     * "focus before typing" event and must never break the UI.
+     */
+    private List<SearchSuggestionItem> fetchDefaultLocationSuggestions(int limit) {
+        try {
+            List<LegacyProvince> provinces = legacyProvinceRepository.findByCodeIn(DEFAULT_TOP_PROVINCE_CODES);
+            if (provinces == null || provinces.isEmpty()) return Collections.emptyList();
+
+            // Preserve the configured ordering (findByCodeIn returns DB order).
+            Map<String, Integer> order = new HashMap<>();
+            for (int i = 0; i < DEFAULT_TOP_PROVINCE_CODES.size(); i++) {
+                order.put(DEFAULT_TOP_PROVINCE_CODES.get(i), i);
+            }
+            provinces.sort(Comparator.comparingInt(p -> order.getOrDefault(p.getCode(), Integer.MAX_VALUE)));
+
+            int max = Math.min(limit, provinces.size());
+            List<SearchSuggestionItem> items = new ArrayList<>(max);
+            for (int i = 0; i < max; i++) {
+                LegacyProvince p = provinces.get(i);
+
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("matchType", "PROVINCE");
+                meta.put("provinceName", p.getName());
+                // districtName is part of the LocationSuggestionMetadata contract;
+                // empty string keeps the FE renderer happy without inventing data.
+                meta.put("districtName", "");
+                if (p.getCode() != null) meta.put("provinceCode", p.getCode());
+                if (p.getId() != null)   meta.put("legacyProvinceId", p.getId());
+                meta.put("isDefault", true);
+
+                double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * i);
+
+                items.add(SearchSuggestionItem.builder()
+                        .type(SuggestionType.LOCATION)
+                        .text(p.getName())
+                        .metadata(meta)
+                        .score(score)
+                        .build());
+            }
+            return items;
+        } catch (Exception e) {
+            log.warn("search-suggestions: default top-city fetch failed (non-fatal): {}", e.getMessage(), e);
             return Collections.emptyList();
         }
     }
@@ -396,14 +492,6 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     // Private — helpers
     // ─────────────────────────────────────────────────────────────────────────
 
-    private SearchSuggestionsResponse buildEmptyResponse(String normalized) {
-        return SearchSuggestionsResponse.builder()
-                .suggestions(Collections.emptyList())
-                .queryNorm(Objects.toString(normalized, ""))
-                .impressionId(0L)
-                .build();
-    }
-
     /**
      * Parses the provinceId string as an Integer.
      * If the string is not numeric (e.g. new province code "01"), returns {@code null}
@@ -457,5 +545,25 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     private static String chooseAddress(String fullAddress, String fullNewAddress) {
         if (fullNewAddress != null && !fullNewAddress.isBlank()) return fullNewAddress;
         return fullAddress;
+    }
+
+    /**
+     * Reads {@code ward.province.id} via the lazy relationship. Wrapped because we
+     * never want telemetry-adjacent fetches to fail the suggestion response.
+     */
+    private static Integer safeLegacyProvinceId(LegacyWard ward) {
+        try {
+            return ward.getProvince() != null ? ward.getProvince().getId() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Integer safeLegacyDistrictId(LegacyWard ward) {
+        try {
+            return ward.getDistrict() != null ? ward.getDistrict().getId() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
