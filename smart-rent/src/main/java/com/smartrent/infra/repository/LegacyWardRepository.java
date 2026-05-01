@@ -38,6 +38,8 @@ public interface LegacyWardRepository extends JpaRepository<LegacyWard, Integer>
 
     @Query("""
         SELECT w FROM LegacyWard w
+        LEFT JOIN FETCH w.province
+        LEFT JOIN FETCH w.district
         WHERE w.key LIKE CONCAT('%', :keyword, '%')
            OR w.districtKey LIKE CONCAT('%', :keyword, '%')
            OR w.provinceKey LIKE CONCAT('%', :keyword, '%')
@@ -47,6 +49,8 @@ public interface LegacyWardRepository extends JpaRepository<LegacyWard, Integer>
 
     @Query("""
         SELECT w FROM LegacyWard w
+        LEFT JOIN FETCH w.province
+        LEFT JOIN FETCH w.district
         WHERE w.provinceCode = :provinceCode
           AND (
               w.key LIKE CONCAT('%', :keyword, '%')

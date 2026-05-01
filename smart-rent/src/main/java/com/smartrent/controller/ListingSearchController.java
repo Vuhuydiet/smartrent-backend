@@ -333,7 +333,7 @@ public class ListingSearchController {
         }
     )
     public com.smartrent.dto.response.ApiResponse<SearchSuggestionsResponse> getSearchSuggestions(
-            @RequestParam("q") String query,
+            @RequestParam(value = "q", required = false, defaultValue = "") String query,
             @RequestParam(value = "limit",      defaultValue = "8")  int    limit,
             @RequestParam(value = "provinceId", required = false)     String provinceId,
             @RequestParam(value = "categoryId", required = false)     Long   categoryId,
