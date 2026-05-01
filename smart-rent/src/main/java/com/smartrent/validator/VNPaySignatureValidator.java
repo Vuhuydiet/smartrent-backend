@@ -43,8 +43,8 @@ public class VNPaySignatureValidator {
             // Build signature data
             String signData = buildSignatureData(signParams);
 
-            // Generate signature
-            String generatedSignature = generateHmacSHA512(signData, vnPayConfig.getHashSecret());
+            // Generate signature with the algorithm configured on the merchant portal
+            String generatedSignature = generateHmac(signData, vnPayConfig.getHashSecret());
 
             // Compare signatures
             boolean isValid = generatedSignature.equalsIgnoreCase(receivedSignature);
@@ -92,13 +92,17 @@ public class VNPaySignatureValidator {
     }
 
     /**
-     * Generate HMAC-SHA512 signature
+     * Generate HMAC signature using the algorithm configured on the VNPay merchant portal.
+     * Must match {@code vnpay.secure-hash-type}: SHA512 (default) or SHA256.
      */
-    private String generateHmacSHA512(String data, String secret) throws Exception {
-        Mac hmacSHA512 = Mac.getInstance("HmacSHA512");
-        SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA512");
-        hmacSHA512.init(secretKeySpec);
-        byte[] hash = hmacSHA512.doFinal(data.getBytes(StandardCharsets.UTF_8));
+    private String generateHmac(String data, String secret) throws Exception {
+        String type = vnPayConfig.getSecureHashType();
+        String alg = (type != null && (type.equalsIgnoreCase("SHA256") || type.equalsIgnoreCase("HMACSHA256")))
+                ? "HmacSHA256" : "HmacSHA512";
+        Mac mac = Mac.getInstance(alg);
+        SecretKeySpec keySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), alg);
+        mac.init(keySpec);
+        byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
 
         StringBuilder hexString = new StringBuilder();
         for (byte b : hash) {
@@ -108,7 +112,6 @@ public class VNPaySignatureValidator {
             }
             hexString.append(hex);
         }
-
         return hexString.toString();
     }
 
@@ -121,9 +124,12 @@ public class VNPaySignatureValidator {
             return false;
         }
 
-        // VNPay HMAC-SHA512 signature should be 128 hex characters
-        if (signature.length() != 128) {
-            log.warn("Invalid signature length: {}", signature.length());
+        // HMAC-SHA512 → 128 hex chars; HMAC-SHA256 → 64 hex chars.
+        String type = vnPayConfig.getSecureHashType();
+        int expected = (type != null && (type.equalsIgnoreCase("SHA256") || type.equalsIgnoreCase("HMACSHA256")))
+                ? 64 : 128;
+        if (signature.length() != expected) {
+            log.warn("Invalid signature length: {} (expected {} for {})", signature.length(), expected, type);
             return false;
         }
 
