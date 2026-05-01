@@ -81,8 +81,7 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             "79", // TP. Hồ Chí Minh
             "01", // Hà Nội
             "48", // Đà Nẵng
-            "31", // Hải Phòng
-            "92"  // Cần Thơ
+            "75"  // Đồng Nai
     );
 
     // ── Dependencies ─────────────────────────────────────────────────────────
