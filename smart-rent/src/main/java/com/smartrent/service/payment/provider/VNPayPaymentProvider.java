@@ -569,11 +569,13 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                 .replace("\u2013", "-")  // En dash
                 .replace("\u2014", "-"); // Em dash
 
-        // Allow only ASCII letters, digits, space, and hyphen — anything else is replaced
-        // with a space, then collapsed. VNPay's signature is sensitive to encoding subtleties
-        // around `:`, `,`, `.`, `+`, etc., so we ban them outright on this field.
-        result = result.replaceAll("[^a-zA-Z0-9 \\-]", " ");
-        result = result.replaceAll("\\s+", " ").trim();
+        // Reduce to pure [a-zA-Z0-9-] — NO spaces, NO punctuation. Spaces are the
+        // dominant cause of VNPay "sai chữ ký": a space encodes as `+` via URLEncoder
+        // but VNPay sometimes round-trips it as `%20`. Removing them entirely sidesteps
+        // every encoder-mismatch bug. Any other non-alnum char also becomes `-`.
+        result = result.replaceAll("[^a-zA-Z0-9]+", "-");
+        // Trim leading / trailing hyphens left over from the replace
+        result = result.replaceAll("^-+|-+$", "");
         if (result.isEmpty()) {
             result = "Payment";
         }
