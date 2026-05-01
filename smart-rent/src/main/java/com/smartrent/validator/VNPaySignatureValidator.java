@@ -9,10 +9,14 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.stream.Collectors;
 
 /**
  * Validator for VNPay signatures
@@ -59,14 +63,32 @@ public class VNPaySignatureValidator {
     }
 
     /**
-     * Build signature data from parameters
+     * Build signature data from decoded parameters: sort keys alphabetically and
+     * URL-encode each value with US_ASCII before joining with `=` and `&`.
+     * Matches VNPay's official Java sample (Config.hashAllFields).
      */
     private String buildSignatureData(Map<String, String> params) {
-        return params.entrySet().stream()
-                .filter(entry -> entry.getValue() != null && !entry.getValue().isEmpty())
-                .sorted(Map.Entry.comparingByKey())
-                .map(entry -> entry.getKey() + "=" + entry.getValue())
-                .collect(Collectors.joining("&"));
+        try {
+            List<String> fieldNames = new ArrayList<>(params.keySet());
+            Collections.sort(fieldNames);
+            StringBuilder hashData = new StringBuilder();
+            Iterator<String> itr = fieldNames.iterator();
+            while (itr.hasNext()) {
+                String fieldName = itr.next();
+                String fieldValue = params.get(fieldName);
+                if (fieldValue != null && !fieldValue.isEmpty()) {
+                    hashData.append(fieldName)
+                            .append('=')
+                            .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                    if (itr.hasNext()) {
+                        hashData.append('&');
+                    }
+                }
+            }
+            return hashData.toString();
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new RuntimeException("Failed to URL-encode VNPay signature data", e);
+        }
     }
 
     /**
