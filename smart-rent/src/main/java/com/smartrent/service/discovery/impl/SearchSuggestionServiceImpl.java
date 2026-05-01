@@ -279,7 +279,16 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
                 Integer legacyProvinceId = safeLegacyProvinceId(ward);
                 Integer legacyDistrictId = safeLegacyDistrictId(ward);
-                if (legacyProvinceId != null) meta.put("legacyProvinceId", legacyProvinceId);
+
+                // The frontend uses these IDs to apply a real location filter.
+                // Without them the only option is to fall back to a keyword
+                // search, which is exactly the silent degradation we want to
+                // prevent — skip the suggestion entirely instead.
+                if (legacyProvinceId == null) {
+                    log.warn("search-suggestions: dropping LOCATION suggestion without legacyProvinceId (ward={})", ward.getCode());
+                    continue;
+                }
+                meta.put("legacyProvinceId", legacyProvinceId);
 
                 String matchType;
                 if (matchesWard) {
@@ -340,6 +349,15 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             for (int i = 0; i < max; i++) {
                 LegacyProvince p = provinces.get(i);
 
+                // Same invariant as fetchLocationSuggestions: every LOCATION
+                // suggestion must carry a legacyProvinceId. A null here would
+                // mean a malformed seed in legacy_provinces — drop it rather
+                // than emit a suggestion the frontend can't filter by.
+                if (p.getId() == null) {
+                    log.warn("search-suggestions: skipping default LOCATION without id (code={})", p.getCode());
+                    continue;
+                }
+
                 Map<String, Object> meta = new HashMap<>();
                 meta.put("matchType", "PROVINCE");
                 meta.put("provinceName", p.getName());
@@ -347,10 +365,10 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
                 // empty string keeps the FE renderer happy without inventing data.
                 meta.put("districtName", "");
                 if (p.getCode() != null) meta.put("provinceCode", p.getCode());
-                if (p.getId() != null)   meta.put("legacyProvinceId", p.getId());
+                meta.put("legacyProvinceId", p.getId());
                 meta.put("isDefault", true);
 
-                double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * i);
+                double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * items.size());
 
                 items.add(SearchSuggestionItem.builder()
                         .type(SuggestionType.LOCATION)
