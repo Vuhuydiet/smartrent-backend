@@ -58,6 +58,22 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         this.vnpayConnector = vnpayConnector;
     }
 
+    /**
+     * Compute the VNPay secure hash using whichever algorithm the merchant portal
+     * is configured for. Reads {@code vnpay.secure-hash-type}:
+     *   "SHA512" / "HMACSHA512" → HMAC-SHA512 (modern 2.1.0 default)
+     *   "SHA256" / "HMACSHA256" → HMAC-SHA256
+     * Mismatch with the portal setting is the #1 cause of "sai chữ ký" once
+     * the hashData itself is provably correct.
+     */
+    private String secureHash(String data) {
+        String type = vnpayConfig.getSecureHashType();
+        if (type != null && (type.equalsIgnoreCase("SHA256") || type.equalsIgnoreCase("HMACSHA256"))) {
+            return PaymentUtil.hmacSHA256(vnpayConfig.getHashSecret(), data);
+        }
+        return PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), data);
+    }
+
     @Override
     public PaymentProvider getProviderType() {
         return PaymentProvider.VNPAY;
@@ -302,7 +318,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             }
 
             String hashData = buildHashDataUrlEncoded(decodedParams);
-            String generatedSignature = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
+            String generatedSignature = secureHash(hashData);
 
             boolean isValid = generatedSignature.equalsIgnoreCase(signature);
             if (!isValid) {
@@ -358,7 +374,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             }
 
             String hashData = buildHashDataUrlEncoded(validationParams);
-            String generatedSignature = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
+            String generatedSignature = secureHash(hashData);
 
             boolean isValid = generatedSignature.equalsIgnoreCase(signature);
             if (!isValid) {
@@ -519,10 +535,10 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
             }
             String queryUrl = query.toString();
 
-            String secureHash = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashDataStr);
+            String vnpSecureHash = secureHash(hashDataStr);
 
             String paymentUrl = vnpayConfig.getPaymentUrl() != null ? vnpayConfig.getPaymentUrl() : vnpayConfig.getUrl();
-            queryUrl += "&vnp_SecureHash=" + secureHash;
+            queryUrl += "&vnp_SecureHash=" + vnpSecureHash;
             paymentUrl = paymentUrl + "?" + queryUrl;
 
             log.info("VNPay payment URL generated for txnRef: {}", transaction.getTransactionId());
@@ -652,7 +668,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
         } catch (UnsupportedEncodingException e) {
             throw new PaymentProviderException("Failed to build VNPay query hash data", e);
         }
-        String secureHash = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
+        String vnpSecureHash = secureHash(hashData);
 
         return VNPayQueryRequest.builder()
                 .vnp_RequestId(requestId)
@@ -664,7 +680,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
                 .vnp_TransactionDate(transactionDate)
                 .vnp_CreateDate(createDate)
                 .vnp_IpAddr(ipAddress)
-                .vnp_SecureHash(secureHash)
+                .vnp_SecureHash(vnpSecureHash)
                 .build();
     }
 
@@ -693,7 +709,7 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
 
             // QueryDR JSON response: VNPay signs URL-encoded values per spec, same canonicalization as everywhere else.
             String hashData = buildHashDataUrlEncoded(responseParams);
-            String computedHash = PaymentUtil.hmacSHA512(vnpayConfig.getHashSecret(), hashData);
+            String computedHash = secureHash(hashData);
 
             return computedHash.equalsIgnoreCase(receivedHash);
         } catch (Exception e) {
