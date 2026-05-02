@@ -222,13 +222,19 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
      * Converts normalized input into a MySQL boolean-mode query.
      * Uses AND semantics across indexed terms and keeps prefix matching within each term,
      * so "ho" no longer has to be the beginning of the whole title to match "can ho".
+     *
+     * <p>Words with fewer than 2 chars are skipped (below MySQL's default
+     * {@code ft_min_word_len = 2}); a single 2-char word is still emitted as a
+     * prefix so that early keystrokes ("ho", "ch") still produce title matches
+     * instead of an empty TITLE source. If every word is dropped, returns null
+     * and the caller falls back to LOCATION / POPULAR_QUERY suggestions.
      */
     private String toBooleanFulltextQuery(String normalized) {
         if (normalized == null || normalized.isBlank()) return null;
 
         StringBuilder query = new StringBuilder();
         for (String word : normalized.split("\\s+")) {
-            if (word.length() < 3) continue;
+            if (word.length() < 2) continue;
             if (!query.isEmpty()) query.append(' ');
             query.append('+').append(word).append('*');
         }
@@ -451,7 +457,13 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         List<SearchSuggestionItem> result = new ArrayList<>(seen.values());
         result.sort((a, b) -> Double.compare(b.getScore(), a.getScore()));
 
-        return result.size() > limit ? result.subList(0, limit) : result;
+        // Return a concrete ArrayList — never the SubList view from List#subList.
+        // The response is cached via GenericJackson2JsonRedisSerializer with
+        // default typing enabled, so an ArrayList$SubList payload would write
+        // "@class":"java.util.ArrayList$SubList" and fail to deserialize on
+        // the next cache hit (no public no-arg constructor), leaking up as a
+        // 9999 error and an empty dropdown on the client.
+        return result.size() > limit ? new ArrayList<>(result.subList(0, limit)) : result;
     }
 
     /** Inserts an item only if its dedup key (lowercased text) is not already present. */

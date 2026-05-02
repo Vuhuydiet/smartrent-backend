@@ -38,7 +38,7 @@ public interface SearchSuggestionClickRepository extends JpaRepository<SearchSug
         WHERE    ssc.suggestion_type = 'POPULAR_QUERY'
           AND    ssc.created_at     >= :since
         GROUP BY ssc.suggestion_text
-        ORDER BY hit_count DESC
+        ORDER BY hit_count DESC, ssc.suggestion_text ASC
         LIMIT    :lim
         """)
     List<Object[]> findPopularQueryTexts(
