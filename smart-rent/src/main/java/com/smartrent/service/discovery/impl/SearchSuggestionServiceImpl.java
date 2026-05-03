@@ -3,11 +3,13 @@ package com.smartrent.service.discovery.impl;
 import com.smartrent.dto.response.SearchSuggestionItem;
 import com.smartrent.dto.response.SearchSuggestionsResponse;
 import com.smartrent.enums.SuggestionType;
+import com.smartrent.infra.repository.LegacyDistrictRepository;
 import com.smartrent.infra.repository.LegacyProvinceRepository;
 import com.smartrent.infra.repository.LegacyWardRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.SearchQueryImpressionRepository;
 import com.smartrent.infra.repository.SearchSuggestionClickRepository;
+import com.smartrent.infra.repository.entity.District;
 import com.smartrent.infra.repository.entity.LegacyProvince;
 import com.smartrent.infra.repository.entity.LegacyWard;
 import com.smartrent.infra.repository.entity.SearchQueryImpression;
@@ -66,9 +68,6 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     private static final double WEIGHT_POPULAR_QUERY = 0.8;
     private static final double SCORE_DECAY_PER_RANK = 0.05;
 
-    /** Maximum number of location suggestions fetched per ward search. */
-    private static final int MAX_LOCATION_CANDIDATES = 8;
-
     /** Rolling window for popular-query aggregation (7 days). */
     private static final long POPULAR_QUERY_WINDOW_DAYS = 7;
 
@@ -87,6 +86,7 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     // ── Dependencies ─────────────────────────────────────────────────────────
     ListingRepository             listingRepository;
     LegacyWardRepository          legacyWardRepository;
+    LegacyDistrictRepository      legacyDistrictRepository;
     LegacyProvinceRepository      legacyProvinceRepository;
     SearchQueryImpressionRepository impressionRepository;
     SearchSuggestionClickRepository clickRepository;
@@ -243,78 +243,112 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     }
 
     /**
-     * Fetches LOCATION suggestions from the {@code legacy_wards} table.
-     * Matches on the ward's {@code key} field (already normalized, e.g. "ba dinh")
-     * so Vietnamese input works correctly via TextNormalizer parity.
+     * Per-tier candidate caps. Province lives at the top because it dedupes the
+     * fastest (one row per matching province); district and ward sit below to
+     * give finer-grained picks when the user drills down.
+     */
+    private static final int MAX_PROVINCE_CANDIDATES = 4;
+    private static final int MAX_DISTRICT_CANDIDATES = 4;
+    private static final int MAX_WARD_CANDIDATES     = 4;
+
+    /**
+     * Multi-tier LOCATION suggestion fetch. Queries the province, district and
+     * ward tables independently — each tier only filters on its own columns,
+     * so a province-level match no longer drags every district/ward inside it
+     * into the result set.
      *
-     * <p>Also matches province/district names to provide coarser-grained location suggestions.
-     * Results are deduplicated by {@code wardName + districtName + provinceName} combination.
+     * <p>Why two key forms (see {@code compactKey}): the seed migrations left
+     * {@code *_key} columns in a space-stripped, partially-stripped form
+     * (e.g. {@code "thanhphohochiminh"}, {@code "quan1"}, {@code "phng_phc_x"}),
+     * which {@code TextNormalizer.normalize}'s "ho chi minh" / "quan 1" output
+     * cannot LIKE against. Each repository query ORs the {@code name} branch
+     * (with spaces, leans on the DB's accent-insensitive collation) against a
+     * {@code key} branch (no spaces) so either layout matches without needing
+     * a data backfill.
      */
     private List<SearchSuggestionItem> fetchLocationSuggestions(String normalized, String rawProvinceId) {
+        String compact = compactKey(normalized);
+        List<SearchSuggestionItem> items = new ArrayList<>();
+        items.addAll(fetchProvinceSuggestionsTier(normalized, compact));
+        items.addAll(fetchDistrictSuggestionsTier(normalized, compact, rawProvinceId));
+        items.addAll(fetchWardSuggestionsTier(normalized, compact, rawProvinceId));
+        return items;
+    }
+
+    /**
+     * Province-level matches. Cheapest tier (~63 rows, indexed on key/name) and
+     * the one that fixes the most common reported miss ("Hồ Chí Minh" → empty).
+     */
+    private List<SearchSuggestionItem> fetchProvinceSuggestionsTier(String normalized, String compact) {
         try {
-            List<LegacyWard> wards;
-            PageRequest page = PageRequest.of(0, MAX_LOCATION_CANDIDATES);
-            if (rawProvinceId != null && !rawProvinceId.isBlank()) {
-                wards = legacyWardRepository.findSuggestionCandidatesByProvince(
-                        toProvinceCode(rawProvinceId), normalized, page);
-            } else {
-                wards = legacyWardRepository.findSuggestionCandidates(normalized, page);
-            }
+            List<LegacyProvince> provinces = legacyProvinceRepository.findSuggestionMatches(
+                    normalized, compact, PageRequest.of(0, MAX_PROVINCE_CANDIDATES));
 
-            List<SearchSuggestionItem> items = new ArrayList<>();
-
-            for (LegacyWard ward : wards) {
-                if (items.size() >= MAX_LOCATION_CANDIDATES) break;
-
-                boolean matchesWard     = ward.getKey() != null && ward.getKey().contains(normalized);
-                boolean matchesDistrict = ward.getDistrictKey() != null && ward.getDistrictKey().contains(normalized);
-                boolean matchesProvince = ward.getProvinceKey() != null && ward.getProvinceKey().contains(normalized);
-
-                if (!matchesWard && !matchesDistrict && !matchesProvince) continue;
-
-                // Build human-readable text and metadata. The metadata carries the legacy
-                // numeric IDs the frontend needs to apply a real location filter (so a
-                // LOCATION pick filters by province/district/ward instead of by free text).
-                String displayText;
-                Map<String, Object> meta = new HashMap<>();
-                meta.put("provinceName", ward.getProvinceName());
-                meta.put("districtName", ward.getDistrictName());
-                meta.put("provinceCode", ward.getProvinceCode());
-                meta.put("districtCode", ward.getDistrictCode());
-
-                Integer legacyProvinceId = safeLegacyProvinceId(ward);
-                Integer legacyDistrictId = safeLegacyDistrictId(ward);
-
-                // The frontend uses these IDs to apply a real location filter.
-                // Without them the only option is to fall back to a keyword
-                // search, which is exactly the silent degradation we want to
-                // prevent — skip the suggestion entirely instead.
-                if (legacyProvinceId == null) {
-                    log.warn("search-suggestions: dropping LOCATION suggestion without legacyProvinceId (ward={})", ward.getCode());
+            List<SearchSuggestionItem> items = new ArrayList<>(provinces.size());
+            for (LegacyProvince p : provinces) {
+                if (p.getId() == null) {
+                    log.warn("search-suggestions: dropping PROVINCE suggestion without id (code={})", p.getCode());
                     continue;
                 }
-                meta.put("legacyProvinceId", legacyProvinceId);
 
-                String matchType;
-                if (matchesWard) {
-                    matchType = "WARD";
-                    displayText = ward.getName() + ", " + ward.getDistrictName() + ", " + ward.getProvinceName();
-                    meta.put("wardName", ward.getName());
-                    meta.put("wardCode", ward.getCode());
-                    meta.put("legacyWardId", ward.getId());
-                    if (legacyDistrictId != null) meta.put("legacyDistrictId", legacyDistrictId);
-                } else if (matchesDistrict) {
-                    matchType = "DISTRICT";
-                    displayText = ward.getDistrictName() + ", " + ward.getProvinceName();
-                    if (legacyDistrictId != null) meta.put("legacyDistrictId", legacyDistrictId);
-                } else {
-                    matchType = "PROVINCE";
-                    displayText = ward.getProvinceName();
-                }
-                meta.put("matchType", matchType);
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("matchType", "PROVINCE");
+                meta.put("provinceName", p.getName());
+                // districtName is part of the LocationSuggestionMetadata contract;
+                // empty string keeps the FE renderer happy without inventing data.
+                meta.put("districtName", "");
+                if (p.getCode() != null) meta.put("provinceCode", p.getCode());
+                meta.put("legacyProvinceId", p.getId());
 
                 double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * items.size());
+                items.add(SearchSuggestionItem.builder()
+                        .type(SuggestionType.LOCATION)
+                        .text(p.getName())
+                        .metadata(meta)
+                        .score(score)
+                        .build());
+            }
+            return items;
+        } catch (Exception e) {
+            log.warn("search-suggestions: province tier fetch failed (non-fatal): {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
+    }
 
+    /**
+     * District-level matches. Falls back to a province-scoped query when the
+     * caller already locked the user into a province (so "Quận" doesn't return
+     * districts from every other province).
+     */
+    private List<SearchSuggestionItem> fetchDistrictSuggestionsTier(String normalized, String compact, String rawProvinceId) {
+        try {
+            PageRequest page = PageRequest.of(0, MAX_DISTRICT_CANDIDATES);
+            List<District> districts = (rawProvinceId != null && !rawProvinceId.isBlank())
+                    ? legacyDistrictRepository.findSuggestionMatchesByProvince(
+                            toProvinceCode(rawProvinceId), normalized, compact, page)
+                    : legacyDistrictRepository.findSuggestionMatches(normalized, compact, page);
+
+            List<SearchSuggestionItem> items = new ArrayList<>(districts.size());
+            for (District d : districts) {
+                Integer legacyProvinceId = safeLegacyProvinceIdOf(d);
+                if (legacyProvinceId == null) {
+                    log.warn("search-suggestions: dropping DISTRICT suggestion without legacyProvinceId (district={})", d.getCode());
+                    continue;
+                }
+
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("matchType", "DISTRICT");
+                meta.put("provinceName", d.getProvinceName());
+                meta.put("districtName", d.getName());
+                if (d.getProvince() != null && d.getProvince().getCode() != null) {
+                    meta.put("provinceCode", d.getProvince().getCode());
+                }
+                if (d.getCode() != null) meta.put("districtCode", d.getCode());
+                meta.put("legacyProvinceId", legacyProvinceId);
+                if (d.getId() != null) meta.put("legacyDistrictId", d.getId());
+
+                String displayText = d.getName() + ", " + d.getProvinceName();
+                double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * items.size());
                 items.add(SearchSuggestionItem.builder()
                         .type(SuggestionType.LOCATION)
                         .text(displayText)
@@ -324,9 +358,71 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             }
             return items;
         } catch (Exception e) {
-            log.warn("search-suggestions: location fetch failed: {}", e.getMessage(), e);
+            log.warn("search-suggestions: district tier fetch failed (non-fatal): {}", e.getMessage(), e);
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * Ward-level matches. Uses the v2 ward query (ward-only columns) so a
+     * city-name search no longer pulls 8 arbitrary wards inside the city as
+     * "WARD" suggestions — those came from the old ward-only fetch matching
+     * on the denormalized province/district key columns.
+     */
+    private List<SearchSuggestionItem> fetchWardSuggestionsTier(String normalized, String compact, String rawProvinceId) {
+        try {
+            PageRequest page = PageRequest.of(0, MAX_WARD_CANDIDATES);
+            List<LegacyWard> wards = (rawProvinceId != null && !rawProvinceId.isBlank())
+                    ? legacyWardRepository.findWardSuggestionMatchesByProvince(
+                            toProvinceCode(rawProvinceId), normalized, compact, page)
+                    : legacyWardRepository.findWardSuggestionMatches(normalized, compact, page);
+
+            List<SearchSuggestionItem> items = new ArrayList<>(wards.size());
+            for (LegacyWard ward : wards) {
+                Integer legacyProvinceId = safeLegacyProvinceId(ward);
+                Integer legacyDistrictId = safeLegacyDistrictId(ward);
+                if (legacyProvinceId == null) {
+                    log.warn("search-suggestions: dropping WARD suggestion without legacyProvinceId (ward={})", ward.getCode());
+                    continue;
+                }
+
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("matchType", "WARD");
+                meta.put("provinceName", ward.getProvinceName());
+                meta.put("districtName", ward.getDistrictName());
+                meta.put("wardName", ward.getName());
+                if (ward.getProvinceCode() != null) meta.put("provinceCode", ward.getProvinceCode());
+                if (ward.getDistrictCode() != null) meta.put("districtCode", ward.getDistrictCode());
+                if (ward.getCode() != null) meta.put("wardCode", ward.getCode());
+                meta.put("legacyProvinceId", legacyProvinceId);
+                if (legacyDistrictId != null) meta.put("legacyDistrictId", legacyDistrictId);
+                if (ward.getId() != null) meta.put("legacyWardId", ward.getId());
+
+                String displayText = ward.getName() + ", " + ward.getDistrictName() + ", " + ward.getProvinceName();
+                double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * items.size());
+                items.add(SearchSuggestionItem.builder()
+                        .type(SuggestionType.LOCATION)
+                        .text(displayText)
+                        .metadata(meta)
+                        .score(score)
+                        .build());
+            }
+            return items;
+        } catch (Exception e) {
+            log.warn("search-suggestions: ward tier fetch failed (non-fatal): {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Strip whitespace from a normalized query so it can LIKE against the
+     * legacy {@code *_key} columns, whose seed values dropped spaces
+     * (e.g. {@code "thanhphohochiminh"}, {@code "quan1"}). Returns "" rather
+     * than null so the LIKE still produces a deterministic miss instead of
+     * an NPE if the caller forgot to pre-validate.
+     */
+    private static String compactKey(String normalized) {
+        return normalized == null ? "" : normalized.replace(" ", "");
     }
 
     /**
@@ -591,6 +687,14 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     private static Integer safeLegacyDistrictId(LegacyWard ward) {
         try {
             return ward.getDistrict() != null ? ward.getDistrict().getId() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static Integer safeLegacyProvinceIdOf(District district) {
+        try {
+            return district.getProvince() != null ? district.getProvince().getId() : null;
         } catch (Exception e) {
             return null;
         }

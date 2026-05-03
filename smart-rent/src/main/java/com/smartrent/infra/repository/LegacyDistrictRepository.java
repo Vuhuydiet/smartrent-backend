@@ -34,4 +34,45 @@ public interface LegacyDistrictRepository extends JpaRepository<District, Intege
     Optional<District> findByCode(String code);
 
     List<District> findByProvinceCode(String provinceCode);
+
+    /**
+     * Suggestion-tier match against the district itself.
+     *
+     * <p>Mirrors {@code LegacyProvinceRepository.findSuggestionMatches} —
+     * accepts {@code normalized} (with spaces, matched against name/shortName
+     * via accent-insensitive collation) and {@code compactKey} (no spaces,
+     * matched against the legacy {@code key} column whose seed data dropped
+     * spaces, e.g. {@code "quan1"}).
+     *
+     * <p>Only filters by the district's own columns — does NOT match on the
+     * denormalized {@code province_name} so that a province-level query does
+     * not pull every district in that province as a separate suggestion.
+     */
+    @Query("""
+        SELECT d FROM District d
+        LEFT JOIN FETCH d.province
+        WHERE LOWER(d.name)      LIKE LOWER(CONCAT('%', :normalized, '%'))
+           OR LOWER(d.shortName) LIKE LOWER(CONCAT('%', :normalized, '%'))
+           OR d.key              LIKE CONCAT('%', :compactKey, '%')
+        ORDER BY d.provinceName ASC, d.name ASC
+    """)
+    List<District> findSuggestionMatches(
+            @Param("normalized") String normalized,
+            @Param("compactKey") String compactKey,
+            Pageable pageable);
+
+    @Query("""
+        SELECT d FROM District d
+        LEFT JOIN FETCH d.province
+        WHERE d.provinceCode = :provinceCode
+          AND ( LOWER(d.name)      LIKE LOWER(CONCAT('%', :normalized, '%'))
+             OR LOWER(d.shortName) LIKE LOWER(CONCAT('%', :normalized, '%'))
+             OR d.key              LIKE CONCAT('%', :compactKey, '%') )
+        ORDER BY d.name ASC
+    """)
+    List<District> findSuggestionMatchesByProvince(
+            @Param("provinceCode") String provinceCode,
+            @Param("normalized") String normalized,
+            @Param("compactKey") String compactKey,
+            Pageable pageable);
 }

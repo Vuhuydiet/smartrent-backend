@@ -36,31 +36,46 @@ public interface LegacyWardRepository extends JpaRepository<LegacyWard, Integer>
 
     List<LegacyWard> findByProvinceCode(String provinceCode);
 
+    /**
+     * Ward-only suggestion match. Mirrors {@code findSuggestionMatches} on
+     * the province / district repositories: filters by the ward's own
+     * columns only, never by the denormalized district / province columns,
+     * so a province- or district-level query cannot pull every ward inside
+     * it as a separate suggestion.
+     *
+     * <p>Accepts both forms because the seed {@code ward_key} is corrupted
+     * (spaces become {@code _} and several Vietnamese vowels are stripped to
+     * empty, e.g. {@code "phng_phc_x"} for "Phường Phúc Xá"). The {@code name}
+     * branch is what actually carries weight; the {@code key} branch is kept
+     * for the rare row whose key happens to be in compact form.
+     */
     @Query("""
         SELECT w FROM LegacyWard w
         LEFT JOIN FETCH w.province
         LEFT JOIN FETCH w.district
-        WHERE w.key LIKE CONCAT('%', :keyword, '%')
-           OR w.districtKey LIKE CONCAT('%', :keyword, '%')
-           OR w.provinceKey LIKE CONCAT('%', :keyword, '%')
+        WHERE LOWER(w.name)      LIKE LOWER(CONCAT('%', :normalized, '%'))
+           OR LOWER(w.shortName) LIKE LOWER(CONCAT('%', :normalized, '%'))
+           OR w.key              LIKE CONCAT('%', :compactKey, '%')
         ORDER BY w.provinceName ASC, w.districtName ASC, w.name ASC
     """)
-    List<LegacyWard> findSuggestionCandidates(@Param("keyword") String keyword, Pageable pageable);
+    List<LegacyWard> findWardSuggestionMatches(
+            @Param("normalized") String normalized,
+            @Param("compactKey") String compactKey,
+            Pageable pageable);
 
     @Query("""
         SELECT w FROM LegacyWard w
         LEFT JOIN FETCH w.province
         LEFT JOIN FETCH w.district
         WHERE w.provinceCode = :provinceCode
-          AND (
-              w.key LIKE CONCAT('%', :keyword, '%')
-              OR w.districtKey LIKE CONCAT('%', :keyword, '%')
-              OR w.provinceKey LIKE CONCAT('%', :keyword, '%')
-          )
+          AND ( LOWER(w.name)      LIKE LOWER(CONCAT('%', :normalized, '%'))
+             OR LOWER(w.shortName) LIKE LOWER(CONCAT('%', :normalized, '%'))
+             OR w.key              LIKE CONCAT('%', :compactKey, '%') )
         ORDER BY w.districtName ASC, w.name ASC
     """)
-    List<LegacyWard> findSuggestionCandidatesByProvince(
+    List<LegacyWard> findWardSuggestionMatchesByProvince(
             @Param("provinceCode") String provinceCode,
-            @Param("keyword") String keyword,
+            @Param("normalized") String normalized,
+            @Param("compactKey") String compactKey,
             Pageable pageable);
 }
