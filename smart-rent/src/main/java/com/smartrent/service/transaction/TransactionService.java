@@ -62,6 +62,18 @@ public interface TransactionService {
     String createPushFeeTransaction(String userId, Long listingId, BigDecimal amount, String paymentProvider);
 
     /**
+     * Create a repost fee transaction (pay-per-repost for an expired listing)
+     *
+     * @param userId User ID
+     * @param listingId Listing ID being reposted
+     * @param amount Payment amount
+     * @param durationDays Duration in days for the new active period
+     * @param paymentProvider Payment provider
+     * @return Transaction ID
+     */
+    String createRepostFeeTransaction(String userId, Long listingId, BigDecimal amount, int durationDays, String paymentProvider);
+
+    /**
      * Complete a transaction after successful payment
      *
      * @param transactionId Transaction ID

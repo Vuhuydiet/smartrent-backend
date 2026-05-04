@@ -132,6 +132,31 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     @Transactional
+    public String createRepostFeeTransaction(
+            String userId, Long listingId, BigDecimal amount, int durationDays, String paymentProvider) {
+        log.info("Creating repost fee transaction for user: {}, listing: {}, days: {}",
+                userId, listingId, durationDays);
+
+        Transaction transaction = Transaction.builder()
+                .transactionId(UUID.randomUUID().toString())
+                .userId(userId)
+                .transactionType(TransactionType.REPOST_FEE)
+                .amount(amount)
+                .referenceType(ReferenceType.REPOST)
+                .referenceId(listingId.toString())
+                .status(TransactionStatus.PENDING)
+                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "VNPAY"))
+                .additionalInfo("Pay-per-repost fee for " + durationDays + " days")
+                .build();
+
+        transaction = transactionRepository.save(transaction);
+        log.info("Created repost fee transaction: {}", transaction.getTransactionId());
+
+        return transaction.getTransactionId();
+    }
+
+    @Override
+    @Transactional
     public TransactionResponse completeTransaction(String transactionId, String providerTransactionId) {
         log.info("Completing transaction: {}, provider tx: {}", transactionId, providerTransactionId);
 

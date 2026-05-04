@@ -143,6 +143,10 @@ public class Transaction {
         return transactionType == TransactionType.PUSH_FEE;
     }
 
+    public boolean isRepostFee() {
+        return transactionType == TransactionType.REPOST_FEE;
+    }
+
     public boolean isWalletTopup() {
         return transactionType == TransactionType.WALLET_TOPUP;
     }
