@@ -1864,6 +1864,13 @@ public class ListingServiceImpl implements ListingService {
         // Set userId in filter to get only owner's listings
         filter.setUserId(userId);
 
+        // The seller dashboard must show ALL of the owner's listings — including
+        // expired / taken-down ones — so the "All" and "Expired" tabs aren't
+        // silently emptied. The DTO defaults excludeExpired=true (intended for
+        // public search), so we override it here. Status filtering for the seller
+        // dashboard is driven by `listingStatus`, not `excludeExpired`.
+        filter.setExcludeExpired(false);
+
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
 
