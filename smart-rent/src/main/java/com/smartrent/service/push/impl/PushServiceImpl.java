@@ -1,5 +1,6 @@
 package com.smartrent.service.push.impl;
 
+import com.smartrent.config.Constants;
 import com.smartrent.constants.PricingConstants;
 import com.smartrent.dto.request.PushListingRequest;
 import com.smartrent.dto.request.PaymentRequest;
@@ -18,6 +19,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -70,6 +73,11 @@ public class PushServiceImpl implements PushService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+    })
     public PushResponse pushListing(String userId, PushListingRequest request) {
         log.info("Pushing listing {} for user {}", request.getListingId(), userId);
 
@@ -170,6 +178,11 @@ public class PushServiceImpl implements PushService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+    })
     public PushResponse completePushAfterPayment(String transactionId) {
         log.info("Completing push after payment for transaction: {}", transactionId);
 
@@ -283,6 +296,11 @@ public class PushServiceImpl implements PushService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+    })
     public int executeScheduledPushes() {
         log.info("Executing scheduled pushes");
         LocalTime currentTime = LocalTime.now().withSecond(0).withNano(0);
