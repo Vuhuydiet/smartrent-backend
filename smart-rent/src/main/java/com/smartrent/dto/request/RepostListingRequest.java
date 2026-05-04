@@ -32,4 +32,12 @@ public class RepostListingRequest {
      * the listing's existing durationDays (or 30 if that is also null).
      */
     Integer durationDays;
+
+    /**
+     * New VIP tier (NORMAL / SILVER / GOLD / DIAMOND) — only honoured on the
+     * quota path. Lets the owner switch the listing's tier at repost time
+     * (e.g. promote Silver → Diamond) using whichever post-quota they have.
+     * When null the listing keeps its existing vipType.
+     */
+    String vipType;
 }

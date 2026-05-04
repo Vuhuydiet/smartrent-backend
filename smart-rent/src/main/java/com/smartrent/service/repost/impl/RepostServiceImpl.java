@@ -68,11 +68,19 @@ public class RepostServiceImpl implements RepostService {
 
         validateListingCanBeReposted(listing);
 
+        boolean useQuota = Boolean.TRUE.equals(request.getUseMembershipQuota());
+
+        // The "đăng lại" UX lets the owner switch tier (e.g. SILVER → DIAMOND) on
+        // the quota path by spending whichever post-quota they have. The direct
+        // payment path keeps the listing's existing tier — pricing/billing for
+        // a tier upgrade is out of scope here.
+        Listing.VipType targetVipType = useQuota
+                ? resolveQuotaVipType(request.getVipType(), listing.getVipType())
+                : listing.getVipType();
+
         int durationDays = resolveDurationDays(request.getDurationDays(), listing.getDurationDays());
         BigDecimal feeAmount = calculateRepostFee(listing.getVipType(), durationDays);
-        BenefitType benefitType = mapVipTypeToBenefitType(listing.getVipType());
-
-        boolean useQuota = Boolean.TRUE.equals(request.getUseMembershipQuota());
+        BenefitType benefitType = mapVipTypeToBenefitType(targetVipType);
 
         if (useQuota && benefitType != null) {
             var quotaStatus = quotaService.checkQuotaAvailability(userId, benefitType);
@@ -86,6 +94,7 @@ public class RepostServiceImpl implements RepostService {
                     log.error("Failed to consume {} quota for user {}", benefitType, userId);
                     throw new RuntimeException("Failed to consume repost quota");
                 }
+                applyVipTypeChange(listing, targetVipType);
                 return reactivateListing(listing, durationDays, "MEMBERSHIP_QUOTA",
                         "Listing reposted successfully using quota");
             }
@@ -183,8 +192,40 @@ public class RepostServiceImpl implements RepostService {
                 .repostedAt(now)
                 .expiryDate(newExpiry)
                 .durationDays(durationDays)
+                .vipType(listing.getVipType() != null ? listing.getVipType().name() : null)
                 .message(message)
                 .build();
+    }
+
+    /**
+     * Pick the VIP tier to use on the quota path. Defaults to the listing's
+     * existing tier; falls back to it if the requested tier is missing /
+     * invalid / NORMAL (NORMAL has no quota).
+     */
+    private Listing.VipType resolveQuotaVipType(String requested, Listing.VipType existing) {
+        if (requested == null || requested.isBlank()) {
+            return existing;
+        }
+        try {
+            Listing.VipType parsed = Listing.VipType.valueOf(requested.trim().toUpperCase());
+            if (parsed == Listing.VipType.NORMAL) {
+                throw new RuntimeException(
+                        "NORMAL listings cannot be reposted via membership quota");
+            }
+            return parsed;
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid vipType: " + requested);
+        }
+    }
+
+    private void applyVipTypeChange(Listing listing, Listing.VipType newVipType) {
+        if (newVipType == null || newVipType == listing.getVipType()) {
+            return;
+        }
+        log.info("Repost: switching listing {} vipType {} -> {}",
+                listing.getListingId(), listing.getVipType(), newVipType);
+        listing.setVipType(newVipType);
+        listing.setVipTypeSortOrder(Listing.getVipTypeSortOrder(newVipType));
     }
 
     private void validateListingCanBeReposted(Listing listing) {

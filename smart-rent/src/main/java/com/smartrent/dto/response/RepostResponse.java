@@ -31,6 +31,8 @@ public class RepostResponse {
     LocalDateTime repostedAt;
     LocalDateTime expiryDate;
     Integer durationDays;
+    /** Final VIP tier applied to the listing after repost. */
+    String vipType;
     String message;
 
     // Only populated when payment is required
