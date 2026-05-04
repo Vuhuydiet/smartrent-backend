@@ -74,6 +74,7 @@ public class PaymentController {
     MembershipService membershipService;
     ListingService listingService;
     PushService pushService;
+    com.smartrent.service.repost.RepostService repostService;
 
     // Generic Payment Endpoints (Provider-agnostic)
 
@@ -744,6 +745,10 @@ public class PaymentController {
                 case PUSH_FEE -> {
                     log.info("Completing push after payment for transaction: {}", transactionRef);
                     pushService.completePushAfterPayment(transactionRef);
+                }
+                case REPOST_FEE -> {
+                    log.info("Completing repost after payment for transaction: {}", transactionRef);
+                    repostService.completeRepostAfterPayment(transactionRef);
                 }
                 default -> log.warn("Unknown transaction type: {} for transaction: {}", type, transactionRef);
             }
