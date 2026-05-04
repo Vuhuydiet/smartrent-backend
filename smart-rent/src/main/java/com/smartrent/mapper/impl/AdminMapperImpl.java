@@ -43,6 +43,7 @@ public class AdminMapperImpl implements AdminMapper {
         .email(admin.getEmail())
         .firstName(admin.getFirstName())
         .lastName(admin.getLastName())
+        .createdAt(admin.getCreatedAt())
         .phoneCode(admin.getPhoneCode())
         .phoneNumber(admin.getPhoneNumber())
         .roles(admin.getRoles().stream().map(Role::getRoleName).toList())

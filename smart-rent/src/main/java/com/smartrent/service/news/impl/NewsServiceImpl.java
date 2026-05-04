@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -38,7 +39,8 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional(readOnly = true)
-    public NewsListResponse getPublishedNews(Integer page, Integer size, NewsCategory category, String tag, String keyword) {
+    public NewsListResponse getPublishedNews(Integer page, Integer size, NewsCategory category, String tag,
+            String keyword) {
         log.info("Getting published news - page: {}, size: {}, category: {}, tag: {}, keyword: {}",
                 page, size, category, tag, keyword);
 
@@ -136,7 +138,8 @@ public class NewsServiceImpl implements NewsService {
     @Override
     @Transactional
     public NewsResponse createNews(NewsCreateRequest request, String adminId, String adminName) {
-        log.info("Creating news - title: {}, category: {}, admin: {}", request.getTitle(), request.getCategory(), adminId);
+        log.info("Creating news - title: {}, category: {}, admin: {}", request.getTitle(), request.getCategory(),
+                adminId);
 
         // Generate slug from title
         String slug = generateSlug(request.getTitle());
@@ -274,15 +277,31 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional(readOnly = true)
-    public NewsListResponse getAllNews(Integer page, Integer size, NewsStatus status) {
-        log.info("Getting all news (admin) - page: {}, size: {}, status: {}", page, size, status);
+    public NewsListResponse getAllNews(Integer page, Integer size, NewsCategory category, String tag, String keyword,
+            NewsStatus status) {
+        log.info("Getting all news (admin) - page: {}, size: {}, keyword: {}, category: {}, tag: {}, status: {}",
+                page, size, keyword, category, tag, status);
 
         int pageNumber = (page != null && page > 0) ? page - 1 : 0;
         int pageSize = (size != null && size > 0) ? size : 20;
         Pageable pageable = PageRequest.of(pageNumber, pageSize);
 
         Page<News> newsPage;
-        if (status != null) {
+        boolean hasKeyword = StringUtils.hasText(keyword);
+        boolean hasTag = StringUtils.hasText(tag);
+
+        if (hasKeyword) {
+            String trimmedKeyword = keyword.trim();
+            if (category != null) {
+                newsPage = newsRepository.searchAdminNewsByCategory(trimmedKeyword, category, status, pageable);
+            } else {
+                newsPage = newsRepository.searchAdminNews(trimmedKeyword, status, pageable);
+            }
+        } else if (hasTag) {
+            newsPage = newsRepository.findByTagAndStatusOptional(tag.trim(), status, pageable);
+        } else if (category != null) {
+            newsPage = newsRepository.findByCategoryAndStatusOptional(category, status, pageable);
+        } else if (status != null) {
             newsPage = newsRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
         } else {
             newsPage = newsRepository.findAllByOrderByCreatedAtDesc(pageable);
@@ -352,7 +371,8 @@ public class NewsServiceImpl implements NewsService {
                 for (News tagNews : tagRelated) {
                     if (relatedNewsList.stream().noneMatch(n -> n.getNewsId().equals(tagNews.getNewsId()))) {
                         relatedNewsList.add(tagNews);
-                        if (relatedNewsList.size() >= 5) break;
+                        if (relatedNewsList.size() >= 5)
+                            break;
                     }
                 }
             }
@@ -364,4 +384,3 @@ public class NewsServiceImpl implements NewsService {
                 .collect(Collectors.toList());
     }
 }
-
