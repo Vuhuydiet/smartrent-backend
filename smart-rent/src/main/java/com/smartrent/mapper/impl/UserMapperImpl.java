@@ -60,9 +60,9 @@ public class UserMapperImpl implements UserMapper {
         .avatarUrl(user.getAvatarUrl())
         .isBroker(user.isBroker())
         .brokerVerificationStatus(
-          user.getBrokerVerificationStatus() != null
-            ? user.getBrokerVerificationStatus().name()
-            : null)
+            user.getBrokerVerificationStatus() != null
+                ? user.getBrokerVerificationStatus().name()
+                : null)
         .build();
   }
 
@@ -73,6 +73,7 @@ public class UserMapperImpl implements UserMapper {
         .email(user.getEmail())
         .firstName(user.getFirstName())
         .lastName(user.getLastName())
+        .createdAt(user.getCreatedAt())
         .idDocument(user.getIdDocument())
         .taxNumber(user.getTaxNumber())
         .phoneCode(user.getPhoneCode())

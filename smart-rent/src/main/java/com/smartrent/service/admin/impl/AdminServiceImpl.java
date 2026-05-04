@@ -18,18 +18,24 @@ import com.smartrent.infra.repository.entity.Role;
 import com.smartrent.mapper.AdminMapper;
 import com.smartrent.service.admin.AdminService;
 import com.smartrent.utility.MaskingUtil;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import software.amazon.awssdk.utils.StringUtils;
 
 @Slf4j
 @Service
@@ -92,11 +98,46 @@ public class AdminServiceImpl implements AdminService {
 
   @Override
   @Transactional(readOnly = true)
-  public PageResponse<GetAdminResponse> getAllAdmins(int page, int size) {
-    log.info("Fetching all admins - page: {}, size: {}", page, size);
+  public PageResponse<GetAdminResponse> getAllAdmins(int page, int size, String keyword, String rolesCsv) {
+    log.info("Fetching all admins - page: {}, size: {}, keyword: {}, roles: {}",
+        page, size, keyword, rolesCsv);
 
     Pageable pageable = PageRequest.of(page - 1, size);
-    Page<Admin> adminPage = adminRepository.findAll(pageable);
+
+    Specification<Admin> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
+
+    if (StringUtils.isNotBlank(keyword)) {
+      String like = "%" + keyword.trim().toLowerCase() + "%";
+      spec = spec.and((root, query, criteriaBuilder) -> {
+        List<Predicate> keywordPredicates = new ArrayList<>();
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("adminId")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("firstName")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("lastName")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("phoneNumber")), like));
+        return criteriaBuilder.or(keywordPredicates.toArray(new Predicate[0]));
+      });
+    }
+
+    List<String> normalizedRoleIds = normalizeRoleIds(rolesCsv);
+    if (!normalizedRoleIds.isEmpty()) {
+      for (String roleId : normalizedRoleIds) {
+        spec = spec.and((root, query, criteriaBuilder) -> {
+          Subquery<Long> subquery = query.subquery(Long.class);
+          var subRoot = subquery.from(Admin.class);
+          var subJoin = subRoot.join("roles");
+
+          subquery.select(criteriaBuilder.literal(1L))
+              .where(
+                  criteriaBuilder.equal(subRoot.get("adminId"), root.get("adminId")),
+                  criteriaBuilder.equal(criteriaBuilder.upper(subJoin.get("roleId")), roleId));
+
+          return criteriaBuilder.exists(subquery);
+        });
+      }
+    }
+
+    Page<Admin> adminPage = adminRepository.findAll(spec, pageable);
 
     List<GetAdminResponse> adminResponses = adminPage.getContent().stream()
         .map(adminMapper::mapFromAdminEntityToGetAdminResponse)
@@ -111,6 +152,18 @@ public class AdminServiceImpl implements AdminService {
         .totalElements(adminPage.getTotalElements())
         .data(adminResponses)
         .build();
+  }
+
+  private List<String> normalizeRoleIds(String rolesCsv) {
+    if (StringUtils.isBlank(rolesCsv)) {
+      return List.of();
+    }
+    return Arrays.stream(rolesCsv.split(","))
+        .map(String::trim)
+        .filter(StringUtils::isNotBlank)
+        .map(role -> role.toUpperCase())
+        .distinct()
+        .toList();
   }
 
   @Override

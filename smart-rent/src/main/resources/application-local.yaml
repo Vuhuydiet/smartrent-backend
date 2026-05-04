@@ -102,6 +102,27 @@ open:
     group:
       package-to-scan: "com.smartrent.controller"
 
+  storage:
+    r2:
+      # Local-safe defaults prevent unresolved placeholders from breaking startup.
+      endpoint: "${R2_ENDPOINT:http://localhost:9000}"
+      region: "${R2_REGION:auto}"
+      accessKey: "${R2_ACCESS_KEY_ID:local-access-key}"
+      secretKey: "${R2_SECRET_ACCESS_KEY:local-secret-key}"
+      bucketName: "${R2_BUCKET_NAME:smartrent-local}"
+      publicBaseUrl: "${R2_PUBLIC_BASE_URL:http://localhost:9000/smartrent-local}"
+      maxImageSizeMB: "${R2_MAX_IMAGE_SIZE_MB:10}"
+      maxVideoSizeMB: "${R2_MAX_VIDEO_SIZE_MB:100}"
+      uploadUrlTtlMinutes: "${R2_UPLOAD_URL_TTL_MINUTES:10}"
+      downloadUrlTtlMinutes: "${R2_DOWNLOAD_URL_TTL_MINUTES:60}"
+      allowedImageTypes:
+        - image/jpeg
+        - image/png
+        - image/webp
+      allowedVideoTypes:
+        - video/mp4
+        - video/webm
+        - video/quicktime
 app:
   push:
     rate-limit:

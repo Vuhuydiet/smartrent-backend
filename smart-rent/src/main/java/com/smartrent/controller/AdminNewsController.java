@@ -5,6 +5,7 @@ import com.smartrent.dto.request.NewsUpdateRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.NewsListResponse;
 import com.smartrent.dto.response.NewsResponse;
+import com.smartrent.enums.NewsCategory;
 import com.smartrent.enums.NewsStatus;
 import com.smartrent.service.news.NewsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,240 +38,168 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 public class AdminNewsController {
 
-    NewsService newsService;
+        NewsService newsService;
 
-    @PostMapping
-    @Operation(
-            summary = "Create a new news/blog post (Admin)",
-            description = "Creates a new news or blog post. The post is created in DRAFT status by default. " +
-                    "Admin ID and name are automatically extracted from the JWT token."
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "News created successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = NewsResponse.class)
-                    )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "409",
-                    description = "News slug already exists",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(
-                                    name = "Slug Conflict",
-                                    value = """
-                                            {
-                                              "code": "15002",
-                                              "message": "News slug already exists",
-                                              "data": null
-                                            }
-                                            """
-                            )
-                    )
-            )
-    })
-    public ApiResponse<NewsResponse> createNews(@Valid @RequestBody NewsCreateRequest request) {
-        // Extract admin ID and name from JWT token
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String adminId = authentication.getName();
-        
-        // For admin name, we'll use the adminId as fallback
-        // In a real scenario, you might want to fetch the admin details from the database
-        String adminName = adminId; // TODO: Fetch actual admin name if needed
+        @PostMapping
+        @Operation(summary = "Create a new news/blog post (Admin)", description = "Creates a new news or blog post. The post is created in DRAFT status by default. "
+                        +
+                        "Admin ID and name are automatically extracted from the JWT token.")
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "News created successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = NewsResponse.class))),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "News slug already exists", content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "Slug Conflict", value = """
+                                        {
+                                          "code": "15002",
+                                          "message": "News slug already exists",
+                                          "data": null
+                                        }
+                                        """)))
+        })
+        public ApiResponse<NewsResponse> createNews(@Valid @RequestBody NewsCreateRequest request) {
+                // Extract admin ID and name from JWT token
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                String adminId = authentication.getName();
 
-        log.info("POST /v1/admin/news - Creating news by admin: {}", adminId);
+                // For admin name, we'll use the adminId as fallback
+                // In a real scenario, you might want to fetch the admin details from the
+                // database
+                String adminName = adminId; // TODO: Fetch actual admin name if needed
 
-        NewsResponse response = newsService.createNews(request, adminId, adminName);
+                log.info("POST /v1/admin/news - Creating news by admin: {}", adminId);
 
-        return ApiResponse.<NewsResponse>builder()
-                .data(response)
-                .message("News created successfully")
-                .build();
-    }
+                NewsResponse response = newsService.createNews(request, adminId, adminName);
 
-    @PutMapping("/{newsId}")
-    @Operation(
-            summary = "Update a news/blog post (Admin)",
-            description = "Updates an existing news or blog post. All fields are optional for partial updates."
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "News updated successfully"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "News not found",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(
-                                    name = "Not Found",
-                                    value = """
-                                            {
-                                              "code": "15001",
-                                              "message": "News not found",
-                                              "data": null
-                                            }
-                                            """
-                            )
-                    )
-            )
-    })
-    public ApiResponse<NewsResponse> updateNews(
-            @Parameter(description = "News ID", example = "1")
-            @PathVariable Long newsId,
-            @Valid @RequestBody NewsUpdateRequest request
-    ) {
-        log.info("PUT /v1/admin/news/{} - Updating news", newsId);
+                return ApiResponse.<NewsResponse>builder()
+                                .data(response)
+                                .message("News created successfully")
+                                .build();
+        }
 
-        NewsResponse response = newsService.updateNews(newsId, request);
+        @PutMapping("/{newsId}")
+        @Operation(summary = "Update a news/blog post (Admin)", description = "Updates an existing news or blog post. All fields are optional for partial updates.")
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "News updated successfully"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "News not found", content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "Not Found", value = """
+                                        {
+                                          "code": "15001",
+                                          "message": "News not found",
+                                          "data": null
+                                        }
+                                        """)))
+        })
+        public ApiResponse<NewsResponse> updateNews(
+                        @Parameter(description = "News ID", example = "1") @PathVariable Long newsId,
+                        @Valid @RequestBody NewsUpdateRequest request) {
+                log.info("PUT /v1/admin/news/{} - Updating news", newsId);
 
-        return ApiResponse.<NewsResponse>builder()
-                .data(response)
-                .message("News updated successfully")
-                .build();
-    }
+                NewsResponse response = newsService.updateNews(newsId, request);
 
-    @PostMapping("/{newsId}/publish")
-    @Operation(
-            summary = "Publish a news/blog post (Admin)",
-            description = "Changes the status of a news post to PUBLISHED and sets the published date if not already set."
-    )
-    public ApiResponse<NewsResponse> publishNews(
-            @Parameter(description = "News ID", example = "1")
-            @PathVariable Long newsId
-    ) {
-        log.info("POST /v1/admin/news/{}/publish - Publishing news", newsId);
+                return ApiResponse.<NewsResponse>builder()
+                                .data(response)
+                                .message("News updated successfully")
+                                .build();
+        }
 
-        NewsResponse response = newsService.publishNews(newsId);
+        @PostMapping("/{newsId}/publish")
+        @Operation(summary = "Publish a news/blog post (Admin)", description = "Changes the status of a news post to PUBLISHED and sets the published date if not already set.")
+        public ApiResponse<NewsResponse> publishNews(
+                        @Parameter(description = "News ID", example = "1") @PathVariable Long newsId) {
+                log.info("POST /v1/admin/news/{}/publish - Publishing news", newsId);
 
-        return ApiResponse.<NewsResponse>builder()
-                .data(response)
-                .message("News published successfully")
-                .build();
-    }
+                NewsResponse response = newsService.publishNews(newsId);
 
-    @PostMapping("/{newsId}/unpublish")
-    @Operation(
-            summary = "Unpublish a news/blog post (Admin)",
-            description = "Changes the status of a news post back to DRAFT."
-    )
-    public ApiResponse<NewsResponse> unpublishNews(
-            @Parameter(description = "News ID", example = "1")
-            @PathVariable Long newsId
-    ) {
-        log.info("POST /v1/admin/news/{}/unpublish - Unpublishing news", newsId);
+                return ApiResponse.<NewsResponse>builder()
+                                .data(response)
+                                .message("News published successfully")
+                                .build();
+        }
 
-        NewsResponse response = newsService.unpublishNews(newsId);
+        @PostMapping("/{newsId}/unpublish")
+        @Operation(summary = "Unpublish a news/blog post (Admin)", description = "Changes the status of a news post back to DRAFT.")
+        public ApiResponse<NewsResponse> unpublishNews(
+                        @Parameter(description = "News ID", example = "1") @PathVariable Long newsId) {
+                log.info("POST /v1/admin/news/{}/unpublish - Unpublishing news", newsId);
 
-        return ApiResponse.<NewsResponse>builder()
-                .data(response)
-                .message("News unpublished successfully")
-                .build();
-    }
+                NewsResponse response = newsService.unpublishNews(newsId);
 
-    @PostMapping("/{newsId}/archive")
-    @Operation(
-            summary = "Archive a news/blog post (Admin)",
-            description = "Changes the status of a news post to ARCHIVED. Archived posts are not visible to end users."
-    )
-    public ApiResponse<NewsResponse> archiveNews(
-            @Parameter(description = "News ID", example = "1")
-            @PathVariable Long newsId
-    ) {
-        log.info("POST /v1/admin/news/{}/archive - Archiving news", newsId);
+                return ApiResponse.<NewsResponse>builder()
+                                .data(response)
+                                .message("News unpublished successfully")
+                                .build();
+        }
 
-        NewsResponse response = newsService.archiveNews(newsId);
+        @PostMapping("/{newsId}/archive")
+        @Operation(summary = "Archive a news/blog post (Admin)", description = "Changes the status of a news post to ARCHIVED. Archived posts are not visible to end users.")
+        public ApiResponse<NewsResponse> archiveNews(
+                        @Parameter(description = "News ID", example = "1") @PathVariable Long newsId) {
+                log.info("POST /v1/admin/news/{}/archive - Archiving news", newsId);
 
-        return ApiResponse.<NewsResponse>builder()
-                .data(response)
-                .message("News archived successfully")
-                .build();
-    }
+                NewsResponse response = newsService.archiveNews(newsId);
 
-    @DeleteMapping("/{newsId}")
-    @Operation(
-            summary = "Delete a news/blog post (Admin)",
-            description = "Permanently deletes a news or blog post from the database."
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "News deleted successfully"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "News not found"
-            )
-    })
-    public ApiResponse<Void> deleteNews(
-            @Parameter(description = "News ID", example = "1")
-            @PathVariable Long newsId
-    ) {
-        log.info("DELETE /v1/admin/news/{} - Deleting news", newsId);
+                return ApiResponse.<NewsResponse>builder()
+                                .data(response)
+                                .message("News archived successfully")
+                                .build();
+        }
 
-        newsService.deleteNews(newsId);
+        @DeleteMapping("/{newsId}")
+        @Operation(summary = "Delete a news/blog post (Admin)", description = "Permanently deletes a news or blog post from the database.")
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "News deleted successfully"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "News not found")
+        })
+        public ApiResponse<Void> deleteNews(
+                        @Parameter(description = "News ID", example = "1") @PathVariable Long newsId) {
+                log.info("DELETE /v1/admin/news/{} - Deleting news", newsId);
 
-        return ApiResponse.<Void>builder()
-                .message("News deleted successfully")
-                .build();
-    }
+                newsService.deleteNews(newsId);
 
-    @GetMapping
-    @Operation(
-            summary = "Get all news (Admin)",
-            description = "Retrieves a paginated list of all news posts regardless of status. " +
-                    "Optionally filter by status (DRAFT, PUBLISHED, ARCHIVED)."
-    )
-    public ApiResponse<NewsListResponse> getAllNews(
-            @Parameter(description = "Page number (1-based)", example = "1")
-            @RequestParam(required = false, defaultValue = "1") Integer page,
+                return ApiResponse.<Void>builder()
+                                .message("News deleted successfully")
+                                .build();
+        }
 
-            @Parameter(description = "Page size", example = "20")
-            @RequestParam(required = false, defaultValue = "20") Integer size,
+        @GetMapping
+        @Operation(summary = "Get all news (Admin)", description = "Retrieves a paginated list of all news posts regardless of status. "
+                        +
+                        "Optionally filter by status (DRAFT, PUBLISHED, ARCHIVED).")
+        public ApiResponse<NewsListResponse> getAllNews(
+                        @Parameter(description = "Page number (1-based)", example = "1") @RequestParam(required = false, defaultValue = "1") Integer page,
 
-            @Parameter(description = "Filter by status")
-            @RequestParam(required = false) NewsStatus status
-    ) {
-        log.info("GET /v1/admin/news - page: {}, size: {}, status: {}", page, size, status);
+                        @Parameter(description = "Page size", example = "20") @RequestParam(required = false, defaultValue = "20") Integer size,
 
-        NewsListResponse response = newsService.getAllNews(page, size, status);
+                        @Parameter(description = "Search keyword (title, summary)") @RequestParam(required = false) String keyword,
 
-        return ApiResponse.<NewsListResponse>builder()
-                .data(response)
-                .build();
-    }
+                        @Parameter(description = "Filter by category") @RequestParam(required = false) NewsCategory category,
 
-    @GetMapping("/{newsId}")
-    @Operation(
-            summary = "Get news by ID (Admin)",
-            description = "Retrieves full details of a news post by its ID. " +
-                    "Unlike the public endpoint, this works for all statuses including DRAFT and ARCHIVED."
-    )
-    @ApiResponses(value = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "200",
-                    description = "News retrieved successfully"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                    responseCode = "404",
-                    description = "News not found"
-            )
-    })
-    public ApiResponse<NewsResponse> getNewsById(
-            @Parameter(description = "News ID", example = "1")
-            @PathVariable Long newsId
-    ) {
-        log.info("GET /v1/admin/news/{} - Getting news by ID", newsId);
+                        @Parameter(description = "Filter by tag") @RequestParam(required = false) String tag,
 
-        NewsResponse response = newsService.getNewsById(newsId);
+                        @Parameter(description = "Filter by status") @RequestParam(required = false) NewsStatus status) {
+                log.info("GET /v1/admin/news - page: {}, size: {}, keyword: {}, category: {}, tag: {}, status: {}",
+                                page, size, keyword, category, tag, status);
 
-        return ApiResponse.<NewsResponse>builder()
-                .data(response)
-                .build();
-    }
+                NewsListResponse response = newsService.getAllNews(page, size, category, tag, keyword, status);
+
+                return ApiResponse.<NewsListResponse>builder()
+                                .data(response)
+                                .build();
+        }
+
+        @GetMapping("/{newsId}")
+        @Operation(summary = "Get news by ID (Admin)", description = "Retrieves full details of a news post by its ID. "
+                        +
+                        "Unlike the public endpoint, this works for all statuses including DRAFT and ARCHIVED.")
+        @ApiResponses(value = {
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "News retrieved successfully"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "News not found")
+        })
+        public ApiResponse<NewsResponse> getNewsById(
+                        @Parameter(description = "News ID", example = "1") @PathVariable Long newsId) {
+                log.info("GET /v1/admin/news/{} - Getting news by ID", newsId);
+
+                NewsResponse response = newsService.getNewsById(newsId);
+
+                return ApiResponse.<NewsResponse>builder()
+                                .data(response)
+                                .build();
+        }
 }
-

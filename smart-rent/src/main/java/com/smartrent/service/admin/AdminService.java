@@ -11,7 +11,7 @@ public interface AdminService {
 
   GetAdminResponse getAdminById(String id);
 
-  PageResponse<GetAdminResponse> getAllAdmins(int page, int size);
+  PageResponse<GetAdminResponse> getAllAdmins(int page, int size, String keyword, String rolesCsv);
 
   GetAdminResponse updateAdmin(String adminId, AdminUpdateRequest request);
 

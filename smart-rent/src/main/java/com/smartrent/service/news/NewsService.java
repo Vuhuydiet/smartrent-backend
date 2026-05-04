@@ -20,17 +20,19 @@ public interface NewsService {
 
     /**
      * Get paginated list of published news
-     * @param page Page number (1-based)
-     * @param size Page size
+     * 
+     * @param page     Page number (1-based)
+     * @param size     Page size
      * @param category Optional category filter
-     * @param tag Optional tag filter
-     * @param keyword Optional search keyword
+     * @param tag      Optional tag filter
+     * @param keyword  Optional search keyword
      * @return Paginated news list
      */
     NewsListResponse getPublishedNews(Integer page, Integer size, NewsCategory category, String tag, String keyword);
 
     /**
      * Get news detail by slug
+     * 
      * @param slug URL-friendly slug
      * @return News detail with related posts
      */
@@ -38,6 +40,7 @@ public interface NewsService {
 
     /**
      * Get the N newest published news articles
+     * 
      * @param limit Number of news articles to return (1-50, default 10)
      * @return List of newest published news summaries
      */
@@ -47,8 +50,9 @@ public interface NewsService {
 
     /**
      * Create a new news/blog post (admin only)
-     * @param request News creation request
-     * @param adminId Admin ID who creates the news
+     * 
+     * @param request   News creation request
+     * @param adminId   Admin ID who creates the news
      * @param adminName Admin display name
      * @return Created news response
      */
@@ -56,7 +60,8 @@ public interface NewsService {
 
     /**
      * Update an existing news/blog post (admin only)
-     * @param newsId News ID
+     * 
+     * @param newsId  News ID
      * @param request News update request
      * @return Updated news response
      */
@@ -64,6 +69,7 @@ public interface NewsService {
 
     /**
      * Publish a news/blog post (admin only)
+     * 
      * @param newsId News ID
      * @return Published news response
      */
@@ -71,6 +77,7 @@ public interface NewsService {
 
     /**
      * Unpublish a news/blog post (admin only)
+     * 
      * @param newsId News ID
      * @return Unpublished news response
      */
@@ -78,6 +85,7 @@ public interface NewsService {
 
     /**
      * Archive a news/blog post (admin only)
+     * 
      * @param newsId News ID
      * @return Archived news response
      */
@@ -85,24 +93,27 @@ public interface NewsService {
 
     /**
      * Delete a news/blog post (admin only)
+     * 
      * @param newsId News ID
      */
     void deleteNews(Long newsId);
 
     /**
      * Get all news (admin view) with pagination
-     * @param page Page number (1-based)
-     * @param size Page size
+     * 
+     * @param page   Page number (1-based)
+     * @param size   Page size
      * @param status Optional status filter
      * @return Paginated news list
      */
-    NewsListResponse getAllNews(Integer page, Integer size, NewsStatus status);
+    NewsListResponse getAllNews(Integer page, Integer size, NewsCategory category, String tag, String keyword,
+            NewsStatus status);
 
     /**
      * Get news by ID (admin view)
+     * 
      * @param newsId News ID
      * @return News response
      */
     NewsResponse getNewsById(Long newsId);
 }
-

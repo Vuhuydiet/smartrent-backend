@@ -31,6 +31,7 @@ import com.smartrent.service.user.UserService;
 import com.smartrent.utility.MaskingUtil;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -43,10 +44,12 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.utils.StringUtils;
+import jakarta.persistence.criteria.Predicate;
 
 @Slf4j
 @Service
@@ -78,7 +81,7 @@ public class UserServiceImpl implements UserService {
 
     if (StringUtils.isNotBlank(request.getPhoneCode()) && StringUtils.isNotBlank(request.getPhoneNumber()) &&
         userRepository.existsByPhoneCodeAndPhoneNumber(request.getPhoneCode(),
-        request.getPhoneNumber())) {
+            request.getPhoneNumber())) {
       throw new PhoneExistingException();
     }
 
@@ -123,8 +126,8 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  @Cacheable(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#page + #size")
-  public PageResponse<GetUserResponse> getUsers(int page, int size) {
+  @Cacheable(cacheNames = Constants.CacheNames.USER_DETAILS, key = "T(java.util.Objects).hash(#page, #size, #keyword, #isBroker, #status)")
+  public PageResponse<GetUserResponse> getUsers(int page, int size, String keyword, Boolean isBroker, String status) {
     // Validate pagination parameters
     if (page < 1) {
       throw new InvalidPageException();
@@ -133,9 +136,41 @@ public class UserServiceImpl implements UserService {
       throw new InvalidPageSizeException();
     }
 
-    Pageable pageable = PageRequest.of(page-1, size);
+    Pageable pageable = PageRequest.of(page - 1, size);
 
-    Page<User> users = userRepository.findAll(pageable);
+    Specification<User> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
+
+    if (StringUtils.isNotBlank(keyword)) {
+      String like = "%" + keyword.trim().toLowerCase() + "%";
+      spec = spec.and((root, query, criteriaBuilder) -> {
+        List<Predicate> keywordPredicates = new ArrayList<>();
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("userId")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("firstName")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("lastName")), like));
+        keywordPredicates.add(criteriaBuilder.like(
+            criteriaBuilder.lower(criteriaBuilder.concat(
+                criteriaBuilder.concat(root.get("firstName"), criteriaBuilder.literal(" ")),
+                root.get("lastName"))),
+            like));
+        keywordPredicates.add(criteriaBuilder.like(
+            criteriaBuilder.lower(criteriaBuilder.concat(
+                criteriaBuilder.concat(root.get("lastName"), criteriaBuilder.literal(" ")),
+                root.get("firstName"))),
+            like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("phoneNumber")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("contactPhoneNumber")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("idDocument")), like));
+        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("taxNumber")), like));
+        return criteriaBuilder.or(keywordPredicates.toArray(new Predicate[0]));
+      });
+    }
+
+    if (isBroker != null) {
+      spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("isBroker"), isBroker));
+    }
+
+    Page<User> users = userRepository.findAll(spec, pageable);
 
     List<GetUserResponse> userResponses = users.getContent().stream()
         .map(userMapper::mapFromUserEntityToGetUserResponse)
@@ -285,8 +320,10 @@ public class UserServiceImpl implements UserService {
   }
 
   /**
-   * Resolve an avatarMediaId coming from the presigned upload flow, verify ownership and
-   * media type, soft-delete the previous avatar media record if any, and copy the public URL
+   * Resolve an avatarMediaId coming from the presigned upload flow, verify
+   * ownership and
+   * media type, soft-delete the previous avatar media record if any, and copy the
+   * public URL
    * onto the user entity.
    */
   private void applyAvatarMedia(User user, Long avatarMediaId) {
@@ -305,9 +342,12 @@ public class UserServiceImpl implements UserService {
       throw new AppException(DomainCode.BAD_REQUEST_ERROR, "Avatar media must be an uploaded file");
     }
 
-    // Replace the previous avatar: mark DB record DELETED and best-effort remove the R2 object
-    // inline so storage doesn't accumulate orphaned avatars. Inline delete must fail silently
-    // — the new avatar is already active and the user-facing operation must not be blocked by
+    // Replace the previous avatar: mark DB record DELETED and best-effort remove
+    // the R2 object
+    // inline so storage doesn't accumulate orphaned avatars. Inline delete must
+    // fail silently
+    // — the new avatar is already active and the user-facing operation must not be
+    // blocked by
     // a transient storage error.
     Long previousMediaId = user.getAvatarMediaId();
     if (previousMediaId != null && !previousMediaId.equals(avatarMediaId)) {
@@ -331,7 +371,8 @@ public class UserServiceImpl implements UserService {
 
   /**
    * Upload avatar file to S3/R2 storage
-   * @param userId User ID
+   * 
+   * @param userId     User ID
    * @param avatarFile Avatar file to upload
    * @return Public URL of the uploaded avatar
    */
@@ -364,8 +405,7 @@ public class UserServiceImpl implements UserService {
           storageKey,
           avatarFile.getInputStream(),
           contentType,
-          avatarFile.getSize()
-      );
+          avatarFile.getSize());
 
       // Return public URL
       String publicUrl = storageService.getPublicUrl(storageKey);

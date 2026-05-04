@@ -16,7 +16,7 @@ public interface UserService {
 
   GetUserResponse getUserById(String id);
 
-  PageResponse<GetUserResponse> getUsers(int page, int size);
+  PageResponse<GetUserResponse> getUsers(int page, int size, String keyword, Boolean isBroker, String status);
 
   User internalCreateUser(InternalUserCreationRequest request);
 
