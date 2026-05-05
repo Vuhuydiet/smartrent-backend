@@ -31,6 +31,10 @@ public class AiListingVerificationResponse {
     @Schema(description = "Confidence level of the verification", example = "0.9")
     private Double confidence;
 
+    @JsonProperty("suggested_status")
+    @Schema(description = "Suggested status for the listing (APPROVED, REJECTED, NEEDS_REVIEW)", example = "APPROVED")
+    private String suggestedStatus;
+
     @JsonProperty("image_validation")
     @Schema(description = "Image validation results")
     private ImageValidation imageValidation;
@@ -58,6 +62,14 @@ public class AiListingVerificationResponse {
     @JsonProperty("verification_timestamp")
     @Schema(description = "When the verification was performed", example = "2025-11-23T15:30:00")
     private LocalDateTime verificationTimestamp;
+
+    @JsonProperty("reason")
+    @Schema(description = "Structured reason for the AI's decision")
+    private StructuredReason reason;
+
+    @JsonProperty("violation_codes")
+    @Schema(description = "List of critical violation codes")
+    private List<String> violationCodes;
 
     @JsonProperty("model_used")
     @Schema(description = "AI model used for verification", example = "gemini-2.5-flash")
@@ -217,5 +229,31 @@ public class AiListingVerificationResponse {
         @JsonProperty("priority")
         @Schema(description = "Suggestion priority", example = "medium")
         private String priority;
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Schema(description = "Structured reason for the AI's decision")
+    public static class StructuredReason {
+        @JsonProperty("blurriness_issue")
+        private boolean blurrinessIssue;
+
+        @JsonProperty("missing_fields")
+        private List<String> missingFields;
+
+        @JsonProperty("inconsistent_info")
+        private boolean inconsistentInfo;
+
+        @JsonProperty("watermark_or_phone")
+        private boolean watermarkOrPhone;
+
+        @JsonProperty("stock_photo")
+        private boolean stockPhoto;
+
+        @JsonProperty("details")
+        private String details;
     }
 }

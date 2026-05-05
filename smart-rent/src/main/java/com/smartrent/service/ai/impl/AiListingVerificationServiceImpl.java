@@ -14,7 +14,9 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
+
+import org.springframework.transaction.annotation.Transactional;
+import com.smartrent.infra.repository.ListingRepository;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -25,11 +27,10 @@ import java.util.Collections;
 @Slf4j
 public class AiListingVerificationServiceImpl implements AiListingVerificationService {
 
-    private final RestTemplate restTemplate;
+    private final com.smartrent.infra.connector.SmartRentAiConnector smartRentAiConnector;
     private final AiListingMapper aiListingMapper;
+    private final ListingRepository listingRepository;
 
-    @Value("${smartrent.ai.verification.url:http://localhost:8000/ai/verify-listing}")
-    private String aiVerificationUrl;
 
     @Override
     public AiListingVerificationResponse verifyListing(AiListingVerificationRequest request) {
@@ -38,54 +39,155 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
             // Normalize request - set default values for optional fields
             AiListingVerificationRequest normalizedRequest = normalizeRequest(request);
             
-            log.info("Sending listing verification request to AI service: {} for listing: {}", 
-                aiVerificationUrl, normalizedRequest.getTitle());
+            log.info("Sending listing verification request via FeignClient for listing: {}", 
+                normalizedRequest.getTitle());
             
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-            
-            HttpEntity<AiListingVerificationRequest> entity = new HttpEntity<>(normalizedRequest, headers);
-            
+            // Map request to FeignClient DTO
+            com.smartrent.dto.request.ListingVerificationRequest feignRequest = 
+                com.smartrent.dto.request.ListingVerificationRequest.builder()
+                .title(normalizedRequest.getTitle())
+                .description(normalizedRequest.getDescription())
+                .price(normalizedRequest.getPrice())
+                .area(normalizedRequest.getArea() != null ? normalizedRequest.getArea().floatValue() : null)
+                .address(normalizedRequest.getAddress())
+                .propertyType(normalizedRequest.getPropertyType() != null ? normalizedRequest.getPropertyType().name() : null)
+                .amenities(normalizedRequest.getAmenities())
+                .images(normalizedRequest.getImages())
+                .build();
+                
+            // Set metadata if present
+            if (normalizedRequest.getMetadata() != null) {
+                feignRequest.setMetadata(com.smartrent.dto.request.ListingVerificationRequest.MetadataDto.builder()
+                    .bedrooms(normalizedRequest.getMetadata().getBedrooms())
+                    .bathrooms(normalizedRequest.getMetadata().getBathrooms())
+                    .floor(normalizedRequest.getMetadata().getFloor() != null ? normalizedRequest.getMetadata().getFloor().toString() : null)
+                    .build());
+            }
+
+            // Set videos if present
+            if (normalizedRequest.getVideos() != null) {
+                feignRequest.setVideos(normalizedRequest.getVideos().stream()
+                    .map(v -> com.smartrent.dto.request.ListingVerificationRequest.VideoDto.builder()
+                        .url(v.getUrl())
+                        .thumbnailUrl(v.getThumbnailUrl())
+                        .duration(v.getDurationSeconds() != null ? v.getDurationSeconds().floatValue() : null)
+                        .build())
+                    .toList());
+            }
+
             log.debug("Making HTTP request to AI service...");
-            ResponseEntity<AiListingVerificationResponse> response = restTemplate.exchange(
-                aiVerificationUrl,
-                HttpMethod.POST,
-                entity,
-                AiListingVerificationResponse.class
-            );
+            com.smartrent.dto.response.ListingVerificationResponse feignResponse = 
+                smartRentAiConnector.verifyListing(feignRequest);
             
             long processingTime = System.currentTimeMillis() - startTime;
-            log.info("AI service responded in {}ms with status: {}", processingTime, response.getStatusCode());
+            log.info("AI service responded in {}ms", processingTime);
             
             log.info("Processing AI verification response...");
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                AiListingVerificationResponse responseBody = response.getBody();
+            if (feignResponse != null) {
                 log.info("AI verification completed successfully with score: {}, confidence: {}", 
-                    responseBody.getScore(), responseBody.getConfidence());
+                    feignResponse.getScore(), feignResponse.getConfidence());
 
-                // Debug video validation inconsistency
-                if (responseBody.getVideoValidation() != null) {
-                    var videoVal = responseBody.getVideoValidation();
-                    log.debug("Video validation: is_valid={}, total_videos={}, valid_videos={}, issues={}",
-                        videoVal.getIsValid(), videoVal.getTotalVideos(), videoVal.getValidVideos(), videoVal.getIssues());
-                    
-                    if (Boolean.FALSE.equals(videoVal.getIsValid()) && 
-                        videoVal.getValidVideos() != null && videoVal.getTotalVideos() != null &&
-                        videoVal.getValidVideos().equals(videoVal.getTotalVideos()) && 
-                        (videoVal.getIssues() == null || videoVal.getIssues().isEmpty())) {
-                        log.warn("INCONSISTENCY DETECTED: video_validation.is_valid=false but all videos are valid with no issues");
-                    }
+                AiListingVerificationResponse responseBody = AiListingVerificationResponse.builder()
+                    .isValid(feignResponse.isValid())
+                    .score(feignResponse.getScore())
+                    .confidence(feignResponse.getConfidence())
+                    .suggestedStatus(feignResponse.getSuggestedStatus())
+                    .modelUsed(feignResponse.getModelUsed())
+                    .verificationTimestamp(feignResponse.getVerificationTimestamp())
+                    .processingTimeSeconds(feignResponse.getProcessingTimeSeconds())
+                    .violationCodes(feignResponse.getViolationCodes())
+                    .build();
+
+                // Map reason
+                if (feignResponse.getReason() != null) {
+                    responseBody.setReason(AiListingVerificationResponse.StructuredReason.builder()
+                        .blurrinessIssue(feignResponse.getReason().isBlurrinessIssue())
+                        .missingFields(feignResponse.getReason().getMissingFields())
+                        .inconsistentInfo(feignResponse.getReason().isInconsistentInfo())
+                        .watermarkOrPhone(feignResponse.getReason().isWatermarkOrPhone())
+                        .stockPhoto(feignResponse.getReason().isStockPhoto())
+                        .details(feignResponse.getReason().getDetails())
+                        .build());
                 }
 
-                if (Boolean.FALSE.equals(responseBody.getIsValid())) {
-                    log.warn("Listing is invalid. Issues: {}", responseBody.getSuggestions());
+                // Map image_validation
+                if (feignResponse.getImageValidation() != null) {
+                    var iv = feignResponse.getImageValidation();
+                    responseBody.setImageValidation(AiListingVerificationResponse.ImageValidation.builder()
+                        .isValid(iv.isValid())
+                        .totalImages(iv.getTotalImages())
+                        .validImages(iv.getValidImages())
+                        .issues(iv.getIssues())
+                        .qualityScore(iv.getQualityScore())
+                        .build());
+                }
+
+                // Map video_validation
+                if (feignResponse.getVideoValidation() != null) {
+                    var vv = feignResponse.getVideoValidation();
+                    responseBody.setVideoValidation(AiListingVerificationResponse.VideoValidation.builder()
+                        .isValid(vv.isValid())
+                        .totalVideos(vv.getTotalVideos())
+                        .validVideos(vv.getValidVideos())
+                        .issues(vv.getIssues())
+                        .qualityScore(vv.getQualityScore())
+                        .build());
+                }
+
+                // Map content_validation
+                if (feignResponse.getContentValidation() != null) {
+                    var cv = feignResponse.getContentValidation();
+                    responseBody.setContentValidation(AiListingVerificationResponse.ContentValidation.builder()
+                        .isRentalRelated(cv.getIsRentalRelated())
+                        .categoryMatch(cv.getCategoryMatch())
+                        .contentScore(cv.getContentScore())
+                        .issues(cv.getIssues())
+                        .build());
+                }
+
+                // Map completeness_validation
+                if (feignResponse.getCompletenessValidation() != null) {
+                    var cmv = feignResponse.getCompletenessValidation();
+                    responseBody.setCompletenessValidation(AiListingVerificationResponse.CompletenessValidation.builder()
+                        .isComplete(cmv.getIsComplete())
+                        .completenessScore(cmv.getCompletenessScore())
+                        .missingFields(cmv.getMissingFields())
+                        .qualityIssues(cmv.getQualityIssues())
+                        .build());
+                }
+
+                // Map violations
+                if (feignResponse.getViolations() != null) {
+                    responseBody.setViolations(feignResponse.getViolations().stream()
+                        .map(v -> AiListingVerificationResponse.Violation.builder()
+                            .category(v.getCategory())
+                            .severity(v.getSeverity())
+                            .message(v.getMessage())
+                            .field(v.getField())
+                            .build())
+                        .toList());
+                }
+
+                // Map suggestions
+                if (feignResponse.getSuggestions() != null) {
+                    responseBody.setSuggestions(feignResponse.getSuggestions().stream()
+                        .map(s -> AiListingVerificationResponse.Suggestion.builder()
+                            .category(s.getCategory())
+                            .message(s.getMessage())
+                            .field(s.getField())
+                            .priority(s.getPriority())
+                            .build())
+                        .toList());
+                }
+
+                if (!feignResponse.isValid()) {
+                    log.warn("Listing is invalid. Issues: {}", feignResponse.getSuggestions());
                 }
 
                 return responseBody;
             } else {
-                log.error("AI service returned non-2xx status: {}", response.getStatusCode());
+                log.error("AI service returned null response");
                 throw new AppException(DomainCode.AI_SERVICE_INVALID_RESPONSE);
             }
             
@@ -121,30 +223,25 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
     }
 
     @Override
-    public boolean isServiceAvailable() {
-        try {
-            // Simple health check - attempt to reach the service with a basic request
-            HttpHeaders headers = new HttpHeaders();
-            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            
-            String healthUrl = aiVerificationUrl.replace("/verify-listing", "/health");
-            
-            ResponseEntity<String> response = restTemplate.exchange(
-                healthUrl,
-                HttpMethod.GET,
-                entity,
-                String.class
-            );
-            
-            boolean isAvailable = response.getStatusCode().is2xxSuccessful();
-            log.debug("AI service health check result: {}", isAvailable ? "Available" : "Unavailable");
-            return isAvailable;
-            
-        } catch (Exception e) {
-            log.debug("AI service health check failed: {}", e.getMessage());
-            return false;
+    @Transactional(readOnly = true)
+    public AiListingVerificationRequest buildVerificationRequest(Long listingId) {
+        Listing listing = listingRepository.findByIdWithMedia(listingId)
+            .orElseThrow(() -> new IllegalArgumentException("Listing not found with id: " + listingId));
+        
+        log.info("Converting listing {} to verification request inside transaction", listingId);
+        
+        AiListingVerificationRequest request = aiListingMapper.toVerificationRequest(listing);
+        if (request == null) {
+            throw new AppException(DomainCode.AI_SERVICE_ERROR);
         }
+        
+        return request;
+    }
+
+    @Override
+    public boolean isServiceAvailable() {
+        // Simplified check as feign handles connection issues natively via exceptions
+        return true;
     }
 
     /**

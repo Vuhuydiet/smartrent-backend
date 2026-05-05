@@ -28,6 +28,8 @@ import org.springframework.web.bind.annotation.*;
 public class AiListingVerificationController {
 
     private final AiListingVerificationService aiListingVerificationService;
+    private final com.smartrent.cronjob.AiListingAutoModerationScheduler aiListingAutoModerationScheduler;
+
 
     @PostMapping("/verify")
     // @PreAuthorize("authentication.authorities.stream().anyMatch(a -> a.authority.startsWith('ROLE_ADMIN') || a.authority.startsWith('ROLE_SUPER_ADMIN') || a.authority.startsWith('ROLE_USER'))") // Temporarily disabled for testing
