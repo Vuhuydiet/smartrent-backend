@@ -1992,7 +1992,7 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional(readOnly = true)
     public com.smartrent.dto.response.ListingCardListResponse getListingsFromFollowedUsers(
-            String userId, int page, int size) {
+            String userId, String targetUserId, int page, int size) {
         if (userId == null || userId.isBlank()) {
             throw new com.smartrent.infra.exception.AppException(
                     com.smartrent.infra.exception.model.DomainCode.UNAUTHENTICATED);
@@ -2002,13 +2002,17 @@ public class ListingServiceImpl implements ListingService {
 
         List<String> followingIds = userFollowRepository.findFollowingIdsByFollowerId(userId);
         if (followingIds.isEmpty()) {
-            return com.smartrent.dto.response.ListingCardListResponse.builder()
-                    .listings(java.util.Collections.emptyList())
-                    .totalCount(0L)
-                    .currentPage(safePage)
-                    .pageSize(safeSize)
-                    .totalPages(0)
-                    .build();
+            return emptyFollowingFeed(safePage, safeSize);
+        }
+
+        // Optional single-user filter — ONLY honored when the viewer actually
+        // follows the target. Otherwise return empty so this endpoint can't
+        // be repurposed to read arbitrary users' listings.
+        if (targetUserId != null && !targetUserId.isBlank()) {
+            if (!followingIds.contains(targetUserId)) {
+                return emptyFollowingFeed(safePage, safeSize);
+            }
+            followingIds = java.util.List.of(targetUserId);
         }
 
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
@@ -2027,6 +2031,16 @@ public class ListingServiceImpl implements ListingService {
                 .currentPage(safePage)
                 .pageSize(safeSize)
                 .totalPages(result.getTotalPages())
+                .build();
+    }
+
+    private com.smartrent.dto.response.ListingCardListResponse emptyFollowingFeed(int page, int size) {
+        return com.smartrent.dto.response.ListingCardListResponse.builder()
+                .listings(java.util.Collections.emptyList())
+                .totalCount(0L)
+                .currentPage(page)
+                .pageSize(size)
+                .totalPages(0)
                 .build();
     }
 
