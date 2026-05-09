@@ -17,5 +17,8 @@ public enum NotificationType {
     // Broker-related
     BROKER_REGISTRATION_RECEIVED,   // admins are notified when a user submits registration
     BROKER_APPROVED,                // user is notified when admin approves
-    BROKER_REJECTED                 // user is notified when admin rejects
+    BROKER_REJECTED,                // user is notified when admin rejects
+
+    // Listing lifecycle
+    LISTING_EXPIRING                // owner is notified at D-7 / D-3 / D-1 before expiry
 }

@@ -351,6 +351,24 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
            "WHERE l.expiryDate IS NOT NULL AND l.expiryDate < :now AND l.expired = false")
     int markExpiredListings(@Param("now") LocalDateTime now);
 
+    /**
+     * Find live, public listings whose expiryDate falls inside [start, end].
+     * Used by the expiring-soon notification scheduler — caller is responsible
+     * for further filtering by the exact D-7 / D-3 / D-1 milestone.
+     */
+    @Query("""
+        SELECT l FROM listings l
+        WHERE l.expiryDate IS NOT NULL
+        AND l.expiryDate BETWEEN :start AND :end
+        AND l.expired = false
+        AND l.verified = true
+        AND l.isDraft = false
+        AND l.isShadow = false
+    """)
+    List<Listing> findExpiringBetween(
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end);
+
     @Query(value = "SELECT DATE(l.created_at) AS label, COUNT(*) AS cnt " +
             "FROM listings l WHERE l.created_at BETWEEN :start AND :end " +
             "AND l.is_draft = false AND l.is_shadow = false " +
