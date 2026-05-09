@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -297,6 +298,27 @@ public class ListingController {
         request.setUserId(userId);
         Object response = listingService.createVipListing(request);
         return ApiResponse.builder().data(response).build();
+    }
+
+    @GetMapping("/my-following-feed")
+    @Operation(
+            summary = "List public listings from users I follow",
+            description = "Authenticated. Returns paginated card-shaped listings posted by users that the current viewer follows, newest first. Drafts, shadow rows, and unverified listings are excluded.",
+            security = @SecurityRequirement(name = "Bearer Authentication"),
+            parameters = {
+                    @Parameter(name = "page", description = "Page number (1-based)", example = "1"),
+                    @Parameter(name = "size", description = "Page size (max 50)", example = "12")
+            })
+    public ApiResponse<com.smartrent.dto.response.ListingCardListResponse> getListingsFromFollowed(
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "size", defaultValue = "12") int size
+    ) {
+        String userId = extractUserId();
+        com.smartrent.dto.response.ListingCardListResponse data =
+                listingService.getListingsFromFollowedUsers(userId, page, size);
+        return ApiResponse.<com.smartrent.dto.response.ListingCardListResponse>builder()
+                .data(data)
+                .build();
     }
 
     private String extractUserId() {

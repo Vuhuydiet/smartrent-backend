@@ -186,6 +186,9 @@ application:
         - "/v1/news"
         - "/v1/news/**"
         - "/v1/recommendations/similar/**"
+        - "/v1/users/*/follow-status"
+        - "/v1/users/*/followers"
+        - "/v1/users/*/following"
       post:
         - "/v1/auth/**"
         - "/v1/users"

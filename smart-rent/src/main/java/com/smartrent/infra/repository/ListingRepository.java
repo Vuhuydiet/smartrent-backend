@@ -369,6 +369,24 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         @Param("start") LocalDateTime start,
         @Param("end") LocalDateTime end);
 
+    /**
+     * Public, live listings posted by any of the given user IDs — feeds the
+     * "from users I follow" tab. Excludes drafts, shadow rows, and unverified
+     * listings so the feed mirrors what those users actually have publicly visible.
+     */
+    @Query("""
+        SELECT l FROM listings l
+        LEFT JOIN FETCH l.address
+        WHERE l.userId IN :userIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.expired = false
+        AND l.verified = true
+    """)
+    Page<Listing> findPublicListingsByUserIdIn(
+        @Param("userIds") Collection<String> userIds,
+        Pageable pageable);
+
     @Query(value = "SELECT DATE(l.created_at) AS label, COUNT(*) AS cnt " +
             "FROM listings l WHERE l.created_at BETWEEN :start AND :end " +
             "AND l.is_draft = false AND l.is_shadow = false " +

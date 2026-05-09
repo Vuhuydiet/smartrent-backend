@@ -124,6 +124,8 @@ public class ListingServiceImpl implements ListingService {
     ListingRequestCacheService listingRequestCacheService;
     ListingQueryService listingQueryService;
     com.smartrent.service.moderation.ListingModerationService listingModerationService;
+    com.smartrent.service.follow.UserFollowService userFollowService;
+    com.smartrent.infra.repository.UserFollowRepository userFollowRepository;
 
     @Override
     @Transactional
@@ -253,6 +255,8 @@ public class ListingServiceImpl implements ListingService {
             createShadowListing(saved);
         }
 
+        notifyFollowersSafely(saved);
+
         return listingMapper.toCreationResponse(saved);
     }
 
@@ -379,6 +383,8 @@ public class ListingServiceImpl implements ListingService {
                     createShadowListing(saved);
                 }
 
+                notifyFollowersSafely(saved);
+
                 return listingMapper.toCreationResponse(saved);
             }
         }
@@ -481,6 +487,25 @@ public class ListingServiceImpl implements ListingService {
                 .isVerify(true)
                 .expired(false)
                 .build();
+    }
+
+    /**
+     * Best-effort fan-out of NEW_LISTING_FROM_FOLLOWED_USER to the author's followers.
+     * Failures here must never roll back listing creation, so we swallow exceptions
+     * (UserFollowService also has its own try/catch + REQUIRES_NEW transaction).
+     */
+    private void notifyFollowersSafely(Listing listing) {
+        if (listing == null
+                || Boolean.TRUE.equals(listing.getIsShadow())
+                || Boolean.TRUE.equals(listing.getIsDraft())) {
+            return;
+        }
+        try {
+            userFollowService.notifyFollowersOfNewListing(listing);
+        } catch (Exception e) {
+            log.warn("Follower notification fan-out failed for listing {}: {}",
+                    listing.getListingId(), e.getMessage());
+        }
     }
 
     private void createShadowListing(Listing premiumListing) {
@@ -998,6 +1023,8 @@ public class ListingServiceImpl implements ListingService {
             // Remove from cache
             listingRequestCacheService.removeNormalListingRequest(transactionId);
 
+            notifyFollowersSafely(saved);
+
             return listingMapper.toCreationResponse(saved);
 
         } catch (Exception e) {
@@ -1053,6 +1080,8 @@ public class ListingServiceImpl implements ListingService {
 
             // Remove from cache
             listingRequestCacheService.removeVipListingRequest(transactionId);
+
+            notifyFollowersSafely(savedVipListing);
 
             return listingMapper.toCreationResponse(savedVipListing);
 
@@ -1957,6 +1986,47 @@ public class ListingServiceImpl implements ListingService {
                 .totalPages(page.getTotalPages())
                 .filterCriteria(filter)
                 .statistics(ownerStats)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.smartrent.dto.response.ListingCardListResponse getListingsFromFollowedUsers(
+            String userId, int page, int size) {
+        if (userId == null || userId.isBlank()) {
+            throw new com.smartrent.infra.exception.AppException(
+                    com.smartrent.infra.exception.model.DomainCode.UNAUTHENTICATED);
+        }
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 50);
+
+        List<String> followingIds = userFollowRepository.findFollowingIdsByFollowerId(userId);
+        if (followingIds.isEmpty()) {
+            return com.smartrent.dto.response.ListingCardListResponse.builder()
+                    .listings(java.util.Collections.emptyList())
+                    .totalCount(0L)
+                    .currentPage(safePage)
+                    .pageSize(safeSize)
+                    .totalPages(0)
+                    .build();
+        }
+
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
+                safePage - 1,
+                safeSize,
+                org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Direction.DESC,
+                        "postDate", "createdAt"));
+
+        Page<Listing> result = listingRepository.findPublicListingsByUserIdIn(followingIds, pageable);
+        List<ListingCardResponse> cards = batchMapCardListings(result.getContent());
+
+        return com.smartrent.dto.response.ListingCardListResponse.builder()
+                .listings(cards)
+                .totalCount(result.getTotalElements())
+                .currentPage(safePage)
+                .pageSize(safeSize)
+                .totalPages(result.getTotalPages())
                 .build();
     }
 
