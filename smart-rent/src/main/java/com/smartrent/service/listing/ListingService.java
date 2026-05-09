@@ -153,12 +153,17 @@ public interface ListingService {
      * Powers the "Bảng tin" tab on the /following page. Returns the same card
      * shape as search so the FE can reuse PropertyCard components.
      *
-     * @param userId current viewer (must be authenticated; the follow graph is per-user)
-     * @param page   1-based page index
-     * @param size   page size (callers should clamp; service is permissive)
+     * @param userId       current viewer (must be authenticated; the follow graph is per-user)
+     * @param targetUserId optional — when non-blank, narrow the feed to a single
+     *                     followed user. Ignored if {@code userId} does not
+     *                     actually follow the target (returns empty page); this
+     *                     prevents the endpoint from being used as a generic
+     *                     "list any user's listings" query.
+     * @param page         1-based page index
+     * @param size         page size (callers should clamp; service is permissive)
      */
     com.smartrent.dto.response.ListingCardListResponse getListingsFromFollowedUsers(
-            String userId, int page, int size);
+            String userId, String targetUserId, int page, int size);
 
     // ============ DRAFT MANAGEMENT METHODS ============
 
