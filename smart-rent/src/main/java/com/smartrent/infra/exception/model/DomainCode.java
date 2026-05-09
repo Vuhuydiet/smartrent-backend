@@ -131,7 +131,10 @@ public enum DomainCode {
   BROKER_DOCUMENT_NOT_CONFIRMED("17005", HttpStatus.BAD_REQUEST, "Broker document must be uploaded and confirmed: %s"),
   BROKER_DOCUMENT_INVALID_TYPE("17006", HttpStatus.BAD_REQUEST, "Broker document must be an image file: %s"),
   //    Push Limit Error 18xxx
-  PUSH_LIMIT_EXCEEDED("18001", HttpStatus.TOO_MANY_REQUESTS, "Hệ thống đang quá tải yêu cầu đẩy tin. Vui lòng chờ %d phút nữa để tiếp tục đẩy tin.")
+  PUSH_LIMIT_EXCEEDED("18001", HttpStatus.TOO_MANY_REQUESTS, "Hệ thống đang quá tải yêu cầu đẩy tin. Vui lòng chờ %d phút nữa để tiếp tục đẩy tin."),
+  //    User Follow Error 19xxx
+  USER_FOLLOW_SELF_NOT_ALLOWED("19001", HttpStatus.BAD_REQUEST, "You cannot follow yourself"),
+  USER_FOLLOW_TARGET_NOT_FOUND("19002", HttpStatus.NOT_FOUND, "Target user to follow was not found")
   ;
 
   private final String value;

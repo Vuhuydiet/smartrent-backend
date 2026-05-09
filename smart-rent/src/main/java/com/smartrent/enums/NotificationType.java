@@ -20,5 +20,8 @@ public enum NotificationType {
     BROKER_REJECTED,                // user is notified when admin rejects
 
     // Listing lifecycle
-    LISTING_EXPIRING                // owner is notified at D-7 / D-3 / D-1 before expiry
+    LISTING_EXPIRING,               // owner is notified at D-7 / D-3 / D-1 before expiry
+
+    // Follow-related
+    NEW_LISTING_FROM_FOLLOWED_USER  // follower is notified when a followed user publishes a new listing
 }

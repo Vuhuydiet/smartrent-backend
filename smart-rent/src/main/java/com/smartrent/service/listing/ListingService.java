@@ -148,6 +148,18 @@ public interface ListingService {
      */
     OwnerListingListResponse getMyListings(ListingFilterRequest filter, String userId);
 
+    /**
+     * Public, live listings posted by users that {@code userId} follows.
+     * Powers the "Bảng tin" tab on the /following page. Returns the same card
+     * shape as search so the FE can reuse PropertyCard components.
+     *
+     * @param userId current viewer (must be authenticated; the follow graph is per-user)
+     * @param page   1-based page index
+     * @param size   page size (callers should clamp; service is permissive)
+     */
+    com.smartrent.dto.response.ListingCardListResponse getListingsFromFollowedUsers(
+            String userId, int page, int size);
+
     // ============ DRAFT MANAGEMENT METHODS ============
 
     /**
