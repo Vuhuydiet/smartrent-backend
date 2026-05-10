@@ -216,6 +216,12 @@ application:
       email: "${SENDER_EMAIL}"
       name: "${SENDER_NAME:SmartRent}"
     subject: "SmartRent - Xác minh tài khoản"
+  notification:
+    expiring-listing:
+      # Only listing-owners whose email is in this whitelist will receive a daily
+      # summary email about their nearly-expired listings. Falls back to the
+      # internal team if the env var is unset/empty so dev can still smoke-test.
+      whitelist-emails: "${WHITE_LIST_EMAIL_NOTIFICATION:lqm550@gmail.com,fatuforwork@gmail.com,smartrent.tools@gmail.com}"
   otp:
     length: 6
     duration: 60 #s

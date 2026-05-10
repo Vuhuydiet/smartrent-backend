@@ -50,4 +50,16 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
             Long referenceId,
             String referenceType,
             LocalDateTime createdAtAfter);
+
+    /**
+     * Dedup probe for daily-summary notifications that have no specific listing
+     * reference (referenceId is null). Used by the expiring-listing scheduler
+     * to skip a recipient who already received today's summary.
+     */
+    boolean existsByRecipientIdAndRecipientTypeAndTypeAndReferenceTypeAndCreatedAtAfter(
+            String recipientId,
+            RecipientType recipientType,
+            NotificationType type,
+            String referenceType,
+            LocalDateTime createdAtAfter);
 }
