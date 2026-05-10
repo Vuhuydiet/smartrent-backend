@@ -55,6 +55,9 @@ public class Listing {
     @Column(name = "title_norm", length = 256)
     String titleNorm;
 
+    @Column(name = "phonetic_title", length = 256)
+    String phoneticTitle;
+
     @Column(name = "user_id", nullable = false, length = 36)
     String userId;
 
@@ -357,6 +360,26 @@ public class Listing {
 
         String combined = sb.toString().trim();
         titleNorm = TextNormalizer.compact(title, 256);
+        if (titleNorm != null && !titleNorm.isEmpty()) {
+            org.apache.commons.codec.language.DoubleMetaphone metaphone = new org.apache.commons.codec.language.DoubleMetaphone();
+            metaphone.setMaxCodeLen(256);
+            
+            // DoubleMetaphone works best per word
+            String[] words = titleNorm.split(" ");
+            StringBuilder phoneticBuilder = new StringBuilder();
+            for (String word : words) {
+                String code = metaphone.doubleMetaphone(word);
+                if (code != null) {
+                    phoneticBuilder.append(code).append(" ");
+                }
+            }
+            phoneticTitle = phoneticBuilder.toString().trim();
+            if (phoneticTitle.length() > 256) {
+                phoneticTitle = phoneticTitle.substring(0, 256);
+            }
+        } else {
+            phoneticTitle = null;
+        }
         searchText = TextNormalizer.compact(combined, 512);
     }
 

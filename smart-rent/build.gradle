@@ -81,6 +81,10 @@ dependencies {
 
     // Embedded Redis for testing
     testImplementation 'it.ozimov:embedded-redis:0.7.3'
+
+    // String matching and phonetic encoding for search
+    implementation 'org.apache.commons:commons-text:1.10.0'
+    implementation 'commons-codec:commons-codec:1.16.0'
 }
 
 tasks.named('test') {
