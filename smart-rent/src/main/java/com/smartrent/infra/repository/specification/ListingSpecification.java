@@ -897,4 +897,91 @@ public class ListingSpecification {
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
     }
+
+    /**
+     * Build specification for natural language search parsed by AI
+     */
+    public static Specification<Listing> matchesCriteria(com.smartrent.dto.request.AiParsedCriteriaDto criteria) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            // Only verified and active listings
+            predicates.add(criteriaBuilder.equal(root.get("verified"), true));
+            predicates.add(criteriaBuilder.equal(root.get("expired"), false));
+            predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
+            predicates.add(criteriaBuilder.equal(root.get("isShadow"), false));
+
+            if (criteria.getPropertyType() != null) {
+                try {
+                    Listing.ProductType productType = Listing.ProductType.valueOf(criteria.getPropertyType().toUpperCase());
+                    predicates.add(criteriaBuilder.equal(root.get("productType"), productType));
+                } catch (IllegalArgumentException e) {
+                    // Ignore if not exactly matching ProductType
+                }
+            }
+            
+            if (criteria.getListingType() != null) {
+                try {
+                    Listing.ListingType listingType = Listing.ListingType.valueOf(criteria.getListingType().toUpperCase());
+                    predicates.add(criteriaBuilder.equal(root.get("listingType"), listingType));
+                } catch (IllegalArgumentException e) {
+                    // Ignore if not exactly matching ListingType
+                }
+            }
+
+            if (criteria.getMaxPrice() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("price"), criteria.getMaxPrice()));
+            }
+            if (criteria.getMinPrice() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("price"), criteria.getMinPrice()));
+            }
+
+            // Location filters using text pattern matching for simplicity, 
+            // since AI returns raw string (e.g. "quận 1")
+            if (criteria.getDistrict() != null || criteria.getProvince() != null || criteria.getWard() != null) {
+                Join<Listing, Address> addressJoin = root.join("address", JoinType.INNER);
+                
+                if (criteria.getDistrict() != null) {
+                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("districtName")), 
+                        "%" + criteria.getDistrict().toLowerCase() + "%"));
+                }
+                if (criteria.getProvince() != null) {
+                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("provinceName")), 
+                        "%" + criteria.getProvince().toLowerCase() + "%"));
+                }
+                if (criteria.getWard() != null) {
+                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("wardName")), 
+                        "%" + criteria.getWard().toLowerCase() + "%"));
+                }
+            }
+            
+            // Keyword fallback: FULLTEXT or Typo Tolerance
+            if (criteria.getKeyword() != null && !criteria.getKeyword().isEmpty()) {
+                String normalized = TextNormalizer.normalize(criteria.getKeyword());
+                if (normalized != null && !normalized.isEmpty()) {
+                    String[] words = normalized.split("\\s+");
+                    StringBuilder ftQuery = new StringBuilder();
+                    for (String word : words) {
+                        if (!word.isEmpty()) {
+                            ftQuery.append("+").append(word).append("* ");
+                        }
+                    }
+                    String fulltextQuery = ftQuery.toString().trim();
+                    if (!fulltextQuery.isEmpty()) {
+                        predicates.add(criteriaBuilder.greaterThan(
+                            criteriaBuilder.function("match_against",
+                                Double.class,
+                                root.get("searchText"),
+                                criteriaBuilder.literal(fulltextQuery)),
+                            0.0));
+                    }
+                }
+            } else if (criteria.getPhoneticKeyword() != null && !criteria.getPhoneticKeyword().isEmpty()) {
+                 // Typo tolerance: if no keyword matched, use phonetic title
+                 predicates.add(criteriaBuilder.like(root.get("phoneticTitle"), "%" + criteria.getPhoneticKeyword() + "%"));
+            }
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
+    }
 }
