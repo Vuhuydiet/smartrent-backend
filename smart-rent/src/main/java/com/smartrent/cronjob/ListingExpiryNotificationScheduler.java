@@ -59,7 +59,6 @@ public class ListingExpiryNotificationScheduler {
     static int LOOKAHEAD_DAYS = 7;
     static Duration DEDUP_LOOKBACK = Duration.ofHours(23);
     static String REFERENCE_TYPE = "LISTING_DAILY_SUMMARY";
-    static String CLIENT_PATH_MY_LISTINGS = "/seller/listings";
 
     ListingRepository listingRepository;
     NotificationRepository notificationRepository;
@@ -72,8 +71,12 @@ public class ListingExpiryNotificationScheduler {
     String whitelistEmailsRaw;
 
     @NonFinal
-    @Value("${application.client-url:http://localhost:3000}")
+    @Value("${application.client-url}")
     String clientUrl;
+
+    @NonFinal
+    @Value("${application.notification.expiring-listing.manage-path:/seller/listings?page=1&size=10}")
+    String managePath;
 
     @NonFinal
     @Value("${application.email.sender.email}")
@@ -204,7 +207,7 @@ public class ListingExpiryNotificationScheduler {
     }
 
     private String buildEmailHtml(int count, long daysToSoonest) {
-        String manageUrl = clientUrl + CLIENT_PATH_MY_LISTINGS;
+        String manageUrl = buildManageUrl();
         String soonestLine = daysToSoonest <= 0
                 ? "Tin sớm nhất sẽ hết hạn <strong>trong vòng 24 giờ tới</strong>."
                 : "Tin sớm nhất sẽ hết hạn sau <strong>" + daysToSoonest + " ngày</strong>.";
@@ -213,12 +216,26 @@ public class ListingExpiryNotificationScheduler {
                 + "<p>Xin chào,</p>"
                 + "<p>Bạn đang có <strong>" + count + "</strong> tin đăng sắp hết hạn. "
                 + soonestLine + "</p>"
-                + "<p>Hãy đăng nhập và truy cập trang quản lý tin để gia hạn, tránh gián đoạn hiển thị:</p>"
+                + "<p>Sau đó vui lòng vào trang này để gia hạn hoặc đăng lại:</p>"
                 + "<p><a href=\"" + manageUrl + "\" "
                 + "style=\"display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;"
-                + "text-decoration:none;border-radius:6px;\">Xem tin đăng của tôi</a></p>"
+                + "text-decoration:none;border-radius:6px;\">Quản lý tin đăng của tôi</a></p>"
+                + "<p style=\"font-size:13px;color:#555;\">Hoặc mở liên kết: "
+                + "<a href=\"" + manageUrl + "\">" + manageUrl + "</a></p>"
                 + "<p style=\"color:#666;font-size:12px;margin-top:24px;\">"
                 + "Email này được gửi tự động — bạn không cần phản hồi.</p>"
                 + "</body></html>";
+    }
+
+    private String buildManageUrl() {
+        String base = clientUrl == null ? "" : clientUrl.trim();
+        String path = managePath == null ? "" : managePath.trim();
+        if (base.endsWith("/") && path.startsWith("/")) {
+            return base.substring(0, base.length() - 1) + path;
+        }
+        if (!base.endsWith("/") && !path.startsWith("/") && !path.isEmpty()) {
+            return base + "/" + path;
+        }
+        return base + path;
     }
 }

@@ -40,18 +40,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
                       @Param("recipientType") RecipientType recipientType);
 
     /**
-     * Dedup probe used by recurring jobs (e.g. listing-expiring scheduler) to avoid
-     * sending the same milestone notification twice within a short window.
-     */
-    boolean existsByRecipientIdAndRecipientTypeAndTypeAndReferenceIdAndReferenceTypeAndCreatedAtAfter(
-            String recipientId,
-            RecipientType recipientType,
-            NotificationType type,
-            Long referenceId,
-            String referenceType,
-            LocalDateTime createdAtAfter);
-
-    /**
      * Dedup probe for daily-summary notifications that have no specific listing
      * reference (referenceId is null). Used by the expiring-listing scheduler
      * to skip a recipient who already received today's summary.

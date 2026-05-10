@@ -353,8 +353,8 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
 
     /**
      * Find live, public listings whose expiryDate falls inside [start, end].
-     * Used by the expiring-soon notification scheduler — caller is responsible
-     * for further filtering by the exact D-7 / D-3 / D-1 milestone.
+     * Used by the expiring-soon notification scheduler to build the daily
+     * per-owner summary across the full [now, now+7d] window.
      */
     @Query("""
         SELECT l FROM listings l
