@@ -29,10 +29,30 @@ public class AiListingAutoModerationScheduler {
     private final ObjectMapper objectMapper;
 
     /**
+     * Run every hour to recover any listings stuck in IN_PROGRESS state.
+     * This acts as a self-healing mechanism in case the server crashes during processing.
+     */
+    @Scheduled(fixedDelayString = "3600000") // 1 hour
+    @org.springframework.transaction.annotation.Transactional
+    public void recoverStuckInProgressListings() {
+        log.info("Starting Self-Healing Job for stuck IN_PROGRESS listings...");
+        try {
+            java.time.LocalDateTime thresholdTime = java.time.LocalDateTime.now().minusMinutes(30);
+            int recoveredCount = listingAiModerationRepository.resetStuckInProgressListings(thresholdTime);
+            if (recoveredCount > 0) {
+                log.info("Self-Healing Job successfully recovered {} listings stuck in IN_PROGRESS state.", recoveredCount);
+            } else {
+                log.debug("No stuck listings found.");
+            }
+        } catch (Exception e) {
+            log.error("Error during Self-Healing Job for stuck IN_PROGRESS listings", e);
+        }
+    }
+
+    /**
      * Run every 5 minutes to verify pending listings using AI.
      */
-    // @Scheduled(fixedDelayString = "${smartrent.ai.verification.scheduler.delay:300000}") // DISABLED for manual testing
-    @org.springframework.transaction.annotation.Transactional
+    @Scheduled(fixedDelayString = "${smartrent.ai.verification.scheduler.delay:300000}")
     public void processPendingListings() {
         log.info("Starting AI Auto Moderation Scheduler...");
         
