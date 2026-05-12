@@ -20,6 +20,7 @@ public interface ListingAiModerationRepository extends JpaRepository<ListingAiMo
         AND (lam.verificationStatus = 'PENDING' OR lam.verificationStatus IS NULL)
     """)
     int markListingsAsInProgress(@Param("listingIds") List<Long> listingIds);
+
     @Modifying
     @Query("""
         UPDATE listing_ai_moderation lam
