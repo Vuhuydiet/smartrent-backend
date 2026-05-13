@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
@@ -60,6 +61,7 @@ public class AiListingVerificationResponse {
     private List<Suggestion> suggestions;
 
     @JsonProperty("verification_timestamp")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Schema(description = "When the verification was performed", example = "2025-11-23T15:30:00")
     private LocalDateTime verificationTimestamp;
 

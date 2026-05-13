@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
@@ -22,63 +23,38 @@ import java.time.LocalDateTime;
 @Schema(description = "Current broker registration status for a user")
 public class BrokerStatusResponse {
 
-    @Schema(description = "User ID", example = "user-123e4567-e89b-12d3-a456-426614174000")
-    String userId;
+        @Schema(description = "User ID", example = "user-123e4567-e89b-12d3-a456-426614174000")
+        String userId;
 
-    @Schema(
-            description = "Whether this user is an approved broker",
-            example = "false"
-    )
-    Boolean isBroker;
+        @Schema(description = "Whether this user is an approved broker", example = "false")
+        Boolean isBroker;
 
-    @Schema(
-            description = "Current broker verification status",
-            example = "PENDING",
-            allowableValues = {"NONE", "PENDING", "APPROVED", "REJECTED"}
-    )
-    String brokerVerificationStatus;
+        @Schema(description = "Current broker verification status", example = "PENDING", allowableValues = { "NONE",
+                        "PENDING", "APPROVED", "REJECTED" })
+        String brokerVerificationStatus;
 
-    @Schema(
-            description = "Timestamp when broker registration was submitted",
-            example = "2024-01-15T10:30:00"
-    )
-    LocalDateTime brokerRegisteredAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @Schema(description = "Timestamp when broker registration was submitted", example = "2024-01-15T10:30:00")
+        LocalDateTime brokerRegisteredAt;
 
-    @Schema(
-            description = "Timestamp when admin approved/rejected the registration",
-            example = "2024-01-16T09:00:00"
-    )
-    LocalDateTime brokerVerifiedAt;
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @Schema(description = "Timestamp when admin approved/rejected the registration", example = "2024-01-16T09:00:00")
+        LocalDateTime brokerVerifiedAt;
 
-    @Schema(
-            description = "Rejection reason provided by admin (only present when status is REJECTED)",
-            example = "License could not be verified"
-    )
-    String brokerRejectionReason;
+        @Schema(description = "Rejection reason provided by admin (only present when status is REJECTED)", example = "License could not be verified")
+        String brokerRejectionReason;
 
-    @Schema(
-            description = "External verification source URL used by admin",
-            example = "https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20"
-    )
-    String brokerVerificationSource;
+        @Schema(description = "External verification source URL used by admin", example = "https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20")
+        String brokerVerificationSource;
 
-    // ============ DOCUMENT VIEWING URLS (presigned, short-lived) ============
+        // ============ DOCUMENT VIEWING URLS (presigned, short-lived) ============
 
-    @Schema(
-            description = "Presigned download URL for CCCD front image (only present when documents have been submitted)",
-            example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
-    )
-    String cccdFrontUrl;
+        @Schema(description = "Presigned download URL for CCCD front image (only present when documents have been submitted)", example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=...")
+        String cccdFrontUrl;
 
-    @Schema(
-            description = "Presigned download URL for CCCD back image",
-            example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
-    )
-    String cccdBackUrl;
+        @Schema(description = "Presigned download URL for CCCD back image", example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=...")
+        String cccdBackUrl;
 
-    @Schema(
-            description = "Presigned download URL for practising certificate image",
-            example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=..."
-    )
-    String certUrl;
+        @Schema(description = "Presigned download URL for practising certificate image", example = "https://r2.example.com/users/.../broker/....jpg?X-Amz-Signature=...")
+        String certUrl;
 }

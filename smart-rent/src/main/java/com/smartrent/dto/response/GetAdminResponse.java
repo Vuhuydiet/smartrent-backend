@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
@@ -40,6 +41,7 @@ public class GetAdminResponse {
     @Schema(description = "Administrator's last name", example = "Smith")
     String lastName;
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Schema(description = "Account creation time", example = "2024-05-01T10:15:30")
     LocalDateTime createdAt;
 

@@ -1,3 +1,10 @@
+buildscript {
+    dependencies {
+        classpath 'com.mysql:mysql-connector-j:8.0.33'
+        classpath 'org.flywaydb:flyway-mysql:10.21.0'
+    }
+}
+
 plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.0'
@@ -12,7 +19,7 @@ description = 'Demo project for Spring Boot'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(20)
     }
 }
 
@@ -119,4 +126,5 @@ flyway {
     baselineVersion = '0'
     validateOnMigrate = false
     outOfOrder = true
+    driver = 'com.mysql.cj.jdbc.Driver'
 }
