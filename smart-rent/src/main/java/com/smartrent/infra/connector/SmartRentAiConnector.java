@@ -15,7 +15,10 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import com.smartrent.dto.request.ListingVerificationRequest;
+import com.smartrent.dto.response.ListingVerificationResponse;
 import java.util.List;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 @FeignClient(name = "smartrent-ai", url = "${feign.client.config.smartrent-ai.url}")
 public interface SmartRentAiConnector {
@@ -52,6 +55,13 @@ public interface SmartRentAiConnector {
   @PostMapping(value = "/api/v1/recommendations/personalized", consumes = MediaType.APPLICATION_JSON_VALUE)
   List<RecommendationItemDto> getPersonalizedFeed(
       @RequestBody AIRecommendationRequest.PersonalizedFeedAiRequest request);
+
+  /**
+   * Verify listing using AI multimodal analysis.
+   */
+  @PostMapping(value = "/ai/verify-listing", consumes = MediaType.APPLICATION_JSON_VALUE)
+  ListingVerificationResponse verifyListing(
+      @RequestBody ListingVerificationRequest request);
 }
 
 

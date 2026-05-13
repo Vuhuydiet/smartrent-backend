@@ -27,6 +27,14 @@ public interface AiListingVerificationService {
     AiListingVerificationResponse verifyListing(Listing listing);
 
     /**
+     * Build verification request from a listing ID (handles lazy loading)
+     *
+     * @param listingId The listing ID
+     * @return The verification request DTO
+     */
+    AiListingVerificationRequest buildVerificationRequest(Long listingId);
+
+    /**
      * Check if the AI verification service is available
      * 
      * @return true if the service is available, false otherwise

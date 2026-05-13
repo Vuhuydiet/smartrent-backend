@@ -35,6 +35,21 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      */
     Optional<Listing> findByTransactionId(String transactionId);
 
+    /**
+     * Find listings that need AI verification
+     */
+    @Query("""
+        SELECT l FROM listings l
+        LEFT JOIN listing_ai_moderation lam ON lam.listingId = l.listingId
+        WHERE (lam IS NULL OR (lam.verificationStatus = 'PENDING' AND lam.retryCount < 3))
+        AND (lam IS NULL OR lam.manualOverride = false)
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.postDate IS NOT NULL
+        ORDER BY l.createdAt DESC
+    """)
+    Page<Listing> findListingsNeedingAiVerification(Pageable pageable);
+
 
     @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address LEFT JOIN FETCH l.amenities WHERE l.listingId = :id")
     Optional<Listing> findByIdWithAmenities(@Param("id") Long id);

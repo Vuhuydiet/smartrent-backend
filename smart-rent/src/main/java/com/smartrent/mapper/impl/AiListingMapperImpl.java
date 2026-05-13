@@ -45,14 +45,23 @@ public class AiListingMapperImpl implements AiListingMapper {
         if (listing.getAddress() == null) {
             return "Address not available";
         }
-        
+
         // Use the new address format if available, otherwise fallback to old format
         String address = listing.getAddress().getFullNewAddress();
-        if (address == null || address.trim().isEmpty()) {
+        if (!isValidAddress(address)) {
             address = listing.getAddress().getFullAddress();
         }
-        
-        return address != null ? address : "Address not available";
+
+        // Final safety check: if still invalid (e.g., "N/A" from old data), use fallback
+        return isValidAddress(address) ? address : "Address not available";
+    }
+
+    /**
+     * Validates that an address string is meaningful (not null, blank, or too short).
+     * AI Service requires address to have at least 5 characters.
+     */
+    private boolean isValidAddress(String address) {
+        return address != null && address.trim().length() >= 5;
     }
 
     private HousingPropertyType convertProductType(Listing.ProductType productType) {

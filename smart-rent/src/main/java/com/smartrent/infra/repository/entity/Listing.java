@@ -115,6 +115,8 @@ public class Listing {
     @Column(name = "pushed_at")
     LocalDateTime pushedAt;
 
+
+
     // ── Moderation fields (nullable for backward compatibility) ──
     @Enumerated(EnumType.STRING)
     @Column(name = "moderation_status", length = 30)

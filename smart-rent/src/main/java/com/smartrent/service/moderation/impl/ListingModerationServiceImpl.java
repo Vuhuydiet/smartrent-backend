@@ -19,9 +19,11 @@ import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.Listing;
+import com.smartrent.infra.repository.entity.ListingAiModeration;
 import com.smartrent.infra.repository.entity.ListingModerationEvent;
 import com.smartrent.infra.repository.entity.ListingOwnerAction;
 import com.smartrent.infra.repository.entity.Media;
+import com.smartrent.infra.repository.ListingAiModerationRepository;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.mapper.UserMapper;
 import com.smartrent.service.moderation.ListingModerationService;
@@ -52,6 +54,7 @@ import java.util.stream.Collectors;
 public class ListingModerationServiceImpl implements ListingModerationService {
 
     ListingRepository listingRepository;
+    ListingAiModerationRepository listingAiModerationRepository;
     ListingModerationEventRepository moderationEventRepository;
     ListingOwnerActionRepository ownerActionRepository;
     MediaRepository mediaRepository;
@@ -434,6 +437,16 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             listing.setExpiryDate(baseDate.plusDays(durationDays));
         }
 
+        // --- AI Moderation Integration ---
+        listingAiModerationRepository.findById(listing.getListingId())
+                .ifPresent(moderation -> {
+                    moderation.setManualOverride(true);
+                    moderation.setVerificationStatus(com.smartrent.infra.repository.entity.enums.VerificationStatus.VERIFIED);
+                    listingAiModerationRepository.save(moderation);
+                    log.info("Recorded manual approval override for listing {}", listing.getListingId());
+                });
+        // ---------------------------------
+
         // Complete any pending owner actions
         List<ListingOwnerAction> pendingActions = ownerActionRepository
                 .findByListingIdAndStatus(listing.getListingId(), OwnerActionStatus.SUBMITTED_FOR_REVIEW);
@@ -461,6 +474,16 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         listing.setLastModeratedAt(LocalDateTime.now());
         listing.setLastModerationReasonCode(resolveReasonCode(request));
         listing.setLastModerationReasonText(reasonText);
+
+        // --- AI Moderation Integration ---
+        listingAiModerationRepository.findById(listing.getListingId())
+                .ifPresent(moderation -> {
+                    moderation.setManualOverride(true);
+                    moderation.setVerificationStatus(com.smartrent.infra.repository.entity.enums.VerificationStatus.REJECTED);
+                    listingAiModerationRepository.save(moderation);
+                    log.info("Recorded manual rejection override for listing {}", listing.getListingId());
+                });
+        // ---------------------------------
 
         // Create owner action if requested
         if (Boolean.TRUE.equals(request.getOwnerActionRequired())) {
