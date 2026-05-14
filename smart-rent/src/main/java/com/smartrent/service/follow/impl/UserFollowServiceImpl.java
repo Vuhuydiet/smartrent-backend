@@ -99,18 +99,23 @@ public class UserFollowServiceImpl implements UserFollowService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<FollowedUserResponse> getFollowers(String userId, Pageable pageable) {
+    public Page<FollowedUserResponse> getFollowers(String viewerId, String userId, Pageable pageable) {
         Page<UserFollow> page = userFollowRepository
                 .findByFollowingIdOrderByCreatedAtDesc(userId, pageable);
-        return mapEdgesToUsers(page, UserFollow::getFollowerId);
+        return mapEdgesToUsers(page, UserFollow::getFollowerId, viewerId);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<FollowedUserResponse> getFollowing(String userId, Pageable pageable) {
+    public Page<FollowedUserResponse> getFollowing(String viewerId, String userId, Pageable pageable) {
         Page<UserFollow> page = userFollowRepository
                 .findByFollowerIdOrderByCreatedAtDesc(userId, pageable);
-        return mapEdgesToUsers(page, UserFollow::getFollowingId);
+        // Fast path: when the viewer is asking for their own following list, every
+        // row is by definition followed by them — skip the bulk lookup.
+        if (viewerId != null && viewerId.equals(userId)) {
+            return mapEdgesToUsersWithKnownFollow(page, UserFollow::getFollowingId, true);
+        }
+        return mapEdgesToUsers(page, UserFollow::getFollowingId, viewerId);
     }
 
     @Override
@@ -177,7 +182,55 @@ public class UserFollowServiceImpl implements UserFollowService {
     }
 
     private Page<FollowedUserResponse> mapEdgesToUsers(Page<UserFollow> page,
-                                                       Function<UserFollow, String> idExtractor) {
+                                                       Function<UserFollow, String> idExtractor,
+                                                       String viewerId) {
+        if (page.isEmpty()) {
+            return page.map(edge -> null);
+        }
+        List<String> ids = page.getContent().stream()
+                .map(idExtractor)
+                .collect(Collectors.toList());
+        Map<String, User> userMap = userRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(User::getUserId, Function.identity()));
+
+        // Bulk-resolve "does the viewer follow each of these users?" so the FE can
+        // render the follow toggle on every row without N status round-trips.
+        final java.util.Set<String> viewerFollowsSet;
+        if (viewerId == null || viewerId.isBlank() || ids.isEmpty()) {
+            viewerFollowsSet = java.util.Collections.emptySet();
+        } else {
+            viewerFollowsSet = new java.util.HashSet<>(
+                    userFollowRepository.findFollowedTargetIds(viewerId, ids));
+        }
+
+        return page.map(edge -> {
+            String otherId = idExtractor.apply(edge);
+            User user = userMap.get(otherId);
+            boolean isFollowing = viewerFollowsSet.contains(otherId);
+            if (user == null) {
+                return FollowedUserResponse.builder()
+                        .userId(otherId)
+                        .isFollowing(isFollowing)
+                        .followedAt(edge.getCreatedAt())
+                        .build();
+            }
+            return FollowedUserResponse.builder()
+                    .userId(user.getUserId())
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .avatarUrl(user.getAvatarUrl())
+                    .isBroker(user.isBroker())
+                    .brokerVerificationStatus(user.getBrokerVerificationStatus() == null
+                            ? null : user.getBrokerVerificationStatus().name())
+                    .isFollowing(isFollowing)
+                    .followedAt(edge.getCreatedAt())
+                    .build();
+        });
+    }
+
+    private Page<FollowedUserResponse> mapEdgesToUsersWithKnownFollow(Page<UserFollow> page,
+                                                                     Function<UserFollow, String> idExtractor,
+                                                                     boolean isFollowing) {
         if (page.isEmpty()) {
             return page.map(edge -> null);
         }
@@ -193,6 +246,7 @@ public class UserFollowServiceImpl implements UserFollowService {
             if (user == null) {
                 return FollowedUserResponse.builder()
                         .userId(otherId)
+                        .isFollowing(isFollowing)
                         .followedAt(edge.getCreatedAt())
                         .build();
             }
@@ -204,6 +258,7 @@ public class UserFollowServiceImpl implements UserFollowService {
                     .isBroker(user.isBroker())
                     .brokerVerificationStatus(user.getBrokerVerificationStatus() == null
                             ? null : user.getBrokerVerificationStatus().name())
+                    .isFollowing(isFollowing)
                     .followedAt(edge.getCreatedAt())
                     .build();
         });
