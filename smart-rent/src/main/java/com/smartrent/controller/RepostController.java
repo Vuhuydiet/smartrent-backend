@@ -1,7 +1,9 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.request.RenewListingRequest;
 import com.smartrent.dto.request.RepostListingRequest;
 import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.RenewListingResponse;
 import com.smartrent.dto.response.RepostResponse;
 import com.smartrent.service.repost.RepostService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -93,5 +95,57 @@ public class RepostController {
         log.info("User {} reposting listing {}", userId, request.getListingId());
         RepostResponse response = repostService.repostListing(userId, request);
         return ApiResponse.<RepostResponse>builder().data(response).build();
+    }
+
+    @PostMapping("/renew")
+    @Operation(
+        summary = "Renew (gia hạn) an active listing by +30 days",
+        description = """
+            Extend an active listing's expiry by a cumulative 30 days. Always
+            quota-only — consumes one credit of the listing's current VIP tier
+            benefit (POST_SILVER / POST_GOLD / POST_DIAMOND). NORMAL listings
+            cannot be renewed.
+
+            The new expiry is `max(current expiry, now) + 30 days`, so renewing
+            mid-cycle stacks instead of reseting the timer. Expired listings
+            reject this call — the FE shows the "đăng lại" (repost) button
+            for those.
+            """,
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = RenewListingRequest.class),
+                examples = @ExampleObject(
+                    name = "Renew listing",
+                    summary = "Renew by 30 days using current-tier quota",
+                    value = """
+                        {
+                          "listingId": 123
+                        }
+                        """
+                )
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Successfully renewed listing",
+                content = @Content(schema = @Schema(implementation = RenewListingResponse.class))
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Listing expired, NORMAL tier, or insufficient quota"
+            )
+        }
+    )
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    public ApiResponse<RenewListingResponse> renewListing(@RequestBody @Valid RenewListingRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
+        log.info("User {} renewing listing {}", userId, request.getListingId());
+        RenewListingResponse response = repostService.renewListing(userId, request);
+        return ApiResponse.<RenewListingResponse>builder().data(response).build();
     }
 }

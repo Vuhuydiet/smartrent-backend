@@ -3,8 +3,10 @@ package com.smartrent.service.repost.impl;
 import com.smartrent.config.Constants;
 import com.smartrent.constants.PricingConstants;
 import com.smartrent.dto.request.PaymentRequest;
+import com.smartrent.dto.request.RenewListingRequest;
 import com.smartrent.dto.request.RepostListingRequest;
 import com.smartrent.dto.response.PaymentResponse;
+import com.smartrent.dto.response.RenewListingResponse;
 import com.smartrent.dto.response.RepostResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.ListingStatus;
@@ -131,6 +133,81 @@ public class RepostServiceImpl implements RepostService {
                 .message("Payment required")
                 .paymentUrl(paymentResponse.getPaymentUrl())
                 .transactionId(paymentResponse.getTransactionRef())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+    })
+    public RenewListingResponse renewListing(String userId, RenewListingRequest request) {
+        log.info("Renewing listing {} for user {}", request.getListingId(), userId);
+
+        Listing listing = listingRepository.findById(request.getListingId())
+                .orElseThrow(() -> new RuntimeException("Listing not found: " + request.getListingId()));
+
+        if (!listing.getUserId().equals(userId)) {
+            throw new RuntimeException("Listing does not belong to user");
+        }
+
+        ListingStatus status = listing.computeListingStatus();
+        if (status == ListingStatus.EXPIRED) {
+            throw new RuntimeException(
+                    "Expired listings cannot be renewed — use repost instead. Current status: " + status);
+        }
+
+        Listing.VipType vipType = listing.getVipType();
+        BenefitType benefitType = mapVipTypeToBenefitType(vipType);
+        if (benefitType == null) {
+            throw new RuntimeException(
+                    "Renewal requires a VIP tier (SILVER/GOLD/DIAMOND); current tier: " + vipType);
+        }
+
+        var quotaStatus = quotaService.checkQuotaAvailability(userId, benefitType);
+        if (quotaStatus.getTotalAvailable() <= 0) {
+            throw new RuntimeException(
+                    "No remaining " + benefitType + " quota to renew this listing");
+        }
+
+        boolean consumed = quotaService.consumeQuota(userId, benefitType, 1);
+        if (!consumed) {
+            log.error("Failed to consume {} quota for user {} during renewal", benefitType, userId);
+            throw new RuntimeException("Failed to consume renew quota");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        // Cumulative extension: keep counting from the existing expiry when it's
+        // still in the future. If the listing is somehow already past expiry but
+        // the expired flag hasn't flipped yet, anchor on `now` so the user gets
+        // a real 30 days instead of an expiry already in the past.
+        LocalDateTime previousExpiry = listing.getExpiryDate();
+        LocalDateTime anchor = (previousExpiry != null && previousExpiry.isAfter(now))
+                ? previousExpiry
+                : now;
+        LocalDateTime newExpiry = anchor.plusDays(PricingConstants.DURATION_30_DAYS);
+
+        listing.setExpiryDate(newExpiry);
+        listing.setExpired(false);
+        // durationDays reflects the most recent billing window; renewals add a
+        // fresh 30-day window, so update it for FE/admin views.
+        listing.setDurationDays(PricingConstants.DURATION_30_DAYS);
+        listingRepository.save(listing);
+
+        log.info("Successfully renewed listing {} for user {} — previous expiry {}, new expiry {}",
+                listing.getListingId(), userId, previousExpiry, newExpiry);
+
+        return RenewListingResponse.builder()
+                .listingId(listing.getListingId())
+                .userId(userId)
+                .renewedAt(now)
+                .previousExpiryDate(previousExpiry)
+                .expiryDate(newExpiry)
+                .daysAdded(PricingConstants.DURATION_30_DAYS)
+                .vipType(vipType != null ? vipType.name() : null)
+                .message("Listing renewed successfully using quota")
                 .build();
     }
 

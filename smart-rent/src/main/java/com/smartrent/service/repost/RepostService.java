@@ -1,6 +1,8 @@
 package com.smartrent.service.repost;
 
+import com.smartrent.dto.request.RenewListingRequest;
 import com.smartrent.dto.request.RepostListingRequest;
+import com.smartrent.dto.response.RenewListingResponse;
 import com.smartrent.dto.response.RepostResponse;
 
 /**
@@ -32,4 +34,17 @@ public interface RepostService {
      * Called from the payment provider callback.
      */
     RepostResponse completeRepostAfterPayment(String transactionId);
+
+    /**
+     * Renew (gia hạn) an active listing by extending its expiry by a fixed
+     * 30 days, cumulatively (new expiry = max(current expiry, now) + 30
+     * days). Always quota-only — consumes one credit of the listing's
+     * current VIP tier benefit (POST_SILVER / POST_GOLD / POST_DIAMOND).
+     *
+     * <p>Throws when the listing is expired, owned by another user, has
+     * VIP tier NORMAL (no matching benefit type), or the user has no
+     * remaining quota for that tier. The caller (FE) should prevent these
+     * states by hiding the renew button.
+     */
+    RenewListingResponse renewListing(String userId, RenewListingRequest request);
 }
