@@ -74,7 +74,7 @@ public class UserFollowController {
             @Parameter(description = "Page size (max 50)", example = "20")
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 50));
-        Page<FollowedUserResponse> result = userFollowService.getFollowers(userId, pageable);
+        Page<FollowedUserResponse> result = userFollowService.getFollowers(currentUserIdOrNull(), userId, pageable);
         return ApiResponse.<Page<FollowedUserResponse>>builder().data(result).build();
     }
 
@@ -85,7 +85,7 @@ public class UserFollowController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 50));
-        Page<FollowedUserResponse> result = userFollowService.getFollowing(userId, pageable);
+        Page<FollowedUserResponse> result = userFollowService.getFollowing(currentUserIdOrNull(), userId, pageable);
         return ApiResponse.<Page<FollowedUserResponse>>builder().data(result).build();
     }
 

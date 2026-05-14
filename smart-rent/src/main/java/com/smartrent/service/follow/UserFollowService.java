@@ -27,11 +27,20 @@ public interface UserFollowService {
      */
     FollowStatusResponse getStatus(String followerId, String followingId);
 
-    /** Users who follow {@code userId}. Newest first. */
-    Page<FollowedUserResponse> getFollowers(String userId, Pageable pageable);
+    /**
+     * Users who follow {@code userId}. Newest first.
+     * {@code viewerId} (the authenticated caller, may be null) is used to populate
+     * each row's {@code isFollowing} flag in bulk so the FE does not need N status
+     * round-trips to render the follow toggle.
+     */
+    Page<FollowedUserResponse> getFollowers(String viewerId, String userId, Pageable pageable);
 
-    /** Users that {@code userId} follows. Newest first. */
-    Page<FollowedUserResponse> getFollowing(String userId, Pageable pageable);
+    /**
+     * Users that {@code userId} follows. Newest first.
+     * {@code viewerId} (the authenticated caller, may be null) is used to populate
+     * each row's {@code isFollowing} flag in bulk.
+     */
+    Page<FollowedUserResponse> getFollowing(String viewerId, String userId, Pageable pageable);
 
     /**
      * Fan out a NEW_LISTING_FROM_FOLLOWED_USER notification to every follower of the

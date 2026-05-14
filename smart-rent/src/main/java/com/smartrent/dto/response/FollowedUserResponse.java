@@ -29,6 +29,11 @@ public class FollowedUserResponse {
     Boolean isBroker;
     String brokerVerificationStatus;
 
+    @Schema(description = "Whether the currently authenticated viewer follows this user. " +
+            "Always false for anonymous callers; allows the client to render the " +
+            "follow-toggle without an extra round-trip per row.")
+    Boolean isFollowing;
+
     @Schema(description = "When this follow edge was created")
     LocalDateTime followedAt;
 }
