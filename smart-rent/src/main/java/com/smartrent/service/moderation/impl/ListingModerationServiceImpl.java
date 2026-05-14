@@ -24,6 +24,7 @@ import com.smartrent.infra.repository.entity.ListingOwnerAction;
 import com.smartrent.infra.repository.entity.Media;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.mapper.UserMapper;
+import com.smartrent.service.follow.UserFollowService;
 import com.smartrent.service.moderation.ListingModerationService;
 import com.smartrent.service.notification.NotificationService;
 import com.smartrent.utility.ModerationEmailBuilder;
@@ -61,6 +62,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     UserMapper userMapper;
     EmailService emailService;
     NotificationService notificationService;
+    UserFollowService userFollowService;
 
     @NonFinal
     @Value("${application.email.sender.email}")
@@ -123,6 +125,21 @@ public class ListingModerationServiceImpl implements ListingModerationService {
                         saved.getUserId(), RecipientType.USER,
                         notifType, "Cập nhật kiểm duyệt tin đăng", notifMessage,
                         saved.getListingId(), "LISTING");
+            }
+        }
+
+        // Fan-out NEW_LISTING_FROM_FOLLOWED_USER to followers only when the listing
+        // transitions to APPROVED (becomes public) from a non-approved state. Skips
+        // shadow/draft listings and avoids re-notifying on suspended→approved cycles.
+        if ("APPROVE".equals(decision)
+                && previousStatus != ModerationStatus.APPROVED
+                && !Boolean.TRUE.equals(saved.getIsShadow())
+                && !Boolean.TRUE.equals(saved.getIsDraft())) {
+            try {
+                userFollowService.notifyFollowersOfNewListing(saved);
+            } catch (Exception e) {
+                log.warn("Follower notification fan-out failed for listing {}: {}",
+                        saved.getListingId(), e.getMessage());
             }
         }
 
