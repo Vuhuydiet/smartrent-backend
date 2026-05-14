@@ -124,7 +124,6 @@ public class ListingServiceImpl implements ListingService {
     ListingRequestCacheService listingRequestCacheService;
     ListingQueryService listingQueryService;
     com.smartrent.service.moderation.ListingModerationService listingModerationService;
-    com.smartrent.service.follow.UserFollowService userFollowService;
     com.smartrent.infra.repository.UserFollowRepository userFollowRepository;
 
     @Override
@@ -255,8 +254,6 @@ public class ListingServiceImpl implements ListingService {
             createShadowListing(saved);
         }
 
-        notifyFollowersSafely(saved);
-
         return listingMapper.toCreationResponse(saved);
     }
 
@@ -383,8 +380,6 @@ public class ListingServiceImpl implements ListingService {
                     createShadowListing(saved);
                 }
 
-                notifyFollowersSafely(saved);
-
                 return listingMapper.toCreationResponse(saved);
             }
         }
@@ -487,25 +482,6 @@ public class ListingServiceImpl implements ListingService {
                 .isVerify(true)
                 .expired(false)
                 .build();
-    }
-
-    /**
-     * Best-effort fan-out of NEW_LISTING_FROM_FOLLOWED_USER to the author's followers.
-     * Failures here must never roll back listing creation, so we swallow exceptions
-     * (UserFollowService also has its own try/catch + REQUIRES_NEW transaction).
-     */
-    private void notifyFollowersSafely(Listing listing) {
-        if (listing == null
-                || Boolean.TRUE.equals(listing.getIsShadow())
-                || Boolean.TRUE.equals(listing.getIsDraft())) {
-            return;
-        }
-        try {
-            userFollowService.notifyFollowersOfNewListing(listing);
-        } catch (Exception e) {
-            log.warn("Follower notification fan-out failed for listing {}: {}",
-                    listing.getListingId(), e.getMessage());
-        }
     }
 
     private void createShadowListing(Listing premiumListing) {
@@ -1023,8 +999,6 @@ public class ListingServiceImpl implements ListingService {
             // Remove from cache
             listingRequestCacheService.removeNormalListingRequest(transactionId);
 
-            notifyFollowersSafely(saved);
-
             return listingMapper.toCreationResponse(saved);
 
         } catch (Exception e) {
@@ -1080,8 +1054,6 @@ public class ListingServiceImpl implements ListingService {
 
             // Remove from cache
             listingRequestCacheService.removeVipListingRequest(transactionId);
-
-            notifyFollowersSafely(savedVipListing);
 
             return listingMapper.toCreationResponse(savedVipListing);
 
