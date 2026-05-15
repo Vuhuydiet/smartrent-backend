@@ -93,8 +93,16 @@ public class SecurityConfig {
             return null;
           }
 
+          // Optional-auth endpoints are listed in the public GET allowlist (so
+          // anonymous callers get through) but still need the JWT processed when
+          // a Bearer token is present, so the response can include
+          // viewer-specific fields like `isFollowing`. Without this, follow
+          // buttons always render as "Follow" on page refresh because the
+          // server never sees who is asking.
+          boolean isOptionalAuthRequest = isOptionalAuthPath(method, path);
+
           // Check if this is a public GET endpoint
-          if ("GET".equalsIgnoreCase(method)) {
+          if (!isOptionalAuthRequest && "GET".equalsIgnoreCase(method)) {
             // Exclude endpoints that always require authentication
             if (path.contains("/my-") || path.contains("/draft/") ||
                 path.contains("/admin") || path.contains("/quota-check")) {
@@ -111,7 +119,7 @@ public class SecurityConfig {
           }
 
           // Check if this is a public POST endpoint
-          if ("POST".equalsIgnoreCase(method)) {
+          if (!isOptionalAuthRequest && "POST".equalsIgnoreCase(method)) {
             for (String pattern : postPatterns) {
               if (pathMatches(path, pattern)) {
                 log.debug("Skipping JWT for public POST endpoint: {}", path);
@@ -120,7 +128,9 @@ public class SecurityConfig {
             }
           }
 
-          // For other requests, extract the bearer token normally
+          // For other requests, extract the bearer token normally. On
+          // optional-auth endpoints, missing or malformed headers just mean
+          // "anonymous" — the controller branches on currentUserIdOrNull().
           String authorization = request.getHeader("Authorization");
           if (authorization != null && authorization.startsWith("Bearer ")) {
             return authorization.substring(7);
@@ -145,6 +155,24 @@ public class SecurityConfig {
         .replace("*", "[^/]*")
         .replace("@@DOUBLE_STAR@@", ".*");
     return path.matches(regex);
+  }
+
+  // Endpoints that are public to anonymous callers but must still process a
+  // Bearer token when one is supplied (so the response can include
+  // viewer-specific fields). Kept inline because the list is small; promote to
+  // application.yml if it grows.
+  private static final String[] OPTIONAL_AUTH_GET_PATTERNS = {
+      "/v1/users/*/follow-status",
+      "/v1/users/*/followers",
+      "/v1/users/*/following",
+  };
+
+  private boolean isOptionalAuthPath(String method, String path) {
+    if (!"GET".equalsIgnoreCase(method)) return false;
+    for (String pattern : OPTIONAL_AUTH_GET_PATTERNS) {
+      if (pathMatches(path, pattern)) return true;
+    }
+    return false;
   }
 
   @Bean
