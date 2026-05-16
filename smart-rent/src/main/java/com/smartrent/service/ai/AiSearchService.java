@@ -1,5 +1,6 @@
 package com.smartrent.service.ai;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartrent.dto.request.AiParsedCriteriaDto;
 import com.smartrent.dto.request.SearchRequest;
 import com.smartrent.dto.response.ListingResponse;
@@ -12,14 +13,17 @@ import com.smartrent.infra.repository.entity.User;
 import com.smartrent.mapper.AddressMapper;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.mapper.UserMapper;
+import com.smartrent.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,6 +38,10 @@ public class AiSearchService {
     private final ListingMapper listingMapper;
     private final UserMapper userMapper;
     private final AddressMapper addressMapper;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+
+    private static final Duration AI_PARSE_CACHE_TTL = Duration.ofMinutes(30);
 
     /**
      * Handles Natural Language Free Text Search
@@ -43,16 +51,7 @@ public class AiSearchService {
         log.info("Processing natural language search query: {}", request.getQuery());
         
         // 1. Send natural language query to AI Server to get structured JSON
-        AiParsedCriteriaDto criteria;
-        try {
-            criteria = aiServerClient.parseNaturalLanguage(request);
-            log.info("AI parsed criteria: {}", criteria);
-        } catch (Exception e) {
-            log.error("Failed to parse query via AI Server. Falling back to FULLTEXT search.", e);
-            // Fallback: If AI fails, use the raw query as a FULLTEXT search keyword
-            criteria = new AiParsedCriteriaDto();
-            criteria.setKeyword(request.getQuery());
-        }
+        AiParsedCriteriaDto criteria = parseWithCache(request);
 
         // 2. Build dynamic JPA query from AI structured output
         org.springframework.data.jpa.domain.Specification<Listing> spec = ListingSpecification.matchesCriteria(criteria);
@@ -73,5 +72,46 @@ public class AiSearchService {
         }).collect(Collectors.toList());
         
         return new PageImpl<>(mappedListings, pageable, listings.getTotalElements());
+    }
+
+    private AiParsedCriteriaDto parseWithCache(SearchRequest request) {
+        String query = request != null ? request.getQuery() : null;
+        String normalized = TextNormalizer.normalize(query);
+        String cacheKey = normalized == null ? null : "search:ai:parse:" + Integer.toHexString(normalized.hashCode());
+
+        if (cacheKey != null) {
+            try {
+                String cached = redisTemplate.opsForValue().get(cacheKey);
+                if (cached != null && !cached.isBlank()) {
+                    return objectMapper.readValue(cached, AiParsedCriteriaDto.class);
+                }
+            } catch (Exception e) {
+                log.debug("AI parse cache read skipped: {}", e.getMessage());
+            }
+        }
+
+        AiParsedCriteriaDto criteria;
+        try {
+            criteria = aiServerClient.parseNaturalLanguage(request);
+            if (criteria == null) {
+                criteria = new AiParsedCriteriaDto();
+                criteria.setKeyword(query);
+            }
+            log.info("AI parsed criteria: {}", criteria);
+        } catch (Exception e) {
+            log.error("Failed to parse query via AI Server. Falling back to FULLTEXT search.", e);
+            criteria = new AiParsedCriteriaDto();
+            criteria.setKeyword(query);
+        }
+
+        if (cacheKey != null && criteria != null) {
+            try {
+                redisTemplate.opsForValue().set(cacheKey, objectMapper.writeValueAsString(criteria), AI_PARSE_CACHE_TTL);
+            } catch (Exception e) {
+                log.debug("AI parse cache write skipped: {}", e.getMessage());
+            }
+        }
+
+        return criteria;
     }
 }
