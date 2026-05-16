@@ -10,6 +10,7 @@ import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Top-level response envelope for {@code GET /v1/listings/search-suggestions}.
@@ -46,4 +47,14 @@ public class SearchSuggestionsResponse {
         example = "9876"
     )
     long impressionId;
+
+    @Schema(
+        description = "Structured filters parsed from the free-text query (no AI required). " +
+                      "The frontend can apply these directly to POST /v1/listings/search when " +
+                      "the user submits, enabling auto-applied filters. Empty when the query " +
+                      "carries no recognisable filter intent.",
+        nullable = true,
+        example = "{\"productType\":\"ROOM\",\"maxPrice\":5000000,\"locationText\":\"tan binh\"}"
+    )
+    Map<String, Object> appliedFilters;
 }
