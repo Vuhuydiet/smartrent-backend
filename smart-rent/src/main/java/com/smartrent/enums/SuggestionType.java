@@ -13,5 +13,8 @@ package com.smartrent.enums;
 public enum SuggestionType {
     TITLE,
     LOCATION,
-    POPULAR_QUERY
+    POPULAR_QUERY,
+    TYPO_CORRECTION,
+    PHONETIC,
+    AI_INTENT
 }

@@ -31,7 +31,7 @@ public class SearchSuggestionItem {
     @Schema(
         description = "Source type of the suggestion",
         example = "TITLE",
-        allowableValues = {"TITLE", "LOCATION", "POPULAR_QUERY"}
+        allowableValues = {"TITLE", "LOCATION", "POPULAR_QUERY", "TYPO_CORRECTION", "PHONETIC", "AI_INTENT"}
     )
     SuggestionType type;
 

@@ -612,5 +612,31 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         @Param("categoryId")    Long    categoryId,
         @Param("lim")           int     limit
     );
-}
 
+    @Query(nativeQuery = true, value = """
+        SELECT   l.listing_id,
+                 l.title,
+                 a.full_address,
+                 a.full_newaddress
+        FROM     listings l
+        JOIN     addresses a ON l.address_id = a.address_id
+        WHERE    l.phonetic_title LIKE CONCAT('%', :phoneticQuery, '%')
+          AND    l.phonetic_title IS NOT NULL
+          AND    (:provinceId IS NULL OR a.legacy_province_id = :provinceId)
+          AND    (:categoryId IS NULL OR l.category_id        = :categoryId)
+          AND    l.is_draft  = false
+          AND    l.is_shadow = false
+          AND    l.verified  = true
+          AND    l.expired   = false
+        ORDER BY l.vip_type_sort_order ASC,
+                 l.pushed_at          DESC,
+                 l.post_date          DESC
+        LIMIT    :lim
+        """)
+    List<Object[]> findPhoneticTitleSuggestions(
+        @Param("phoneticQuery") String  phoneticQuery,
+        @Param("provinceId")    Integer provinceId,
+        @Param("categoryId")    Long    categoryId,
+        @Param("lim")           int     limit
+    );
+}

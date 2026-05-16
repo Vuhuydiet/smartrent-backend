@@ -1,8 +1,11 @@
 package com.smartrent.service.discovery.impl;
 
+import com.smartrent.dto.request.AiSuggestionRequest;
+import com.smartrent.dto.response.AiSuggestionResponse;
 import com.smartrent.dto.response.SearchSuggestionItem;
 import com.smartrent.dto.response.SearchSuggestionsResponse;
 import com.smartrent.enums.SuggestionType;
+import com.smartrent.infra.client.AiServerClient;
 import com.smartrent.infra.repository.LegacyDistrictRepository;
 import com.smartrent.infra.repository.LegacyProvinceRepository;
 import com.smartrent.infra.repository.LegacyWardRepository;
@@ -20,6 +23,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.language.DoubleMetaphone;
+import org.apache.commons.text.similarity.LevenshteinDistance;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -35,6 +40,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Implementation of {@link SearchSuggestionService}.
@@ -64,12 +71,17 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
     // ── Weights ──────────────────────────────────────────────────────────────
     private static final double WEIGHT_TITLE         = 1.5;
+    private static final double WEIGHT_AI_INTENT     = 1.15;
     private static final double WEIGHT_LOCATION      = 1.0;
+    private static final double WEIGHT_TYPO          = 0.95;
+    private static final double WEIGHT_PHONETIC      = 0.9;
     private static final double WEIGHT_POPULAR_QUERY = 0.8;
     private static final double SCORE_DECAY_PER_RANK = 0.05;
 
     /** Rolling window for popular-query aggregation (7 days). */
     private static final long POPULAR_QUERY_WINDOW_DAYS = 7;
+    private static final int MIN_AI_SUGGESTION_LENGTH = 5;
+    private static final Pattern PRICE_TRIEU_PATTERN = Pattern.compile("\\b(\\d{1,3})\\s*(tr|trieu)\\b");
 
     /**
      * Province codes returned as default LOCATION suggestions when the user
@@ -90,6 +102,25 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     LegacyProvinceRepository      legacyProvinceRepository;
     SearchQueryImpressionRepository impressionRepository;
     SearchSuggestionClickRepository clickRepository;
+    AiServerClient aiServerClient;
+
+    DoubleMetaphone metaphone = new DoubleMetaphone();
+    LevenshteinDistance levenshtein = new LevenshteinDistance();
+
+    private static final List<String> LOCAL_CANONICAL_SUGGESTIONS = List.of(
+            "phòng trọ quận 1 dưới 5 triệu",
+            "căn hộ quận 1 giá dưới 5 triệu",
+            "căn hộ gần đại học quốc gia",
+            "căn hộ full nội thất gần đại học quốc gia",
+            "phòng trọ có máy lạnh",
+            "phòng trọ full nội thất có máy lạnh",
+            "phòng full nội thất bình thạnh",
+            "nhà trọ giá rẻ quận 7",
+            "phòng trọ quận 7 giá rẻ",
+            "căn hộ bình thạnh full nội thất",
+            "studio gần trung tâm",
+            "phòng trọ thủ đức gần đại học quốc gia"
+    );
 
     // ─────────────────────────────────────────────────────────────────────────
     // Public API
@@ -121,7 +152,8 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
         int safeLimit = Math.min(Math.max(limit, 1), 20);
 
-        String normalized = TextNormalizer.normalize(query);
+        String rawNormalized = TextNormalizer.normalize(query);
+        String normalized = normalizeIntent(rawNormalized);
         if (normalized == null || normalized.length() < 2) {
             // Empty / very short query → return curated top-city LOCATION
             // suggestions so the dropdown is useful on focus before typing.
@@ -143,9 +175,16 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         List<SearchSuggestionItem> titleItems    = fetchTitleSuggestions(normalized, provinceIdInt, categoryId, safeLimit);
         List<SearchSuggestionItem> locationItems = fetchLocationSuggestions(normalized, provinceId);
         List<SearchSuggestionItem> popularItems  = fetchPopularQuerySuggestions(normalized, safeLimit);
+        List<SearchSuggestionItem> typoItems     = fetchTypoSuggestions(normalized, safeLimit);
+        List<SearchSuggestionItem> phoneticItems = fetchPhoneticSuggestions(normalized, provinceIdInt, categoryId, safeLimit);
 
         // ── Merge, deduplicate, rank, and trim ───────────────────────────────
-        List<SearchSuggestionItem> merged = mergeAndRank(titleItems, locationItems, popularItems, safeLimit);
+        List<SearchSuggestionItem> merged = mergeAndRank(
+                titleItems, locationItems, popularItems, typoItems, phoneticItems, Collections.emptyList(), safeLimit);
+        if (shouldCallAiForSuggestions(normalized, merged, safeLimit)) {
+            List<SearchSuggestionItem> aiItems = fetchAiIntentSuggestions(query, normalized, safeLimit);
+            merged = mergeAndRank(titleItems, locationItems, popularItems, typoItems, phoneticItems, aiItems, safeLimit);
+        }
 
         // ── Persist impression (separate TX — does not affect cache result) ──
         long impressionId = persistImpression(normalized, provinceId, categoryId, merged.size(), clientIp, sessionId);
@@ -175,6 +214,154 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     // ─────────────────────────────────────────────────────────────────────────
     // Private — Suggestion fetchers
     // ─────────────────────────────────────────────────────────────────────────
+
+    private String normalizeIntent(String normalized) {
+        if (normalized == null || normalized.isBlank()) return null;
+
+        String result = " " + normalized + " ";
+        result = result.replace(" canho ", " can ho ");
+        result = result.replace(" phongtro ", " phong tro ");
+        result = result.replace(" nha tro ", " phong tro ");
+        result = result.replace(" tro ", " phong tro ");
+        result = result.replace(" dhqg ", " dai hoc quoc gia ");
+        result = result.replace(" may lan ", " may lanh ");
+        result = result.replace(" maylanh ", " may lanh ");
+        result = result.replace(" full nt ", " full noi that ");
+        result = result.replace(" noi that day du ", " full noi that ");
+
+        for (int i = 1; i <= 12; i++) {
+            result = result.replace(" q" + i + " ", " quan " + i + " ");
+        }
+
+        Matcher matcher = PRICE_TRIEU_PATTERN.matcher(result);
+        result = matcher.replaceAll("$1 trieu");
+
+        return result.replaceAll("\\s+", " ").trim();
+    }
+
+    private List<SearchSuggestionItem> fetchTypoSuggestions(String normalized, int limit) {
+        List<SearchSuggestionItem> items = new ArrayList<>();
+        for (String candidate : LOCAL_CANONICAL_SUGGESTIONS) {
+            String candidateNorm = TextNormalizer.normalize(candidate);
+            if (candidateNorm == null) continue;
+
+            int distance = levenshtein.apply(compactKey(normalized), compactKey(candidateNorm));
+            boolean contains = candidateNorm.contains(normalized) || normalized.contains(candidateNorm);
+            boolean close = distance > 0 && distance <= Math.max(2, Math.min(5, normalized.length() / 4));
+            if (!contains && !close) continue;
+
+            double bonus = contains ? 0.15 : 0.0;
+            double score = WEIGHT_TYPO + bonus - (0.03 * items.size());
+            items.add(buildTextSuggestion(SuggestionType.TYPO_CORRECTION, candidate, score, "LOCAL_DICTIONARY"));
+            if (items.size() >= limit) break;
+        }
+        return items;
+    }
+
+    private List<SearchSuggestionItem> fetchPhoneticSuggestions(
+            String normalized, Integer provinceIdInt, Long categoryId, int limit) {
+        String phoneticQuery = toPhoneticQuery(normalized);
+        if (phoneticQuery == null || phoneticQuery.length() < 2) {
+            return Collections.emptyList();
+        }
+
+        List<SearchSuggestionItem> items = new ArrayList<>();
+        for (String candidate : LOCAL_CANONICAL_SUGGESTIONS) {
+            String candidatePhonetic = toPhoneticQuery(TextNormalizer.normalize(candidate));
+            if (candidatePhonetic != null && candidatePhonetic.contains(phoneticQuery)) {
+                items.add(buildTextSuggestion(
+                        SuggestionType.PHONETIC, candidate,
+                        WEIGHT_PHONETIC - (0.03 * items.size()), "LOCAL_PHONETIC"));
+            }
+            if (items.size() >= limit) return items;
+        }
+
+        try {
+            List<Object[]> rows = listingRepository.findPhoneticTitleSuggestions(
+                    phoneticQuery, provinceIdInt, categoryId, limit);
+            for (Object[] row : rows) {
+                Map<String, Object> meta = new HashMap<>();
+                String addr = chooseAddress(toString(row[2]), toString(row[3]));
+                if (addr != null) meta.put("address", addr);
+                meta.put("matchType", "DB_PHONETIC");
+
+                items.add(SearchSuggestionItem.builder()
+                        .type(SuggestionType.PHONETIC)
+                        .text(toString(row[1]))
+                        .listingId(toLong(row[0]))
+                        .metadata(meta)
+                        .score(WEIGHT_PHONETIC - (0.03 * items.size()))
+                        .build());
+            }
+            return items;
+        } catch (Exception e) {
+            log.warn("search-suggestions: phonetic fetch failed (non-fatal): {}", e.getMessage(), e);
+            return items;
+        }
+    }
+
+    private boolean shouldCallAiForSuggestions(String normalized, List<SearchSuggestionItem> localItems, int limit) {
+        if (normalized == null || normalized.length() < MIN_AI_SUGGESTION_LENGTH) return false;
+        if (localItems.size() < Math.min(3, limit)) return true;
+        return normalized.contains(" gan ") || normalized.contains(" duoi ") || normalized.contains(" tren ");
+    }
+
+    private List<SearchSuggestionItem> fetchAiIntentSuggestions(String rawQuery, String normalized, int limit) {
+        try {
+            AiSuggestionResponse response = aiServerClient.suggestSearchQueries(AiSuggestionRequest.builder()
+                    .query(rawQuery)
+                    .limit(Math.min(limit, 5))
+                    .build());
+            if (response == null || response.getSuggestions() == null) {
+                return Collections.emptyList();
+            }
+
+            List<SearchSuggestionItem> items = new ArrayList<>();
+            for (String text : response.getSuggestions()) {
+                if (text == null || text.isBlank()) continue;
+                String itemNorm = TextNormalizer.normalize(text);
+                if (itemNorm == null) continue;
+
+                boolean related = itemNorm.contains(normalized)
+                        || normalized.split("\\s+").length >= 2
+                        || levenshtein.apply(compactKey(normalized), compactKey(itemNorm)) <= 5;
+                if (!related) continue;
+
+                items.add(buildTextSuggestion(
+                        SuggestionType.AI_INTENT, text,
+                        WEIGHT_AI_INTENT - (0.04 * items.size()), "AI_INTENT"));
+                if (items.size() >= limit) break;
+            }
+            return items;
+        } catch (Exception e) {
+            log.debug("search-suggestions: AI intent suggestions skipped: {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private SearchSuggestionItem buildTextSuggestion(SuggestionType type, String text, double score, String matchType) {
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("matchType", matchType);
+        return SearchSuggestionItem.builder()
+                .type(type)
+                .text(text)
+                .metadata(meta)
+                .score(score)
+                .build();
+    }
+
+    private String toPhoneticQuery(String normalized) {
+        if (normalized == null || normalized.isBlank()) return null;
+        StringBuilder result = new StringBuilder();
+        for (String word : normalized.split("\\s+")) {
+            if (word.length() < 2) continue;
+            String code = metaphone.doubleMetaphone(word);
+            if (code == null || code.isBlank()) continue;
+            if (!result.isEmpty()) result.append(' ');
+            result.append(code);
+        }
+        return result.isEmpty() ? null : result.toString();
+    }
 
     /**
      * Fetches TITLE suggestions from the listings table via a lightweight native projection.
@@ -541,6 +728,9 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             List<SearchSuggestionItem> titles,
             List<SearchSuggestionItem> locations,
             List<SearchSuggestionItem> popular,
+            List<SearchSuggestionItem> typo,
+            List<SearchSuggestionItem> phonetic,
+            List<SearchSuggestionItem> aiIntent,
             int limit) {
 
         // Use LinkedHashMap to preserve insertion order during dedup
@@ -548,6 +738,9 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
         for (SearchSuggestionItem item : titles)   dedup(seen, item);
         for (SearchSuggestionItem item : locations) dedup(seen, item);
+        for (SearchSuggestionItem item : aiIntent)  dedup(seen, item);
+        for (SearchSuggestionItem item : typo)      dedup(seen, item);
+        for (SearchSuggestionItem item : phonetic)  dedup(seen, item);
         for (SearchSuggestionItem item : popular)   dedup(seen, item);
 
         List<SearchSuggestionItem> result = new ArrayList<>(seen.values());

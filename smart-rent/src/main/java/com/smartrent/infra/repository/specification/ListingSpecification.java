@@ -906,6 +906,9 @@ public class ListingSpecification {
             List<Predicate> predicates = new ArrayList<>();
             
             // Only verified and active listings
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                query.distinct(true);
+            }
             predicates.add(criteriaBuilder.equal(root.get("verified"), true));
             predicates.add(criteriaBuilder.equal(root.get("expired"), false));
             predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
@@ -952,6 +955,27 @@ public class ListingSpecification {
                 if (criteria.getWard() != null) {
                     predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("wardName")), 
                         "%" + criteria.getWard().toLowerCase() + "%"));
+                }
+            }
+
+            if (criteria.getAmenities() != null && !criteria.getAmenities().isEmpty()) {
+                Join<Listing, Amenity> amenityJoin = root.join("amenities", JoinType.LEFT);
+                List<Predicate> amenityPredicates = new ArrayList<>();
+                for (String amenity : criteria.getAmenities()) {
+                    if (amenity == null || amenity.isBlank()) continue;
+                    String raw = amenity.toLowerCase();
+                    String normalized = TextNormalizer.normalize(amenity);
+                    amenityPredicates.add(criteriaBuilder.like(
+                            criteriaBuilder.lower(amenityJoin.get("name")),
+                            "%" + raw + "%"));
+                    if (normalized != null && !normalized.equals(raw)) {
+                        amenityPredicates.add(criteriaBuilder.like(
+                                criteriaBuilder.lower(amenityJoin.get("name")),
+                                "%" + normalized + "%"));
+                    }
+                }
+                if (!amenityPredicates.isEmpty()) {
+                    predicates.add(criteriaBuilder.or(amenityPredicates.toArray(new Predicate[0])));
                 }
             }
             
