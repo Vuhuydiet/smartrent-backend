@@ -7,7 +7,9 @@ import com.smartrent.infra.exception.PaymentNotFoundException;
 import com.smartrent.infra.exception.PaymentProviderException;
 import com.smartrent.infra.exception.PaymentValidationException;
 import com.smartrent.infra.repository.PaymentRepository;
+import com.smartrent.infra.repository.TransactionAuditRepository;
 import com.smartrent.infra.repository.entity.Transaction;
+import com.smartrent.infra.repository.entity.TransactionAudit;
 import com.smartrent.utility.PaymentUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.AccessLevel;
@@ -27,6 +29,7 @@ import java.util.Optional;
 public abstract class AbstractPaymentProvider implements PaymentProvider {
 
     PaymentRepository paymentRepository;
+    TransactionAuditRepository transactionAuditRepository;
 
     /**
      * Create a payment record in the database
@@ -42,6 +45,10 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
             Optional<Transaction> existingTransaction = paymentRepository.findByTransactionRef(request.getTransactionId());
             if (existingTransaction.isPresent()) {
                 Transaction transaction = existingTransaction.get();
+                if (transaction.getStatus() != TransactionStatus.PENDING) {
+                    log.info("Reusing final transaction {} with status {}", transaction.getTransactionId(), transaction.getStatus());
+                    return transaction;
+                }
                 // Update transaction with additional payment info if needed
                 String ipAddress = getClientIpAddress(httpRequest);
                 if (transaction.getIpAddress() == null || transaction.getIpAddress().equals("UNKNOWN") || transaction.getIpAddress().equals("127.0.0.1")) {
@@ -60,6 +67,18 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
                 : generateTransactionRef();
         String ipAddress = getClientIpAddress(httpRequest);
         String userId = getCurrentUserId();
+        String idempotencyKey = metadataValue(request, "idempotencyKey");
+
+        if (idempotencyKey != null) {
+            Optional<Transaction> existingByKey = paymentRepository.findByIdempotencyKey(idempotencyKey);
+            if (existingByKey.isPresent()) {
+                Transaction existing = existingByKey.get();
+                if (existing.getStatus() == TransactionStatus.PENDING || existing.getStatus() == TransactionStatus.COMPLETED) {
+                    log.info("Reusing transaction {} for idempotency key {}", existing.getTransactionId(), idempotencyKey);
+                    return existing;
+                }
+            }
+        }
 
         // Build additional info with all payment details
         StringBuilder additionalInfo = new StringBuilder();
@@ -96,9 +115,20 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
                 .additionalInfo(additionalInfo.toString())
                 .orderInfo(request.getOrderInfo())
                 .ipAddress(ipAddress)
+                .idempotencyKey(idempotencyKey)
+                .invoiceId(metadataValue(request, "invoiceId"))
+                .invoiceCode(metadataValue(request, "invoiceCode"))
+                .landlordId(metadataValue(request, "landlordId"))
+                .roomId(parseLong(metadataValue(request, "roomId")))
+                .roomCode(metadataValue(request, "roomCode"))
+                .roomName(metadataValue(request, "roomName"))
+                .roomAddress(metadataValue(request, "roomAddress"))
+                .expiredAt(LocalDateTime.now().plusMinutes(20))
                 .build();
 
-        return paymentRepository.save(transaction);
+        Transaction saved = paymentRepository.save(transaction);
+        audit(saved, null, TransactionStatus.PENDING, "SYSTEM", null, "Payment created", null);
+        return saved;
     }
 
     /**
@@ -114,19 +144,33 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
     @Transactional
     protected Transaction updatePaymentStatus(String transactionRef, TransactionStatus status,
                                           String responseCode, String responseMessage) {
-        Optional<Transaction> transactionOpt = paymentRepository.findByTransactionRef(transactionRef);
+        Optional<Transaction> transactionOpt = paymentRepository.findByTransactionRefForUpdate(transactionRef);
         if (transactionOpt.isEmpty()) {
             throw new PaymentNotFoundException(transactionRef);
         }
 
         Transaction transaction = transactionOpt.get();
+        TransactionStatus oldStatus = transaction.getStatus();
+        if (isFinalStatus(oldStatus)) {
+            log.info("Ignoring duplicate status update for final transaction {} with status {}", transactionRef, oldStatus);
+            return transaction;
+        }
         transaction.setStatus(status);
+        transaction.setGatewayResponseCode(responseCode);
+        if (status == TransactionStatus.COMPLETED) {
+            transaction.setCompletedAt(LocalDateTime.now());
+        }
+        if (status == TransactionStatus.FAILED || status == TransactionStatus.CANCELLED) {
+            transaction.setFailureReason(responseMessage);
+        }
 
         // Append response info to additional info
         String currentInfo = transaction.getAdditionalInfo() != null ? transaction.getAdditionalInfo() : "";
         transaction.setAdditionalInfo(currentInfo + " | Response: " + responseCode + " - " + responseMessage);
 
-        return paymentRepository.save(transaction);
+        Transaction saved = paymentRepository.save(transaction);
+        audit(saved, oldStatus, status, "GATEWAY", null, responseMessage, responseCode);
+        return saved;
     }
 
     /**
@@ -145,18 +189,34 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
         log.info("Updating payment with provider data - txnRef: {}, status: {}, responseCode: {}",
                  transactionRef, status, responseCode);
 
-        Optional<Transaction> transactionOpt = paymentRepository.findByTransactionRef(transactionRef);
+        Optional<Transaction> transactionOpt = paymentRepository.findByTransactionRefForUpdate(transactionRef);
         if (transactionOpt.isEmpty()) {
             log.error("Transaction not found for txnRef: {}", transactionRef);
             throw new PaymentNotFoundException(transactionRef);
         }
 
         Transaction transaction = transactionOpt.get();
+        TransactionStatus oldStatus = transaction.getStatus();
         log.info("Found transaction - txnId: {}, current status: {}, new status: {}",
                  transaction.getTransactionId(), transaction.getStatus(), status);
 
+        if (isFinalStatus(oldStatus)) {
+            log.info("Ignoring duplicate provider callback for final transaction {} with status {}", transactionRef, oldStatus);
+            return transaction;
+        }
+
         transaction.setProviderTransactionId(providerTransactionId);
         transaction.setStatus(status);
+        transaction.setPaymentMethod(paymentMethod);
+        transaction.setGatewayBankCode(bankCode);
+        transaction.setGatewayBankTransactionId(bankTransactionId);
+        transaction.setGatewayResponseCode(responseCode);
+        if (status == TransactionStatus.COMPLETED) {
+            transaction.setCompletedAt(LocalDateTime.now());
+        }
+        if (status == TransactionStatus.FAILED || status == TransactionStatus.CANCELLED) {
+            transaction.setFailureReason(responseMessage);
+        }
 
         log.info("After setStatus - transaction status is now: {}", transaction.getStatus());
 
@@ -171,6 +231,7 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
 
         log.info("Calling paymentRepository.save() for txnId: {}", transaction.getTransactionId());
         Transaction savedTransaction = paymentRepository.save(transaction);
+        audit(savedTransaction, oldStatus, status, "GATEWAY", null, responseMessage, providerTransactionId);
         log.info("Transaction saved successfully - txnId: {}, status: {}",
                  savedTransaction.getTransactionId(), savedTransaction.getStatus());
 
@@ -226,6 +287,41 @@ public abstract class AbstractPaymentProvider implements PaymentProvider {
      */
     protected boolean paymentExists(String transactionRef) {
         return paymentRepository.existsByTransactionRef(transactionRef);
+    }
+
+    private boolean isFinalStatus(TransactionStatus status) {
+        return status == TransactionStatus.COMPLETED
+                || status == TransactionStatus.FAILED
+                || status == TransactionStatus.CANCELLED
+                || status == TransactionStatus.REFUNDED;
+    }
+
+    private void audit(Transaction transaction, TransactionStatus oldStatus, TransactionStatus newStatus,
+                       String actorType, String actorId, String reason, String providerEventId) {
+        transactionAuditRepository.save(TransactionAudit.builder()
+                .transactionId(transaction.getTransactionId())
+                .oldStatus(oldStatus)
+                .newStatus(newStatus)
+                .actorType(actorType)
+                .actorId(actorId)
+                .reason(reason)
+                .providerEventId(providerEventId)
+                .build());
+    }
+
+    private String metadataValue(PaymentRequest request, String key) {
+        return request.getMetadata() == null ? null : request.getMetadata().get(key);
+    }
+
+    private Long parseLong(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     /**

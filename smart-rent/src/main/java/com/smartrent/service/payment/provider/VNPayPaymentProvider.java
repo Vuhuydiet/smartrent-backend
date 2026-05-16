@@ -13,6 +13,7 @@ import com.smartrent.infra.exception.PaymentNotFoundException;
 import com.smartrent.infra.exception.PaymentProviderException;
 import com.smartrent.infra.exception.PaymentValidationException;
 import com.smartrent.infra.repository.PaymentRepository;
+import com.smartrent.infra.repository.TransactionAuditRepository;
 import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.utility.PaymentUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,8 +53,11 @@ public class VNPayPaymentProvider extends AbstractPaymentProvider {
     // Pattern to match Vietnamese diacritical marks for removal
     private static final Pattern DIACRITICS_PATTERN = Pattern.compile("\\p{InCombiningDiacriticalMarks}+");
 
-    public VNPayPaymentProvider(PaymentRepository paymentRepository, VNPayConfig vnpayConfig, VNPayConnector vnpayConnector) {
-        super(paymentRepository);
+    public VNPayPaymentProvider(PaymentRepository paymentRepository,
+                                TransactionAuditRepository transactionAuditRepository,
+                                VNPayConfig vnpayConfig,
+                                VNPayConnector vnpayConnector) {
+        super(paymentRepository, transactionAuditRepository);
         this.vnpayConfig = vnpayConfig;
         this.vnpayConnector = vnpayConnector;
     }

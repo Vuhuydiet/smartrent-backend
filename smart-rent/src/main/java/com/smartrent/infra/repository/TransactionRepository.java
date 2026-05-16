@@ -6,17 +6,20 @@ import com.smartrent.enums.TransactionType;
 import com.smartrent.infra.repository.entity.Transaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import jakarta.persistence.LockModeType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface TransactionRepository extends JpaRepository<Transaction, String> {
+public interface TransactionRepository extends JpaRepository<Transaction, String>, JpaSpecificationExecutor<Transaction> {
 
     List<Transaction> findByUserId(String userId);
 
@@ -29,6 +32,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
     List<Transaction> findByUserIdAndTransactionTypeAndStatus(String userId, TransactionType transactionType, TransactionStatus status);
 
     Optional<Transaction> findByProviderTransactionId(String providerTransactionId);
+
+    Optional<Transaction> findByIdempotencyKey(String idempotencyKey);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM transactions t WHERE t.transactionId = :transactionId")
+    Optional<Transaction> findByTransactionIdForUpdate(@Param("transactionId") String transactionId);
 
     List<Transaction> findByReferenceTypeAndReferenceId(ReferenceType referenceType, String referenceId);
 

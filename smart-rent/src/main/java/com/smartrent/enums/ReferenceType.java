@@ -4,5 +4,9 @@ public enum ReferenceType {
     LISTING,
     MEMBERSHIP,
     PUSH,
-    REPOST
+    REPOST,
+    INVOICE,
+    ROOM,
+    CONTRACT,
+    WALLET
 }

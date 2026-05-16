@@ -7,6 +7,11 @@ public enum TransactionType {
     PUSH_FEE,
     REPOST_FEE,
     WALLET_TOPUP,
+    ROOM_RENT,
+    DEPOSIT,
+    MONTHLY_INVOICE,
+    UTILITY_BILL,
+    SERVICE_FEE,
     REFUND
 }
 
