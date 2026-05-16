@@ -8,7 +8,10 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-@FeignClient(name = "ai-server", url = "${ai.server.url:http://localhost:8000}")
+// Reads the same base URL as the rest of the AI integration
+// (feign.client.config.smartrent-ai.url) so the search AI fallback is
+// reachable in deployed environments, not just on localhost.
+@FeignClient(name = "ai-server", url = "${ai.server.url:${AI_SERVICE_BASE_URL:http://localhost:8000}}")
 public interface AiServerClient {
 
     @PostMapping("/api/v1/search/parse")

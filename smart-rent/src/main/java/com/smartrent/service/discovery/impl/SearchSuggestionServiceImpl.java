@@ -18,6 +18,7 @@ import com.smartrent.infra.repository.entity.LegacyWard;
 import com.smartrent.infra.repository.entity.SearchQueryImpression;
 import com.smartrent.infra.repository.entity.SearchSuggestionClick;
 import com.smartrent.service.discovery.SearchSuggestionService;
+import com.smartrent.util.SearchQueryParser;
 import com.smartrent.util.TextNormalizer;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -171,9 +173,18 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
         Integer provinceIdInt = parseProvinceId(provinceId);
 
-        // ── Fetch candidates from all three sources ──────────────────────────
+        // Parse the free-text query into structured filters locally (no AI).
+        // The isolated location token drives LOCATION matching, so a multi-word
+        // query like "tro tan binh duoi 5tr" still resolves the "Tân Bình"
+        // district instead of LIKE-matching the whole sentence against a name.
+        SearchQueryParser.ParsedQuery parsed = SearchQueryParser.parse(query);
+        String locationQuery = (parsed.locationText() != null && !parsed.locationText().isBlank())
+                ? parsed.locationText()
+                : normalized;
+
+        // ── Fetch candidates from all sources ────────────────────────────────
         List<SearchSuggestionItem> titleItems    = fetchTitleSuggestions(normalized, provinceIdInt, categoryId, safeLimit);
-        List<SearchSuggestionItem> locationItems = fetchLocationSuggestions(normalized, provinceId);
+        List<SearchSuggestionItem> locationItems = fetchLocationSuggestions(locationQuery, provinceId);
         List<SearchSuggestionItem> popularItems  = fetchPopularQuerySuggestions(normalized, safeLimit);
         List<SearchSuggestionItem> typoItems     = fetchTypoSuggestions(normalized, safeLimit);
         List<SearchSuggestionItem> phoneticItems = fetchPhoneticSuggestions(normalized, provinceIdInt, categoryId, safeLimit);
@@ -186,15 +197,23 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             merged = mergeAndRank(titleItems, locationItems, popularItems, typoItems, phoneticItems, aiItems, safeLimit);
         }
 
-        // ── Persist impression (separate TX — does not affect cache result) ──
-        long impressionId = persistImpression(normalized, provinceId, categoryId, merged.size(), clientIp, sessionId);
+        // ── Synthesize a "ready to apply" suggestion from parsed filters ─────
+        // Guarantees the dropdown is never empty for NL queries and gives the
+        // frontend a structured payload to auto-apply on submit.
+        Map<String, Object> appliedFilters = parsed.toAppliedFilters();
+        SearchSuggestionItem synthesized = synthesizeParsedSuggestion(parsed, merged, appliedFilters);
+        List<SearchSuggestionItem> finalList = withSynthesizedFirst(synthesized, merged, safeLimit);
 
-        log.debug("search-suggestions: q='{}' → {} suggestions (impression {})", normalized, merged.size(), impressionId);
+        // ── Persist impression (separate TX — does not affect cache result) ──
+        long impressionId = persistImpression(normalized, provinceId, categoryId, finalList.size(), clientIp, sessionId);
+
+        log.debug("search-suggestions: q='{}' → {} suggestions (impression {})", normalized, finalList.size(), impressionId);
 
         return SearchSuggestionsResponse.builder()
-                .suggestions(merged)
+                .suggestions(finalList)
                 .queryNorm(normalized)
                 .impressionId(impressionId)
+                .appliedFilters(appliedFilters.isEmpty() ? null : appliedFilters)
                 .build();
     }
 
@@ -370,7 +389,7 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     private List<SearchSuggestionItem> fetchTitleSuggestions(
             String normalized, Integer provinceIdInt, Long categoryId, int limit) {
         try {
-            String fulltextQuery = toBooleanFulltextQuery(normalized);
+            String fulltextQuery = toContentFulltextQuery(normalized);
             if (fulltextQuery == null) {
                 return Collections.emptyList();
             }
@@ -427,6 +446,156 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         }
 
         return query.isEmpty() ? null : query.toString();
+    }
+
+    /**
+     * Words that describe price / intent rather than title content. Forcing
+     * these into the AND full-text query is what made multi-word NL queries
+     * (e.g. "... duoi 5 trieu") match zero titles, since no listing title
+     * contains "duoi" or "trieu". They are dropped here so the title source
+     * matches on the meaningful tokens ("phong tro tan binh") instead.
+     */
+    private static final java.util.Set<String> FT_STOPWORDS = java.util.Set.of(
+            "duoi", "tren", "tu", "den", "khoang", "tam", "gia", "re",
+            "trieu", "tr", "ty", "nghin", "ngan", "cu", "gan", "khong",
+            "qua", "toi", "da", "it", "nhat", "co", "va", "can", "tim"
+    );
+
+    /**
+     * Builds the title full-text query from content words only. Falls back to
+     * {@link #toBooleanFulltextQuery} when every token was a stopword (e.g. the
+     * user typed only a price), so early single-word keystrokes still work.
+     */
+    private String toContentFulltextQuery(String normalized) {
+        if (normalized == null || normalized.isBlank()) return null;
+
+        StringBuilder query = new StringBuilder();
+        for (String word : normalized.split("\\s+")) {
+            if (word.length() < 2) continue;
+            if (FT_STOPWORDS.contains(word)) continue;
+            if (word.matches("\\d+")) continue;
+            if (!query.isEmpty()) query.append(' ');
+            query.append('+').append(word).append('*');
+        }
+
+        return query.isEmpty() ? toBooleanFulltextQuery(normalized) : query.toString();
+    }
+
+    /**
+     * Turns the locally-parsed filters into a single top-ranked suggestion the
+     * user can click to run the search with filters already applied. When a
+     * LOCATION candidate was found it reuses that accented name (and its legacy
+     * ids, copied into {@code appliedFilters}) so the displayed text is clean;
+     * otherwise it falls back to the parser's reconstructed phrase. Returns
+     * {@code null} when the query carried no recognisable filter intent.
+     */
+    private SearchSuggestionItem synthesizeParsedSuggestion(
+            SearchQueryParser.ParsedQuery parsed,
+            List<SearchSuggestionItem> merged,
+            Map<String, Object> appliedFilters) {
+
+        if (parsed == null || !parsed.hasStructuredFilter()) return null;
+
+        SearchSuggestionItem bestLocation = merged.stream()
+                .filter(i -> i.getType() == SuggestionType.LOCATION)
+                .findFirst()
+                .orElse(null);
+
+        String productPart = vnProductTypeDisplay(parsed.productType());
+        String locationPart;
+
+        if (bestLocation != null) {
+            locationPart = bestLocation.getText();
+            copyLocationIds(bestLocation.getMetadata(), appliedFilters);
+        } else {
+            locationPart = parsed.locationText();
+        }
+
+        StringBuilder text = new StringBuilder();
+        if (productPart != null) text.append(productPart);
+        if (locationPart != null && !locationPart.isBlank()) {
+            if (!text.isEmpty()) text.append(' ');
+            text.append(locationPart);
+        }
+        String priceClause = priceClause(parsed.minPrice(), parsed.maxPrice());
+        if (priceClause != null) {
+            if (!text.isEmpty()) text.append(' ');
+            text.append(priceClause);
+        }
+        for (String a : parsed.amenities()) {
+            if (!text.isEmpty()) text.append(' ');
+            text.append(a);
+        }
+
+        String display = text.length() == 0 ? parsed.fallbackSuggestion() : text.toString();
+        if (display == null || display.isBlank()) return null;
+
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("matchType", "PARSED_QUERY");
+        meta.put("appliedFilters", appliedFilters);
+
+        return SearchSuggestionItem.builder()
+                .type(SuggestionType.AI_INTENT)
+                .text(display)
+                .metadata(meta)
+                .score(WEIGHT_TITLE + 1.0) // always rank first
+                .build();
+    }
+
+    private void copyLocationIds(Map<String, Object> locationMeta, Map<String, Object> appliedFilters) {
+        if (locationMeta == null) return;
+        for (String key : new String[]{
+                "legacyProvinceId", "legacyDistrictId", "legacyWardId",
+                "provinceCode", "districtCode", "wardCode"}) {
+            Object v = locationMeta.get(key);
+            if (v != null) appliedFilters.put(key, v);
+        }
+    }
+
+    private List<SearchSuggestionItem> withSynthesizedFirst(
+            SearchSuggestionItem synthesized, List<SearchSuggestionItem> merged, int limit) {
+
+        if (synthesized == null) return merged;
+
+        List<SearchSuggestionItem> result = new ArrayList<>(merged.size() + 1);
+        result.add(synthesized);
+        String synthKey = synthesized.getText().toLowerCase();
+        for (SearchSuggestionItem item : merged) {
+            if (item.getText() != null && item.getText().toLowerCase().equals(synthKey)) continue;
+            result.add(item);
+        }
+        return result.size() > limit ? new ArrayList<>(result.subList(0, limit)) : result;
+    }
+
+    private static String vnProductTypeDisplay(String productType) {
+        if (productType == null) return null;
+        return switch (productType) {
+            case "ROOM"      -> "phòng trọ";
+            case "APARTMENT" -> "căn hộ";
+            case "HOUSE"     -> "nhà";
+            case "STUDIO"    -> "studio";
+            case "OFFICE"    -> "văn phòng";
+            default          -> null;
+        };
+    }
+
+    private static String priceClause(BigDecimal min, BigDecimal max) {
+        if (min != null && max != null) return "từ " + humanPrice(min) + " đến " + humanPrice(max);
+        if (max != null) return "dưới " + humanPrice(max);
+        if (min != null) return "trên " + humanPrice(min);
+        return null;
+    }
+
+    private static String humanPrice(BigDecimal v) {
+        long n = v.longValue();
+        if (n >= 1_000_000_000L) return strip(n / 1_000_000_000d) + " tỷ";
+        if (n >= 1_000_000L)     return strip(n / 1_000_000d) + " triệu";
+        if (n >= 1_000L)         return strip(n / 1_000d) + " nghìn";
+        return String.valueOf(n);
+    }
+
+    private static String strip(double d) {
+        return d == Math.floor(d) ? String.valueOf((long) d) : String.valueOf(d);
     }
 
     /**

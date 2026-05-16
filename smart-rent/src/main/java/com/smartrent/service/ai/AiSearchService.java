@@ -13,6 +13,7 @@ import com.smartrent.infra.repository.entity.User;
 import com.smartrent.mapper.AddressMapper;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.mapper.UserMapper;
+import com.smartrent.util.SearchQueryParser;
 import com.smartrent.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,6 +75,43 @@ public class AiSearchService {
         return new PageImpl<>(mappedListings, pageable, listings.getTotalElements());
     }
 
+    /**
+     * No-AI fallback: derive structured filters locally instead of dumping the
+     * whole raw query into the keyword field. Dumping the raw query meant every
+     * token (including "dưới", "5tr") was ANDed into the FULLTEXT match, which
+     * matched zero listings. The local parser extracts price / type / location
+     * so the search still returns relevant results when the AI server is down.
+     */
+    private AiParsedCriteriaDto localParse(String query) {
+        SearchQueryParser.ParsedQuery p = SearchQueryParser.parse(query);
+        AiParsedCriteriaDto c = new AiParsedCriteriaDto();
+        c.setPropertyType(p.productType());
+        c.setListingType(p.listingType());
+        c.setMinPrice(p.minPrice());
+        c.setMaxPrice(p.maxPrice());
+        if (p.locationText() != null && !p.locationText().isBlank()) {
+            c.setDistrict(p.locationText());
+        }
+        if (p.amenities() != null && !p.amenities().isEmpty()) {
+            c.setAmenities(p.amenities());
+        }
+        if (!p.hasStructuredFilter()) {
+            // Nothing recognised — keep the legacy behaviour so at least a
+            // FULLTEXT keyword search runs.
+            c.setKeyword(query);
+        }
+        return c;
+    }
+
+    private boolean isEmptyCriteria(AiParsedCriteriaDto c) {
+        return c.getPropertyType() == null && c.getListingType() == null
+                && c.getMinPrice() == null && c.getMaxPrice() == null
+                && c.getDistrict() == null && c.getProvince() == null && c.getWard() == null
+                && (c.getAmenities() == null || c.getAmenities().isEmpty())
+                && (c.getKeyword() == null || c.getKeyword().isBlank())
+                && (c.getPhoneticKeyword() == null || c.getPhoneticKeyword().isBlank());
+    }
+
     private AiParsedCriteriaDto parseWithCache(SearchRequest request) {
         String query = request != null ? request.getQuery() : null;
         String normalized = TextNormalizer.normalize(query);
@@ -93,15 +131,13 @@ public class AiSearchService {
         AiParsedCriteriaDto criteria;
         try {
             criteria = aiServerClient.parseNaturalLanguage(request);
-            if (criteria == null) {
-                criteria = new AiParsedCriteriaDto();
-                criteria.setKeyword(query);
+            if (criteria == null || isEmptyCriteria(criteria)) {
+                criteria = localParse(query);
             }
             log.info("AI parsed criteria: {}", criteria);
         } catch (Exception e) {
-            log.error("Failed to parse query via AI Server. Falling back to FULLTEXT search.", e);
-            criteria = new AiParsedCriteriaDto();
-            criteria.setKeyword(query);
+            log.error("Failed to parse query via AI Server. Falling back to local parser.", e);
+            criteria = localParse(query);
         }
 
         if (cacheKey != null && criteria != null) {
