@@ -5,10 +5,12 @@ import com.smartrent.infra.repository.entity.Transaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import jakarta.persistence.LockModeType;
 import java.util.Optional;
 
 /**
@@ -51,6 +53,12 @@ public interface PaymentRepository extends JpaRepository<Transaction, String> {
      * Find transaction by provider transaction ID
      */
     Optional<Transaction> findByProviderTransactionId(String providerTransactionId);
+
+    Optional<Transaction> findByIdempotencyKey(String idempotencyKey);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT t FROM transactions t WHERE t.transactionId = :transactionRef")
+    Optional<Transaction> findByTransactionRefForUpdate(@Param("transactionRef") String transactionRef);
 
     /**
      * Find transaction by additional info content

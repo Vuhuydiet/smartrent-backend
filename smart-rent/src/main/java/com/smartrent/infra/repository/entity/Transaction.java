@@ -71,6 +71,70 @@ public class Transaction {
     @Column(name = "provider_transaction_id")
     String providerTransactionId;
 
+    @Column(name = "payment_method", length = 50)
+    String paymentMethod;
+
+    @Column(name = "gateway_response_code", length = 50)
+    String gatewayResponseCode;
+
+    @Column(name = "gateway_bank_code", length = 50)
+    String gatewayBankCode;
+
+    @Column(name = "gateway_bank_transaction_id", length = 100)
+    String gatewayBankTransactionId;
+
+    @Column(name = "failure_reason", length = 500)
+    String failureReason;
+
+    @Column(name = "idempotency_key", length = 120)
+    String idempotencyKey;
+
+    @Column(name = "invoice_id", length = 36)
+    String invoiceId;
+
+    @Column(name = "invoice_code", length = 50)
+    String invoiceCode;
+
+    @Column(name = "landlord_id", length = 36)
+    String landlordId;
+
+    @Column(name = "room_id")
+    Long roomId;
+
+    @Column(name = "room_code", length = 50)
+    String roomCode;
+
+    @Column(name = "room_name", length = 150)
+    String roomName;
+
+    @Column(name = "room_address", length = 500)
+    String roomAddress;
+
+    @Column(name = "customer_name_snapshot", length = 150)
+    String customerNameSnapshot;
+
+    @Column(name = "customer_phone_snapshot", length = 30)
+    String customerPhoneSnapshot;
+
+    @Column(name = "landlord_name_snapshot", length = 150)
+    String landlordNameSnapshot;
+
+    @Column(name = "landlord_phone_snapshot", length = 30)
+    String landlordPhoneSnapshot;
+
+    @Column(name = "provider_payload", columnDefinition = "TEXT")
+    String providerPayload;
+
+    @Column(name = "completed_at")
+    LocalDateTime completedAt;
+
+    @Column(name = "expired_at")
+    LocalDateTime expiredAt;
+
+    @Version
+    @Column(name = "version")
+    Long version;
+
     /**
      * For membership upgrade transactions, stores the ID of the membership being upgraded from
      */
@@ -117,6 +181,7 @@ public class Transaction {
 
     public void complete() {
         this.status = TransactionStatus.COMPLETED;
+        this.completedAt = LocalDateTime.now();
     }
 
     public void fail() {

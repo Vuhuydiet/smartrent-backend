@@ -10,6 +10,7 @@ import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.enums.TransactionStatus;
 import com.smartrent.infra.repository.PaymentRepository;
+import com.smartrent.infra.repository.TransactionAuditRepository;
 import com.smartrent.infra.repository.entity.Transaction;
 import com.smartrent.utility.PaymentUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,11 +37,12 @@ public class ZaloPayPaymentProvider extends AbstractPaymentProvider {
 
     private static final java.time.ZoneId VIETNAM_ZONE = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
 
-    public ZaloPayPaymentProvider(PaymentRepository paymentRepository, 
-                                 ZaloPayConfig zaloPayConfig, 
+    public ZaloPayPaymentProvider(PaymentRepository paymentRepository,
+                                 TransactionAuditRepository transactionAuditRepository,
+                                 ZaloPayConfig zaloPayConfig,
                                  RestTemplate restTemplate, 
                                  ObjectMapper objectMapper) {
-        super(paymentRepository);
+        super(paymentRepository, transactionAuditRepository);
         this.zaloPayConfig = zaloPayConfig;
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
