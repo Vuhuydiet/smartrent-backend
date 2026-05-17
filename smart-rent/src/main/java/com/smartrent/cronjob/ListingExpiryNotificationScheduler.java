@@ -23,6 +23,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -35,19 +36,21 @@ import java.util.stream.Collectors;
  * Daily scheduler that warns listing owners ahead of expiry.
  *
  * Strategy:
- *  - Scans every live, public-visible listing whose expiry falls within the next
- *    7 days.
- *  - Groups by owner and sends ONE aggregated notification per owner per day —
+ *  - Runs once per day but only notifies an owner at TWO milestones: when a
+ *    listing is exactly 3 calendar days from expiry, and again when it is
+ *    exactly 1 day from expiry (the last full day). No daily spam in between.
+ *  - Groups by owner and sends ONE aggregated notification per owner per run —
  *    "Bạn có N tin đăng sắp hết hạn" — instead of one per listing. Owners click
  *    through to /seller/listings to see the full list.
- *  - In-app notification: pushed to every owner with expiring listings.
+ *  - In-app notification: pushed to every owner with a listing hitting a milestone.
  *  - Email: only sent to owners whose email is in the WHITE_LIST_EMAIL_NOTIFICATION
  *    whitelist. Defaults to the internal team if the env var is empty so dev can
  *    smoke-test without spamming real users.
  *  - Fires once per day at 09:00 Asia/Ho_Chi_Minh (peak attention, before work).
  *  - Dedups via the notifications table itself: a (recipient, LISTING_EXPIRING,
  *    "LISTING_DAILY_SUMMARY") row created in the last 23h short-circuits resend,
- *    so manual re-runs and clock drift cannot double-fire.
+ *    so manual re-runs and clock drift cannot double-fire. The 3-day and 1-day
+ *    milestones are 2 days apart, so the 23h window never blocks the second one.
  */
 @Slf4j
 @Component
@@ -56,7 +59,14 @@ import java.util.stream.Collectors;
 public class ListingExpiryNotificationScheduler {
 
     static ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
-    static int LOOKAHEAD_DAYS = 7;
+    /** Only notify when a listing is exactly this many calendar days from expiry. */
+    static Set<Long> NOTIFY_DAY_OFFSETS = Set.of(3L, 1L);
+    /**
+     * DB window must reach the far edge of the largest milestone. The job runs at
+     * 09:00, but a listing 3 calendar days out can expire as late as ~23:59 that
+     * day, so we query 4 days ahead and filter down to the exact milestones below.
+     */
+    static int QUERY_LOOKAHEAD_DAYS = 4;
     static Duration DEDUP_LOOKBACK = Duration.ofHours(23);
     static String REFERENCE_TYPE = "LISTING_DAILY_SUMMARY";
 
@@ -91,14 +101,26 @@ public class ListingExpiryNotificationScheduler {
         LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
         log.info("=== Starting expiring-listing notification scan at {} (SGT) ===", now);
 
-        LocalDateTime windowEnd = now.plusDays(LOOKAHEAD_DAYS);
+        LocalDateTime windowEnd = now.plusDays(QUERY_LOOKAHEAD_DAYS);
         List<Listing> candidates = listingRepository.findExpiringBetween(now, windowEnd);
         if (candidates.isEmpty()) {
-            log.info("No listings expiring within {} days. Done.", LOOKAHEAD_DAYS);
+            log.info("No listings expiring within {} days. Done.", QUERY_LOOKAHEAD_DAYS);
             return;
         }
 
-        Map<String, List<Listing>> byUser = candidates.stream()
+        // Keep only listings sitting exactly on a milestone (3 or 1 day out) so
+        // owners are pinged at those two points, not every single day.
+        List<Listing> dueForReminder = candidates.stream()
+                .filter(l -> l.getExpiryDate() != null
+                        && NOTIFY_DAY_OFFSETS.contains(calendarDaysUntil(now, l.getExpiryDate())))
+                .collect(Collectors.toList());
+        if (dueForReminder.isEmpty()) {
+            log.info("{} listings expiring soon but none at a {}-day milestone. Done.",
+                    candidates.size(), NOTIFY_DAY_OFFSETS);
+            return;
+        }
+
+        Map<String, List<Listing>> byUser = dueForReminder.stream()
                 .filter(l -> l.getUserId() != null && !l.getUserId().isBlank())
                 .collect(Collectors.groupingBy(Listing::getUserId));
         if (byUser.isEmpty()) {
@@ -136,9 +158,9 @@ public class ListingExpiryNotificationScheduler {
             long daysToSoonest = listings.stream()
                     .map(Listing::getExpiryDate)
                     .filter(d -> d != null)
-                    .mapToLong(d -> Math.max(0, Duration.between(now, d).toDays()))
+                    .mapToLong(d -> calendarDaysUntil(now, d))
                     .min()
-                    .orElse(LOOKAHEAD_DAYS);
+                    .orElse(1);
 
             notificationService.sendNotification(
                     userId,
@@ -160,6 +182,15 @@ public class ListingExpiryNotificationScheduler {
 
         log.info("=== Expiring-listing scan done. Owners={}, notified={}, emailed={} ===",
                 byUser.size(), notified, emailed);
+    }
+
+    /**
+     * Whole calendar days from {@code now}'s date to the expiry date, ignoring
+     * time-of-day. Using the date (not raw Duration) keeps the milestone stable
+     * regardless of what hour the job runs or the listing happens to expire.
+     */
+    private static long calendarDaysUntil(LocalDateTime now, LocalDateTime expiry) {
+        return ChronoUnit.DAYS.between(now.toLocalDate(), expiry.toLocalDate());
     }
 
     private boolean sendSummaryEmail(String to, int count, long daysToSoonest) {
