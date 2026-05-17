@@ -127,7 +127,7 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
 
       return jwsObject.serialize();
     } catch (JOSEException e) {
-      throw  new DomainException(DomainCode.UNKNOWN_ERROR);
+      throw new DomainException(DomainCode.UNKNOWN_ERROR);
     }
   }
 
@@ -156,14 +156,15 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
         .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
         .claim("acId", otherId)
         .claim("scope", buildScope(admin))
-        .claim("user", adminMapper.mapFromAdminEntityToGetAdminResponse(admin))
+        .claim("adminId", admin.getAdminId())
+        .claim("adminName", admin.getFirstName() + " " + admin.getLastName())
         .build();
   }
 
   private String buildScope(Admin admin) {
     StringJoiner joiner = new StringJoiner(" ");
     admin.getRoles().forEach(role -> {
-      joiner.add("ROLE_" + role.getRoleId());  // Use roleId (SA, UA, SPA) instead of roleName (Super Admin)
+      joiner.add("ROLE_" + role.getRoleId()); // Use roleId (SA, UA, SPA) instead of roleName (Super Admin)
     });
 
     return joiner.toString();

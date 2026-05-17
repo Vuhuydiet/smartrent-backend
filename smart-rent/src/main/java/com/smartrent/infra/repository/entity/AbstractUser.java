@@ -1,5 +1,6 @@
 package com.smartrent.infra.repository.entity;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
 import java.time.LocalDateTime;
@@ -40,6 +41,7 @@ public abstract class AbstractUser {
   String lastName;
 
   @CreationTimestamp
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
   @Column(name = "created_at", updatable = false)
   LocalDateTime createdAt;
 
