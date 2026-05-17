@@ -322,8 +322,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
           .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
           .claim("rfId", otherId)
           .claim("scope", Constants.ROLE_USER)
-          .claim("userId", user.getUserId())
-          .claim("userName", user.getFirstName() + " " + user.getLastName())
+          .claim("user", userMapper.mapFromUserEntityToJwtUserClaimsDto(user))
           .build();
     } catch (Exception e) {
       throw new DomainException(DomainCode.UNKNOWN_ERROR);

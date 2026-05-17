@@ -141,6 +141,7 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
           .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
           .claim("rfId", otherId)
           .claim("scope", buildScope(admin))
+          .claim("user", adminMapper.mapFromAdminEntityToJwtAdminClaimsDto(admin))
           .build();
     } catch (Exception e) {
       throw new DomainException(DomainCode.UNKNOWN_ERROR);
@@ -156,8 +157,7 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
         .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
         .claim("acId", otherId)
         .claim("scope", buildScope(admin))
-        .claim("adminId", admin.getAdminId())
-        .claim("adminName", admin.getFirstName() + " " + admin.getLastName())
+        .claim("user", adminMapper.mapFromAdminEntityToJwtAdminClaimsDto(admin))
         .build();
   }
 
