@@ -201,7 +201,8 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         // Guarantees the dropdown is never empty for NL queries and gives the
         // frontend a structured payload to auto-apply on submit.
         Map<String, Object> appliedFilters = parsed.toAppliedFilters();
-        SearchSuggestionItem synthesized = synthesizeParsedSuggestion(parsed, merged, appliedFilters);
+        SearchSuggestionItem synthesized =
+                synthesizeParsedSuggestion(parsed, merged, locationItems, appliedFilters);
         List<SearchSuggestionItem> finalList = withSynthesizedFirst(synthesized, merged, safeLimit);
 
         // ── Persist impression (separate TX — does not affect cache result) ──
@@ -492,14 +493,25 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     private SearchSuggestionItem synthesizeParsedSuggestion(
             SearchQueryParser.ParsedQuery parsed,
             List<SearchSuggestionItem> merged,
+            List<SearchSuggestionItem> locationItems,
             Map<String, Object> appliedFilters) {
 
         if (parsed == null || !parsed.hasStructuredFilter()) return null;
 
-        SearchSuggestionItem bestLocation = merged.stream()
-                .filter(i -> i.getType() == SuggestionType.LOCATION)
-                .findFirst()
-                .orElse(null);
+        // Resolve the parsed location into legacy ids from the FULL untrimmed
+        // location candidate list — not the display-trimmed `merged` list.
+        // Otherwise a query like "phòng trọ tân bình dưới 5 triệu" whose
+        // "Tân Bình" district candidate gets pushed out of the top-N by
+        // higher-scored TITLE hits would leave `appliedFilters.locationText`
+        // unresolved, degrading the location into a fuzzy keyword instead of
+        // a real province/district filter. Prefer the location the user
+        // actually sees (first LOCATION in `merged`) for the display label,
+        // else fall back to the best untrimmed candidate so the ids still
+        // resolve even when no LOCATION row is shown.
+        SearchSuggestionItem bestLocation = firstLocation(merged);
+        if (bestLocation == null) {
+            bestLocation = firstLocation(locationItems);
+        }
 
         String productPart = vnProductTypeDisplay(parsed.productType());
         String locationPart;
@@ -540,6 +552,15 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
                 .metadata(meta)
                 .score(WEIGHT_TITLE + 1.0) // always rank first
                 .build();
+    }
+
+    /** First LOCATION item in a candidate list, or {@code null} if none. */
+    private SearchSuggestionItem firstLocation(List<SearchSuggestionItem> items) {
+        if (items == null) return null;
+        return items.stream()
+                .filter(i -> i.getType() == SuggestionType.LOCATION)
+                .findFirst()
+                .orElse(null);
     }
 
     private void copyLocationIds(Map<String, Object> locationMeta, Map<String, Object> appliedFilters) {
