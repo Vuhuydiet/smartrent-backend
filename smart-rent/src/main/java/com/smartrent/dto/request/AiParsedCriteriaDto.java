@@ -20,6 +20,9 @@ public class AiParsedCriteriaDto {
     private String province;
     private BigDecimal maxPrice;
     private BigDecimal minPrice;
+    private Float minArea;       // m²
+    private Float maxArea;       // m²
+    private Integer bedrooms;    // minimum number of bedrooms
     private List<String> amenities;
     private String keyword; // For FULLTEXT search fallback
     private String phoneticKeyword; // For typo tolerance

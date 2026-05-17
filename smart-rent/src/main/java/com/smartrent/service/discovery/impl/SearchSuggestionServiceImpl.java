@@ -17,6 +17,7 @@ import com.smartrent.infra.repository.entity.LegacyProvince;
 import com.smartrent.infra.repository.entity.LegacyWard;
 import com.smartrent.infra.repository.entity.SearchQueryImpression;
 import com.smartrent.infra.repository.entity.SearchSuggestionClick;
+import com.smartrent.service.discovery.AmenityResolver;
 import com.smartrent.service.discovery.SearchSuggestionService;
 import com.smartrent.util.SearchQueryParser;
 import com.smartrent.util.TextNormalizer;
@@ -105,6 +106,7 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     SearchQueryImpressionRepository impressionRepository;
     SearchSuggestionClickRepository clickRepository;
     AiServerClient aiServerClient;
+    AmenityResolver amenityResolver;
 
     DoubleMetaphone metaphone = new DoubleMetaphone();
     LevenshteinDistance levenshtein = new LevenshteinDistance();
@@ -201,6 +203,18 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         // Guarantees the dropdown is never empty for NL queries and gives the
         // frontend a structured payload to auto-apply on submit.
         Map<String, Object> appliedFilters = parsed.toAppliedFilters();
+        // Enrich with canonical amenity ids so the frontend can auto-apply the
+        // amenity filter chips (the real /v1/listings/search filter takes
+        // amenityIds + amenityMatchMode, not the display text). The displayed
+        // suggestion text and the `amenities` display list are left unchanged,
+        // so the response structure is preserved — only enriched.
+        if (parsed.amenities() != null && !parsed.amenities().isEmpty()) {
+            AmenityResolver.Resolved resolvedAmenities = amenityResolver.resolve(parsed.amenities());
+            if (!resolvedAmenities.amenityIds().isEmpty()) {
+                appliedFilters.put("amenityIds", new ArrayList<>(resolvedAmenities.amenityIds()));
+                appliedFilters.put("amenityMatchMode", "ALL");
+            }
+        }
         SearchSuggestionItem synthesized =
                 synthesizeParsedSuggestion(parsed, merged, locationItems, appliedFilters);
         List<SearchSuggestionItem> finalList = withSynthesizedFirst(synthesized, merged, safeLimit);
