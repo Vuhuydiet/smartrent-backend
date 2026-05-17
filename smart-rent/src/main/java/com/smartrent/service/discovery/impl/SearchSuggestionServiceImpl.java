@@ -205,29 +205,38 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         // Guarantees the dropdown is never empty for NL queries and gives the
         // frontend a structured payload to auto-apply on submit.
         Map<String, Object> appliedFilters = parsed.toAppliedFilters();
-        // Enrich with canonical amenity ids so the frontend can auto-apply the
-        // amenity filter chips (the real /v1/listings/search filter takes
-        // amenityIds + amenityMatchMode, not the display text). The displayed
-        // suggestion text and the `amenities` display list are left unchanged,
-        // so the response structure is preserved — only enriched.
-        if (parsed.amenities() != null && !parsed.amenities().isEmpty()) {
-            AmenityResolver.Resolved resolvedAmenities = amenityResolver.resolve(parsed.amenities());
-            if (!resolvedAmenities.amenityIds().isEmpty()) {
-                appliedFilters.put("amenityIds", new ArrayList<>(resolvedAmenities.amenityIds()));
-                appliedFilters.put("amenityMatchMode", "ALL");
-            }
-        }
         SearchSuggestionItem synthesized =
                 synthesizeParsedSuggestion(parsed, merged, locationItems, appliedFilters);
         // The AI server resolved the query against its RAG knowledge base
-        // (same context the chatbox uses): location → legacy ids, amenity →
-        // ids, type → enum. Overlay those AFTER the local/DB resolution so the
-        // RAG-resolved ids win. `synthesized` stored this same map reference
+        // (same context the chatbox uses): location → legacy ids, type → enum,
+        // price/area. Overlay those AFTER the local/DB resolution so the
+        // RAG-resolved values win. `synthesized` stored this same map reference
         // in its metadata, so both the dropdown's apply-row and the top-level
         // response reflect the overlay. Without this the frontend kept
         // FULLTEXT-searching the raw query (the reported bug).
+        // NOTE: amenity *ids* are deliberately excluded from the overlay (see
+        // overlayAiAppliedFilters) — the AI service's amenities.json ids are
+        // placeholders that drift from the backend, so they are resolved below
+        // from the live amenities table instead.
         overlayAiAppliedFilters(appliedFilters, aiResp);
-        List<SearchSuggestionItem> finalList = withSynthesizedFirst(synthesized, merged, safeLimit);
+        // Authoritative amenity-id resolution against the LIVE amenities table.
+        // Source phrases = locally-parsed amenities ∪ the AI's amenity display
+        // names. AmenityResolver maps them to whatever ids the backend actually
+        // seeded, so "có điều hoà" filters by the real "Điều hòa" id instead of
+        // the AI's hardcoded placeholder.
+        resolveAmenityIdsFromLiveTable(appliedFilters, parsed);
+        // Drop the parsed free-text keys: `keyword` (residual) and
+        // `locationText` (unresolved place). Both would make the frontend run
+        // a title FULLTEXT search off an error-prone parse — exactly the
+        // behaviour this feature replaces. appliedFilters stays structured-only.
+        appliedFilters.remove("keyword");
+        appliedFilters.remove("locationText");
+        // Only surface the "ready to apply" suggestion + the appliedFilters
+        // payload when at least one STRUCTURED filter resolved — an applied
+        // filter that carries nothing actionable is meaningless to the user.
+        boolean hasStructuredFilters = hasStructuredAppliedFilters(appliedFilters);
+        SearchSuggestionItem contextual = hasStructuredFilters ? synthesized : null;
+        List<SearchSuggestionItem> finalList = withSynthesizedFirst(contextual, merged, safeLimit);
 
         // ── Persist impression (separate TX — does not affect cache result) ──
         long impressionId = persistImpression(normalized, provinceId, categoryId, finalList.size(), clientIp, sessionId);
@@ -238,8 +247,32 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
                 .suggestions(finalList)
                 .queryNorm(normalized)
                 .impressionId(impressionId)
-                .appliedFilters(appliedFilters.isEmpty() ? null : appliedFilters)
+                .appliedFilters(hasStructuredFilters ? appliedFilters : null)
                 .build();
+    }
+
+    /**
+     * Keys that represent a real, actionable filter the frontend can apply to
+     * {@code POST /v1/listings/search}. Deliberately excludes {@code keyword},
+     * {@code locationText} and the {@code amenities} display list.
+     */
+    private static final java.util.Set<String> STRUCTURED_FILTER_KEYS = java.util.Set.of(
+            "productType", "productTypes", "listingType",
+            "minPrice", "maxPrice", "minArea", "maxArea", "bedrooms",
+            "legacyProvinceId", "legacyDistrictId", "legacyWardId",
+            "provinceCode", "districtCode", "wardCode",
+            "amenityIds");
+
+    private boolean hasStructuredAppliedFilters(Map<String, Object> appliedFilters) {
+        if (appliedFilters == null || appliedFilters.isEmpty()) return false;
+        for (String key : STRUCTURED_FILTER_KEYS) {
+            Object v = appliedFilters.get(key);
+            if (v == null) continue;
+            if (v instanceof java.util.Collection<?> c && c.isEmpty()) continue;
+            if (v instanceof String s && s.isBlank()) continue;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -394,20 +427,63 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     }
 
     /**
+     * Keys the AI server is NOT trusted to resolve. Amenity ids in the AI
+     * service's {@code amenities.json} are documented placeholders that drift
+     * from whatever the backend actually seeded, so they are resolved from the
+     * live {@code amenities} table instead (see resolveAmenityIdsFromLiveTable).
+     */
+    private static final java.util.Set<String> AI_OVERLAY_SKIP_KEYS =
+            java.util.Set.of("amenityIds", "amenityMatchMode");
+
+    /**
      * Overlay the AI server's RAG-resolved filters onto the locally-parsed
      * {@code appliedFilters}, letting the AI win for any key it resolved.
      * Null / blank / empty AI values are skipped so a sparse AI payload never
-     * clobbers a good local value.
+     * clobbers a good local value; amenity ids are skipped entirely (the
+     * backend owns those — see {@link #AI_OVERLAY_SKIP_KEYS}).
      */
     private void overlayAiAppliedFilters(Map<String, Object> target, AiSuggestionResponse aiResp) {
         if (aiResp == null || aiResp.getAppliedFilters() == null) return;
         for (Map.Entry<String, Object> e : aiResp.getAppliedFilters().entrySet()) {
+            if (AI_OVERLAY_SKIP_KEYS.contains(e.getKey())) continue;
             Object v = e.getValue();
             if (v == null) continue;
             if (v instanceof java.util.Collection<?> c && c.isEmpty()) continue;
             if (v instanceof String s && s.isBlank()) continue;
             target.put(e.getKey(), v);
         }
+    }
+
+    /**
+     * Resolve amenity ids from the live {@code amenities} table — the single
+     * source of truth. Phrases = locally-parsed amenities ∪ the AI's amenity
+     * display names (e.g. "Điều hòa"). Sets {@code amenityIds} +
+     * {@code amenityMatchMode} when anything resolves, and clears both
+     * otherwise so a stale / placeholder id can never reach the frontend.
+     */
+    private void resolveAmenityIdsFromLiveTable(
+            Map<String, Object> appliedFilters, SearchQueryParser.ParsedQuery parsed) {
+        java.util.Set<String> phrases = new java.util.LinkedHashSet<>();
+        if (parsed != null && parsed.amenities() != null) {
+            phrases.addAll(parsed.amenities());
+        }
+        Object aiAmenities = appliedFilters.get("amenities");
+        if (aiAmenities instanceof java.util.Collection<?> c) {
+            for (Object o : c) {
+                if (o != null && !o.toString().isBlank()) phrases.add(o.toString());
+            }
+        }
+
+        if (!phrases.isEmpty()) {
+            AmenityResolver.Resolved resolved = amenityResolver.resolve(phrases);
+            if (!resolved.amenityIds().isEmpty()) {
+                appliedFilters.put("amenityIds", new ArrayList<>(resolved.amenityIds()));
+                appliedFilters.put("amenityMatchMode", "ALL");
+                return;
+            }
+        }
+        appliedFilters.remove("amenityIds");
+        appliedFilters.remove("amenityMatchMode");
     }
 
     private SearchSuggestionItem buildTextSuggestion(SuggestionType type, String text, double score, String matchType) {
