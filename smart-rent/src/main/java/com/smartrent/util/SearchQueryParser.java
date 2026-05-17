@@ -44,11 +44,15 @@ public final class SearchQueryParser {
             String locationText,
             List<String> amenities,
             String residualKeyword,
-            String fallbackSuggestion
+            String fallbackSuggestion,
+            Float minArea,
+            Float maxArea,
+            Integer bedrooms
     ) {
         public boolean hasStructuredFilter() {
             return productType != null || listingType != null
                     || minPrice != null || maxPrice != null
+                    || minArea != null || maxArea != null || bedrooms != null
                     || (locationText != null && !locationText.isBlank())
                     || !amenities.isEmpty();
         }
@@ -59,6 +63,9 @@ public final class SearchQueryParser {
             if (listingType != null)   m.put("listingType", listingType);
             if (minPrice != null)      m.put("minPrice", minPrice);
             if (maxPrice != null)      m.put("maxPrice", maxPrice);
+            if (minArea != null)       m.put("minArea", minArea);
+            if (maxArea != null)       m.put("maxArea", maxArea);
+            if (bedrooms != null)      m.put("bedrooms", bedrooms);
             if (locationText != null && !locationText.isBlank()) m.put("locationText", locationText);
             if (!amenities.isEmpty())  m.put("amenities", amenities);
             if (residualKeyword != null && !residualKeyword.isBlank()) m.put("keyword", residualKeyword);
@@ -107,11 +114,34 @@ public final class SearchQueryParser {
         AMENITIES.put("ban cong",       "ban công");
         AMENITIES.put("gac",            "gác");
         AMENITIES.put("wifi",           "wifi");
+        AMENITIES.put("internet",       "wifi");
         AMENITIES.put("cho de xe",      "chỗ để xe");
+        AMENITIES.put("cho dau xe",     "chỗ để xe");
+        AMENITIES.put("bai do xe",      "chỗ để xe");
+        AMENITIES.put("gui xe",         "chỗ để xe");
+        AMENITIES.put("ham xe",         "chỗ để xe");
         AMENITIES.put("bao ve",         "bảo vệ");
+        AMENITIES.put("an ninh",        "bảo vệ");
         AMENITIES.put("nha bep",        "nhà bếp");
+        AMENITIES.put("bep",            "nhà bếp");
         AMENITIES.put("ve sinh rieng",  "vệ sinh riêng");
+        AMENITIES.put("khep kin",       "vệ sinh riêng");
+        AMENITIES.put("phong khep kin", "phòng khép kín");
         AMENITIES.put("gio giac tu do", "giờ giấc tự do");
+        AMENITIES.put("camera",         "camera an ninh");
+        AMENITIES.put("cctv",           "camera an ninh");
+        AMENITIES.put("ho boi",         "hồ bơi");
+        AMENITIES.put("be boi",         "hồ bơi");
+        AMENITIES.put("phong gym",      "phòng gym");
+        AMENITIES.put("gym",            "phòng gym");
+        AMENITIES.put("san vuon",       "sân vườn");
+        AMENITIES.put("tivi",           "tivi");
+        AMENITIES.put("giuong",         "giường");
+        AMENITIES.put("nuoc nong",      "bình nước nóng");
+        AMENITIES.put("binh nuoc nong", "bình nước nóng");
+        AMENITIES.put("may nuoc nong",  "bình nước nóng");
+        AMENITIES.put("thu cung",       "thú cưng");
+        AMENITIES.put("nuoi pet",       "thú cưng");
     }
 
     /** Tokens that are never part of a location and carry no filter on their own. */
@@ -120,7 +150,10 @@ public final class SearchQueryParser {
             "gia", "re", "gia re", "dep", "moi", "rong", "rai", "co", "va",
             "can", "tim", "thue", "muon", "mua", "phong", "nha", "cho",
             "duoi", "tren", "tu", "den", "khoang", "tam", "gia tu",
-            "khong", "qua", "toi", "da", "it", "nhat", "duoi muc"
+            "khong", "qua", "toi", "da", "it", "nhat", "duoi muc",
+            "dien", "tich", "dien tich", "m2", "met", "vuong", "mv",
+            "ngu", "pn", "phong ngu", "lon", "rong tren", "rong hon",
+            "nho hon", "lon hon"
     );
 
     private static final Pattern RANGE_PATTERN =
@@ -132,15 +165,41 @@ public final class SearchQueryParser {
     private static final Pattern LONE_PRICE_PATTERN =
             Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|ty|nghin|ngan|k|cu)");
 
+    // ── Area (m²) — always carries the explicit "m2" unit so it is extracted
+    //    BEFORE price; otherwise "duoi 30m2" would be read as maxPrice 30 triệu.
+    private static final Pattern AREA_RANGE_PATTERN =
+            Pattern.compile("(?:dien tich\\s+)?(?:tu\\s+)?(\\d+(?:[.,]\\d+)?)\\s*(?:m2)?\\s*(?:-|den|toi)\\s*(\\d+(?:[.,]\\d+)?)\\s*m2");
+    private static final Pattern AREA_MAX_PATTERN =
+            Pattern.compile("(?:duoi|nho hon|toi da|<=|<)\\s*(\\d+(?:[.,]\\d+)?)\\s*m2");
+    private static final Pattern AREA_MIN_PATTERN =
+            Pattern.compile("(?:tren|tu|lon hon|rong tren|rong hon|>=|>)\\s*(\\d+(?:[.,]\\d+)?)\\s*m2");
+    private static final Pattern AREA_LONE_PATTERN =
+            Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*m2");
+
+    // ── Bedrooms — "pn" / "p ngu" are expanded to "phong ngu" first.
+    private static final Pattern BEDROOM_PATTERN =
+            Pattern.compile("(\\d+)\\s*phong ngu");
+
     public static ParsedQuery parse(String rawQuery) {
         String norm = expandAbbreviations(TextNormalizer.normalize(rawQuery));
         if (norm == null || norm.isBlank()) {
-            return new ParsedQuery(null, null, null, null, null, List.of(), null, null);
+            return new ParsedQuery(null, null, null, null, null, List.of(), null, null,
+                    null, null, null);
         }
 
         String working = " " + norm + " ";
 
-        // 1. Price first — it owns the most ambiguous tokens (numbers, "tr").
+        // 1a. Bedrooms — "2 phong ngu" owns its number, so consume it before
+        //     price so "tu 2 phong ngu" is not misread as minPrice 2 triệu.
+        Integer[] bedroomsHolder = new Integer[1];
+        working = extractBedrooms(working, bedroomsHolder);
+
+        // 1b. Area — always unit-qualified ("m2"); consume before price so
+        //     "duoi 30m2" is not misread as maxPrice 30 triệu.
+        Float[] area = new Float[2]; // [min, max]
+        working = extractArea(working, area);
+
+        // 1c. Price — owns the remaining ambiguous tokens (numbers, "tr").
         BigDecimal[] price = new BigDecimal[2]; // [min, max]
         working = extractPrice(working, price);
 
@@ -182,12 +241,71 @@ public final class SearchQueryParser {
         // leftover is treated as a location, not a free keyword, so we do not
         // also emit it as residualKeyword (that would double-filter).
         String locationText = stripStopwords(working);
-        String fallback = buildFallbackSuggestion(productDisplay, locationText, price[0], price[1], amenities);
+        String fallback = buildFallbackSuggestion(
+                productDisplay, locationText, price[0], price[1], amenities,
+                area[0], area[1], bedroomsHolder[0]);
 
         return new ParsedQuery(
                 productType, listingType, price[0], price[1],
                 locationText.isBlank() ? null : locationText,
-                amenities, null, fallback);
+                amenities, null, fallback,
+                area[0], area[1], bedroomsHolder[0]);
+    }
+
+    private static String extractBedrooms(String working, Integer[] out) {
+        Matcher m = BEDROOM_PATTERN.matcher(working);
+        if (m.find()) {
+            try {
+                out[0] = Integer.valueOf(m.group(1));
+            } catch (NumberFormatException ignored) {
+                // leave bedrooms unset on overflow / garbage
+            }
+            working = working.replace(m.group(), " ");
+        }
+        // Strip any remaining bare "phong ngu" so it does not leak into location.
+        return working.replace(" phong ngu ", " ");
+    }
+
+    private static String extractArea(String working, Float[] out) {
+        Matcher range = AREA_RANGE_PATTERN.matcher(working);
+        if (range.find()) {
+            out[0] = area(range.group(1));
+            out[1] = area(range.group(2));
+            return working.replace(range.group(), " ");
+        }
+
+        Matcher max = AREA_MAX_PATTERN.matcher(working);
+        if (max.find()) {
+            out[1] = area(max.group(1));
+            working = working.replace(max.group(), " ");
+        }
+
+        Matcher min = AREA_MIN_PATTERN.matcher(working);
+        if (min.find()) {
+            out[0] = area(min.group(1));
+            working = working.replace(min.group(), " ");
+        }
+
+        if (out[0] == null && out[1] == null) {
+            Matcher lone = AREA_LONE_PATTERN.matcher(working);
+            if (lone.find()) {
+                // bare "25m2" → treat as a lower bound ("at least ~"), which is
+                // how users mean it (they want it no smaller than that).
+                out[0] = area(lone.group(1));
+                working = working.replace(lone.group(), " ");
+            }
+        }
+        // Drop any leftover lone "m2" unit token.
+        return working.replace(" m2 ", " ");
+    }
+
+    private static Float area(String number) {
+        if (number == null) return null;
+        try {
+            return Float.valueOf(number.replace(",", "."));
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**
@@ -208,12 +326,26 @@ public final class SearchQueryParser {
         r = r.replace(" maylanh ", " may lanh ");
         r = r.replace(" may lan ", " may lanh ");
         r = r.replace(" dieuhoa ", " dieu hoa ");
+        r = r.replace(" mlanh ", " may lanh ");
+        r = r.replace(" mgiat ", " may giat ");
+        r = r.replace(" tlanh ", " tu lanh ");
         r = r.replace(" full nt ", " full noi that ");
         r = r.replace(" fullnt ", " full noi that ");
         r = r.replace(" nt ", " noi that ");
+        r = r.replace(" dctd ", " gio giac tu do ");
+        r = r.replace(" wc ", " ve sinh rieng ");
+        r = r.replace(" nvs ", " ve sinh rieng ");
         for (int i = 1; i <= 12; i++) {
             r = r.replace(" q" + i + " ", " quan " + i + " ");
         }
+        // Bedrooms: "2pn", "2 pn", "2 p ngu", "2 phong ngu" → "2 phong ngu".
+        r = r.replaceAll("(\\d+)\\s*pn\\b", "$1 phong ngu");
+        r = r.replaceAll("(\\d+)\\s*p\\s*ngu\\b", "$1 phong ngu");
+        r = r.replaceAll("(\\d+)\\s*phong\\s*ngu\\b", "$1 phong ngu");
+        // Area unit: "m2", "m²" (→ "m 2" after normalize), "met vuong", "mv".
+        r = r.replaceAll("(\\d+(?:[.,]\\d+)?)\\s*m\\s*2\\b", "$1 m2");
+        r = r.replaceAll("(\\d+(?:[.,]\\d+)?)\\s*(?:met vuong|met vng|mv)\\b", "$1 m2");
+        r = r.replaceAll("(\\d+(?:[.,]\\d+)?)\\s*m2\\b", "$1 m2");
         r = r.replace(" tphcm ", " ho chi minh ");
         r = r.replace(" hcm ", " ho chi minh ");
         r = r.replace(" sg ", " ho chi minh ");
@@ -289,10 +421,12 @@ public final class SearchQueryParser {
      */
     private static String buildFallbackSuggestion(
             String productDisplay, String locationText,
-            BigDecimal minPrice, BigDecimal maxPrice, List<String> amenities) {
+            BigDecimal minPrice, BigDecimal maxPrice, List<String> amenities,
+            Float minArea, Float maxArea, Integer bedrooms) {
 
         Set<String> parts = new LinkedHashSet<>();
         if (productDisplay != null) parts.add(productDisplay);
+        if (bedrooms != null) parts.add(bedrooms + " phòng ngủ");
         if (locationText != null && !locationText.isBlank()) parts.add(locationText);
         if (maxPrice != null && minPrice != null) {
             parts.add("từ " + humanPrice(minPrice) + " đến " + humanPrice(maxPrice));
@@ -301,8 +435,20 @@ public final class SearchQueryParser {
         } else if (minPrice != null) {
             parts.add("trên " + humanPrice(minPrice));
         }
+        if (minArea != null && maxArea != null) {
+            parts.add("từ " + humanArea(minArea) + " đến " + humanArea(maxArea));
+        } else if (maxArea != null) {
+            parts.add("dưới " + humanArea(maxArea));
+        } else if (minArea != null) {
+            parts.add("trên " + humanArea(minArea));
+        }
         parts.addAll(amenities);
         return parts.isEmpty() ? null : String.join(" ", parts);
+    }
+
+    private static String humanArea(Float v) {
+        if (v == null) return "";
+        return (v == Math.floor(v) ? String.valueOf(v.longValue()) : String.valueOf(v)) + "m²";
     }
 
     private static String humanPrice(BigDecimal v) {

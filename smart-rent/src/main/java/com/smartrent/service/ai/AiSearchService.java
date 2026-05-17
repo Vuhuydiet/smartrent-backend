@@ -13,6 +13,7 @@ import com.smartrent.infra.repository.entity.User;
 import com.smartrent.mapper.AddressMapper;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.mapper.UserMapper;
+import com.smartrent.service.discovery.AmenityResolver;
 import com.smartrent.util.SearchQueryParser;
 import com.smartrent.util.TextNormalizer;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,7 @@ public class AiSearchService {
     private final AddressMapper addressMapper;
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final AmenityResolver amenityResolver;
 
     private static final Duration AI_PARSE_CACHE_TTL = Duration.ofMinutes(30);
 
@@ -54,8 +56,15 @@ public class AiSearchService {
         // 1. Send natural language query to AI Server to get structured JSON
         AiParsedCriteriaDto criteria = parseWithCache(request);
 
+        // 1b. Resolve the colloquial amenity phrases ("máy lạnh", "wifi", …)
+        //     to canonical amenity ids so they filter by id instead of the
+        //     LIKE on amenity.name that never matched the stored canonical name.
+        AmenityResolver.Resolved amenities = amenityResolver.resolve(criteria.getAmenities());
+
         // 2. Build dynamic JPA query from AI structured output
-        org.springframework.data.jpa.domain.Specification<Listing> spec = ListingSpecification.matchesCriteria(criteria);
+        org.springframework.data.jpa.domain.Specification<Listing> spec =
+                ListingSpecification.matchesCriteria(
+                        criteria, amenities.amenityIds(), amenities.unresolved());
 
         // 3. Execute query
         Page<Listing> listings = listingRepository.findAll(spec, pageable);
@@ -89,6 +98,9 @@ public class AiSearchService {
         c.setListingType(p.listingType());
         c.setMinPrice(p.minPrice());
         c.setMaxPrice(p.maxPrice());
+        c.setMinArea(p.minArea());
+        c.setMaxArea(p.maxArea());
+        c.setBedrooms(p.bedrooms());
         if (p.locationText() != null && !p.locationText().isBlank()) {
             c.setDistrict(p.locationText());
         }
@@ -106,6 +118,7 @@ public class AiSearchService {
     private boolean isEmptyCriteria(AiParsedCriteriaDto c) {
         return c.getPropertyType() == null && c.getListingType() == null
                 && c.getMinPrice() == null && c.getMaxPrice() == null
+                && c.getMinArea() == null && c.getMaxArea() == null && c.getBedrooms() == null
                 && c.getDistrict() == null && c.getProvince() == null && c.getWard() == null
                 && (c.getAmenities() == null || c.getAmenities().isEmpty())
                 && (c.getKeyword() == null || c.getKeyword().isBlank())

@@ -18,7 +18,10 @@ import org.springframework.data.jpa.domain.Specification;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * JPA Specifications for dynamic Listing queries
@@ -899,12 +902,42 @@ public class ListingSpecification {
     }
 
     /**
-     * Build specification for natural language search parsed by AI
+     * Build specification for natural language search parsed by AI.
+     *
+     * <p>Backwards-compatible overload: amenities are still matched by the
+     * legacy {@code LOWER(name) LIKE} fallback. Prefer
+     * {@link #matchesCriteria(com.smartrent.dto.request.AiParsedCriteriaDto, java.util.Set, java.util.Collection)}
+     * with resolver-provided ids so amenities filter by canonical id (the LIKE
+     * never matched, because the DB stores "Điều hòa" while the parser emits
+     * "máy lạnh").
      */
     public static Specification<Listing> matchesCriteria(com.smartrent.dto.request.AiParsedCriteriaDto criteria) {
+        return matchesCriteria(
+                criteria,
+                Collections.emptySet(),
+                criteria != null ? criteria.getAmenities() : null);
+    }
+
+    /**
+     * Build specification for natural language search parsed by AI, with
+     * amenities already resolved to canonical ids by
+     * {@link com.smartrent.service.discovery.AmenityResolver}.
+     *
+     * @param amenityIds          canonical amenity ids; matched with ALL
+     *                            semantics (listing must have every one) via an
+     *                            EXISTS subquery — same as the structured
+     *                            {@code fromFilterRequest} path.
+     * @param unresolvedAmenities phrases the resolver could not map; kept on the
+     *                            legacy {@code LOWER(name) LIKE} OR-match so
+     *                            recall never regresses for unknown amenities.
+     */
+    public static Specification<Listing> matchesCriteria(
+            com.smartrent.dto.request.AiParsedCriteriaDto criteria,
+            Set<Long> amenityIds,
+            Collection<String> unresolvedAmenities) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
-            
+
             // Only verified and active listings
             if (query.getResultType() != Long.class && query.getResultType() != long.class) {
                 query.distinct(true);
@@ -922,7 +955,7 @@ public class ListingSpecification {
                     // Ignore if not exactly matching ProductType
                 }
             }
-            
+
             if (criteria.getListingType() != null) {
                 try {
                     Listing.ListingType listingType = Listing.ListingType.valueOf(criteria.getListingType().toUpperCase());
@@ -939,29 +972,62 @@ public class ListingSpecification {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("price"), criteria.getMinPrice()));
             }
 
-            // Location filters using text pattern matching for simplicity, 
+            // Area (m²) — Listing.area is Float.
+            if (criteria.getMinArea() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("area"), criteria.getMinArea()));
+            }
+            if (criteria.getMaxArea() != null) {
+                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("area"), criteria.getMaxArea()));
+            }
+
+            // Bedrooms — treated as a minimum ("2 phòng ngủ" ⇒ at least 2) so
+            // an exact-match never starves the result set.
+            if (criteria.getBedrooms() != null) {
+                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("bedrooms"), criteria.getBedrooms()));
+            }
+
+            // Location filters using text pattern matching for simplicity,
             // since AI returns raw string (e.g. "quận 1")
             if (criteria.getDistrict() != null || criteria.getProvince() != null || criteria.getWard() != null) {
                 Join<Listing, Address> addressJoin = root.join("address", JoinType.INNER);
-                
+
                 if (criteria.getDistrict() != null) {
-                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("districtName")), 
+                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("districtName")),
                         "%" + criteria.getDistrict().toLowerCase() + "%"));
                 }
                 if (criteria.getProvince() != null) {
-                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("provinceName")), 
+                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("provinceName")),
                         "%" + criteria.getProvince().toLowerCase() + "%"));
                 }
                 if (criteria.getWard() != null) {
-                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("wardName")), 
+                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("wardName")),
                         "%" + criteria.getWard().toLowerCase() + "%"));
                 }
             }
 
-            if (criteria.getAmenities() != null && !criteria.getAmenities().isEmpty()) {
+            // Resolved amenities → ALL semantics via per-id EXISTS subquery
+            // (mirrors the structured fromFilterRequest path so NL search and
+            // filter chips behave identically).
+            if (amenityIds != null && !amenityIds.isEmpty()) {
+                for (Long amenityId : amenityIds) {
+                    Subquery<Long> amenitySubquery = query.subquery(Long.class);
+                    var amenityRoot = amenitySubquery.from(Listing.class);
+                    Join<Listing, Amenity> amenityJoin = amenityRoot.join("amenities");
+                    amenitySubquery.select(amenityRoot.get("listingId"))
+                            .where(criteriaBuilder.and(
+                                    criteriaBuilder.equal(amenityRoot.get("listingId"), root.get("listingId")),
+                                    criteriaBuilder.equal(amenityJoin.get("amenityId"), amenityId)
+                            ));
+                    predicates.add(criteriaBuilder.exists(amenitySubquery));
+                }
+            }
+
+            // Unresolved amenity phrases → legacy LOWER(name) LIKE OR-match so
+            // an amenity the resolver doesn't know still narrows the results.
+            if (unresolvedAmenities != null && !unresolvedAmenities.isEmpty()) {
                 Join<Listing, Amenity> amenityJoin = root.join("amenities", JoinType.LEFT);
                 List<Predicate> amenityPredicates = new ArrayList<>();
-                for (String amenity : criteria.getAmenities()) {
+                for (String amenity : unresolvedAmenities) {
                     if (amenity == null || amenity.isBlank()) continue;
                     String raw = amenity.toLowerCase();
                     String normalized = TextNormalizer.normalize(amenity);
@@ -978,7 +1044,7 @@ public class ListingSpecification {
                     predicates.add(criteriaBuilder.or(amenityPredicates.toArray(new Predicate[0])));
                 }
             }
-            
+
             // Keyword fallback: FULLTEXT or Typo Tolerance
             if (criteria.getKeyword() != null && !criteria.getKeyword().isEmpty()) {
                 String normalized = TextNormalizer.normalize(criteria.getKeyword());
