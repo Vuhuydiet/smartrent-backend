@@ -194,8 +194,10 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         // ── Merge, deduplicate, rank, and trim ───────────────────────────────
         List<SearchSuggestionItem> merged = mergeAndRank(
                 titleItems, locationItems, popularItems, typoItems, phoneticItems, Collections.emptyList(), safeLimit);
+        AiSuggestionResponse aiResp = null;
         if (shouldCallAiForSuggestions(normalized, merged, safeLimit)) {
-            List<SearchSuggestionItem> aiItems = fetchAiIntentSuggestions(query, normalized, safeLimit);
+            aiResp = fetchAiSuggestionResponse(query, safeLimit);
+            List<SearchSuggestionItem> aiItems = toAiIntentItems(aiResp, normalized, safeLimit);
             merged = mergeAndRank(titleItems, locationItems, popularItems, typoItems, phoneticItems, aiItems, safeLimit);
         }
 
@@ -217,6 +219,14 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         }
         SearchSuggestionItem synthesized =
                 synthesizeParsedSuggestion(parsed, merged, locationItems, appliedFilters);
+        // The AI server resolved the query against its RAG knowledge base
+        // (same context the chatbox uses): location → legacy ids, amenity →
+        // ids, type → enum. Overlay those AFTER the local/DB resolution so the
+        // RAG-resolved ids win. `synthesized` stored this same map reference
+        // in its metadata, so both the dropdown's apply-row and the top-level
+        // response reflect the overlay. Without this the frontend kept
+        // FULLTEXT-searching the raw query (the reported bug).
+        overlayAiAppliedFilters(appliedFilters, aiResp);
         List<SearchSuggestionItem> finalList = withSynthesizedFirst(synthesized, merged, safeLimit);
 
         // ── Persist impression (separate TX — does not affect cache result) ──
@@ -340,36 +350,63 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         return normalized.contains(" gan ") || normalized.contains(" duoi ") || normalized.contains(" tren ");
     }
 
-    private List<SearchSuggestionItem> fetchAiIntentSuggestions(String rawQuery, String normalized, int limit) {
+    /**
+     * Single AI server round-trip. Returns the raw response (text suggestions
+     * + RAG-resolved {@code appliedFilters}) or {@code null} on any failure —
+     * the AI is strictly an enrichment, never required for a usable response.
+     */
+    private AiSuggestionResponse fetchAiSuggestionResponse(String rawQuery, int limit) {
         try {
-            AiSuggestionResponse response = aiServerClient.suggestSearchQueries(AiSuggestionRequest.builder()
+            return aiServerClient.suggestSearchQueries(AiSuggestionRequest.builder()
                     .query(rawQuery)
                     .limit(Math.min(limit, 5))
                     .build());
-            if (response == null || response.getSuggestions() == null) {
-                return Collections.emptyList();
-            }
-
-            List<SearchSuggestionItem> items = new ArrayList<>();
-            for (String text : response.getSuggestions()) {
-                if (text == null || text.isBlank()) continue;
-                String itemNorm = TextNormalizer.normalize(text);
-                if (itemNorm == null) continue;
-
-                boolean related = itemNorm.contains(normalized)
-                        || normalized.split("\\s+").length >= 2
-                        || levenshtein.apply(compactKey(normalized), compactKey(itemNorm)) <= 5;
-                if (!related) continue;
-
-                items.add(buildTextSuggestion(
-                        SuggestionType.AI_INTENT, text,
-                        WEIGHT_AI_INTENT - (0.04 * items.size()), "AI_INTENT"));
-                if (items.size() >= limit) break;
-            }
-            return items;
         } catch (Exception e) {
-            log.debug("search-suggestions: AI intent suggestions skipped: {}", e.getMessage());
+            log.debug("search-suggestions: AI suggestion call skipped: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /** Maps the AI server's text suggestions into AI_INTENT dropdown rows. */
+    private List<SearchSuggestionItem> toAiIntentItems(
+            AiSuggestionResponse response, String normalized, int limit) {
+        if (response == null || response.getSuggestions() == null) {
             return Collections.emptyList();
+        }
+
+        List<SearchSuggestionItem> items = new ArrayList<>();
+        for (String text : response.getSuggestions()) {
+            if (text == null || text.isBlank()) continue;
+            String itemNorm = TextNormalizer.normalize(text);
+            if (itemNorm == null) continue;
+
+            boolean related = itemNorm.contains(normalized)
+                    || normalized.split("\\s+").length >= 2
+                    || levenshtein.apply(compactKey(normalized), compactKey(itemNorm)) <= 5;
+            if (!related) continue;
+
+            items.add(buildTextSuggestion(
+                    SuggestionType.AI_INTENT, text,
+                    WEIGHT_AI_INTENT - (0.04 * items.size()), "AI_INTENT"));
+            if (items.size() >= limit) break;
+        }
+        return items;
+    }
+
+    /**
+     * Overlay the AI server's RAG-resolved filters onto the locally-parsed
+     * {@code appliedFilters}, letting the AI win for any key it resolved.
+     * Null / blank / empty AI values are skipped so a sparse AI payload never
+     * clobbers a good local value.
+     */
+    private void overlayAiAppliedFilters(Map<String, Object> target, AiSuggestionResponse aiResp) {
+        if (aiResp == null || aiResp.getAppliedFilters() == null) return;
+        for (Map.Entry<String, Object> e : aiResp.getAppliedFilters().entrySet()) {
+            Object v = e.getValue();
+            if (v == null) continue;
+            if (v instanceof java.util.Collection<?> c && c.isEmpty()) continue;
+            if (v instanceof String s && s.isBlank()) continue;
+            target.put(e.getKey(), v);
         }
     }
 
