@@ -68,10 +68,14 @@ public class ListingSpecification {
             if (filter.getVerified() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("verified"), filter.getVerified()));
             } else if (filter.getUserId() == null && !Boolean.TRUE.equals(filter.getIsAdminRequest())) {
-                // For public search (userId null AND not admin), only show verified listings
-                // This ensures unverified/pending/rejected listings are NOT visible to public users
-                // Admin requests (isAdminRequest=true) can see ALL listings regardless of verification status
-                predicates.add(criteriaBuilder.equal(root.get("verified"), true));
+                // Public search gates on moderation outcome, not the admin "verified" badge.
+                // verified=true still surfaces a "Tin đã xác minh" badge on the FE, but pending
+                // listings that passed moderation (APPROVED) are visible too — matching how
+                // batdongsan.com / chotot.vn treat the verified badge as a trust signal, not
+                // a visibility gate.
+                predicates.add(criteriaBuilder.equal(
+                    root.get("moderationStatus"),
+                    com.smartrent.enums.ModerationStatus.APPROVED));
             }
 
             // Verification pending filter
