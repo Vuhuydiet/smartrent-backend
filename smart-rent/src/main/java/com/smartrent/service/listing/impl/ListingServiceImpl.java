@@ -480,6 +480,10 @@ public class ListingServiceImpl implements ListingService {
                 .roomCapacity(request.getRoomCapacity())
                 .verified(false)
                 .isVerify(true)
+                // Mirror ListingMapperImpl.toEntity: a freshly created VIP listing is
+                // IN_REVIEW and must carry PENDING_REVIEW so it shows on the seller's
+                // IN_REVIEW tab and enters the admin moderation queue.
+                .moderationStatus(ModerationStatus.PENDING_REVIEW)
                 .expired(false)
                 .build();
     }
@@ -507,6 +511,12 @@ public class ListingServiceImpl implements ListingService {
                 .roomCapacity(premiumListing.getRoomCapacity())
                 .verified(premiumListing.getVerified())
                 .isVerify(premiumListing.getIsVerify())
+                // Shadow mirrors the parent's verification state, so it must mirror the
+                // parent's moderation state too; default to PENDING_REVIEW if the parent
+                // somehow has none (keeps the shadow visible on the IN_REVIEW tab).
+                .moderationStatus(premiumListing.getModerationStatus() != null
+                        ? premiumListing.getModerationStatus()
+                        : ModerationStatus.PENDING_REVIEW)
                 .expired(premiumListing.getExpired() != null ? premiumListing.getExpired() : false)
                 .isShadow(true)
                 .parentListingId(premiumListing.getListingId())

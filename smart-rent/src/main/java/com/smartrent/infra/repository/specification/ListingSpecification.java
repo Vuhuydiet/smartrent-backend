@@ -113,7 +113,20 @@ public class ListingSpecification {
                 try {
                     com.smartrent.enums.ModerationStatus moderationStatus =
                         com.smartrent.enums.ModerationStatus.valueOf(filter.getModerationStatus());
-                    predicates.add(criteriaBuilder.equal(root.get("moderationStatus"), moderationStatus));
+                    if (moderationStatus == com.smartrent.enums.ModerationStatus.PENDING_REVIEW) {
+                        // PENDING_REVIEW is the canonical default for a not-yet-moderated
+                        // listing. Legacy/older rows (and any that slipped through a
+                        // creation path that forgot to stamp it) have moderation_status
+                        // NULL while still being IN_REVIEW. Treat NULL as PENDING_REVIEW
+                        // so those listings stay visible on the seller's IN_REVIEW tab
+                        // and in the admin review queue instead of disappearing.
+                        predicates.add(criteriaBuilder.or(
+                            criteriaBuilder.equal(root.get("moderationStatus"), moderationStatus),
+                            criteriaBuilder.isNull(root.get("moderationStatus"))
+                        ));
+                    } else {
+                        predicates.add(criteriaBuilder.equal(root.get("moderationStatus"), moderationStatus));
+                    }
                 } catch (IllegalArgumentException e) {
                     // Invalid moderation status value, skip filter
                 }
