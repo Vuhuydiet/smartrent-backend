@@ -12,6 +12,7 @@ import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.MediaResponse;
 import com.smartrent.dto.response.UserCreationResponse;
 import com.smartrent.infra.repository.entity.*;
+import com.smartrent.infra.repository.LegacyDistrictRepository;
 import com.smartrent.mapper.AmenityMapper;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.mapper.MediaMapper;
@@ -28,6 +29,8 @@ public class ListingMapperImpl implements ListingMapper {
 
     private final AmenityMapper amenityMapper;
     private final MediaMapper mediaMapper;
+    private final LegacyDistrictRepository legacyDistrictRepository;
+
     @Override
     public Listing toEntity(ListingCreationRequest req) {
         Listing.VipType vipType = req.getVipType() != null ? Listing.VipType.valueOf(req.getVipType()) : null;
@@ -38,8 +41,8 @@ public class ListingMapperImpl implements ListingMapper {
                 .postDate(req.getPostDate() != null ? req.getPostDate() : java.time.LocalDateTime.now())
                 .expiryDate(req.getExpiryDate())
                 .listingType(req.getListingType() != null ? Listing.ListingType.valueOf(req.getListingType()) : null)
-                .verified(false)  // Always false for new listings (IN_REVIEW status)
-                .isVerify(true)   // Always true for new listings (IN_REVIEW status)
+                .verified(false) // Always false for new listings (IN_REVIEW status)
+                .isVerify(true) // Always true for new listings (IN_REVIEW status)
                 .moderationStatus(com.smartrent.enums.ModerationStatus.PENDING_REVIEW)
                 .expired(req.getExpired() != null ? req.getExpired() : false)
                 .vipType(vipType)
@@ -48,7 +51,8 @@ public class ListingMapperImpl implements ListingMapper {
                 .productType(req.getProductType() != null ? Listing.ProductType.valueOf(req.getProductType()) : null)
                 .price(req.getPrice())
                 .priceUnit(req.getPriceUnit() != null ? Listing.PriceUnit.valueOf(req.getPriceUnit()) : null)
-                // Note: address is NOT set here - it will be set in the service layer after creation
+                // Note: address is NOT set here - it will be set in the service layer after
+                // creation
                 // to ensure transactional integrity between Address and Listing creation
                 .area(req.getArea())
                 .bedrooms(req.getBedrooms())
@@ -89,8 +93,10 @@ public class ListingMapperImpl implements ListingMapper {
                     .filter(media -> media.getStatus() == Media.MediaStatus.ACTIVE)
                     .sorted((m1, m2) -> {
                         // Primary media first
-                        if (m1.getIsPrimary() && !m2.getIsPrimary()) return -1;
-                        if (!m1.getIsPrimary() && m2.getIsPrimary()) return 1;
+                        if (m1.getIsPrimary() && !m2.getIsPrimary())
+                            return -1;
+                        if (!m1.getIsPrimary() && m2.getIsPrimary())
+                            return 1;
                         // Then sort by sortOrder
                         return m1.getSortOrder().compareTo(m2.getSortOrder());
                     })
@@ -154,7 +160,6 @@ public class ListingMapperImpl implements ListingMapper {
                 .build();
     }
 
-
     @Override
     public ListingCardResponse toCardResponse(Listing entity, UserCreationResponse user, AddressResponse address) {
         List<ListingCardResponse.MediaCard> mediaCards = null;
@@ -162,8 +167,10 @@ public class ListingMapperImpl implements ListingMapper {
             mediaCards = entity.getMedia().stream()
                     .filter(m -> m.getStatus() == Media.MediaStatus.ACTIVE)
                     .sorted((m1, m2) -> {
-                        if (m1.getIsPrimary() && !m2.getIsPrimary()) return -1;
-                        if (!m1.getIsPrimary() && m2.getIsPrimary()) return 1;
+                        if (m1.getIsPrimary() && !m2.getIsPrimary())
+                            return -1;
+                        if (!m1.getIsPrimary() && m2.getIsPrimary())
+                            return 1;
                         return m1.getSortOrder().compareTo(m2.getSortOrder());
                     })
                     .map(m -> ListingCardResponse.MediaCard.builder()
@@ -226,7 +233,8 @@ public class ListingMapperImpl implements ListingMapper {
     }
 
     @Override
-    public ListingResponseWithAdmin toResponseWithAdmin(Listing entity, UserCreationResponse user, Admin verifyingAdmin, String verificationStatus, String verificationNotes) {
+    public ListingResponseWithAdmin toResponseWithAdmin(Listing entity, UserCreationResponse user, Admin verifyingAdmin,
+            String verificationStatus, String verificationNotes) {
         // Map amenities to AmenityResponse list
         List<AmenityResponse> amenityResponses = null;
 
@@ -243,8 +251,10 @@ public class ListingMapperImpl implements ListingMapper {
                     .filter(media -> media.getStatus() == Media.MediaStatus.ACTIVE)
                     .sorted((m1, m2) -> {
                         // Primary media first
-                        if (m1.getIsPrimary() && !m2.getIsPrimary()) return -1;
-                        if (!m1.getIsPrimary() && m2.getIsPrimary()) return 1;
+                        if (m1.getIsPrimary() && !m2.getIsPrimary())
+                            return -1;
+                        if (!m1.getIsPrimary() && m2.getIsPrimary())
+                            return 1;
                         // Then sort by sortOrder
                         return m1.getSortOrder().compareTo(m2.getSortOrder());
                     })
@@ -254,16 +264,18 @@ public class ListingMapperImpl implements ListingMapper {
 
         // Always calculate verification status based on listing state
         String finalVerificationStatus = verificationStatus != null
-            ? verificationStatus
-            : (entity.getVerified() ? "APPROVED" : (entity.getIsVerify() ? "PENDING" : "REJECTED"));
+                ? verificationStatus
+                : (entity.getVerified() ? "APPROVED" : (entity.getIsVerify() ? "PENDING" : "REJECTED"));
 
-        // Build admin verification info - always include verificationStatus for FE filtering
-        // Admin-specific fields (adminId, adminName, adminEmail) are nullable if no admin has verified yet
+        // Build admin verification info - always include verificationStatus for FE
+        // filtering
+        // Admin-specific fields (adminId, adminName, adminEmail) are nullable if no
+        // admin has verified yet
         String adminName = null;
         if (verifyingAdmin != null) {
             adminName = (verifyingAdmin.getFirstName() != null ? verifyingAdmin.getFirstName() : "") +
-                        " " +
-                        (verifyingAdmin.getLastName() != null ? verifyingAdmin.getLastName() : "");
+                    " " +
+                    (verifyingAdmin.getLastName() != null ? verifyingAdmin.getLastName() : "");
             adminName = adminName.trim();
             if (adminName.isEmpty()) {
                 adminName = null;
@@ -278,6 +290,23 @@ public class ListingMapperImpl implements ListingMapper {
                 .verificationStatus(finalVerificationStatus)
                 .verificationNotes(verificationNotes)
                 .build();
+
+        // Build PropertyInfo from address and listing data
+        ListingResponseWithAdmin.PropertyInfo propertyInfo = null;
+        if (entity.getAddress() != null) {
+            String districtName = null;
+            if (entity.getAddress().getLegacyDistrictId() != null) {
+                districtName = legacyDistrictRepository.findById(entity.getAddress().getLegacyDistrictId())
+                        .map(District::getName)
+                        .orElse(null);
+            }
+            propertyInfo = ListingResponseWithAdmin.PropertyInfo.builder()
+                    .type(entity.getProductType() != null ? entity.getProductType().name() : null)
+                    .area(entity.getArea())
+                    .district(districtName)
+                    .fullAddress(entity.getAddress().getDisplayAddress())
+                    .build();
+        }
 
         return ListingResponseWithAdmin.builder()
                 .listingId(entity.getListingId())
@@ -317,6 +346,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .revisionCount(entity.getRevisionCount())
                 .lastModerationReasonCode(entity.getLastModerationReasonCode())
                 .lastModerationReasonText(entity.getLastModerationReasonText())
+                .propertyInfo(propertyInfo)
                 .build();
     }
 
@@ -338,7 +368,6 @@ public class ListingMapperImpl implements ListingMapper {
                     .map(amenityMapper::toResponse)
                     .collect(Collectors.toList());
         }
-
 
         // Derive owner contact fields from user
         String ownerPhone = user != null ? user.getContactPhoneNumber() : null;
@@ -397,7 +426,8 @@ public class ListingMapperImpl implements ListingMapper {
                 .statistics(statistics)
                 .verificationNotes(verificationNotes)
                 .rejectionReason(rejectionReason)
-                // Moderation context (pendingOwnerAction & moderationTimeline populated by service layer)
+                // Moderation context (pendingOwnerAction & moderationTimeline populated by
+                // service layer)
                 .moderationStatus(entity.getModerationStatus() != null ? entity.getModerationStatus().name() : null)
                 .build();
     }

@@ -41,7 +41,7 @@ public class ListingResponseWithAdmin {
     @Schema(description = "Expiry date")
     LocalDateTime expiryDate;
 
-    @Schema(description = "Listing type", example = "RENT", allowableValues = {"RENT", "SALE", "SHARE"})
+    @Schema(description = "Listing type", example = "RENT", allowableValues = { "RENT", "SALE", "SHARE" })
     String listingType;
 
     @Schema(description = "Whether listing is verified")
@@ -50,22 +50,19 @@ public class ListingResponseWithAdmin {
     @Schema(description = "Whether listing is expired")
     Boolean expired;
 
-    @Schema(
-        description = "Computed listing status based on verification state",
-        example = "IN_REVIEW",
-        allowableValues = {"EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED", "RESUBMITTED"})
+    @Schema(description = "Computed listing status based on verification state", example = "IN_REVIEW", allowableValues = {
+            "EXPIRED", "EXPIRING_SOON", "DISPLAYING", "IN_REVIEW", "PENDING_PAYMENT", "REJECTED", "VERIFIED",
+            "RESUBMITTED" })
     String listingStatus;
 
-    @Schema(
-        description = "VIP tier: NORMAL, SILVER, GOLD, DIAMOND",
-        example = "SILVER",
-        allowableValues = {"NORMAL", "SILVER", "GOLD", "DIAMOND"}
-    )
+    @Schema(description = "VIP tier: NORMAL, SILVER, GOLD, DIAMOND", example = "SILVER", allowableValues = { "NORMAL",
+            "SILVER", "GOLD", "DIAMOND" })
     String vipType;
 
     Long categoryId;
 
-    @Schema(description = "Product type (loại bất động sản)", example = "APARTMENT", allowableValues = {"ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO"})
+    @Schema(description = "Product type (loại bất động sản)", example = "APARTMENT", allowableValues = { "ROOM",
+            "APARTMENT", "HOUSE", "OFFICE", "STUDIO" })
     String productType;
 
     BigDecimal price;
@@ -115,8 +112,8 @@ public class ListingResponseWithAdmin {
     Long updatedBy;
 
     // ── Moderation context ──
-    @Schema(description = "Canonical moderation status", example = "PENDING_REVIEW",
-            allowableValues = {"PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED"})
+    @Schema(description = "Canonical moderation status", example = "PENDING_REVIEW", allowableValues = {
+            "PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED" })
     String moderationStatus;
 
     @Schema(description = "Number of times the listing has been revised", example = "0")
@@ -127,4 +124,29 @@ public class ListingResponseWithAdmin {
 
     @Schema(description = "Human-readable reason for last moderation action")
     String lastModerationReasonText;
+
+    @Schema(description = "Property information summary")
+    PropertyInfo propertyInfo;
+
+    // ── PropertyInfo nested class ──
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Schema(description = "Property information summary")
+    public static class PropertyInfo {
+        @Schema(description = "Property type", example = "APARTMENT")
+        String type;
+
+        @Schema(description = "Property area in square meters", example = "85.5")
+        Float area;
+
+        @Schema(description = "District name", example = "Quận 5")
+        String district;
+
+        @Schema(description = "Full address", example = "123 Nguyễn Trãi, Phường 5, Quận 5, Thành Phố Hồ Chí Minh")
+        String fullAddress;
+    }
 }
