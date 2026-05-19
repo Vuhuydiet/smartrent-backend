@@ -27,8 +27,14 @@ import java.time.LocalDateTime;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class SearchQueryImpression {
 
+    /**
+     * Application-assigned (see {@link com.smartrent.util.SnowflakeId}) so the
+     * id is known before the row is written, letting the INSERT be dispatched
+     * asynchronously while the request still returns a usable impressionId.
+     * The DB column stays {@code BIGINT AUTO_INCREMENT}; an explicit value is
+     * always supplied so the auto-increment path is simply never exercised.
+     */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     Long id;
 

@@ -7,7 +7,8 @@ import com.smartrent.infra.repository.LegacyDistrictRepository;
 import com.smartrent.infra.repository.LegacyProvinceRepository;
 import com.smartrent.infra.repository.LegacyWardRepository;
 import com.smartrent.infra.repository.ListingRepository;
-import com.smartrent.infra.repository.SearchQueryImpressionRepository;
+import com.smartrent.service.discovery.SearchTelemetryWriter;
+import com.smartrent.service.discovery.TelemetryExecutor;
 import com.smartrent.infra.repository.SearchSuggestionClickRepository;
 import com.smartrent.infra.repository.entity.District;
 import com.smartrent.infra.repository.entity.LegacyProvince;
@@ -18,6 +19,7 @@ import com.smartrent.service.discovery.AmenityResolver;
 import com.smartrent.service.discovery.LocationFuzzyIndex;
 import com.smartrent.service.discovery.SearchSuggestionService;
 import com.smartrent.util.SearchQueryParser;
+import com.smartrent.util.SnowflakeId;
 import com.smartrent.util.TextNormalizer;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -124,8 +126,9 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     LegacyWardRepository          legacyWardRepository;
     LegacyDistrictRepository      legacyDistrictRepository;
     LegacyProvinceRepository      legacyProvinceRepository;
-    SearchQueryImpressionRepository impressionRepository;
     SearchSuggestionClickRepository clickRepository;
+    TelemetryExecutor telemetryExecutor;
+    SearchTelemetryWriter telemetryWriter;
     AmenityResolver amenityResolver;
     LocationFuzzyIndex locationFuzzyIndex;
 
@@ -189,7 +192,7 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
                 // never empty (e.g. legacy_provinces unseeded in a fresh env).
                 defaults = fetchDefaultLocationSuggestions(safeLimit);
             }
-            long impressionId = persistImpression(
+            long impressionId = dispatchImpression(
                     Objects.toString(normalized, ""), provinceId, categoryId,
                     defaults.size(), clientIp, sessionId);
             return SearchSuggestionsResponse.builder()
@@ -257,8 +260,8 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         SearchSuggestionItem contextual = hasStructuredFilters ? synthesized : null;
         List<SearchSuggestionItem> finalList = withSynthesizedFirst(contextual, merged, safeLimit);
 
-        // ── Persist impression (separate TX — does not affect cache result) ──
-        long impressionId = persistImpression(normalized, provinceId, categoryId, finalList.size(), clientIp, sessionId);
+        // ── Dispatch impression telemetry off the request thread ────────────
+        long impressionId = dispatchImpression(normalized, provinceId, categoryId, finalList.size(), clientIp, sessionId);
 
         log.debug("search-suggestions: q='{}' → {} suggestions (impression {})", normalized, finalList.size(), impressionId);
 
@@ -1176,28 +1179,28 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Persists a {@link SearchQueryImpression} in a separate transaction.
-     * Returns the generated ID (used by the controller to populate the response envelope).
-     * Returns {@code 0} on failure so the API caller is never affected.
+     * Generates the impression id up front (so the synchronous response can
+     * carry it for click-tracking) and dispatches the actual INSERT to
+     * {@link TelemetryExecutor} — the request thread never waits on the
+     * telemetry write. Never throws; never returns 0 (the id always exists,
+     * independent of whether the async write later succeeds — the telemetry
+     * tables have no FK, so a late/failed impression row is harmless).
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public long persistImpression(
+    private long dispatchImpression(
             String normalized, String provinceId, Long categoryId,
             int suggestionCount, String clientIp, String sessionId) {
-        try {
-            SearchQueryImpression impression = SearchQueryImpression.builder()
-                    .queryNorm(normalized)
-                    .provinceId(provinceId)
-                    .categoryId(categoryId)
-                    .suggestionCount(suggestionCount)
-                    .clientIp(clientIp)
-                    .sessionId(sessionId)
-                    .build();
-            return impressionRepository.save(impression).getId();
-        } catch (Exception e) {
-            log.warn("search-suggestions: impression persist failed (non-fatal): {}", e.getMessage(), e);
-            return 0L;
-        }
+        long id = SnowflakeId.next();
+        SearchQueryImpression impression = SearchQueryImpression.builder()
+                .id(id)
+                .queryNorm(normalized)
+                .provinceId(provinceId)
+                .categoryId(categoryId)
+                .suggestionCount(suggestionCount)
+                .clientIp(clientIp)
+                .sessionId(sessionId)
+                .build();
+        telemetryExecutor.execute(() -> telemetryWriter.saveImpression(impression));
+        return id;
     }
 
     /**
