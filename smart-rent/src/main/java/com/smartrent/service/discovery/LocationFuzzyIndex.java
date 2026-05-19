@@ -76,7 +76,35 @@ public class LocationFuzzyIndex {
             String districtName,
             List<String> matchStrings) {}
 
-    public record Index(List<Entry> entries) {}
+    /**
+     * Pre-built lookup structures so the hot path never linearly scans the
+     * ~760-entry list:
+     * <ul>
+     *   <li>{@code entries} — flat list, used ONLY by {@link #searchIndex}
+     *       (the typo fallback that genuinely has to score everything, and
+     *       only runs when every exact tier missed);</li>
+     *   <li>{@code provinceByMatch} — province {@code matchString → Entry}
+     *       (O(1) {@link #findProvinceExact});</li>
+     *   <li>{@code districtByKey} — {@code provinceCodematchString →
+     *       Entry} (O(1) {@link #findDistrictInProvince} /
+     *       {@link #resolveDistrictIn});</li>
+     *   <li>{@code districtsByProvince} — {@code provinceCode → its districts}
+     *       so the fuzzy district scan is bounded to one province (~20-35
+     *       rows) instead of all ~700.</li>
+     * </ul>
+     */
+    public record Index(
+            List<Entry> entries,
+            Map<String, Entry> provinceByMatch,
+            Map<String, Entry> districtByKey,
+            Map<String, List<Entry>> districtsByProvince) {}
+
+    /** Composite key for {@link Index#districtByKey}. {@code U+0001} can never
+     *  appear in {@link TextNormalizer#normalize} output, so it is a safe,
+     *  collision-free delimiter between the province code and the match. */
+    private static String dkey(String provinceCode, String match) {
+        return provinceCode + '\u0001' + match;
+    }
 
     /** A scored fuzzy hit (highest score first when returned). */
     public record Match(
@@ -164,14 +192,21 @@ public class LocationFuzzyIndex {
     static Index buildIndex(List<LegacyProvince> provinces, List<District> districts) {
         Map<String, LegacyProvince> byCode = new HashMap<>();
         List<Entry> entries = new ArrayList<>();
+        Map<String, Entry> provinceByMatch = new HashMap<>();
+        Map<String, Entry> districtByKey = new HashMap<>();
+        Map<String, List<Entry>> districtsByProvince = new HashMap<>();
 
         for (LegacyProvince p : provinces) {
             if (p.getCode() != null) byCode.put(p.getCode(), p);
             if (p.getId() == null) continue;
             List<String> match = norms(p.getName(), p.getShortName(), p.getAlias());
             if (match.isEmpty()) continue;
-            entries.add(new Entry(Kind.PROVINCE, p.getName(), p.getId(), null,
-                    p.getCode(), null, p.getName(), null, match));
+            Entry e = new Entry(Kind.PROVINCE, p.getName(), p.getId(), null,
+                    p.getCode(), null, p.getName(), null, match);
+            entries.add(e);
+            // putIfAbsent ⇒ first-wins, identical to the old in-order
+            // linear scan that returned the first matching entry.
+            for (String m : match) provinceByMatch.putIfAbsent(m, e);
         }
 
         for (District d : districts) {
@@ -181,10 +216,17 @@ public class LocationFuzzyIndex {
             if (provinceId == null) continue; // can't filter without a province id
             List<String> match = norms(d.getName(), d.getShortName(), d.getAlias());
             if (match.isEmpty()) continue;
-            entries.add(new Entry(Kind.DISTRICT, d.getName(), provinceId, d.getId(),
-                    d.getProvinceCode(), d.getCode(), d.getProvinceName(), d.getName(), match));
+            Entry e = new Entry(Kind.DISTRICT, d.getName(), provinceId, d.getId(),
+                    d.getProvinceCode(), d.getCode(), d.getProvinceName(), d.getName(), match);
+            entries.add(e);
+            districtsByProvince
+                    .computeIfAbsent(d.getProvinceCode(), k -> new ArrayList<>())
+                    .add(e);
+            for (String m : match) {
+                districtByKey.putIfAbsent(dkey(d.getProvinceCode(), m), e);
+            }
         }
-        return new Index(entries);
+        return new Index(entries, provinceByMatch, districtByKey, districtsByProvince);
     }
 
     private static List<String> norms(String... raw) {
@@ -236,14 +278,8 @@ public class LocationFuzzyIndex {
         }
         String q = normalizedName.trim();
         if (q.isEmpty()) return Optional.empty();
-        for (Entry e : idx.entries()) {
-            if (e.kind() == Kind.DISTRICT
-                    && provinceCode.equals(e.provinceCode())
-                    && e.matchStrings().contains(q)) {
-                return Optional.of(toMatch(e, 1.0));
-            }
-        }
-        return Optional.empty();
+        Entry e = idx.districtByKey().get(dkey(provinceCode, q));
+        return e != null ? Optional.of(toMatch(e, 1.0)) : Optional.empty();
     }
 
     /**
@@ -306,37 +342,27 @@ public class LocationFuzzyIndex {
     }
 
     private static Entry findProvinceExact(Index idx, String candidate) {
-        for (Entry e : idx.entries()) {
-            if (e.kind() == Kind.PROVINCE && e.matchStrings().contains(candidate)) {
-                return e;
-            }
-        }
-        return null;
+        return idx.provinceByMatch().get(candidate);
     }
 
     private static Entry findDistrictInProvince(Index idx, String provinceCode, String seg) {
         if (provinceCode == null) return null;
-        for (Entry e : idx.entries()) {
-            if (e.kind() == Kind.DISTRICT
-                    && provinceCode.equals(e.provinceCode())
-                    && e.matchStrings().contains(seg)) {
-                return e;
-            }
-        }
-        return null;
+        return idx.districtByKey().get(dkey(provinceCode, seg));
     }
 
     private static Entry bestFuzzyDistrictInProvince(
             Index idx, String provinceCode, String seg, double minScore) {
         if (provinceCode == null || seg.length() < MIN_QUERY_LENGTH) return null;
+        List<Entry> districts = idx.districtsByProvince().get(provinceCode);
+        if (districts == null || districts.isEmpty()) return null;
         // Same loose length gate as searchIndex: a typo may add/drop a few
         // chars, but a wildly different-length name (e.g. "quan" vs
-        // "quan tan binh") must not fuzzy-match.
+        // "quan tan binh") must not fuzzy-match. Scan is now bounded to the
+        // ~20-35 districts of ONE province instead of all ~700.
         int maxLenDelta = Math.max(4, seg.length());
         Entry best = null;
         double bestScore = -1.0;
-        for (Entry e : idx.entries()) {
-            if (e.kind() != Kind.DISTRICT || !provinceCode.equals(e.provinceCode())) continue;
+        for (Entry e : districts) {
             for (String c : e.matchStrings()) {
                 if (Math.abs(c.length() - seg.length()) > maxLenDelta) continue;
                 Double s = JARO_WINKLER.apply(seg, c);
