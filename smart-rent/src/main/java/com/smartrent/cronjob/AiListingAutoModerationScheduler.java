@@ -11,6 +11,7 @@ import com.smartrent.infra.repository.entity.enums.VerificationStatus;
 import com.smartrent.service.ai.AiListingVerificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,6 +22,11 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(
+    name = "smartrent.ai.verification.scheduler.enabled",
+    havingValue = "true",
+    matchIfMissing = true
+)
 public class AiListingAutoModerationScheduler {
 
     private final ListingRepository listingRepository;
