@@ -42,7 +42,9 @@ public interface LegacyDistrictRepository extends JpaRepository<District, Intege
      * accepts {@code normalized} (with spaces, matched against name/shortName
      * via accent-insensitive collation) and {@code compactKey} (no spaces,
      * matched against the legacy {@code key} column whose seed data dropped
-     * spaces, e.g. {@code "quan1"}).
+     * spaces, e.g. {@code "quan1"}, AND the {@code short_key} column, e.g.
+     * {@code "tanbinh"}, so a bare named district resolves regardless of the
+     * DB collation's accent sensitivity).
      *
      * <p>Only filters by the district's own columns — does NOT match on the
      * denormalized {@code province_name} so that a province-level query does
@@ -54,6 +56,7 @@ public interface LegacyDistrictRepository extends JpaRepository<District, Intege
         WHERE LOWER(d.name)      LIKE LOWER(CONCAT('%', :normalized, '%'))
            OR LOWER(d.shortName) LIKE LOWER(CONCAT('%', :normalized, '%'))
            OR d.key              LIKE CONCAT('%', :compactKey, '%')
+           OR d.shortKey         LIKE CONCAT('%', :compactKey, '%')
         ORDER BY d.provinceName ASC, d.name ASC
     """)
     List<District> findSuggestionMatches(
@@ -67,7 +70,8 @@ public interface LegacyDistrictRepository extends JpaRepository<District, Intege
         WHERE d.provinceCode = :provinceCode
           AND ( LOWER(d.name)      LIKE LOWER(CONCAT('%', :normalized, '%'))
              OR LOWER(d.shortName) LIKE LOWER(CONCAT('%', :normalized, '%'))
-             OR d.key              LIKE CONCAT('%', :compactKey, '%') )
+             OR d.key              LIKE CONCAT('%', :compactKey, '%')
+             OR d.shortKey         LIKE CONCAT('%', :compactKey, '%') )
         ORDER BY d.name ASC
     """)
     List<District> findSuggestionMatchesByProvince(
