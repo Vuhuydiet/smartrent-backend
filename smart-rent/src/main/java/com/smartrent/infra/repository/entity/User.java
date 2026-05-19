@@ -1,6 +1,7 @@
 package com.smartrent.infra.repository.entity;
 
 import com.smartrent.enums.BrokerVerificationStatus;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -22,10 +23,9 @@ import lombok.experimental.SuperBuilder;
 import java.time.LocalDateTime;
 
 @Entity(name = "users")
-@Table(name = "users",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_users_phone", columnNames = {"phone_code", "phone_number"})
-    })
+@Table(name = "users", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_users_phone", columnNames = { "phone_code", "phone_number" })
+})
 @Getter
 @Setter
 @SuperBuilder
@@ -34,83 +34,88 @@ import java.time.LocalDateTime;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class User extends AbstractUser {
 
-  @Id
-  @Column(name = "user_id")
-  @GeneratedValue(strategy = GenerationType.UUID)
-  String userId;
+    @Id
+    @Column(name = "user_id")
+    @GeneratedValue(strategy = GenerationType.UUID)
+    String userId;
 
-  @Column(name = "id_document", unique = true)
-  String idDocument;
+    @Column(name = "id_document", unique = true)
+    String idDocument;
 
-  @Column(name = "tax_number", unique = true)
-  String taxNumber;
+    @Column(name = "tax_number", unique = true)
+    String taxNumber;
 
-  @Column(name = "is_verified")
-  boolean isVerified;
+    @Column(name = "is_verified")
+    boolean isVerified;
 
-  @Column(name = "contact_phone_number")
-  String contactPhoneNumber;
+    @Column(name = "contact_phone_number")
+    String contactPhoneNumber;
 
-  @Column(name = "contact_phone_verified")
-  Boolean contactPhoneVerified;
+    @Column(name = "contact_phone_verified")
+    Boolean contactPhoneVerified;
 
-  @Column(name = "avatar_url")
-  String avatarUrl;
+    @Column(name = "avatar_url")
+    String avatarUrl;
 
-  @Column(name = "avatar_media_id")
-  Long avatarMediaId;
+    @Column(name = "avatar_media_id")
+    Long avatarMediaId;
 
-  // ============ BROKER FIELDS ============
+    // ============ BROKER FIELDS ============
 
-  /** True when the user is an approved broker. */
-  @Builder.Default
-  @Column(name = "is_broker", nullable = false)
-  boolean isBroker = false;
+    /** True when the user is an approved broker. */
+    @Builder.Default
+    @Column(name = "is_broker", nullable = false)
+    boolean isBroker = false;
 
-  /** Current state in the broker verification lifecycle. */
-  @Builder.Default
-  @Enumerated(EnumType.STRING)
-  @Column(name = "broker_verification_status", nullable = false, length = 20)
-  BrokerVerificationStatus brokerVerificationStatus = BrokerVerificationStatus.NONE;
+    /** Current state in the broker verification lifecycle. */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "broker_verification_status", nullable = false, length = 20)
+    BrokerVerificationStatus brokerVerificationStatus = BrokerVerificationStatus.NONE;
 
-  /** Timestamp when the user first submitted a broker registration. */
-  @Column(name = "broker_registered_at")
-  LocalDateTime brokerRegisteredAt;
+    /** Timestamp when the user first submitted a broker registration. */
+    @Column(name = "broker_registered_at")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    LocalDateTime brokerRegisteredAt;
 
-  /** Timestamp when an admin approved or rejected the registration. */
-  @Column(name = "broker_verified_at")
-  LocalDateTime brokerVerifiedAt;
+    /** Timestamp when an admin approved or rejected the registration. */
+    @Column(name = "broker_verified_at")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    LocalDateTime brokerVerifiedAt;
 
-  /** Admin ID who performed the final review (stored as VARCHAR(36) to support UUID-style admin IDs). */
-  @Column(name = "broker_verified_by_admin_id", length = 36)
-  String brokerVerifiedByAdminId;
+    /**
+     * Admin ID who performed the final review (stored as VARCHAR(36) to support
+     * UUID-style admin IDs).
+     */
+    @Column(name = "broker_verified_by_admin_id", length = 36)
+    String brokerVerifiedByAdminId;
 
-  /** Admin-provided reason for rejection. Null when approved. */
-  @Column(name = "broker_rejection_reason", length = 500)
-  String brokerRejectionReason;
+    /** Admin-provided reason for rejection. Null when approved. */
+    @Column(name = "broker_rejection_reason", length = 500)
+    String brokerRejectionReason;
 
-  /**
-   * URL of the external registry used to manually verify the broker.
-   * Default: https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20
-   */
-  @Column(name = "broker_verification_source", length = 255)
-  String brokerVerificationSource;
+    /**
+     * URL of the external registry used to manually verify the broker.
+     * Default: https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20
+     */
+    @Column(name = "broker_verification_source", length = 255)
+    String brokerVerificationSource;
 
-  // ============ BROKER DOCUMENT FIELDS ============
+    // ============ BROKER DOCUMENT FIELDS ============
 
-  /** Media ID for the front side of the user's CCCD (National ID). */
-  @Column(name = "broker_cccd_front_media_id")
-  Long brokerCccdFrontMediaId;
+    /** Media ID for the front side of the user's CCCD (National ID). */
+    @Column(name = "broker_cccd_front_media_id")
+    Long brokerCccdFrontMediaId;
 
-  /** Media ID for the back side of the user's CCCD (National ID). */
-  @Column(name = "broker_cccd_back_media_id")
-  Long brokerCccdBackMediaId;
+    /** Media ID for the back side of the user's CCCD (National ID). */
+    @Column(name = "broker_cccd_back_media_id")
+    Long brokerCccdBackMediaId;
 
-  /** Media ID for the practising certificate image (single required image). */
-  @Column(name = "broker_cert_front_media_id")
-  Long brokerCertFrontMediaId;
+    /** Media ID for the practising certificate image (single required image). */
+    @Column(name = "broker_cert_front_media_id")
+    Long brokerCertFrontMediaId;
 
-  /** Legacy media ID for historical back-side certificate data. */
-  @Column(name = "broker_cert_back_media_id")
-  Long brokerCertBackMediaId;
+    /** Legacy media ID for historical back-side certificate data. */
+    @Column(name = "broker_cert_back_media_id")
+    Long brokerCertBackMediaId;
 }

@@ -3,6 +3,7 @@ package com.smartrent.mapper.impl;
 import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.GetUserResponse;
+import com.smartrent.dto.response.JwtUserClaimsDto;
 import com.smartrent.dto.response.UserCreationResponse;
 import com.smartrent.infra.repository.entity.User;
 import com.smartrent.mapper.UserMapper;
@@ -60,9 +61,9 @@ public class UserMapperImpl implements UserMapper {
         .avatarUrl(user.getAvatarUrl())
         .isBroker(user.isBroker())
         .brokerVerificationStatus(
-          user.getBrokerVerificationStatus() != null
-            ? user.getBrokerVerificationStatus().name()
-            : null)
+            user.getBrokerVerificationStatus() != null
+                ? user.getBrokerVerificationStatus().name()
+                : null)
         .build();
   }
 
@@ -73,6 +74,7 @@ public class UserMapperImpl implements UserMapper {
         .email(user.getEmail())
         .firstName(user.getFirstName())
         .lastName(user.getLastName())
+        .createdAt(user.getCreatedAt())
         .idDocument(user.getIdDocument())
         .taxNumber(user.getTaxNumber())
         .phoneCode(user.getPhoneCode())
@@ -87,6 +89,21 @@ public class UserMapperImpl implements UserMapper {
             user.getBrokerVerificationStatus() != null
                 ? user.getBrokerVerificationStatus().name()
                 : null)
+        .build();
+  }
+
+  @Override
+  public JwtUserClaimsDto mapFromUserEntityToJwtUserClaimsDto(User user) {
+    return JwtUserClaimsDto.builder()
+        .userId(user.getUserId())
+        .email(user.getEmail())
+        .firstName(user.getFirstName())
+        .lastName(user.getLastName())
+        .phoneCode(user.getPhoneCode())
+        .phoneNumber(user.getPhoneNumber())
+        .isVerified(user.isVerified())
+        .isBroker(user.isBroker())
+        .avatarUrl(user.getAvatarUrl())
         .build();
   }
 }

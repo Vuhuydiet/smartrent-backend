@@ -1,6 +1,7 @@
 package com.smartrent.service.admin;
 
 import com.smartrent.dto.request.AdminCreationRequest;
+import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.AdminUpdateRequest;
 import com.smartrent.dto.response.AdminCreationResponse;
 import com.smartrent.dto.response.GetAdminResponse;
@@ -11,7 +12,7 @@ public interface AdminService {
 
   GetAdminResponse getAdminById(String id);
 
-  PageResponse<GetAdminResponse> getAllAdmins(int page, int size);
+  PageResponse<GetAdminResponse> getAllAdmins(AdminFilterRequest filter);
 
   GetAdminResponse updateAdmin(String adminId, AdminUpdateRequest request);
 

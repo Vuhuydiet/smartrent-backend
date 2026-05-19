@@ -180,8 +180,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     verificationService.verifyCode(VerifyCodeRequest.builder()
-            .email(user.getEmail())
-            .verificationCode(request.getVerificationCode())
+        .email(user.getEmail())
+        .verificationCode(request.getVerificationCode())
         .build());
 
     user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -308,7 +308,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
       return jwsObject.serialize();
     } catch (JOSEException e) {
-      throw  new DomainException(DomainCode.UNKNOWN_ERROR);
+      throw new DomainException(DomainCode.UNKNOWN_ERROR);
     }
   }
 
@@ -321,8 +321,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
           .issueTime(new Date())
           .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
           .claim("rfId", otherId)
-          .claim("scope",Constants.ROLE_USER)
-          .claim("user", userMapper.mapFromUserEntityToGetUserResponse(user))
+          .claim("scope", Constants.ROLE_USER)
+          .claim("user", userMapper.mapFromUserEntityToJwtUserClaimsDto(user))
           .build();
     } catch (Exception e) {
       throw new DomainException(DomainCode.UNKNOWN_ERROR);
@@ -352,4 +352,3 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         .build();
   }
 }
-

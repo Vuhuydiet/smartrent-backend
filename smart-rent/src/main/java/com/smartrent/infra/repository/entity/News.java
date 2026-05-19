@@ -2,6 +2,7 @@ package com.smartrent.infra.repository.entity;
 
 import com.smartrent.enums.NewsCategory;
 import com.smartrent.enums.NewsStatus;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -20,15 +21,14 @@ import java.time.LocalDateTime;
  * Stores news articles, blog posts, market trends, and guides
  */
 @Entity(name = "news")
-@Table(name = "news",
-        indexes = {
-                @Index(name = "idx_news_slug", columnList = "slug", unique = true),
-                @Index(name = "idx_news_category", columnList = "category"),
-                @Index(name = "idx_news_status", columnList = "status"),
-                @Index(name = "idx_news_published_at", columnList = "published_at"),
-                @Index(name = "idx_news_category_status", columnList = "category, status"),
-                @Index(name = "idx_news_status_published", columnList = "status, published_at")
-        })
+@Table(name = "news", indexes = {
+        @Index(name = "idx_news_slug", columnList = "slug", unique = true),
+        @Index(name = "idx_news_category", columnList = "category"),
+        @Index(name = "idx_news_status", columnList = "status"),
+        @Index(name = "idx_news_published_at", columnList = "published_at"),
+        @Index(name = "idx_news_category_status", columnList = "category, status"),
+        @Index(name = "idx_news_status_published", columnList = "status, published_at")
+})
 @Getter
 @Setter
 @Builder
@@ -70,6 +70,7 @@ public class News {
     NewsStatus status = NewsStatus.DRAFT;
 
     @Column(name = "published_at")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime publishedAt;
 
     @Column(name = "author_id", length = 36)
@@ -93,10 +94,12 @@ public class News {
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     LocalDateTime updatedAt;
 
     /**
@@ -113,4 +116,3 @@ public class News {
         this.viewCount = (this.viewCount == null ? 0L : this.viewCount) + 1;
     }
 }
-

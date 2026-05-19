@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
@@ -31,10 +32,12 @@ public class AdminVerificationInfo {
     @Schema(description = "Admin's email", example = "admin@smartrent.com")
     String adminEmail;
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Schema(description = "Verification timestamp", example = "2025-09-01T10:00:00")
     LocalDateTime verifiedAt;
 
-    @Schema(description = "Verification status", example = "APPROVED", allowableValues = {"PENDING", "APPROVED", "REJECTED"})
+    @Schema(description = "Verification status", example = "APPROVED", allowableValues = { "PENDING", "APPROVED",
+            "REJECTED" })
     String verificationStatus;
 
     @Schema(description = "Admin's notes or comments on verification", example = "Verified property documents and ownership")

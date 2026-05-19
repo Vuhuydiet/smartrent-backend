@@ -1,6 +1,7 @@
 package com.smartrent.service.user.impl;
 
 import com.smartrent.config.Constants;
+import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UpdateContactPhoneRequest;
 import com.smartrent.dto.request.UserCreationRequest;
@@ -31,6 +32,7 @@ import com.smartrent.service.user.UserService;
 import com.smartrent.utility.MaskingUtil;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -43,10 +45,12 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.utils.StringUtils;
+import jakarta.persistence.criteria.Predicate;
 
 @Slf4j
 @Service
@@ -78,7 +82,7 @@ public class UserServiceImpl implements UserService {
 
     if (StringUtils.isNotBlank(request.getPhoneCode()) && StringUtils.isNotBlank(request.getPhoneNumber()) &&
         userRepository.existsByPhoneCodeAndPhoneNumber(request.getPhoneCode(),
-        request.getPhoneNumber())) {
+            request.getPhoneNumber())) {
       throw new PhoneExistingException();
     }
 
@@ -123,19 +127,73 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  @Cacheable(cacheNames = Constants.CacheNames.USER_DETAILS, key = "#page + #size")
-  public PageResponse<GetUserResponse> getUsers(int page, int size) {
-    // Validate pagination parameters
-    if (page < 1) {
-      throw new InvalidPageException();
-    }
-    if (size <= 0) {
-      throw new InvalidPageSizeException();
+  public PageResponse<GetUserResponse> getUsers(AdminFilterRequest filter) {
+    // Validate and set defaults
+    int page = Math.max(filter.getPage() != null ? filter.getPage() : 1, 1);
+    int size = Math.max(filter.getSize() != null ? filter.getSize() : 20, 1);
+
+    Pageable pageable = PageRequest.of(page - 1, size);
+
+    // Build dynamic specification from filter request
+    Specification<User> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
+
+    // Search filters - apply contains search for multiple fields
+    if (filter.hasFilter("userId") || filter.hasFilter("firstName") ||
+        filter.hasFilter("lastName") || filter.hasFilter("email") || filter.hasFilter("phoneNumber")) {
+
+      spec = spec.and((root, query, criteriaBuilder) -> {
+        List<Predicate> predicates = new ArrayList<>();
+
+        // userId filter
+        if (filter.hasFilter("userId")) {
+          String value = "%" + filter.getStringFilter("userId").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("userId")), value));
+        }
+
+        // firstName filter
+        if (filter.hasFilter("firstName")) {
+          String value = "%" + filter.getStringFilter("firstName").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("firstName")), value));
+        }
+
+        // lastName filter
+        if (filter.hasFilter("lastName")) {
+          String value = "%" + filter.getStringFilter("lastName").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("lastName")), value));
+        }
+
+        // email filter
+        if (filter.hasFilter("email")) {
+          String value = "%" + filter.getStringFilter("email").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), value));
+        }
+
+        // phoneNumber filter
+        if (filter.hasFilter("phoneNumber")) {
+          String value = "%" + filter.getStringFilter("phoneNumber").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("phoneNumber")), value));
+        }
+
+        // Combine with OR if multiple filters exist
+        if (predicates.isEmpty()) {
+          return criteriaBuilder.conjunction();
+        } else if (predicates.size() == 1) {
+          return predicates.get(0);
+        } else {
+          return criteriaBuilder.or(predicates.toArray(new Predicate[0]));
+        }
+      });
     }
 
-    Pageable pageable = PageRequest.of(page-1, size);
+    // isBroker filter
+    if (filter.hasFilter("isBroker")) {
+      Boolean isBroker = filter.getBooleanFilter("isBroker");
+      if (isBroker != null) {
+        spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("isBroker"), isBroker));
+      }
+    }
 
-    Page<User> users = userRepository.findAll(pageable);
+    Page<User> users = userRepository.findAll(spec, pageable);
 
     List<GetUserResponse> userResponses = users.getContent().stream()
         .map(userMapper::mapFromUserEntityToGetUserResponse)
@@ -285,8 +343,10 @@ public class UserServiceImpl implements UserService {
   }
 
   /**
-   * Resolve an avatarMediaId coming from the presigned upload flow, verify ownership and
-   * media type, soft-delete the previous avatar media record if any, and copy the public URL
+   * Resolve an avatarMediaId coming from the presigned upload flow, verify
+   * ownership and
+   * media type, soft-delete the previous avatar media record if any, and copy the
+   * public URL
    * onto the user entity.
    */
   private void applyAvatarMedia(User user, Long avatarMediaId) {
@@ -305,9 +365,12 @@ public class UserServiceImpl implements UserService {
       throw new AppException(DomainCode.BAD_REQUEST_ERROR, "Avatar media must be an uploaded file");
     }
 
-    // Replace the previous avatar: mark DB record DELETED and best-effort remove the R2 object
-    // inline so storage doesn't accumulate orphaned avatars. Inline delete must fail silently
-    // — the new avatar is already active and the user-facing operation must not be blocked by
+    // Replace the previous avatar: mark DB record DELETED and best-effort remove
+    // the R2 object
+    // inline so storage doesn't accumulate orphaned avatars. Inline delete must
+    // fail silently
+    // — the new avatar is already active and the user-facing operation must not be
+    // blocked by
     // a transient storage error.
     Long previousMediaId = user.getAvatarMediaId();
     if (previousMediaId != null && !previousMediaId.equals(avatarMediaId)) {
@@ -331,7 +394,8 @@ public class UserServiceImpl implements UserService {
 
   /**
    * Upload avatar file to S3/R2 storage
-   * @param userId User ID
+   * 
+   * @param userId     User ID
    * @param avatarFile Avatar file to upload
    * @return Public URL of the uploaded avatar
    */
@@ -364,8 +428,7 @@ public class UserServiceImpl implements UserService {
           storageKey,
           avatarFile.getInputStream(),
           contentType,
-          avatarFile.getSize()
-      );
+          avatarFile.getSize());
 
       // Return public URL
       String publicUrl = storageService.getPublicUrl(storageKey);

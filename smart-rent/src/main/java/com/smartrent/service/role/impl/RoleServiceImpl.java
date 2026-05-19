@@ -1,5 +1,6 @@
 package com.smartrent.service.role.impl;
 
+import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.RoleCreationRequest;
 import com.smartrent.dto.request.RoleUpdateRequest;
 import com.smartrent.dto.response.GetRoleResponse;
@@ -73,6 +74,60 @@ public class RoleServiceImpl implements RoleService {
           .totalPages(rolePage.getTotalPages())
           .totalElements(rolePage.getTotalElements())
           .data(roleResponses)
+          .build();
+
+    } catch (Exception e) {
+      log.error("Failed to retrieve roles from database", e);
+      throw e;
+    }
+  }
+
+  @Override
+  public PageResponse<GetRoleResponse> getAllRoles(AdminFilterRequest filter) {
+    int page = Math.max(filter.getPage() != null ? filter.getPage() : 1, 1);
+    int size = Math.max(filter.getSize() != null ? filter.getSize() : 20, 1);
+
+    log.info("Fetching roles with filters - page: {}, size: {}, filters: {}", page, size, filter.getFilters());
+
+    try {
+      List<Role> roles = roleRepository.findAll();
+
+      // Filter by roleId if provided
+      if (filter.hasFilter("roleId")) {
+        String roleIdFilter = filter.getStringFilter("roleId").toLowerCase();
+        roles = roles.stream()
+            .filter(role -> role.getRoleId().toLowerCase().contains(roleIdFilter))
+            .collect(Collectors.toList());
+      }
+
+      // Filter by roleName if provided
+      if (filter.hasFilter("roleName")) {
+        String roleNameFilter = filter.getStringFilter("roleName").toLowerCase();
+        roles = roles.stream()
+            .filter(role -> role.getRoleName().toLowerCase().contains(roleNameFilter))
+            .collect(Collectors.toList());
+      }
+
+      // Apply pagination
+      int fromIndex = (page - 1) * size;
+      int toIndex = Math.min(fromIndex + size, roles.size());
+
+      List<GetRoleResponse> pageContent = roles.subList(
+          Math.min(fromIndex, roles.size()),
+          Math.min(toIndex, roles.size())).stream()
+          .map(roleMapper::mapFromRoleEntityToGetRoleResponse)
+          .collect(Collectors.toList());
+
+      int totalPages = (roles.size() + size - 1) / size;
+
+      log.info("Successfully retrieved {} roles with filters", pageContent.size());
+
+      return PageResponse.<GetRoleResponse>builder()
+          .page(page)
+          .size(size)
+          .totalPages(totalPages)
+          .totalElements((long) roles.size())
+          .data(pageContent)
           .build();
 
     } catch (Exception e) {

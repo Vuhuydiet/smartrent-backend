@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.smartrent.enums.NewsCategory;
 import com.smartrent.enums.NewsStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -47,6 +48,7 @@ public class NewsSummaryResponse {
     @Schema(description = "Publication status", example = "PUBLISHED")
     NewsStatus status;
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Schema(description = "Publication date and time")
     LocalDateTime publishedAt;
 
@@ -56,6 +58,7 @@ public class NewsSummaryResponse {
     @Schema(description = "Number of views", example = "1250")
     Long viewCount;
 
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Schema(description = "Creation timestamp")
     LocalDateTime createdAt;
 }

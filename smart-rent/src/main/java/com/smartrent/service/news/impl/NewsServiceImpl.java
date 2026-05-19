@@ -1,5 +1,6 @@
 package com.smartrent.service.news.impl;
 
+import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.NewsCreateRequest;
 import com.smartrent.dto.request.NewsUpdateRequest;
 import com.smartrent.dto.response.NewsDetailResponse;
@@ -21,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -38,7 +40,8 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional(readOnly = true)
-    public NewsListResponse getPublishedNews(Integer page, Integer size, NewsCategory category, String tag, String keyword) {
+    public NewsListResponse getPublishedNews(Integer page, Integer size, NewsCategory category, String tag,
+            String keyword) {
         log.info("Getting published news - page: {}, size: {}, category: {}, tag: {}, keyword: {}",
                 page, size, category, tag, keyword);
 
@@ -136,7 +139,8 @@ public class NewsServiceImpl implements NewsService {
     @Override
     @Transactional
     public NewsResponse createNews(NewsCreateRequest request, String adminId, String adminName) {
-        log.info("Creating news - title: {}, category: {}, admin: {}", request.getTitle(), request.getCategory(), adminId);
+        log.info("Creating news - title: {}, category: {}, admin: {}", request.getTitle(), request.getCategory(),
+                adminId);
 
         // Generate slug from title
         String slug = generateSlug(request.getTitle());
@@ -274,15 +278,62 @@ public class NewsServiceImpl implements NewsService {
 
     @Override
     @Transactional(readOnly = true)
-    public NewsListResponse getAllNews(Integer page, Integer size, NewsStatus status) {
-        log.info("Getting all news (admin) - page: {}, size: {}, status: {}", page, size, status);
+    public NewsListResponse getAllNews(AdminFilterRequest filter) {
+        // Validate and set defaults
+        int page = Math.max(filter.getPage() != null ? filter.getPage() : 1, 1);
+        int size = Math.max(filter.getSize() != null ? filter.getSize() : 20, 1);
 
-        int pageNumber = (page != null && page > 0) ? page - 1 : 0;
-        int pageSize = (size != null && size > 0) ? size : 20;
-        Pageable pageable = PageRequest.of(pageNumber, pageSize);
+        log.info("Getting all news (admin) - page: {}, size: {}, filters: {}",
+                page, size, filter.getFilters());
+
+        int pageNumber = page - 1;
+        Pageable pageable = PageRequest.of(pageNumber, size);
+
+        // Extract filters
+        String title = filter.hasFilter("title") ? filter.getStringFilter("title") : null;
+        String summary = filter.hasFilter("summary") ? filter.getStringFilter("summary") : null;
+        String categoryStr = filter.hasFilter("category") ? filter.getStringFilter("category") : null;
+        String tag = filter.hasFilter("tag") ? filter.getStringFilter("tag") : null;
+        String statusStr = filter.hasFilter("status") ? filter.getStringFilter("status") : null;
+
+        // Parse enums
+        NewsCategory category = null;
+        NewsStatus status = null;
+
+        if (categoryStr != null) {
+            try {
+                category = NewsCategory.valueOf(categoryStr);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid category: {}", categoryStr);
+            }
+        }
+
+        if (statusStr != null) {
+            try {
+                status = NewsStatus.valueOf(statusStr);
+            } catch (IllegalArgumentException e) {
+                log.warn("Invalid status: {}", statusStr);
+            }
+        }
 
         Page<News> newsPage;
-        if (status != null) {
+        boolean hasKeyword = StringUtils.hasText(title) || StringUtils.hasText(summary);
+
+        // Use title for keyword search (support both title and summary filters)
+        String keyword = title != null ? title : summary;
+
+        if (hasKeyword) {
+            String trimmedKeyword = keyword.trim();
+            if (category != null) {
+                newsPage = newsRepository.searchAdminNewsByCategory(trimmedKeyword, category, status, pageable);
+            } else {
+                newsPage = newsRepository.searchAdminNews(trimmedKeyword, status, pageable);
+            }
+        } else if (StringUtils.hasText(tag)) {
+            newsPage = newsRepository.findByTagAndStatusOptional(tag.trim(), status, pageable);
+        } else if (category != null) {
+            newsPage = newsRepository.findByCategoryAndStatusOptional(category, status, pageable);
+        } else if (status != null) {
             newsPage = newsRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
         } else {
             newsPage = newsRepository.findAllByOrderByCreatedAtDesc(pageable);
@@ -295,8 +346,8 @@ public class NewsServiceImpl implements NewsService {
         return NewsListResponse.builder()
                 .news(newsList)
                 .totalItems(newsPage.getTotalElements())
-                .currentPage(page != null ? page : 1)
-                .pageSize(pageSize)
+                .currentPage(page)
+                .pageSize(size)
                 .totalPages(newsPage.getTotalPages())
                 .build();
     }
@@ -352,7 +403,8 @@ public class NewsServiceImpl implements NewsService {
                 for (News tagNews : tagRelated) {
                     if (relatedNewsList.stream().noneMatch(n -> n.getNewsId().equals(tagNews.getNewsId()))) {
                         relatedNewsList.add(tagNews);
-                        if (relatedNewsList.size() >= 5) break;
+                        if (relatedNewsList.size() >= 5)
+                            break;
                     }
                 }
             }
@@ -364,4 +416,3 @@ public class NewsServiceImpl implements NewsService {
                 .collect(Collectors.toList());
     }
 }
-
