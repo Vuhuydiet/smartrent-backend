@@ -37,7 +37,8 @@ public class TakeDownServiceImpl implements TakeDownService {
     @Caching(evict = {
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
-            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_STATS_CATEGORIES, allEntries = true)
     })
     public TakeDownResponse takeDownListing(String userId, TakeDownListingRequest request) {
         log.info("Taking down listing {} for user {}", request.getListingId(), userId);
