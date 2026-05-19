@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Typo-tolerant resolver for province / district names, used as a fallback
@@ -104,6 +105,22 @@ public class LocationFuzzyIndex {
         }
     }
 
+    /**
+     * Exact (normalized) district lookup scoped to a province — used to
+     * resolve the legacy ids behind curated "default" suggestions without a
+     * DB round-trip (the index is already in memory). {@code normalizedName}
+     * must be {@link TextNormalizer#normalize} output, e.g. {@code "quan 1"}
+     * or {@code "binh thanh"}.
+     */
+    public Optional<Match> resolveDistrict(String provinceCode, String normalizedName) {
+        try {
+            return resolveDistrictIn(index(), provinceCode, normalizedName);
+        } catch (Exception ex) {
+            log.warn("location-fuzzy: resolveDistrict failed (non-fatal): {}", ex.getMessage(), ex);
+            return Optional.empty();
+        }
+    }
+
     private Index index() {
         Index local = cached;
         if (local != null && System.currentTimeMillis() - builtAtMs <= REFRESH_TTL_MS) {
@@ -175,9 +192,7 @@ public class LocationFuzzyIndex {
                 if (score != null && score > best) best = score;
             }
             if (best >= minScore) {
-                hits.add(new Match(e.kind(), e.display(), e.legacyProvinceId(),
-                        e.legacyDistrictId(), e.provinceCode(), e.districtCode(),
-                        e.provinceName(), e.districtName(), best));
+                hits.add(toMatch(e, best));
             }
         }
 
@@ -189,5 +204,28 @@ public class LocationFuzzyIndex {
 
         List<Match> out = new ArrayList<>(deduped.values());
         return out.size() > limit ? new ArrayList<>(out.subList(0, limit)) : out;
+    }
+
+    static Optional<Match> resolveDistrictIn(
+            Index idx, String provinceCode, String normalizedName) {
+        if (idx == null || provinceCode == null || normalizedName == null) {
+            return Optional.empty();
+        }
+        String q = normalizedName.trim();
+        if (q.isEmpty()) return Optional.empty();
+        for (Entry e : idx.entries()) {
+            if (e.kind() == Kind.DISTRICT
+                    && provinceCode.equals(e.provinceCode())
+                    && e.matchStrings().contains(q)) {
+                return Optional.of(toMatch(e, 1.0));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static Match toMatch(Entry e, double score) {
+        return new Match(e.kind(), e.display(), e.legacyProvinceId(),
+                e.legacyDistrictId(), e.provinceCode(), e.districtCode(),
+                e.provinceName(), e.districtName(), score);
     }
 }

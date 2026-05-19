@@ -6,8 +6,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -90,5 +92,28 @@ class LocationFuzzyIndexTest {
         List<LocationFuzzyIndex.Match> hits = LocationFuzzyIndex.searchIndex(
                 sampleIndex(), "ha noi", 0.0, 1);
         assertTrue(hits.size() <= 1);
+    }
+
+    @Test
+    @DisplayName("resolveDistrict: exact normalized name within a province → ids")
+    void resolveDistrictExactWithinProvince() {
+        Optional<LocationFuzzyIndex.Match> m = LocationFuzzyIndex.resolveDistrictIn(
+                sampleIndex(), "79", "tan binh");
+        assertTrue(m.isPresent());
+        assertEquals(766, m.get().legacyDistrictId().intValue());
+        assertEquals(79, m.get().legacyProvinceId().intValue());
+
+        // Numbered district resolves via its "quan N" normalized name too.
+        assertTrue(LocationFuzzyIndex
+                .resolveDistrictIn(sampleIndex(), "79", "quan 7").isPresent());
+    }
+
+    @Test
+    @DisplayName("resolveDistrict: wrong province / unknown name → empty")
+    void resolveDistrictScopedAndStrict() {
+        assertFalse(LocationFuzzyIndex
+                .resolveDistrictIn(sampleIndex(), "01", "tan binh").isPresent());
+        assertFalse(LocationFuzzyIndex
+                .resolveDistrictIn(sampleIndex(), "79", "khong co dau").isPresent());
     }
 }
