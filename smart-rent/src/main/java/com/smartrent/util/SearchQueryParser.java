@@ -158,6 +158,16 @@ public final class SearchQueryParser {
 
     private static final Pattern RANGE_PATTERN =
             Pattern.compile("(?:tu\\s+)?(\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|ty|nghin|ngan|k|cu)?\\s*(?:-|den|toi)\\s*(\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|ty|nghin|ngan|k|cu)");
+    // TextNormalizer turns every non-alphanumeric char (incl. "-", "~", "→")
+    // into a space, so "từ 10-20tr" arrives here as "tu 10 20 trieu" with no
+    // separator left. A range cue ("tu/tam/khoang/gia") followed by two
+    // numbers is therefore still a range even though the dash is gone.
+    private static final Pattern RANGE_CUE_PATTERN =
+            Pattern.compile("(?:tu|tam|khoang|gia)\\s+(\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|ty|nghin|ngan|k|cu)?\\s+(\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|ty|nghin|ngan|k|cu)");
+    // "10tr-20tr" / "10 triệu 20 triệu": both bounds carry an explicit unit
+    // and sit next to each other → a range even without a cue word.
+    private static final Pattern RANGE_DUAL_UNIT_PATTERN =
+            Pattern.compile("(\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|ty|nghin|ngan|k|cu)\\s+(\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|ty|nghin|ngan|k|cu)");
     private static final Pattern MAX_PATTERN =
             Pattern.compile("(?:duoi|khong qua|toi da|<=|<)\\s*(\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|ty|nghin|ngan|k|cu)?");
     private static final Pattern MIN_PATTERN =
@@ -179,6 +189,20 @@ public final class SearchQueryParser {
     // ── Bedrooms — "pn" / "p ngu" are expanded to "phong ngu" first.
     private static final Pattern BEDROOM_PATTERN =
             Pattern.compile("(\\d+)\\s*phong ngu");
+
+    /**
+     * District-level administrative markers ("quận", "huyện", "thị xã").
+     * The legacy address tables store named districts WITHOUT this prefix
+     * (district_name "Quận Tân Bình", but district_short_name "Tân Bình" and
+     * district_short_key "tanbinh"), so leaving the marker in the location
+     * text makes "quận tân bình" fail to resolve to the Tân Bình district.
+     *
+     * <p>The {@code (?=[a-z])} lookahead strips the marker only when a NAMED
+     * unit follows ("quan tan binh" → "tan binh"); a numbered district
+     * ("quan 1") keeps its marker so it still matches the {@code quan1} key.
+     */
+    private static final Pattern DISTRICT_UNIT_PREFIX =
+            Pattern.compile("\\b(thi xa|quan|huyen)\\s+(?=[a-z])");
 
     public static ParsedQuery parse(String rawQuery) {
         String norm = expandAbbreviations(TextNormalizer.normalize(rawQuery));
@@ -239,7 +263,11 @@ public final class SearchQueryParser {
 
         // 5. Whatever is left, minus stopwords, is the location guess. The
         // leftover is treated as a location, not a free keyword, so we do not
-        // also emit it as residualKeyword (that would double-filter).
+        // also emit it as residualKeyword (that would double-filter). Strip a
+        // district marker ("quận"/"huyện") so a named district resolves
+        // ("quan tan binh" → "tan binh"); done BEFORE stopword removal so a
+        // numbered district ("quan 1") still keeps its marker.
+        working = DISTRICT_UNIT_PREFIX.matcher(working).replaceAll(" ");
         String locationText = stripStopwords(working);
         String fallback = buildFallbackSuggestion(
                 productDisplay, locationText, price[0], price[1], amenities,
@@ -364,6 +392,24 @@ public final class SearchQueryParser {
             out[0] = money(range.group(1), unit);
             out[1] = money(range.group(3), unit);
             return working.replace(range.group(), " ");
+        }
+
+        // Separator-less range: "(tu) 10 20 trieu" — the dash/word that used
+        // to join the bounds was stripped by normalization.
+        Matcher cue = RANGE_CUE_PATTERN.matcher(working);
+        if (cue.find()) {
+            String unit = cue.group(4) != null ? cue.group(4) : cue.group(2);
+            out[0] = money(cue.group(1), unit);
+            out[1] = money(cue.group(3), unit);
+            return working.replace(cue.group(), " ");
+        }
+
+        // Both bounds explicitly unit-qualified and adjacent: "10 trieu 20 trieu".
+        Matcher dual = RANGE_DUAL_UNIT_PATTERN.matcher(working);
+        if (dual.find()) {
+            out[0] = money(dual.group(1), dual.group(2));
+            out[1] = money(dual.group(3), dual.group(4));
+            return working.replace(dual.group(), " ");
         }
 
         Matcher max = MAX_PATTERN.matcher(working);

@@ -1,11 +1,8 @@
 package com.smartrent.service.discovery.impl;
 
-import com.smartrent.dto.request.AiSuggestionRequest;
-import com.smartrent.dto.response.AiSuggestionResponse;
 import com.smartrent.dto.response.SearchSuggestionItem;
 import com.smartrent.dto.response.SearchSuggestionsResponse;
 import com.smartrent.enums.SuggestionType;
-import com.smartrent.infra.client.AiServerClient;
 import com.smartrent.infra.repository.LegacyDistrictRepository;
 import com.smartrent.infra.repository.LegacyProvinceRepository;
 import com.smartrent.infra.repository.LegacyWardRepository;
@@ -18,6 +15,7 @@ import com.smartrent.infra.repository.entity.LegacyWard;
 import com.smartrent.infra.repository.entity.SearchQueryImpression;
 import com.smartrent.infra.repository.entity.SearchSuggestionClick;
 import com.smartrent.service.discovery.AmenityResolver;
+import com.smartrent.service.discovery.LocationFuzzyIndex;
 import com.smartrent.service.discovery.SearchSuggestionService;
 import com.smartrent.util.SearchQueryParser;
 import com.smartrent.util.TextNormalizer;
@@ -74,7 +72,6 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
     // ── Weights ──────────────────────────────────────────────────────────────
     private static final double WEIGHT_TITLE         = 1.5;
-    private static final double WEIGHT_AI_INTENT     = 1.15;
     private static final double WEIGHT_LOCATION      = 1.0;
     private static final double WEIGHT_TYPO          = 0.95;
     private static final double WEIGHT_PHONETIC      = 0.9;
@@ -83,7 +80,6 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
     /** Rolling window for popular-query aggregation (7 days). */
     private static final long POPULAR_QUERY_WINDOW_DAYS = 7;
-    private static final int MIN_AI_SUGGESTION_LENGTH = 5;
     private static final Pattern PRICE_TRIEU_PATTERN = Pattern.compile("\\b(\\d{1,3})\\s*(tr|trieu)\\b");
 
     /**
@@ -105,8 +101,8 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     LegacyProvinceRepository      legacyProvinceRepository;
     SearchQueryImpressionRepository impressionRepository;
     SearchSuggestionClickRepository clickRepository;
-    AiServerClient aiServerClient;
     AmenityResolver amenityResolver;
+    LocationFuzzyIndex locationFuzzyIndex;
 
     DoubleMetaphone metaphone = new DoubleMetaphone();
     LevenshteinDistance levenshtein = new LevenshteinDistance();
@@ -185,21 +181,27 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
                 : normalized;
 
         // ── Fetch candidates from all sources ────────────────────────────────
+        // No synchronous AI round-trip here: the local parser + DB location
+        // resolution + live amenities table already produce the structured
+        // appliedFilters the frontend needs, so the AI call was pure latency
+        // (a blocking Feign hop with a 30s read timeout) for no functional
+        // gain. The dropdown is built entirely from in-process + indexed-DB
+        // sources now.
         List<SearchSuggestionItem> titleItems    = fetchTitleSuggestions(normalized, provinceIdInt, categoryId, safeLimit);
         List<SearchSuggestionItem> locationItems = fetchLocationSuggestions(locationQuery, provinceId);
         List<SearchSuggestionItem> popularItems  = fetchPopularQuerySuggestions(normalized, safeLimit);
         List<SearchSuggestionItem> typoItems     = fetchTypoSuggestions(normalized, safeLimit);
-        List<SearchSuggestionItem> phoneticItems = fetchPhoneticSuggestions(normalized, provinceIdInt, categoryId, safeLimit);
+        // The phonetic DB lookup is a `LIKE '%...%'` scan on phonetic_title
+        // (non-sargable, full scan). It is only a fuzzy fallback for
+        // misspellings the FULLTEXT title source could not catch, so skip the
+        // scan whenever we already have title hits — that keeps it off the
+        // hot path for the overwhelming majority of queries.
+        List<SearchSuggestionItem> phoneticItems = fetchPhoneticSuggestions(
+                normalized, provinceIdInt, categoryId, safeLimit, titleItems.isEmpty());
 
         // ── Merge, deduplicate, rank, and trim ───────────────────────────────
         List<SearchSuggestionItem> merged = mergeAndRank(
-                titleItems, locationItems, popularItems, typoItems, phoneticItems, Collections.emptyList(), safeLimit);
-        AiSuggestionResponse aiResp = null;
-        if (shouldCallAiForSuggestions(normalized, merged, safeLimit)) {
-            aiResp = fetchAiSuggestionResponse(query, safeLimit);
-            List<SearchSuggestionItem> aiItems = toAiIntentItems(aiResp, normalized, safeLimit);
-            merged = mergeAndRank(titleItems, locationItems, popularItems, typoItems, phoneticItems, aiItems, safeLimit);
-        }
+                titleItems, locationItems, popularItems, typoItems, phoneticItems, safeLimit);
 
         // ── Synthesize a "ready to apply" suggestion from parsed filters ─────
         // Guarantees the dropdown is never empty for NL queries and gives the
@@ -207,23 +209,10 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         Map<String, Object> appliedFilters = parsed.toAppliedFilters();
         SearchSuggestionItem synthesized =
                 synthesizeParsedSuggestion(parsed, merged, locationItems, appliedFilters);
-        // The AI server resolved the query against its RAG knowledge base
-        // (same context the chatbox uses): location → legacy ids, type → enum,
-        // price/area. Overlay those AFTER the local/DB resolution so the
-        // RAG-resolved values win. `synthesized` stored this same map reference
-        // in its metadata, so both the dropdown's apply-row and the top-level
-        // response reflect the overlay. Without this the frontend kept
-        // FULLTEXT-searching the raw query (the reported bug).
-        // NOTE: amenity *ids* are deliberately excluded from the overlay (see
-        // overlayAiAppliedFilters) — the AI service's amenities.json ids are
-        // placeholders that drift from the backend, so they are resolved below
-        // from the live amenities table instead.
-        overlayAiAppliedFilters(appliedFilters, aiResp);
         // Authoritative amenity-id resolution against the LIVE amenities table.
-        // Source phrases = locally-parsed amenities ∪ the AI's amenity display
-        // names. AmenityResolver maps them to whatever ids the backend actually
-        // seeded, so "có điều hoà" filters by the real "Điều hòa" id instead of
-        // the AI's hardcoded placeholder.
+        // Source phrases = the locally-parsed amenity display names.
+        // AmenityResolver maps them to whatever ids the backend actually
+        // seeded, so "có điều hoà" filters by the real "Điều hòa" id.
         resolveAmenityIdsFromLiveTable(appliedFilters, parsed);
         // Drop the parsed free-text keys: `keyword` (residual) and
         // `locationText` (unresolved place). Both would make the frontend run
@@ -336,7 +325,7 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     }
 
     private List<SearchSuggestionItem> fetchPhoneticSuggestions(
-            String normalized, Integer provinceIdInt, Long categoryId, int limit) {
+            String normalized, Integer provinceIdInt, Long categoryId, int limit, boolean allowDbScan) {
         String phoneticQuery = toPhoneticQuery(normalized);
         if (phoneticQuery == null || phoneticQuery.length() < 2) {
             return Collections.emptyList();
@@ -351,6 +340,13 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
                         WEIGHT_PHONETIC - (0.03 * items.size()), "LOCAL_PHONETIC"));
             }
             if (items.size() >= limit) return items;
+        }
+
+        // Skip the non-sargable phonetic_title scan entirely when the caller
+        // already has FULLTEXT title hits — phonetic is only the misspelling
+        // fallback, and the scan is the most expensive query in this path.
+        if (!allowDbScan) {
+            return items;
         }
 
         try {
@@ -374,83 +370,6 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         } catch (Exception e) {
             log.warn("search-suggestions: phonetic fetch failed (non-fatal): {}", e.getMessage(), e);
             return items;
-        }
-    }
-
-    private boolean shouldCallAiForSuggestions(String normalized, List<SearchSuggestionItem> localItems, int limit) {
-        if (normalized == null || normalized.length() < MIN_AI_SUGGESTION_LENGTH) return false;
-        if (localItems.size() < Math.min(3, limit)) return true;
-        return normalized.contains(" gan ") || normalized.contains(" duoi ") || normalized.contains(" tren ");
-    }
-
-    /**
-     * Single AI server round-trip. Returns the raw response (text suggestions
-     * + RAG-resolved {@code appliedFilters}) or {@code null} on any failure —
-     * the AI is strictly an enrichment, never required for a usable response.
-     */
-    private AiSuggestionResponse fetchAiSuggestionResponse(String rawQuery, int limit) {
-        try {
-            return aiServerClient.suggestSearchQueries(AiSuggestionRequest.builder()
-                    .query(rawQuery)
-                    .limit(Math.min(limit, 5))
-                    .build());
-        } catch (Exception e) {
-            log.debug("search-suggestions: AI suggestion call skipped: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /** Maps the AI server's text suggestions into AI_INTENT dropdown rows. */
-    private List<SearchSuggestionItem> toAiIntentItems(
-            AiSuggestionResponse response, String normalized, int limit) {
-        if (response == null || response.getSuggestions() == null) {
-            return Collections.emptyList();
-        }
-
-        List<SearchSuggestionItem> items = new ArrayList<>();
-        for (String text : response.getSuggestions()) {
-            if (text == null || text.isBlank()) continue;
-            String itemNorm = TextNormalizer.normalize(text);
-            if (itemNorm == null) continue;
-
-            boolean related = itemNorm.contains(normalized)
-                    || normalized.split("\\s+").length >= 2
-                    || levenshtein.apply(compactKey(normalized), compactKey(itemNorm)) <= 5;
-            if (!related) continue;
-
-            items.add(buildTextSuggestion(
-                    SuggestionType.AI_INTENT, text,
-                    WEIGHT_AI_INTENT - (0.04 * items.size()), "AI_INTENT"));
-            if (items.size() >= limit) break;
-        }
-        return items;
-    }
-
-    /**
-     * Keys the AI server is NOT trusted to resolve. Amenity ids in the AI
-     * service's {@code amenities.json} are documented placeholders that drift
-     * from whatever the backend actually seeded, so they are resolved from the
-     * live {@code amenities} table instead (see resolveAmenityIdsFromLiveTable).
-     */
-    private static final java.util.Set<String> AI_OVERLAY_SKIP_KEYS =
-            java.util.Set.of("amenityIds", "amenityMatchMode");
-
-    /**
-     * Overlay the AI server's RAG-resolved filters onto the locally-parsed
-     * {@code appliedFilters}, letting the AI win for any key it resolved.
-     * Null / blank / empty AI values are skipped so a sparse AI payload never
-     * clobbers a good local value; amenity ids are skipped entirely (the
-     * backend owns those — see {@link #AI_OVERLAY_SKIP_KEYS}).
-     */
-    private void overlayAiAppliedFilters(Map<String, Object> target, AiSuggestionResponse aiResp) {
-        if (aiResp == null || aiResp.getAppliedFilters() == null) return;
-        for (Map.Entry<String, Object> e : aiResp.getAppliedFilters().entrySet()) {
-            if (AI_OVERLAY_SKIP_KEYS.contains(e.getKey())) continue;
-            Object v = e.getValue();
-            if (v == null) continue;
-            if (v instanceof java.util.Collection<?> c && c.isEmpty()) continue;
-            if (v instanceof String s && s.isBlank()) continue;
-            target.put(e.getKey(), v);
         }
     }
 
@@ -756,6 +675,14 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     private static final int MAX_WARD_CANDIDATES     = 4;
 
     /**
+     * Similarity floor for the typo fallback. 0.86 Jaro-Winkler keeps
+     * "tn binh"→"tan binh" / "ha noi"→"ha noi" while rejecting unrelated
+     * names; tuned to favour precision (a wrong location is worse than none).
+     */
+    private static final double FUZZY_LOCATION_MIN_SCORE =
+            LocationFuzzyIndex.DEFAULT_MIN_SCORE;
+
+    /**
      * Multi-tier LOCATION suggestion fetch. Queries the province, district and
      * ward tables independently — each tier only filters on its own columns,
      * so a province-level match no longer drags every district/ward inside it
@@ -776,6 +703,55 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         items.addAll(fetchProvinceSuggestionsTier(normalized, compact));
         items.addAll(fetchDistrictSuggestionsTier(normalized, compact, rawProvinceId));
         items.addAll(fetchWardSuggestionsTier(normalized, compact, rawProvinceId));
+        // Typo fallback: only when the exact tiers found nothing — keeps the
+        // fuzzy scorer off the hot path for well-formed queries. Handles
+        // "tn binh" → Tân Bình (+ its parent province), so a misspelt place
+        // still resolves to province + district instead of degrading to a
+        // keyword search.
+        if (items.isEmpty()) {
+            items.addAll(fetchFuzzyLocationSuggestions(normalized));
+        }
+        return items;
+    }
+
+    /**
+     * Maps {@link LocationFuzzyIndex} hits into LOCATION suggestion items,
+     * mirroring the exact-tier metadata contract so the synthesized
+     * "ready to apply" row and the frontend resolve province + district ids
+     * exactly as they would for an exact match.
+     */
+    private List<SearchSuggestionItem> fetchFuzzyLocationSuggestions(String normalized) {
+        List<LocationFuzzyIndex.Match> matches = locationFuzzyIndex.search(
+                normalized, FUZZY_LOCATION_MIN_SCORE, MAX_DISTRICT_CANDIDATES);
+        if (matches.isEmpty()) return Collections.emptyList();
+
+        List<SearchSuggestionItem> items = new ArrayList<>(matches.size());
+        for (LocationFuzzyIndex.Match m : matches) {
+            boolean isDistrict = m.kind() == LocationFuzzyIndex.Kind.DISTRICT;
+
+            Map<String, Object> meta = new HashMap<>();
+            meta.put("matchType", isDistrict ? "DISTRICT" : "PROVINCE");
+            meta.put("provinceName", m.provinceName());
+            meta.put("districtName", isDistrict ? m.districtName() : "");
+            if (m.provinceCode() != null) meta.put("provinceCode", m.provinceCode());
+            if (m.legacyProvinceId() != null) meta.put("legacyProvinceId", m.legacyProvinceId());
+            if (isDistrict) {
+                if (m.districtCode() != null) meta.put("districtCode", m.districtCode());
+                if (m.legacyDistrictId() != null) meta.put("legacyDistrictId", m.legacyDistrictId());
+            }
+            meta.put("fuzzy", true);
+
+            String text = isDistrict
+                    ? m.districtName() + ", " + m.provinceName()
+                    : m.provinceName();
+            double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * items.size());
+            items.add(SearchSuggestionItem.builder()
+                    .type(SuggestionType.LOCATION)
+                    .text(text)
+                    .metadata(meta)
+                    .score(score)
+                    .build());
+        }
         return items;
     }
 
@@ -1047,7 +1023,6 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             List<SearchSuggestionItem> popular,
             List<SearchSuggestionItem> typo,
             List<SearchSuggestionItem> phonetic,
-            List<SearchSuggestionItem> aiIntent,
             int limit) {
 
         // Use LinkedHashMap to preserve insertion order during dedup
@@ -1055,7 +1030,6 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
         for (SearchSuggestionItem item : titles)   dedup(seen, item);
         for (SearchSuggestionItem item : locations) dedup(seen, item);
-        for (SearchSuggestionItem item : aiIntent)  dedup(seen, item);
         for (SearchSuggestionItem item : typo)      dedup(seen, item);
         for (SearchSuggestionItem item : phonetic)  dedup(seen, item);
         for (SearchSuggestionItem item : popular)   dedup(seen, item);
