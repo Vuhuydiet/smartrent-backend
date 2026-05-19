@@ -60,7 +60,8 @@ public class BrokerServiceImpl implements BrokerService {
             @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
-            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_STATS_CATEGORIES, allEntries = true)
     })
     public BrokerStatusResponse registerBroker(String userId, BrokerRegisterRequest request) {
         log.info("Broker registration request for user={}", userId);
@@ -136,7 +137,8 @@ public class BrokerServiceImpl implements BrokerService {
             @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
-            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_STATS_CATEGORIES, allEntries = true)
     })
     public BrokerStatusResponse reviewBroker(String userId, String adminId, BrokerVerificationRequest request) {
         String action = request.getAction();
@@ -203,7 +205,8 @@ public class BrokerServiceImpl implements BrokerService {
             @CacheEvict(cacheNames = Constants.CacheNames.USER_DETAILS, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
-            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_STATS_CATEGORIES, allEntries = true)
     })
     public BrokerStatusResponse removeBrokerRole(String userId, String adminId) {
         log.info("Admin={} removing broker role from user={}", adminId, userId);

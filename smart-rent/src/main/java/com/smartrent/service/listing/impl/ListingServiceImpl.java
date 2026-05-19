@@ -1650,6 +1650,9 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_STATS_CATEGORIES,
+            key = "T(com.smartrent.util.CacheKeyBuilder).categoryStatsKey(#request)",
+            unless = "#result == null || #result.isEmpty()")
     public List<CategoryListingStatsResponse> getCategoryStats(CategoryStatsRequest request) {
         log.info("Getting category stats - categoryIds: {}, verifiedOnly: {}",
                 request.getCategoryIds(), request.getVerifiedOnly());
