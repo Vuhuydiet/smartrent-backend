@@ -108,19 +108,25 @@ public final class CacheKeyBuilder {
 
     /**
      * Cache key for {@code GET /v1/listings/search-suggestions}.
-     * Encodes: normalized query + provinceId + categoryId + limit.
+     * Encodes: canonical query + provinceId + categoryId + limit.
      *
-     * <p>The key is intentionally compact so it fits within Redis key-size limits
-     * and remains human-readable for debugging (e.g. via {@code redis-cli keys}).
+     * <p>The query part uses {@link SearchTextCanonicalizer#cacheCanonical}
+     * (not just {@link TextNormalizer#normalize}) so abbreviation variants of
+     * the SAME intent — {@code "q1"} / {@code "quan 1"}, {@code "5tr"} /
+     * {@code "5 trieu"}, {@code "phongtro"} / {@code "phong tro"} — collapse to
+     * a single entry instead of each re-running the full DB resolution (title
+     * FULLTEXT + popular-query scan + parse). It only ever merges inputs that
+     * provably produce an identical response, so the cached list is always
+     * correct for the key.
      *
-     * @param query      Raw input query (normalized internally)
+     * @param query      Raw input query (canonicalized internally)
      * @param provinceId Optional province ID string (may be {@code null})
      * @param categoryId Optional category ID (may be {@code null})
      * @param limit      Requested result count (already clamped by service)
      * @return Cache key string prefixed with {@code "sugg|"}
      */
     public static String suggestionKey(String query, String provinceId, Long categoryId, int limit) {
-        String norm = TextNormalizer.normalize(query);
+        String norm = SearchTextCanonicalizer.cacheCanonical(query);
         return "sugg|q="  + Objects.toString(norm, "")
              + "|p="      + Objects.toString(provinceId, "")
              + "|c="      + Objects.toString(categoryId, "")

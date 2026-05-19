@@ -41,8 +41,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Implementation of {@link SearchSuggestionService}.
@@ -80,7 +78,6 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
     /** Rolling window for popular-query aggregation (7 days). */
     private static final long POPULAR_QUERY_WINDOW_DAYS = 7;
-    private static final Pattern PRICE_TRIEU_PATTERN = Pattern.compile("\\b(\\d{1,3})\\s*(tr|trieu)\\b");
 
     /**
      * Province codes returned as default LOCATION suggestions when the user
@@ -314,28 +311,13 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
     // Private — Suggestion fetchers
     // ─────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Delegates to {@link com.smartrent.util.SearchTextCanonicalizer#applyIntent}
+     * — the single source of truth shared with the suggestion cache key, so the
+     * key and the computation can never drift apart.
+     */
     private String normalizeIntent(String normalized) {
-        if (normalized == null || normalized.isBlank()) return null;
-
-        String result = " " + normalized + " ";
-        result = result.replace(" canho ", " can ho ");
-        result = result.replace(" phongtro ", " phong tro ");
-        result = result.replace(" nha tro ", " phong tro ");
-        result = result.replace(" tro ", " phong tro ");
-        result = result.replace(" dhqg ", " dai hoc quoc gia ");
-        result = result.replace(" may lan ", " may lanh ");
-        result = result.replace(" maylanh ", " may lanh ");
-        result = result.replace(" full nt ", " full noi that ");
-        result = result.replace(" noi that day du ", " full noi that ");
-
-        for (int i = 1; i <= 12; i++) {
-            result = result.replace(" q" + i + " ", " quan " + i + " ");
-        }
-
-        Matcher matcher = PRICE_TRIEU_PATTERN.matcher(result);
-        result = matcher.replaceAll("$1 trieu");
-
-        return result.replaceAll("\\s+", " ").trim();
+        return com.smartrent.util.SearchTextCanonicalizer.applyIntent(normalized);
     }
 
     private List<SearchSuggestionItem> fetchTypoSuggestions(String normalized, int limit) {
@@ -731,8 +713,26 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
      * a data backfill.
      */
     private List<SearchSuggestionItem> fetchLocationSuggestions(String normalized, String rawProvinceId) {
+        // Structured fast path: a multi-segment "<district> <province>" phrase
+        // (e.g. "quan 1 ho chi minh") resolves precisely off the in-memory
+        // index with NO DB round-trip. A confident DISTRICT hit IS the answer
+        // for "search theo quận" — return only it and skip the three
+        // unindexed LIKE '%...%' tier scans + the fuzzy scan. This both fixes
+        // the "ra kết quả lạ" bug (the LIKE path matched "Quảng Ninh / Nam /
+        // Ngãi" for "quận …") and removes 4 scans per debounced keystroke.
+        LocationFuzzyIndex.Match seg =
+                locationFuzzyIndex.resolveLocationPhrase(normalized).orElse(null);
+        if (seg != null && seg.kind() == LocationFuzzyIndex.Kind.DISTRICT) {
+            return new ArrayList<>(List.of(toLocationItem(seg, 0, false)));
+        }
+
         String compact = compactKey(normalized);
         List<SearchSuggestionItem> items = new ArrayList<>();
+        // A province-only structured hit is still authoritative — keep it
+        // first, then let the DB tiers add finer-grained alternatives.
+        if (seg != null) {
+            items.add(toLocationItem(seg, 0, false));
+        }
         items.addAll(fetchProvinceSuggestionsTier(normalized, compact));
         items.addAll(fetchDistrictSuggestionsTier(normalized, compact, rawProvinceId));
         items.addAll(fetchWardSuggestionsTier(normalized, compact, rawProvinceId));
@@ -760,32 +760,47 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
 
         List<SearchSuggestionItem> items = new ArrayList<>(matches.size());
         for (LocationFuzzyIndex.Match m : matches) {
-            boolean isDistrict = m.kind() == LocationFuzzyIndex.Kind.DISTRICT;
-
-            Map<String, Object> meta = new HashMap<>();
-            meta.put("matchType", isDistrict ? "DISTRICT" : "PROVINCE");
-            meta.put("provinceName", m.provinceName());
-            meta.put("districtName", isDistrict ? m.districtName() : "");
-            if (m.provinceCode() != null) meta.put("provinceCode", m.provinceCode());
-            if (m.legacyProvinceId() != null) meta.put("legacyProvinceId", m.legacyProvinceId());
-            if (isDistrict) {
-                if (m.districtCode() != null) meta.put("districtCode", m.districtCode());
-                if (m.legacyDistrictId() != null) meta.put("legacyDistrictId", m.legacyDistrictId());
-            }
-            meta.put("fuzzy", true);
-
-            String text = isDistrict
-                    ? m.districtName() + ", " + m.provinceName()
-                    : m.provinceName();
-            double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * items.size());
-            items.add(SearchSuggestionItem.builder()
-                    .type(SuggestionType.LOCATION)
-                    .text(text)
-                    .metadata(meta)
-                    .score(score)
-                    .build());
+            items.add(toLocationItem(m, items.size(), true));
         }
         return items;
+    }
+
+    /**
+     * Maps a {@link LocationFuzzyIndex.Match} to a LOCATION suggestion item.
+     * Shared by the structured fast path (exact, {@code fuzzy=false}) and the
+     * typo fallback ({@code fuzzy=true}) so both emit the identical metadata
+     * contract the synthesized "ready to apply" row and the frontend rely on
+     * ({@code legacyProvinceId}/{@code legacyDistrictId} + province/district
+     * codes — these feed {@code resolveAddressMappings}, which expands the
+     * legacy district id to the new ward codes so listings under BOTH the old
+     * and new address structures are matched).
+     */
+    private SearchSuggestionItem toLocationItem(
+            LocationFuzzyIndex.Match m, int rank, boolean fuzzy) {
+        boolean isDistrict = m.kind() == LocationFuzzyIndex.Kind.DISTRICT;
+
+        Map<String, Object> meta = new HashMap<>();
+        meta.put("matchType", isDistrict ? "DISTRICT" : "PROVINCE");
+        meta.put("provinceName", m.provinceName());
+        meta.put("districtName", isDistrict ? m.districtName() : "");
+        if (m.provinceCode() != null) meta.put("provinceCode", m.provinceCode());
+        if (m.legacyProvinceId() != null) meta.put("legacyProvinceId", m.legacyProvinceId());
+        if (isDistrict) {
+            if (m.districtCode() != null) meta.put("districtCode", m.districtCode());
+            if (m.legacyDistrictId() != null) meta.put("legacyDistrictId", m.legacyDistrictId());
+        }
+        if (fuzzy) meta.put("fuzzy", true);
+
+        String text = isDistrict
+                ? m.districtName() + ", " + m.provinceName()
+                : m.provinceName();
+        double score = WEIGHT_LOCATION * (1.0 - SCORE_DECAY_PER_RANK * rank);
+        return SearchSuggestionItem.builder()
+                .type(SuggestionType.LOCATION)
+                .text(text)
+                .metadata(meta)
+                .score(score)
+                .build();
     }
 
     /**

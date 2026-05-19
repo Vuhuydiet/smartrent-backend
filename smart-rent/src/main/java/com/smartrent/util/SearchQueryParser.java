@@ -453,7 +453,20 @@ public final class SearchQueryParser {
         for (String token : working.trim().split("\\s+")) {
             if (token.isBlank()) continue;
             if (STOPWORDS.contains(token)) continue;
-            if (token.matches("\\d+")) continue;
+            if (token.matches("\\d+")) {
+                // Price / area / bedrooms have already consumed their digits
+                // by this point, so a leftover short number is a DISTRICT
+                // number ("quận 1" … "quận 12"). Keep 1–2 digit numbers (drop
+                // years / long street numbers) so the location stays
+                // "quan 1" instead of collapsing to "quan" — the latter
+                // LIKE-matched "Quảng Ninh / Quảng Nam / Quảng Ngãi" and was
+                // the reported "search theo quận ra kết quả lạ" bug.
+                if (token.length() <= 2) {
+                    if (!sb.isEmpty()) sb.append(' ');
+                    sb.append(token);
+                }
+                continue;
+            }
             if (token.length() < 2) continue;
             if (!sb.isEmpty()) sb.append(' ');
             sb.append(token);
