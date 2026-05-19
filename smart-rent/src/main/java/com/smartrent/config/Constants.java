@@ -20,6 +20,8 @@ public class Constants {
     public static final String LISTING_DETAIL = LISTING + "detail";
     /** Short-TTL cache for GET /v1/listings/search-suggestions (see application.yml). */
     public static final String LISTING_SUGGESTIONS = LISTING + "suggestions";
+    /** Short-TTL cache for POST /v1/listings/stats/categories — only 5 keys (categoryIds set × verifiedOnly). */
+    public static final String LISTING_STATS_CATEGORIES = LISTING + "stats.categories";
   }
 
   @NoArgsConstructor(access = AccessLevel.NONE)

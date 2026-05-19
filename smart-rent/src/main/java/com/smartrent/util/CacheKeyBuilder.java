@@ -1,7 +1,9 @@
 package com.smartrent.util;
 
+import com.smartrent.dto.request.CategoryStatsRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -125,6 +127,31 @@ public final class CacheKeyBuilder {
      * @param limit      Requested result count (already clamped by service)
      * @return Cache key string prefixed with {@code "sugg|"}
      */
+    /**
+     * Cache key for {@code POST /v1/listings/stats/categories}.
+     * Encodes the sorted set of category ids plus the verifiedOnly toggle. The
+     * homepage and a handful of admin views only ever ask for the full 5-category
+     * set, so the key cardinality stays in the single digits.
+     */
+    public static String categoryStatsKey(CategoryStatsRequest request) {
+        if (request == null) {
+            return "null";
+        }
+        return "catStats|ids=" + sortAndJoinLongs(request.getCategoryIds())
+             + "|verifiedOnly=" + Objects.toString(request.getVerifiedOnly(), "false");
+    }
+
+    private static String sortAndJoinLongs(List<Long> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        return values.stream()
+            .filter(Objects::nonNull)
+            .sorted()
+            .map(String::valueOf)
+            .collect(Collectors.joining(","));
+    }
+
     public static String suggestionKey(String query, String provinceId, Long categoryId, int limit) {
         String norm = SearchTextCanonicalizer.cacheCanonical(query);
         return "sugg|q="  + Objects.toString(norm, "")

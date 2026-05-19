@@ -137,6 +137,7 @@ spring:
       - "listing.browse"
       - "listing.detail"
       - "listing.suggestions"
+      - "listing.stats.categories"
     type: "${CACHE_TYPE:redis}"
     redis:
       timeToLive: 1d
@@ -149,6 +150,7 @@ spring:
         "[listing.browse]": 3m
         "[listing.detail]": 3m
         "[listing.suggestions]": 2m
+        "[listing.stats.categories]": 3m
 
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"

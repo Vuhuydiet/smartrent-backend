@@ -56,7 +56,8 @@ public class RepostServiceImpl implements RepostService {
     @Caching(evict = {
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
-            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_STATS_CATEGORIES, allEntries = true)
     })
     public RepostResponse repostListing(String userId, RepostListingRequest request) {
         log.info("Reposting listing {} for user {}", request.getListingId(), userId);
@@ -141,7 +142,8 @@ public class RepostServiceImpl implements RepostService {
     @Caching(evict = {
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
-            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_STATS_CATEGORIES, allEntries = true)
     })
     public RenewListingResponse renewListing(String userId, RenewListingRequest request) {
         log.info("Renewing listing {} for user {}", request.getListingId(), userId);
@@ -216,7 +218,8 @@ public class RepostServiceImpl implements RepostService {
     @Caching(evict = {
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
             @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
-            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true)
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_STATS_CATEGORIES, allEntries = true)
     })
     public RepostResponse completeRepostAfterPayment(String transactionId) {
         log.info("Completing repost after payment for transaction: {}", transactionId);
