@@ -94,6 +94,34 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
             "75"  // Đồng Nai
     );
 
+    /**
+     * Curated "ready to apply" suggestions shown when the box is focused but
+     * empty. Each carries pre-resolved structured filters (room + province
+     * [+ district] + a 1–5 triệu price band) so the very first click runs a
+     * useful filtered search instead of a bare city navigation. Order is the
+     * display order; province-only rows first, then a few popular
+     * district+city combos. {@code districtNameNorm} is
+     * {@link TextNormalizer#normalize} output resolved to a legacy id via the
+     * in-memory {@link LocationFuzzyIndex} (no DB round-trip).
+     */
+    private record DefaultIntent(String provinceCode, String districtNameNorm) {}
+
+    private static final List<DefaultIntent> DEFAULT_INTENTS = List.of(
+            new DefaultIntent("79", null),          // Hồ Chí Minh
+            new DefaultIntent("01", null),          // Hà Nội
+            new DefaultIntent("75", null),          // Đồng Nai
+            new DefaultIntent("48", null),          // Đà Nẵng
+            new DefaultIntent("79", "quan 7"),
+            new DefaultIntent("79", "binh thanh"),
+            new DefaultIntent("79", "tan binh"),
+            new DefaultIntent("01", "cau giay")
+    );
+
+    private static final BigDecimal DEFAULT_MIN_PRICE = BigDecimal.valueOf(1_000_000);
+    private static final BigDecimal DEFAULT_MAX_PRICE = BigDecimal.valueOf(5_000_000);
+    private static final String DEFAULT_PRODUCT_TYPE    = "ROOM";
+    private static final String DEFAULT_PRODUCT_DISPLAY = "Nhà trọ";
+
     // ── Dependencies ─────────────────────────────────────────────────────────
     ListingRepository             listingRepository;
     LegacyWardRepository          legacyWardRepository;
@@ -157,8 +185,13 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
         if (normalized == null || normalized.length() < 2) {
             // Empty / very short query → return curated top-city LOCATION
             // suggestions so the dropdown is useful on focus before typing.
-            log.debug("search-suggestions: query too short, returning default top-city suggestions");
-            List<SearchSuggestionItem> defaults = fetchDefaultLocationSuggestions(safeLimit);
+            log.debug("search-suggestions: query too short, returning curated default suggestions");
+            List<SearchSuggestionItem> defaults = buildDefaultContextualSuggestions(safeLimit);
+            if (defaults.isEmpty()) {
+                // Degrade to plain top-city LOCATION rows so the dropdown is
+                // never empty (e.g. legacy_provinces unseeded in a fresh env).
+                defaults = fetchDefaultLocationSuggestions(safeLimit);
+            }
             long impressionId = persistImpression(
                     Objects.toString(normalized, ""), provinceId, categoryId,
                     defaults.size(), clientIp, sessionId);
@@ -903,6 +936,76 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
      */
     private static String compactKey(String normalized) {
         return normalized == null ? "" : normalized.replace(" ", "");
+    }
+
+    /**
+     * Builds the curated "ready to apply" default suggestions
+     * ({@link #DEFAULT_INTENTS}). Each row is an AI_INTENT item carrying its
+     * own {@code appliedFilters} (room + province [+ district] + a 1–5 triệu
+     * band) in metadata, exactly like the synthesized contextual row, so the
+     * frontend applies structured filters on click instead of doing a bare
+     * city navigation. District ids are resolved from the in-memory
+     * {@link LocationFuzzyIndex} (no DB hit); a row whose province (or named
+     * district) cannot be resolved is skipped rather than emitting a
+     * suggestion the frontend cannot filter by.
+     *
+     * <p>Never throws — degrades to an empty list so the caller can fall back.
+     */
+    private List<SearchSuggestionItem> buildDefaultContextualSuggestions(int limit) {
+        try {
+            Map<String, LegacyProvince> byCode = new HashMap<>();
+            for (LegacyProvince p : legacyProvinceRepository.findByCodeIn(DEFAULT_TOP_PROVINCE_CODES)) {
+                if (p.getCode() != null) byCode.put(p.getCode(), p);
+            }
+            if (byCode.isEmpty()) return Collections.emptyList();
+
+            String priceClause = priceClause(DEFAULT_MIN_PRICE, DEFAULT_MAX_PRICE);
+            List<SearchSuggestionItem> items = new ArrayList<>();
+            for (DefaultIntent intent : DEFAULT_INTENTS) {
+                if (items.size() >= limit) break;
+                LegacyProvince province = byCode.get(intent.provinceCode());
+                if (province == null || province.getId() == null) continue;
+
+                Map<String, Object> applied = new LinkedHashMap<>();
+                applied.put("productType", DEFAULT_PRODUCT_TYPE);
+                applied.put("minPrice", DEFAULT_MIN_PRICE);
+                applied.put("maxPrice", DEFAULT_MAX_PRICE);
+                applied.put("legacyProvinceId", province.getId());
+                if (province.getCode() != null) applied.put("provinceCode", province.getCode());
+
+                String locationLabel = province.getShortName();
+                if (intent.districtNameNorm() != null) {
+                    LocationFuzzyIndex.Match d = locationFuzzyIndex
+                            .resolveDistrict(intent.provinceCode(), intent.districtNameNorm())
+                            .orElse(null);
+                    if (d == null || d.legacyDistrictId() == null) continue; // can't filter → skip
+                    applied.put("legacyDistrictId", d.legacyDistrictId());
+                    if (d.districtCode() != null) applied.put("districtCode", d.districtCode());
+                    locationLabel = d.districtName() + ", " + province.getShortName();
+                }
+
+                StringBuilder text = new StringBuilder(DEFAULT_PRODUCT_DISPLAY)
+                        .append(' ').append(locationLabel);
+                if (priceClause != null) text.append(' ').append(priceClause);
+
+                Map<String, Object> meta = new HashMap<>();
+                meta.put("matchType", "PARSED_QUERY");
+                meta.put("appliedFilters", applied);
+                meta.put("isDefault", true);
+
+                double score = (WEIGHT_TITLE + 1.0) - (SCORE_DECAY_PER_RANK * items.size());
+                items.add(SearchSuggestionItem.builder()
+                        .type(SuggestionType.AI_INTENT)
+                        .text(text.toString())
+                        .metadata(meta)
+                        .score(score)
+                        .build());
+            }
+            return items;
+        } catch (Exception e) {
+            log.warn("search-suggestions: default contextual build failed (non-fatal): {}", e.getMessage(), e);
+            return Collections.emptyList();
+        }
     }
 
     /**
