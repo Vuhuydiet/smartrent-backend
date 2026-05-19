@@ -1,5 +1,6 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.NewsCreateRequest;
 import com.smartrent.dto.request.NewsUpdateRequest;
 import com.smartrent.dto.response.ApiResponse;
@@ -159,25 +160,31 @@ public class AdminNewsController {
         }
 
         @GetMapping
-        @Operation(summary = "Get all news (Admin)", description = "Retrieves a paginated list of all news posts regardless of status. "
-                        +
-                        "Optionally filter by status (DRAFT, PUBLISHED, ARCHIVED).")
+        @Operation(summary = "Get all news (Admin)", description = "Retrieves a paginated list of all news posts regardless of status. Supports flexible key:value filtering.\n\nFilters format: filter=key:value\n- Example: filter=title:market&filter=status:PUBLISHED")
         public ApiResponse<NewsListResponse> getAllNews(
                         @Parameter(description = "Page number (1-based)", example = "1") @RequestParam(required = false, defaultValue = "1") Integer page,
-
                         @Parameter(description = "Page size", example = "20") @RequestParam(required = false, defaultValue = "20") Integer size,
+                        @Parameter(description = "Flexible filters in format key:value (e.g., title:market, status:PUBLISHED, category:BLOG)") @RequestParam(required = false) String[] filter) {
 
-                        @Parameter(description = "Search keyword (title, summary)") @RequestParam(required = false) String keyword,
+                AdminFilterRequest filterRequest = AdminFilterRequest.builder()
+                                .page(page != null ? page : 1)
+                                .size(size != null ? size : 20)
+                                .build();
 
-                        @Parameter(description = "Filter by category") @RequestParam(required = false) NewsCategory category,
+                if (filter != null && filter.length > 0) {
+                        for (String f : filter) {
+                                if (f != null && f.contains(":")) {
+                                        String[] parts = f.split(":", 2);
+                                        if (parts.length == 2) {
+                                                filterRequest.getFilters().put(parts[0].trim(), parts[1].trim());
+                                        }
+                                }
+                        }
+                }
 
-                        @Parameter(description = "Filter by tag") @RequestParam(required = false) String tag,
-
-                        @Parameter(description = "Filter by status") @RequestParam(required = false) NewsStatus status) {
-                log.info("GET /v1/admin/news - page: {}, size: {}, keyword: {}, category: {}, tag: {}, status: {}",
-                                page, size, keyword, category, tag, status);
-
-                NewsListResponse response = newsService.getAllNews(page, size, category, tag, keyword, status);
+                log.info("GET /v1/admin/news - page: {}, size: {}, filters: {}",
+                                page, size, filterRequest.getFilters());
+                NewsListResponse response = newsService.getAllNews(filterRequest);
 
                 return ApiResponse.<NewsListResponse>builder()
                                 .data(response)

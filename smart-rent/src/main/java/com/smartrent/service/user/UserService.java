@@ -1,5 +1,6 @@
 package com.smartrent.service.user;
 
+import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UpdateContactPhoneRequest;
 import com.smartrent.dto.request.UserCreationRequest;
@@ -16,7 +17,7 @@ public interface UserService {
 
   GetUserResponse getUserById(String id);
 
-  PageResponse<GetUserResponse> getUsers(int page, int size, String keyword, Boolean isBroker, String status);
+  PageResponse<GetUserResponse> getUsers(AdminFilterRequest filter);
 
   User internalCreateUser(InternalUserCreationRequest request);
 

@@ -1,5 +1,6 @@
 package com.smartrent.service.news;
 
+import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.NewsCreateRequest;
 import com.smartrent.dto.request.NewsUpdateRequest;
 import com.smartrent.dto.response.NewsDetailResponse;
@@ -99,15 +100,19 @@ public interface NewsService {
     void deleteNews(Long newsId);
 
     /**
-     * Get all news (admin view) with pagination
+     * Get all news (admin view) with pagination and flexible filtering
      * 
-     * @param page   Page number (1-based)
-     * @param size   Page size
-     * @param status Optional status filter
+     * Supported filters (in AdminFilterRequest.filters):
+     * - title: String (contains search)
+     * - summary: String (contains search)
+     * - category: String (NewsCategory enum)
+     * - tag: String (comma-separated tags)
+     * - status: String (NewsStatus enum)
+     * 
+     * @param filter Filter criteria containing page, size, and filters map
      * @return Paginated news list
      */
-    NewsListResponse getAllNews(Integer page, Integer size, NewsCategory category, String tag, String keyword,
-            NewsStatus status);
+    NewsListResponse getAllNews(AdminFilterRequest filter);
 
     /**
      * Get news by ID (admin view)

@@ -2,6 +2,7 @@ package com.smartrent.service.admin.impl;
 
 import com.smartrent.config.Constants;
 import com.smartrent.dto.request.AdminCreationRequest;
+import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.AdminUpdateRequest;
 import com.smartrent.dto.response.AdminCreationResponse;
 import com.smartrent.dto.response.GetAdminResponse;
@@ -98,42 +99,87 @@ public class AdminServiceImpl implements AdminService {
 
   @Override
   @Transactional(readOnly = true)
-  public PageResponse<GetAdminResponse> getAllAdmins(int page, int size, String keyword, String rolesCsv) {
-    log.info("Fetching all admins - page: {}, size: {}, keyword: {}, roles: {}",
-        page, size, keyword, rolesCsv);
+  public PageResponse<GetAdminResponse> getAllAdmins(AdminFilterRequest filter) {
+    log.info("Fetching all admins - page: {}, size: {}, filters: {}",
+        filter.getPage(), filter.getSize(), filter.getFilters());
+
+    // Validate and set defaults
+    int page = Math.max(filter.getPage() != null ? filter.getPage() : 1, 1);
+    int size = Math.max(filter.getSize() != null ? filter.getSize() : 20, 1);
 
     Pageable pageable = PageRequest.of(page - 1, size);
 
+    // Build dynamic specification from filter request
     Specification<Admin> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
 
-    if (StringUtils.isNotBlank(keyword)) {
-      String like = "%" + keyword.trim().toLowerCase() + "%";
+    // Search filters - apply contains search for multiple fields
+    if (filter.hasFilter("adminId") || filter.hasFilter("firstName") ||
+        filter.hasFilter("lastName") || filter.hasFilter("email") || filter.hasFilter("phoneNumber")) {
+
       spec = spec.and((root, query, criteriaBuilder) -> {
-        List<Predicate> keywordPredicates = new ArrayList<>();
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("adminId")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("firstName")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("lastName")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("phoneNumber")), like));
-        return criteriaBuilder.or(keywordPredicates.toArray(new Predicate[0]));
+        List<Predicate> predicates = new ArrayList<>();
+
+        // adminId filter
+        if (filter.hasFilter("adminId")) {
+          String value = "%" + filter.getStringFilter("adminId").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("adminId")), value));
+        }
+
+        // firstName filter
+        if (filter.hasFilter("firstName")) {
+          String value = "%" + filter.getStringFilter("firstName").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("firstName")), value));
+        }
+
+        // lastName filter
+        if (filter.hasFilter("lastName")) {
+          String value = "%" + filter.getStringFilter("lastName").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("lastName")), value));
+        }
+
+        // email filter
+        if (filter.hasFilter("email")) {
+          String value = "%" + filter.getStringFilter("email").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), value));
+        }
+
+        // phoneNumber filter
+        if (filter.hasFilter("phoneNumber")) {
+          String value = "%" + filter.getStringFilter("phoneNumber").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("phoneNumber")), value));
+        }
+
+        // Combine with OR if multiple filters exist
+        if (predicates.isEmpty()) {
+          return criteriaBuilder.conjunction();
+        } else if (predicates.size() == 1) {
+          return predicates.get(0);
+        } else {
+          return criteriaBuilder.or(predicates.toArray(new Predicate[0]));
+        }
       });
     }
 
-    List<String> normalizedRoleIds = normalizeRoleIds(rolesCsv);
-    if (!normalizedRoleIds.isEmpty()) {
-      for (String roleId : normalizedRoleIds) {
-        spec = spec.and((root, query, criteriaBuilder) -> {
-          Subquery<Long> subquery = query.subquery(Long.class);
-          var subRoot = subquery.from(Admin.class);
-          var subJoin = subRoot.join("roles");
+    // Role filter - filter admins that have any of the specified roles
+    if (filter.hasFilter("role")) {
+      String rolesCsv = filter.getStringFilter("role");
+      List<String> normalizedRoleIds = normalizeRoleIds(rolesCsv);
 
-          subquery.select(criteriaBuilder.literal(1L))
-              .where(
-                  criteriaBuilder.equal(subRoot.get("adminId"), root.get("adminId")),
-                  criteriaBuilder.equal(criteriaBuilder.upper(subJoin.get("roleId")), roleId));
+      if (!normalizedRoleIds.isEmpty()) {
+        for (String roleId : normalizedRoleIds) {
+          spec = spec.and((root, query, criteriaBuilder) -> {
+            Subquery<Long> subquery = query.subquery(Long.class);
+            var subRoot = subquery.from(Admin.class);
+            var subJoin = subRoot.join("roles");
 
-          return criteriaBuilder.exists(subquery);
-        });
+            subquery.select(criteriaBuilder.literal(1L))
+                .where(
+                    criteriaBuilder.equal(subRoot.get("adminId"), root.get("adminId")),
+                    criteriaBuilder.equal(criteriaBuilder.upper(subJoin.get("roleId")), roleId));
+
+            return criteriaBuilder.exists(subquery);
+          });
+        }
       }
     }
 

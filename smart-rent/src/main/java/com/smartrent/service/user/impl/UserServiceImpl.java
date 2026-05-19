@@ -1,6 +1,7 @@
 package com.smartrent.service.user.impl;
 
 import com.smartrent.config.Constants;
+import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UpdateContactPhoneRequest;
 import com.smartrent.dto.request.UserCreationRequest;
@@ -126,48 +127,70 @@ public class UserServiceImpl implements UserService {
   }
 
   @Override
-  @Cacheable(cacheNames = Constants.CacheNames.USER_DETAILS, key = "T(java.util.Objects).hash(#page, #size, #keyword, #isBroker, #status)")
-  public PageResponse<GetUserResponse> getUsers(int page, int size, String keyword, Boolean isBroker, String status) {
-    // Validate pagination parameters
-    if (page < 1) {
-      throw new InvalidPageException();
-    }
-    if (size <= 0) {
-      throw new InvalidPageSizeException();
-    }
+  public PageResponse<GetUserResponse> getUsers(AdminFilterRequest filter) {
+    // Validate and set defaults
+    int page = Math.max(filter.getPage() != null ? filter.getPage() : 1, 1);
+    int size = Math.max(filter.getSize() != null ? filter.getSize() : 20, 1);
 
     Pageable pageable = PageRequest.of(page - 1, size);
 
+    // Build dynamic specification from filter request
     Specification<User> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
 
-    if (StringUtils.isNotBlank(keyword)) {
-      String like = "%" + keyword.trim().toLowerCase() + "%";
+    // Search filters - apply contains search for multiple fields
+    if (filter.hasFilter("userId") || filter.hasFilter("firstName") ||
+        filter.hasFilter("lastName") || filter.hasFilter("email") || filter.hasFilter("phoneNumber")) {
+
       spec = spec.and((root, query, criteriaBuilder) -> {
-        List<Predicate> keywordPredicates = new ArrayList<>();
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("userId")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("firstName")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("lastName")), like));
-        keywordPredicates.add(criteriaBuilder.like(
-            criteriaBuilder.lower(criteriaBuilder.concat(
-                criteriaBuilder.concat(root.get("firstName"), criteriaBuilder.literal(" ")),
-                root.get("lastName"))),
-            like));
-        keywordPredicates.add(criteriaBuilder.like(
-            criteriaBuilder.lower(criteriaBuilder.concat(
-                criteriaBuilder.concat(root.get("lastName"), criteriaBuilder.literal(" ")),
-                root.get("firstName"))),
-            like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("phoneNumber")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("contactPhoneNumber")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("idDocument")), like));
-        keywordPredicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("taxNumber")), like));
-        return criteriaBuilder.or(keywordPredicates.toArray(new Predicate[0]));
+        List<Predicate> predicates = new ArrayList<>();
+
+        // userId filter
+        if (filter.hasFilter("userId")) {
+          String value = "%" + filter.getStringFilter("userId").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("userId")), value));
+        }
+
+        // firstName filter
+        if (filter.hasFilter("firstName")) {
+          String value = "%" + filter.getStringFilter("firstName").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("firstName")), value));
+        }
+
+        // lastName filter
+        if (filter.hasFilter("lastName")) {
+          String value = "%" + filter.getStringFilter("lastName").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("lastName")), value));
+        }
+
+        // email filter
+        if (filter.hasFilter("email")) {
+          String value = "%" + filter.getStringFilter("email").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), value));
+        }
+
+        // phoneNumber filter
+        if (filter.hasFilter("phoneNumber")) {
+          String value = "%" + filter.getStringFilter("phoneNumber").toLowerCase() + "%";
+          predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("phoneNumber")), value));
+        }
+
+        // Combine with OR if multiple filters exist
+        if (predicates.isEmpty()) {
+          return criteriaBuilder.conjunction();
+        } else if (predicates.size() == 1) {
+          return predicates.get(0);
+        } else {
+          return criteriaBuilder.or(predicates.toArray(new Predicate[0]));
+        }
       });
     }
 
-    if (isBroker != null) {
-      spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("isBroker"), isBroker));
+    // isBroker filter
+    if (filter.hasFilter("isBroker")) {
+      Boolean isBroker = filter.getBooleanFilter("isBroker");
+      if (isBroker != null) {
+        spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("isBroker"), isBroker));
+      }
     }
 
     Page<User> users = userRepository.findAll(spec, pageable);
