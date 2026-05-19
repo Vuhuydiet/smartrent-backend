@@ -8,7 +8,7 @@ import com.nimbusds.jose.Payload;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.smartrent.config.Constants;
-import com.smartrent.dto.response.GetUserResponse;
+import com.smartrent.dto.response.JwtUserClaimsDto;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.entity.User;
@@ -19,12 +19,12 @@ import java.util.Date;
 
 public class TokenGenerator {
 
-  public static String generateToken(User user, GetUserResponse userResponse, long duration, String id, String otherId, String signerKey, TokenType tokenType) {
+  public static String generateToken(User user, JwtUserClaimsDto userClaims, long duration, String id, String otherId, String signerKey, TokenType tokenType) {
     JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.HS512).build();
     JWTClaimsSet claimsSet = null;
 
     if (TokenType.ACCESS.equals(tokenType)) {
-      claimsSet = buildAccessTokenClaims(user, duration, id, otherId, userResponse);
+      claimsSet = buildAccessTokenClaims(user, duration, id, otherId, userClaims);
     } else if (TokenType.REFRESH.equals(tokenType)) {
       claimsSet = buildRefreshTokenClaims(user, duration, id, otherId);
     }
@@ -43,7 +43,7 @@ public class TokenGenerator {
   }
 
   private static JWTClaimsSet buildAccessTokenClaims(User user, long duration, String id,
-      String otherId, GetUserResponse userResponse) {
+      String otherId, JwtUserClaimsDto userClaims) {
     try {
       return new JWTClaimsSet.Builder()
           .subject(user.getUserId())
@@ -53,7 +53,7 @@ public class TokenGenerator {
           .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
           .claim("rfId", otherId)
           .claim("scope", Constants.ROLE_USER)
-          .claim("user", userResponse)
+          .claim("user", userClaims)
           .build();
     } catch (Exception e) {
       throw new DomainException(DomainCode.UNKNOWN_ERROR);

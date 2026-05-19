@@ -3,7 +3,7 @@ package com.smartrent.service.authentication.impl;
 import com.smartrent.dto.request.InternalUserCreationRequest;
 import com.smartrent.dto.request.UserCreationRequest;
 import com.smartrent.dto.response.AuthenticationResponse;
-import com.smartrent.dto.response.GetUserResponse;
+import com.smartrent.dto.response.JwtUserClaimsDto;
 import com.smartrent.infra.connector.GoogleAuthConnector;
 import com.smartrent.infra.connector.GoogleConnector;
 import com.smartrent.infra.connector.model.GoogleExchangeTokenRequest;
@@ -119,10 +119,8 @@ public class GoogleAuthenticationServiceImpl implements OutboundAuthenticationSe
         log.info("Updated avatar URL for existing Google OAuth user: {}", user.getEmail());
       }
 
-      GetUserResponse userResponse = userMapper.mapFromUserEntityToGetUserResponse(user);
-
       log.info("Google OAuth authentication successful for user: {}", user.getEmail());
-      return buildAuthenticationResponse(user, userResponse);
+      return buildAuthenticationResponse(user);
 
     } catch (FeignException.BadRequest e) {
       log.error("Invalid Google authorization code: {}", e.getMessage());
@@ -146,12 +144,14 @@ public class GoogleAuthenticationServiceImpl implements OutboundAuthenticationSe
     }
   }
 
-  protected AuthenticationResponse buildAuthenticationResponse(User user, GetUserResponse getUserResponse) {
+  protected AuthenticationResponse buildAuthenticationResponse(User user) {
     String acId = UUID.randomUUID().toString();
     String rfId = UUID.randomUUID().toString();
 
-    String accessToken = TokenGenerator.generateToken(user, getUserResponse, VALID_DURATION, acId, rfId, SIGNER_KEY, TokenType.ACCESS);
-    String refreshToken = TokenGenerator.generateToken(user, getUserResponse, REFRESHABLE_DURATION, rfId, acId, REFRESH_SIGNER_KEY, TokenType.REFRESH);
+    JwtUserClaimsDto userClaims = userMapper.mapFromUserEntityToJwtUserClaimsDto(user);
+
+    String accessToken = TokenGenerator.generateToken(user, userClaims, VALID_DURATION, acId, rfId, SIGNER_KEY, TokenType.ACCESS);
+    String refreshToken = TokenGenerator.generateToken(user, userClaims, REFRESHABLE_DURATION, rfId, acId, REFRESH_SIGNER_KEY, TokenType.REFRESH);
 
     return AuthenticationResponse.builder()
         .accessToken(accessToken)
