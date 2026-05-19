@@ -214,23 +214,46 @@ public class SearchSuggestionServiceImpl implements SearchSuggestionService {
                 : normalized;
 
         // ── Fetch candidates from all sources ────────────────────────────────
-        // No synchronous AI round-trip here: the local parser + DB location
-        // resolution + live amenities table already produce the structured
-        // appliedFilters the frontend needs, so the AI call was pure latency
-        // (a blocking Feign hop with a 30s read timeout) for no functional
-        // gain. The dropdown is built entirely from in-process + indexed-DB
-        // sources now.
-        List<SearchSuggestionItem> titleItems    = fetchTitleSuggestions(normalized, provinceIdInt, categoryId, safeLimit);
+        // No synchronous AI round-trip here (verified: zero Feign/HTTP on this
+        // path). Cost is dominated by two DB reads — the title FULLTEXT and
+        // the popular-query GROUP BY. We gate BOTH so a resolved structured
+        // query pays neither.
+        //
+        // LOCATION runs first: it is the cheapest source (in-memory hash-index
+        // fast path, no DB for the common "<district> <province>" shape) and
+        // it tells us whether the query is a resolved place.
         List<SearchSuggestionItem> locationItems = fetchLocationSuggestions(locationQuery, provinceId);
-        List<SearchSuggestionItem> popularItems  = fetchPopularQuerySuggestions(normalized, safeLimit);
-        List<SearchSuggestionItem> typoItems     = fetchTypoSuggestions(normalized, safeLimit);
-        // The phonetic DB lookup is a `LIKE '%...%'` scan on phonetic_title
-        // (non-sargable, full scan). It is only a fuzzy fallback for
-        // misspellings the FULLTEXT title source could not catch, so skip the
-        // scan whenever we already have title hits — that keeps it off the
-        // hot path for the overwhelming majority of queries.
+        boolean locationResolved = firstLocation(locationItems) != null;
+        // A "structured query" = the parser extracted a real filter intent AND
+        // a concrete province/district/ward resolved. For those the dropdown
+        // is led by the synthesized AI_INTENT "ready to apply" row + the
+        // LOCATION row; title matches off a parsed filter sentence and generic
+        // popular terms are pure noise, so skip both DB reads entirely.
+        boolean structuredQuery = parsed.hasStructuredFilter() && locationResolved;
+
+        // TITLE (FULLTEXT) — kept ONLY for keyword/project queries (no place
+        // resolved), where title search is the actual intent ("masteri",
+        // "vinhomes sunrise"). Skipped for resolved structured queries.
+        List<SearchSuggestionItem> titleItems = structuredQuery
+                ? Collections.emptyList()
+                : fetchTitleSuggestions(normalized, provinceIdInt, categoryId, safeLimit);
+
+        List<SearchSuggestionItem> typoItems = fetchTypoSuggestions(normalized, safeLimit);
+        // Phonetic DB `LIKE '%...%'` scan only when we actually RAN title and
+        // it found nothing — never reintroduce a scan we deliberately skipped.
+        boolean allowPhoneticDbScan = !structuredQuery && titleItems.isEmpty();
         List<SearchSuggestionItem> phoneticItems = fetchPhoneticSuggestions(
-                normalized, provinceIdInt, categoryId, safeLimit, titleItems.isEmpty());
+                normalized, provinceIdInt, categoryId, safeLimit, allowPhoneticDbScan);
+
+        // POPULAR_QUERY — the single heaviest query (GROUP BY over a growing
+        // telemetry table, filesort). Pay it only when the query is NOT a
+        // resolved structured one AND the cheap in-process / indexed sources
+        // did not already fill the dropdown.
+        int candidateCount = titleItems.size() + locationItems.size()
+                + typoItems.size() + phoneticItems.size();
+        List<SearchSuggestionItem> popularItems = (!structuredQuery && candidateCount < safeLimit)
+                ? fetchPopularQuerySuggestions(normalized, safeLimit)
+                : Collections.emptyList();
 
         // ── Merge, deduplicate, rank, and trim ───────────────────────────────
         List<SearchSuggestionItem> merged = mergeAndRank(
