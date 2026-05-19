@@ -48,12 +48,40 @@ class SearchQueryParserTest {
     }
 
     @Test
-    @DisplayName("numbered district 'quận 1' keeps its marker (no over-strip to '1')")
-    void numberedDistrictKeepsMarker() {
-        // The digit is dropped by stopword removal (pre-existing behaviour);
-        // the marker MUST survive so the location is still "quan" and not
-        // an empty / digit-only token.
-        assertEquals("quan", SearchQueryParser.parse("quận 1").locationText());
+    @DisplayName("numbered district 'quận 1' keeps BOTH marker and number")
+    void numberedDistrictKeepsMarkerAndNumber() {
+        // Regression: the digit used to be dropped by stopword removal,
+        // collapsing "quan 1" → "quan", which then LIKE-matched
+        // "Quảng Ninh / Quảng Nam / Quảng Ngãi" (the reported
+        // "search theo quận ra kết quả lạ" bug). The number MUST survive
+        // so the district resolves to "Quận 1" (key "quan1").
+        assertEquals("quan 1", SearchQueryParser.parse("quận 1").locationText());
+    }
+
+    @Test
+    @DisplayName("multi-digit district 'quận 12' keeps its number")
+    void twoDigitDistrictKept() {
+        assertEquals("quan 12", SearchQueryParser.parse("quận 12").locationText());
+    }
+
+    @Test
+    @DisplayName("full NL query with NUMBERED district + city")
+    void fullNaturalLanguageNumberedDistrict() {
+        SearchQueryParser.ParsedQuery parsed =
+                SearchQueryParser.parse("nhà trọ quận 1 hồ chí minh dưới 5tr");
+        assertEquals("ROOM", parsed.productType());
+        assertEquals(0, new BigDecimal("5000000").compareTo(parsed.maxPrice()));
+        // Number preserved next to the city so the segment resolver can
+        // split it into Quận 1 + Hồ Chí Minh.
+        assertEquals("quan 1 ho chi minh", parsed.locationText());
+    }
+
+    @Test
+    @DisplayName("a long bare number (year) is still dropped from the location")
+    void longNumberStillDropped() {
+        // Only 1–2 digit district numbers survive; a 4-digit number is noise.
+        assertEquals("tan binh",
+                SearchQueryParser.parse("phòng trọ tân bình 2024").locationText());
     }
 
     @Test

@@ -116,4 +116,80 @@ class LocationFuzzyIndexTest {
         assertFalse(LocationFuzzyIndex
                 .resolveDistrictIn(sampleIndex(), "79", "khong co dau").isPresent());
     }
+
+    // ── resolveLocationPhrase: the "<district> <province>" splitter ──────────
+
+    @Test
+    @DisplayName("'quan 7 ho chi minh' → Quận 7 district + HCM province ids")
+    void numberedDistrictThenProvince() {
+        Optional<LocationFuzzyIndex.Match> m = LocationFuzzyIndex
+                .resolveLocationPhraseIn(sampleIndex(), "quan 7 ho chi minh");
+        assertTrue(m.isPresent());
+        assertEquals(LocationFuzzyIndex.Kind.DISTRICT, m.get().kind());
+        assertEquals(778, m.get().legacyDistrictId().intValue());
+        assertEquals(79, m.get().legacyProvinceId().intValue());
+        assertEquals("79", m.get().provinceCode());
+    }
+
+    @Test
+    @DisplayName("'tan binh ho chi minh' → Tân Bình district + HCM province ids")
+    void namedDistrictThenProvince() {
+        Optional<LocationFuzzyIndex.Match> m = LocationFuzzyIndex
+                .resolveLocationPhraseIn(sampleIndex(), "tan binh ho chi minh");
+        assertTrue(m.isPresent());
+        assertEquals(LocationFuzzyIndex.Kind.DISTRICT, m.get().kind());
+        assertEquals(766, m.get().legacyDistrictId().intValue());
+        assertEquals(79, m.get().legacyProvinceId().intValue());
+    }
+
+    @Test
+    @DisplayName("province-first order: 'ha noi hoan kiem' → Hoàn Kiếm + Hà Nội")
+    void provinceThenDistrict() {
+        Optional<LocationFuzzyIndex.Match> m = LocationFuzzyIndex
+                .resolveLocationPhraseIn(sampleIndex(), "ha noi hoan kiem");
+        assertTrue(m.isPresent());
+        assertEquals(LocationFuzzyIndex.Kind.DISTRICT, m.get().kind());
+        assertEquals(7, m.get().legacyDistrictId().intValue());
+        assertEquals(1, m.get().legacyProvinceId().intValue());
+    }
+
+    @Test
+    @DisplayName("order-independent: 'ho chi minh quan 7' (province FIRST + numbered) → Quận 7")
+    void provinceFirstThenNumberedDistrict() {
+        Optional<LocationFuzzyIndex.Match> m = LocationFuzzyIndex
+                .resolveLocationPhraseIn(sampleIndex(), "ho chi minh quan 7");
+        assertTrue(m.isPresent());
+        assertEquals(LocationFuzzyIndex.Kind.DISTRICT, m.get().kind());
+        assertEquals(778, m.get().legacyDistrictId().intValue());
+        assertEquals(79, m.get().legacyProvinceId().intValue());
+        assertEquals("79", m.get().provinceCode());
+    }
+
+    @Test
+    @DisplayName("single-segment phrase is left to the DB tiers → empty")
+    void singleSegmentIsEmpty() {
+        assertFalse(LocationFuzzyIndex
+                .resolveLocationPhraseIn(sampleIndex(), "ho chi minh").isPresent());
+        assertFalse(LocationFuzzyIndex
+                .resolveLocationPhraseIn(sampleIndex(), "tan binh").isPresent());
+    }
+
+    @Test
+    @DisplayName("district not in the resolved province → province-only match")
+    void districtNotInProvinceFallsBackToProvince() {
+        // "Hoàn Kiếm" belongs to Hà Nội, not HCM → no district in 79;
+        // the resolver still returns the province it DID resolve.
+        Optional<LocationFuzzyIndex.Match> m = LocationFuzzyIndex
+                .resolveLocationPhraseIn(sampleIndex(), "hoan kiem ho chi minh");
+        assertTrue(m.isPresent());
+        assertEquals(LocationFuzzyIndex.Kind.PROVINCE, m.get().kind());
+        assertEquals(79, m.get().legacyProvinceId().intValue());
+    }
+
+    @Test
+    @DisplayName("no province anywhere in the phrase → empty (no false district)")
+    void noProvinceMeansEmpty() {
+        assertFalse(LocationFuzzyIndex
+                .resolveLocationPhraseIn(sampleIndex(), "tan binh quan 7").isPresent());
+    }
 }

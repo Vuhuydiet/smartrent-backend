@@ -121,6 +121,29 @@ public class LocationFuzzyIndex {
         }
     }
 
+    /**
+     * Structured resolver for a multi-segment "&lt;district&gt; &lt;province&gt;"
+     * (or "&lt;province&gt; &lt;district&gt;") location phrase — the
+     * {@link TextNormalizer#normalize} output of e.g. "quan 1 ho chi minh" or
+     * "tan binh ho chi minh". Resolves the province from the longest exactly
+     * matching trailing (then leading) token-run and the district from the
+     * remaining tokens, scoped to that province. Returns the DISTRICT match
+     * (carrying both province and district legacy ids/codes) when both
+     * resolve, the PROVINCE match when only the province does, and empty for a
+     * single-segment phrase (left to the DB tiers) or no province match.
+     *
+     * <p>Runs entirely off the cached in-memory index — zero DB round-trips —
+     * and never throws, so it is safe on the suggestion hot path.
+     */
+    public Optional<Match> resolveLocationPhrase(String normalizedPhrase) {
+        try {
+            return resolveLocationPhraseIn(index(), normalizedPhrase);
+        } catch (Exception ex) {
+            log.warn("location-fuzzy: resolveLocationPhrase failed (non-fatal): {}", ex.getMessage(), ex);
+            return Optional.empty();
+        }
+    }
+
     private Index index() {
         Index local = cached;
         if (local != null && System.currentTimeMillis() - builtAtMs <= REFRESH_TTL_MS) {
@@ -221,6 +244,118 @@ public class LocationFuzzyIndex {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Leading administrative unit marker. The legacy district index entries
+     * carry BOTH the marked ("quan tan binh") and short ("tan binh") name
+     * forms, but a few only have one, so we retry the segment with the marker
+     * stripped before falling back to fuzzy.
+     */
+    private static final java.util.regex.Pattern DISTRICT_UNIT_PREFIX =
+            java.util.regex.Pattern.compile("^(thi xa|quan|huyen)\\s+");
+
+    static Optional<Match> resolveLocationPhraseIn(Index idx, String normalizedPhrase) {
+        if (idx == null || normalizedPhrase == null) return Optional.empty();
+        String[] toks = normalizedPhrase.trim().split("\\s+");
+        // Single segment ("ho chi minh", "tan binh") → the exact DB tiers
+        // already handle it; this resolver only fixes the multi-segment miss.
+        if (toks.length < 2) return Optional.empty();
+
+        Entry province = null;
+        String districtSeg = null;
+
+        // (a) Trailing province — the dominant order: "<district> <province>"
+        //     ("quan 1 ho chi minh"). Keep ≥1 leading token for the district.
+        int maxTrail = Math.min(4, toks.length - 1);
+        for (int take = maxTrail; take >= 1 && province == null; take--) {
+            Entry p = findProvinceExact(idx, joinTokens(toks, toks.length - take, toks.length));
+            if (p != null) {
+                province = p;
+                districtSeg = joinTokens(toks, 0, toks.length - take).trim();
+            }
+        }
+        // (b) Leading province — "<province> <district>" ("ho chi minh quan 1").
+        if (province == null) {
+            int maxLead = Math.min(4, toks.length - 1);
+            for (int take = maxLead; take >= 1 && province == null; take--) {
+                Entry p = findProvinceExact(idx, joinTokens(toks, 0, take));
+                if (p != null) {
+                    province = p;
+                    districtSeg = joinTokens(toks, take, toks.length).trim();
+                }
+            }
+        }
+        if (province == null) return Optional.empty();
+        if (districtSeg == null || districtSeg.isEmpty()) {
+            return Optional.of(toMatch(province, 1.0));
+        }
+
+        Entry district = findDistrictInProvince(idx, province.provinceCode(), districtSeg);
+        if (district == null) {
+            String stripped = DISTRICT_UNIT_PREFIX.matcher(districtSeg).replaceFirst("").trim();
+            if (!stripped.isEmpty() && !stripped.equals(districtSeg)) {
+                district = findDistrictInProvince(idx, province.provinceCode(), stripped);
+            }
+        }
+        if (district == null) {
+            district = bestFuzzyDistrictInProvince(
+                    idx, province.provinceCode(), districtSeg, DEFAULT_MIN_SCORE);
+        }
+        return Optional.of(district != null ? toMatch(district, 1.0) : toMatch(province, 1.0));
+    }
+
+    private static Entry findProvinceExact(Index idx, String candidate) {
+        for (Entry e : idx.entries()) {
+            if (e.kind() == Kind.PROVINCE && e.matchStrings().contains(candidate)) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    private static Entry findDistrictInProvince(Index idx, String provinceCode, String seg) {
+        if (provinceCode == null) return null;
+        for (Entry e : idx.entries()) {
+            if (e.kind() == Kind.DISTRICT
+                    && provinceCode.equals(e.provinceCode())
+                    && e.matchStrings().contains(seg)) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    private static Entry bestFuzzyDistrictInProvince(
+            Index idx, String provinceCode, String seg, double minScore) {
+        if (provinceCode == null || seg.length() < MIN_QUERY_LENGTH) return null;
+        // Same loose length gate as searchIndex: a typo may add/drop a few
+        // chars, but a wildly different-length name (e.g. "quan" vs
+        // "quan tan binh") must not fuzzy-match.
+        int maxLenDelta = Math.max(4, seg.length());
+        Entry best = null;
+        double bestScore = -1.0;
+        for (Entry e : idx.entries()) {
+            if (e.kind() != Kind.DISTRICT || !provinceCode.equals(e.provinceCode())) continue;
+            for (String c : e.matchStrings()) {
+                if (Math.abs(c.length() - seg.length()) > maxLenDelta) continue;
+                Double s = JARO_WINKLER.apply(seg, c);
+                if (s != null && s > bestScore) {
+                    bestScore = s;
+                    best = e;
+                }
+            }
+        }
+        return bestScore >= minScore ? best : null;
+    }
+
+    private static String joinTokens(String[] toks, int from, int to) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = from; i < to; i++) {
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(toks[i]);
+        }
+        return sb.toString();
     }
 
     private static Match toMatch(Entry e, double score) {
