@@ -1257,6 +1257,104 @@ public class ListingServiceImpl implements ListingService {
                     .build();
         }
 
+        // Resolve old↔new address mappings (shared with homepage stats — single source of truth)
+        resolveAddressMappings(filter);
+
+        // Execute query using shared query service
+        Page<Listing> page = listingQueryService.executeQuery(filter);
+
+        // Batch-load relationships and map to card DTOs (3 queries: users + media, no amenities)
+        List<ListingCardResponse> listings = batchMapCardListings(page.getContent());
+
+        return ListingCardListResponse.builder()
+                .listings(listings)
+                .totalCount(page.getTotalElements())
+                .currentPage(page.getNumber() + 1)
+                .pageSize(page.getSize())
+                .totalPages(page.getTotalPages())
+                .build();
+    }
+
+            @Override
+            @Transactional(readOnly = true)
+            public ListingCardListResponse getTopSavedListingsByUser(String userId, int limit) {
+            int safeLimit = Math.min(Math.max(limit, 1), 20);
+
+            List<Object[]> rows = savedListingRepository.findTopSavedListingIdsForOwner(
+                userId,
+                PageRequest.of(0, safeLimit)
+            );
+
+            if (rows.isEmpty()) {
+                return ListingCardListResponse.builder()
+                    .listings(Collections.emptyList())
+                    .totalCount(0L)
+                    .currentPage(1)
+                    .pageSize(safeLimit)
+                    .totalPages(0)
+                    .build();
+            }
+
+            List<Long> listingIds = rows.stream()
+                .map(row -> ((Number) row[0]).longValue())
+                .collect(Collectors.toList());
+
+            List<Listing> listingEntities = listingRepository.findByListingIdIn(listingIds);
+            Map<Long, Listing> listingMap = listingEntities.stream()
+                .collect(Collectors.toMap(Listing::getListingId, Function.identity(), (a, b) -> a));
+
+            List<Listing> orderedListings = listingIds.stream()
+                .map(listingMap::get)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
+
+            List<ListingCardResponse> listingResponses = batchMapCardListings(orderedListings);
+
+            return ListingCardListResponse.builder()
+                .listings(listingResponses)
+                .totalCount((long) listingResponses.size())
+                .currentPage(1)
+                .pageSize(safeLimit)
+                .totalPages(listingResponses.isEmpty() ? 0 : 1)
+                .build();
+            }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<com.smartrent.dto.response.ListingAutocompleteResponse> autocompleteListings(String query, int limit) {
+        String normalized = TextNormalizer.normalize(query);
+        if (normalized == null || normalized.length() < 2) {
+            return Collections.emptyList();
+        }
+
+        int safeLimit = Math.min(Math.max(limit, 1), 20);
+        Pageable pageable = PageRequest.of(0, safeLimit,
+                Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                        .and(Sort.by(Sort.Direction.DESC, "updatedAt")));
+
+        Page<Listing> page = listingRepository.findAutocomplete(normalized, pageable);
+
+        return page.getContent().stream()
+                .map(listing -> com.smartrent.dto.response.ListingAutocompleteResponse.builder()
+                        .listingId(listing.getListingId())
+                        .title(listing.getTitle())
+                        .address(listing.getAddress() != null ? listing.getAddress().getDisplayAddress() : null)
+                        .price(listing.getPrice())
+                        .priceUnit(listing.getPriceUnit())
+                        .vipType(listing.getVipType())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Resolve old↔new address code/id mappings onto the filter so the shared
+     * {@link com.smartrent.infra.repository.specification.ListingSpecification}
+     * matches listings stored under either address structure. Extracted from
+     * {@link #searchListings} so homepage province/category stats can reuse the
+     * EXACT same matching logic — a homepage card number must always equal the
+     * /properties listing-page total for the same navigation params.
+     */
+    private void resolveAddressMappings(ListingFilterRequest filter) {
         // Merge single provinceCode into provinceCodes list (FE typically sends provinceCode singular)
         if (filter.getProvinceCode() != null && !filter.getProvinceCode().isBlank()) {
             List<String> merged = new ArrayList<>();
@@ -1411,91 +1509,18 @@ public class ListingServiceImpl implements ListingService {
                 log.warn("wardId {} is not a valid integer — skipping legacy→new resolution", filter.getWardId());
             }
         }
-
-        // Execute query using shared query service
-        Page<Listing> page = listingQueryService.executeQuery(filter);
-
-        // Batch-load relationships and map to card DTOs (3 queries: users + media, no amenities)
-        List<ListingCardResponse> listings = batchMapCardListings(page.getContent());
-
-        return ListingCardListResponse.builder()
-                .listings(listings)
-                .totalCount(page.getTotalElements())
-                .currentPage(page.getNumber() + 1)
-                .pageSize(page.getSize())
-                .totalPages(page.getTotalPages())
-                .build();
     }
 
-            @Override
-            @Transactional(readOnly = true)
-            public ListingCardListResponse getTopSavedListingsByUser(String userId, int limit) {
-            int safeLimit = Math.min(Math.max(limit, 1), 20);
-
-            List<Object[]> rows = savedListingRepository.findTopSavedListingIdsForOwner(
-                userId,
-                PageRequest.of(0, safeLimit)
-            );
-
-            if (rows.isEmpty()) {
-                return ListingCardListResponse.builder()
-                    .listings(Collections.emptyList())
-                    .totalCount(0L)
-                    .currentPage(1)
-                    .pageSize(safeLimit)
-                    .totalPages(0)
-                    .build();
-            }
-
-            List<Long> listingIds = rows.stream()
-                .map(row -> ((Number) row[0]).longValue())
-                .collect(Collectors.toList());
-
-            List<Listing> listingEntities = listingRepository.findByListingIdIn(listingIds);
-            Map<Long, Listing> listingMap = listingEntities.stream()
-                .collect(Collectors.toMap(Listing::getListingId, Function.identity(), (a, b) -> a));
-
-            List<Listing> orderedListings = listingIds.stream()
-                .map(listingMap::get)
-                .filter(java.util.Objects::nonNull)
-                .collect(Collectors.toList());
-
-            List<ListingCardResponse> listingResponses = batchMapCardListings(orderedListings);
-
-            return ListingCardListResponse.builder()
-                .listings(listingResponses)
-                .totalCount((long) listingResponses.size())
-                .currentPage(1)
-                .pageSize(safeLimit)
-                .totalPages(listingResponses.isEmpty() ? 0 : 1)
-                .build();
-            }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<com.smartrent.dto.response.ListingAutocompleteResponse> autocompleteListings(String query, int limit) {
-        String normalized = TextNormalizer.normalize(query);
-        if (normalized == null || normalized.length() < 2) {
-            return Collections.emptyList();
-        }
-
-        int safeLimit = Math.min(Math.max(limit, 1), 20);
-        Pageable pageable = PageRequest.of(0, safeLimit,
-                Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
-                        .and(Sort.by(Sort.Direction.DESC, "updatedAt")));
-
-        Page<Listing> page = listingRepository.findAutocomplete(normalized, pageable);
-
-        return page.getContent().stream()
-                .map(listing -> com.smartrent.dto.response.ListingAutocompleteResponse.builder()
-                        .listingId(listing.getListingId())
-                        .title(listing.getTitle())
-                        .address(listing.getAddress() != null ? listing.getAddress().getDisplayAddress() : null)
-                        .price(listing.getPrice())
-                        .priceUnit(listing.getPriceUnit())
-                        .vipType(listing.getVipType())
-                        .build())
-                .collect(Collectors.toList());
+    /**
+     * Count listings exactly the way the public /properties listing page would
+     * for {@code filter}: same address resolution + same ListingSpecification.
+     * Single source of truth keeping homepage stats and the listing-page total
+     * in lock-step.
+     */
+    private long countPublicListings(ListingFilterRequest filter) {
+        resolveAddressMappings(filter);
+        return listingRepository.count(
+                com.smartrent.infra.repository.specification.ListingSpecification.fromFilterRequest(filter));
     }
 
     @Override
@@ -1554,18 +1579,15 @@ public class ListingServiceImpl implements ListingService {
             allLegacyIds.add(legacyId);
         }
 
-        // Accumulator: provinceCode → [total, verified, vip]
-        Map<String, long[]> aggregated = new LinkedHashMap<>();
-        for (String code : provinceCodes) {
-            aggregated.put(code, new long[]{0L, 0L, 0L});
-        }
+        // Build the ordered set of province codes to report (request order)
+        java.util.LinkedHashSet<String> codeSet = new java.util.LinkedHashSet<>(provinceCodes);
 
         // Fallback: if address_mapping has no data, use provinceIds from request directly.
         // FE sends provinceIds: [1, 79, ...] and provinceCodes: ["1", "79", ...] with matching numeric values.
         if (allLegacyIds.isEmpty() && request.getProvinceIds() != null && !request.getProvinceIds().isEmpty()) {
             for (Integer id : request.getProvinceIds()) {
                 String codeKey = strippedToOriginal.getOrDefault(String.valueOf(id), String.valueOf(id));
-                if (aggregated.containsKey(codeKey)) {
+                if (codeSet.contains(codeKey)) {
                     legacyIdToCode.put(id, codeKey);
                     allLegacyIds.add(id);
                 }
@@ -1573,65 +1595,52 @@ public class ListingServiceImpl implements ListingService {
             log.debug("address_mapping empty — built legacyIdToCode directly from request provinceIds: {}", legacyIdToCode);
         }
 
-        // Aggregate new-structure listings (addresses.new_province_code)
-        boolean verifiedOnly = Boolean.TRUE.equals(request.getVerifiedOnly());
-        List<Object[]> newStats = listingRepository.getListingStatsByProvinceCodes(
-                provinceCodes, verifiedOnly);
-        for (Object[] row : newStats) {
-            String code = (String) row[0];
-            long[] acc = aggregated.get(code);
-            if (acc != null) {
-                acc[0] += toLong(row[1]);
-                acc[1] += toLong(row[2]);
-                acc[2] += toLong(row[3]);
-            }
-        }
-
-        // Aggregate old-structure listings (addresses.legacy_province_id)
-        // Exclude listings already counted via new_province_code to avoid double-counting
-        if (!allLegacyIds.isEmpty()) {
-            List<Object[]> oldStats = listingRepository.getListingStatsByProvinceIdsWithoutNewCode(
-                    allLegacyIds, verifiedOnly);
-            for (Object[] row : oldStats) {
-                Integer legacyId = ((Number) row[0]).intValue();
-                String code = legacyIdToCode.get(legacyId);
-                long[] acc = (code != null) ? aggregated.get(code) : null;
-                if (acc != null) {
-                    acc[0] += toLong(row[1]);
-                    acc[1] += toLong(row[2]);
-                    acc[2] += toLong(row[3]);
-                }
-            }
-        }
-
         // Load province names for new structure
         Map<String, String> provinceNames = provinceRepository.findByCodeIn(provinceCodes)
                 .stream().collect(Collectors.toMap(Province::getCode, Province::getName));
 
-        // Create reverse mapping for response
+        // Reverse mapping (new code → representative legacy id) for the response
         Map<String, Integer> codeToLegacyId = new HashMap<>();
         for (Map.Entry<Integer, String> entry : legacyIdToCode.entrySet()) {
             codeToLegacyId.putIfAbsent(entry.getValue(), entry.getKey());
         }
 
-        // Build response list (preserves insertion order from LinkedHashMap)
+        // SINGLE SOURCE OF TRUTH: count each province card with the EXACT same
+        // resolution + ListingSpecification the public /properties listing page
+        // uses, with the same params the FE card navigates with (provinceCode +
+        // provinceId). Guarantees the homepage number equals the listing-page
+        // total for that card.
+        boolean verifiedOnly = Boolean.TRUE.equals(request.getVerifiedOnly());
         List<ProvinceListingStatsResponse> results = new ArrayList<>();
-        for (Map.Entry<String, long[]> entry : aggregated.entrySet()) {
-            String code = entry.getKey();
-            long[] counts = entry.getValue();
-            long verified = counts[1];
+        java.util.Set<String> emittedKeys = new java.util.HashSet<>();
+        for (String code : codeSet) {
+            Integer legacyId = codeToLegacyId.get(code);
+            // Collapse "1"/"01" (and id duplicates) into a single card
+            String dedupeKey = (legacyId != null)
+                    ? "id:" + legacyId
+                    : "code:" + code.replaceFirst("^0+(?!$)", "");
+            if (!emittedKeys.add(dedupeKey)) {
+                continue;
+            }
 
-            if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verified == 0) {
+            ListingFilterRequest cardFilter = ListingFilterRequest.builder()
+                    .provinceCodes(new ArrayList<>(java.util.Collections.singletonList(code)))
+                    .provinceId(legacyId != null ? String.valueOf(legacyId) : null)
+                    .excludeExpired(true)
+                    .build();
+            long count = countPublicListings(cardFilter);
+
+            if (verifiedOnly && count == 0) {
                 continue;
             }
 
             results.add(ProvinceListingStatsResponse.builder()
-                    .provinceId(codeToLegacyId.get(code))
+                    .provinceId(legacyId)
                     .provinceCode(code)
                     .provinceName(provinceNames.getOrDefault(code, "Unknown Province"))
-                    .totalListings(counts[0])
-                    .verifiedListings(verified)
-                    .vipListings(counts[2])
+                    .totalListings(count)
+                    .verifiedListings(count) // public count is verified-only by definition
+                    .vipListings(0L)
                     .build());
         }
 
@@ -1653,29 +1662,29 @@ public class ListingServiceImpl implements ListingService {
 
         List<CategoryListingStatsResponse> results = new ArrayList<>();
 
-        // Get stats from repository
-        boolean verifiedOnly = Boolean.TRUE.equals(request.getVerifiedOnly());
-        List<Object[]> statsData = listingRepository.getListingStatsByCategoryIds(
-                request.getCategoryIds(), verifiedOnly);
-
         // Batch-load all categories in 1 query (avoids N+1)
         Map<Long, Category> categoryMap = categoryRepository.findAllById(request.getCategoryIds())
                 .stream().collect(Collectors.toMap(Category::getCategoryId, Function.identity()));
 
-        // Map to response objects
-        for (Object[] row : statsData) {
-            Long categoryId = toLong(row[0]);
-            Long totalCount = toLong(row[1]);
-            Long verifiedCount = toLong(row[2]);
-            Long vipCount = toLong(row[3]);
-
+        // SINGLE SOURCE OF TRUTH: count each category with the EXACT same
+        // ListingSpecification the public /properties listing page uses, with
+        // the same param the FE card navigates with (categoryId). Guarantees
+        // the homepage number equals the listing-page total for that card.
+        boolean verifiedOnly = Boolean.TRUE.equals(request.getVerifiedOnly());
+        for (Long categoryId : request.getCategoryIds()) {
             Category category = categoryMap.get(categoryId);
             if (category == null) {
                 log.warn("Category not found: {}", categoryId);
                 continue;
             }
 
-            if (Boolean.TRUE.equals(request.getVerifiedOnly()) && verifiedCount == 0) {
+            ListingFilterRequest cardFilter = ListingFilterRequest.builder()
+                    .categoryId(categoryId)
+                    .excludeExpired(true)
+                    .build();
+            long count = countPublicListings(cardFilter);
+
+            if (verifiedOnly && count == 0) {
                 continue;
             }
 
@@ -1684,18 +1693,11 @@ public class ListingServiceImpl implements ListingService {
                     .categoryName(category.getName())
                     .categorySlug(category.getSlug())
                     .categoryIcon(category.getIcon())
-                    .totalListings(totalCount)
-                    .verifiedListings(verifiedCount)
-                    .vipListings(vipCount)
+                    .totalListings(count)
+                    .verifiedListings(count) // public count is verified-only by definition
+                    .vipListings(0L)
                     .build());
         }
-
-        // Sort results to match input order
-        results.sort((a, b) -> {
-            int indexA = request.getCategoryIds().indexOf(a.getCategoryId());
-            int indexB = request.getCategoryIds().indexOf(b.getCategoryId());
-            return Integer.compare(indexA, indexB);
-        });
 
         log.info("Category stats retrieved successfully - {} results", results.size());
         return results;
