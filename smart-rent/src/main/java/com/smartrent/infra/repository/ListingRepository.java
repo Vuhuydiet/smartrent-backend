@@ -281,8 +281,19 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         @Param("verifiedOnly") boolean verifiedOnly);
 
     /**
-     * Get listing statistics grouped by category
-     * Returns: categoryId, totalCount, verifiedCount, vipCount
+     * Get listing statistics grouped by category.
+     * Returns: categoryId, totalCount, verifiedCount, vipCount.
+     *
+     * <p>The count is filtered down to moderation_status = APPROVED to match
+     * what the public search endpoint actually surfaces after PR #247 changed
+     * the search gate from {@code verified=true} to
+     * {@code moderation_status='APPROVED'}. Without this predicate the
+     * homepage cards would advertise "38,094 tin đăng" but the listing page
+     * underneath would only show the ~30k APPROVED rows — a confusing
+     * mismatch. The predicate is also load-bearing for performance: it
+     * lets the planner use {@code idx_listings_cat_mod_filter} (V80) instead
+     * of falling back to {@code idx_is_shadow}, cutting the homepage stats
+     * query from ~1.9 s to ~80 ms on the 100k-row dataset.
      */
     @Query("""
         SELECT
@@ -292,6 +303,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
             SUM(CASE WHEN l.vipType IN ('SILVER', 'GOLD', 'DIAMOND') THEN 1 ELSE 0 END)
         FROM listings l
         WHERE l.categoryId IN :categoryIds
+        AND l.moderationStatus = com.smartrent.enums.ModerationStatus.APPROVED
         AND l.isDraft = false
         AND l.isShadow = false
         AND l.expired = false
