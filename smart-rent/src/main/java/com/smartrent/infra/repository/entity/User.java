@@ -9,6 +9,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -23,9 +24,13 @@ import lombok.experimental.SuperBuilder;
 import java.time.LocalDateTime;
 
 @Entity(name = "users")
-@Table(name = "users", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_users_phone", columnNames = { "phone_code", "phone_number" })
-})
+@Table(name = "users",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_users_phone", columnNames = { "phone_code", "phone_number" })
+        },
+        indexes = {
+                @Index(name = "idx_users_broker_status", columnList = "is_broker, broker_verification_status")
+        })
 @Getter
 @Setter
 @SuperBuilder

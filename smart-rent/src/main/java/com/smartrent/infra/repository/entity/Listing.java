@@ -27,7 +27,16 @@ import java.util.List;
                 @Index(name = "idx_price_type", columnList = "price, listing_type"),
                 @Index(name = "idx_status", columnList = "verified, expired, vip_type"),
                 @Index(name = "idx_expiry_date", columnList = "expiry_date"),
-                @Index(name = "idx_post_date", columnList = "post_date")
+                @Index(name = "idx_post_date", columnList = "post_date"),
+                @Index(name = "idx_listings_user_draft_updated", columnList = "user_id, is_draft, updated_at"),
+                @Index(name = "idx_listings_pushed_at", columnList = "pushed_at"),
+                @Index(name = "idx_listings_parent", columnList = "parent_listing_id"),
+                @Index(name = "idx_listings_public_default_sort",
+                        columnList = "moderation_status, is_shadow, is_draft, expired, vip_type_sort_order, updated_at"),
+                @Index(name = "idx_listings_public_price_sort",
+                        columnList = "moderation_status, is_shadow, is_draft, expired, price"),
+                @Index(name = "idx_listings_product_type", columnList = "product_type, listing_type"),
+                @Index(name = "idx_listings_user_vip_updated", columnList = "user_id, vip_type, updated_at")
         })
 @Getter
 @Setter
