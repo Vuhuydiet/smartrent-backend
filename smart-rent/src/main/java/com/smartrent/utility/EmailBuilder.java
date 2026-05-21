@@ -27,6 +27,10 @@ public class EmailBuilder {
     htmlContent.append(".expiry-info { background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center; }");
     htmlContent.append(".footer { background-color: #f8f9fa; padding: 20px; text-align: center; color: #6c757d; font-size: 14px; }");
     htmlContent.append(".security-note { background-color: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; padding: 15px; border-radius: 5px; margin: 20px 0; }");
+    htmlContent.append(".cta-container { text-align: center; margin: 30px 0; }");
+    htmlContent.append(".cta-button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white !important; font-size: 16px; font-weight: 600; padding: 14px 32px; border-radius: 8px; text-decoration: none; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3); }");
+    htmlContent.append(".cta-fallback { font-size: 13px; color: #6c757d; text-align: center; margin-top: 15px; word-break: break-all; }");
+    htmlContent.append(".cta-fallback a { color: #667eea; }");
     htmlContent.append("</style>");
     htmlContent.append("</head>");
     htmlContent.append("<body>");
@@ -82,5 +86,59 @@ public class EmailBuilder {
 
     return htmlContent.toString();
   }
-  
+
+  public static String buildExpiringListingHtmlContent(String senderName, String firstName,
+                                                      String lastName, int count, long daysToSoonest,
+                                                      String manageUrl) {
+    StringBuilder htmlContent = buildHtmlHeader(Constants.EMAIL_EXPIRING_LISTING_HEADER);
+
+    htmlContent.append("<div class=\"container\">");
+
+    // Header
+    htmlContent.append("<div class=\"header\">");
+    htmlContent.append("<h1>%s — Tin đăng sắp hết hạn</h1>".formatted(senderName));
+    htmlContent.append("</div>");
+
+    // Content
+    htmlContent.append("<div class=\"content\">");
+    htmlContent.append("<div class=\"greeting\">Xin chào %s! 👋</div>"
+        .formatted(Utils.buildName(firstName, lastName)));
+
+    htmlContent.append("<div class=\"message\">");
+    htmlContent.append("Bạn đang có <strong>%d</strong> tin đăng sắp hết hạn trên %s."
+        .formatted(count, senderName));
+    htmlContent.append("</div>");
+
+    // Urgency info (reuses .expiry-info)
+    htmlContent.append("<div class=\"expiry-info\">");
+    if (daysToSoonest <= 0) {
+      htmlContent.append("⏰ <strong>Khẩn:</strong> Tin sớm nhất sẽ hết hạn trong vòng 24 giờ tới.");
+    } else {
+      htmlContent.append("⏰ <strong>Lưu ý:</strong> Tin sớm nhất sẽ hết hạn sau %d ngày."
+          .formatted(daysToSoonest));
+    }
+    htmlContent.append("</div>");
+
+    // CTA button
+    htmlContent.append("<div class=\"cta-container\">");
+    htmlContent.append("<a href=\"%s\" class=\"cta-button\">Quản lý tin đăng của tôi</a>"
+        .formatted(manageUrl));
+    htmlContent.append("<div class=\"cta-fallback\">Hoặc mở liên kết: "
+        + "<a href=\"%s\">%s</a></div>".formatted(manageUrl, manageUrl));
+    htmlContent.append("</div>");
+
+    htmlContent.append("</div>"); // End content
+
+    // Footer
+    htmlContent.append("<div class=\"footer\">");
+    htmlContent.append("Email này được gửi tự động — bạn không cần phản hồi.<br>");
+    htmlContent.append("© 2024 %s. Bản quyền được bảo lưu.".formatted(senderName));
+    htmlContent.append("</div>");
+
+    htmlContent.append("</div>"); // End container
+    htmlContent.append("</body></html>");
+
+    return htmlContent.toString();
+  }
+
 }

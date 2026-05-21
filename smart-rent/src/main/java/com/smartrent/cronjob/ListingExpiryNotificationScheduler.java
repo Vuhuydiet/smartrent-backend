@@ -11,6 +11,8 @@ import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.User;
 import com.smartrent.service.email.EmailService;
 import com.smartrent.service.notification.NotificationService;
+import com.smartrent.utility.EmailBuilder;
+import com.smartrent.utility.Utils;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -128,9 +130,9 @@ public class ListingExpiryNotificationScheduler {
             return;
         }
 
-        Map<String, String> userEmails = userRepository.findAllById(byUser.keySet()).stream()
+        Map<String, User> usersById = userRepository.findAllById(byUser.keySet()).stream()
                 .filter(u -> u.getEmail() != null && !u.getEmail().isBlank())
-                .collect(Collectors.toMap(User::getUserId, User::getEmail));
+                .collect(Collectors.toMap(User::getUserId, u -> u));
 
         Set<String> whitelist = parseWhitelist();
         LocalDateTime dedupAfter = now.minus(DEDUP_LOOKBACK);
@@ -172,9 +174,9 @@ public class ListingExpiryNotificationScheduler {
                     REFERENCE_TYPE);
             notified++;
 
-            String email = userEmails.get(userId);
-            if (email != null && whitelist.contains(email.toLowerCase())) {
-                if (sendSummaryEmail(email, count, daysToSoonest)) {
+            User user = usersById.get(userId);
+            if (user != null && whitelist.contains(user.getEmail().toLowerCase())) {
+                if (sendSummaryEmail(user, count, daysToSoonest)) {
                     emailed++;
                 }
             }
@@ -193,13 +195,24 @@ public class ListingExpiryNotificationScheduler {
         return ChronoUnit.DAYS.between(now.toLocalDate(), expiry.toLocalDate());
     }
 
-    private boolean sendSummaryEmail(String to, int count, long daysToSoonest) {
+    private boolean sendSummaryEmail(User user, int count, long daysToSoonest) {
+        String to = user.getEmail();
         try {
+            EmailInfo recipient = EmailInfo.builder()
+                    .email(to)
+                    .name(Utils.buildName(user.getFirstName(), user.getLastName()))
+                    .build();
             EmailRequest request = EmailRequest.builder()
                     .sender(EmailInfo.builder().email(senderEmail).name(senderName).build())
-                    .to(List.of(EmailInfo.builder().email(to).build()))
+                    .to(List.of(recipient))
                     .subject(buildEmailSubject(count))
-                    .htmlContent(buildEmailHtml(count, daysToSoonest))
+                    .htmlContent(EmailBuilder.buildExpiringListingHtmlContent(
+                            senderName,
+                            user.getFirstName(),
+                            user.getLastName(),
+                            count,
+                            daysToSoonest,
+                            buildManageUrl()))
                     .build();
             emailService.sendEmail(request);
             return true;
@@ -235,27 +248,6 @@ public class ListingExpiryNotificationScheduler {
 
     private static String buildEmailSubject(int count) {
         return "[SmartRent] Bạn có " + count + " tin đăng sắp hết hạn";
-    }
-
-    private String buildEmailHtml(int count, long daysToSoonest) {
-        String manageUrl = buildManageUrl();
-        String soonestLine = daysToSoonest <= 0
-                ? "Tin sớm nhất sẽ hết hạn <strong>trong vòng 24 giờ tới</strong>."
-                : "Tin sớm nhất sẽ hết hạn sau <strong>" + daysToSoonest + " ngày</strong>.";
-        return "<!DOCTYPE html><html><body style=\"font-family:Arial,sans-serif;color:#222;\">"
-                + "<h2 style=\"margin:0 0 12px\">SmartRent — Tin đăng sắp hết hạn</h2>"
-                + "<p>Xin chào,</p>"
-                + "<p>Bạn đang có <strong>" + count + "</strong> tin đăng sắp hết hạn. "
-                + soonestLine + "</p>"
-                + "<p>Sau đó vui lòng vào trang này để gia hạn hoặc đăng lại:</p>"
-                + "<p><a href=\"" + manageUrl + "\" "
-                + "style=\"display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;"
-                + "text-decoration:none;border-radius:6px;\">Quản lý tin đăng của tôi</a></p>"
-                + "<p style=\"font-size:13px;color:#555;\">Hoặc mở liên kết: "
-                + "<a href=\"" + manageUrl + "\">" + manageUrl + "</a></p>"
-                + "<p style=\"color:#666;font-size:12px;margin-top:24px;\">"
-                + "Email này được gửi tự động — bạn không cần phản hồi.</p>"
-                + "</body></html>";
     }
 
     private String buildManageUrl() {
