@@ -25,7 +25,8 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_media_type", columnList = "media_type"),
                 @Index(name = "idx_status", columnList = "status"),
                 @Index(name = "idx_listing_sort", columnList = "listing_id, sort_order"),
-                @Index(name = "idx_storage_key", columnList = "storage_key")
+                @Index(name = "idx_storage_key", columnList = "storage_key"),
+                @Index(name = "idx_media_listing_status", columnList = "listing_id, status")
         })
 @Getter
 @Setter

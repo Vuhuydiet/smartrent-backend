@@ -15,7 +15,14 @@ import java.util.List;
  * Matches database schema from V7 migration
  */
 @Entity(name = "addresses")
-@Table(name = "addresses")
+@Table(name = "addresses",
+        indexes = {
+                @Index(name = "idx_addresses_legacy_loc", columnList = "legacy_province_id, legacy_district_id, legacy_ward_id"),
+                @Index(name = "idx_addresses_new_loc", columnList = "new_province_code, new_ward_code"),
+                @Index(name = "idx_addresses_geo", columnList = "latitude, longitude"),
+                @Index(name = "idx_addresses_legacy_ward", columnList = "legacy_ward_id"),
+                @Index(name = "idx_addresses_legacy_district", columnList = "legacy_district_id")
+        })
 @Getter
 @Setter
 @Builder

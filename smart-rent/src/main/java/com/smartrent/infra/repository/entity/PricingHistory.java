@@ -17,7 +17,9 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_listing_id", columnList = "listing_id"),
                 @Index(name = "idx_listing_date", columnList = "listing_id, changed_at"),
                 @Index(name = "idx_changed_at", columnList = "changed_at"),
-                @Index(name = "idx_is_current", columnList = "is_current")
+                @Index(name = "idx_is_current", columnList = "is_current"),
+                @Index(name = "idx_pricing_listing_current_type",
+                        columnList = "listing_id, is_current, change_type, changed_at")
         })
 @Getter
 @Setter

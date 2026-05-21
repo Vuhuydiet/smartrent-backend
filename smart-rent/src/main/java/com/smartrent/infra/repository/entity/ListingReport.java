@@ -24,7 +24,9 @@ import java.util.List;
                 @Index(name = "idx_category", columnList = "category"),
                 @Index(name = "idx_created_at", columnList = "created_at"),
                 @Index(name = "idx_status", columnList = "status"),
-                @Index(name = "idx_resolved_by", columnList = "resolved_by")
+                @Index(name = "idx_resolved_by", columnList = "resolved_by"),
+                @Index(name = "idx_listing_reports_status_created", columnList = "status, created_at"),
+                @Index(name = "idx_listing_reports_resolver_resolved", columnList = "resolved_by, resolved_at")
         })
 @Getter
 @Setter
