@@ -107,12 +107,28 @@ public interface ListingService {
     List<ProvinceListingStatsResponse> getProvinceStats(ProvinceStatsRequest request);
 
     /**
+     * Recompute province stats and overwrite the cached entry in place (no evict).
+     * Used by the daily midnight refresh so the homepage cache never goes cold.
+     * @param request Province statistics request (provinceIds or provinceCodes)
+     * @return Freshly computed list of province statistics
+     */
+    List<ProvinceListingStatsResponse> refreshProvinceStats(ProvinceStatsRequest request);
+
+    /**
      * Get listing statistics by categories (for home screen)
      * Returns statistics for each category including total listings, verified, and VIP counts
      * @param request Category statistics request (categoryIds)
      * @return List of category statistics
      */
     List<CategoryListingStatsResponse> getCategoryStats(CategoryStatsRequest request);
+
+    /**
+     * Recompute category stats and overwrite the cached entry in place (no evict).
+     * Used by the daily midnight refresh so the homepage cache never goes cold.
+     * @param request Category statistics request (categoryIds)
+     * @return Freshly computed list of category statistics
+     */
+    List<CategoryListingStatsResponse> refreshCategoryStats(CategoryStatsRequest request);
 
     /**
      * Get my listing detail with owner-specific information (Owner only)
