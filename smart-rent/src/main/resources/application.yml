@@ -138,6 +138,7 @@ spring:
       - "listing.detail"
       - "listing.suggestions"
       - "listing.stats.categories"
+      - "listing.stats.provinces"
     type: "${CACHE_TYPE:redis}"
     redis:
       timeToLive: 1d
@@ -150,7 +151,10 @@ spring:
         "[listing.browse]": 3m
         "[listing.detail]": 3m
         "[listing.suggestions]": 2m
-        "[listing.stats.categories]": 3m
+        # Homepage stats: permanent (0s = no TTL). Refreshed daily at 00:00
+        # Asia/Ho_Chi_Minh by HomepageStatsCacheScheduler.
+        "[listing.stats.categories]": 0s
+        "[listing.stats.provinces]": 0s
 
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"
