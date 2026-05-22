@@ -2,6 +2,7 @@ package com.smartrent.util;
 
 import com.smartrent.dto.request.CategoryStatsRequest;
 import com.smartrent.dto.request.ListingFilterRequest;
+import com.smartrent.dto.request.ProvinceStatsRequest;
 
 import java.util.List;
 import java.util.Objects;
@@ -139,6 +140,43 @@ public final class CacheKeyBuilder {
         }
         return "catStats|ids=" + sortAndJoinLongs(request.getCategoryIds())
              + "|verifiedOnly=" + Objects.toString(request.getVerifiedOnly(), "false");
+    }
+
+    /**
+     * Cache key for {@code POST /v1/listings/stats/provinces}.
+     * Encodes the sorted province ids + sorted province codes + addressType +
+     * the verifiedOnly toggle. The homepage only ever asks for the same fixed
+     * set of top provinces, so the key cardinality stays tiny.
+     */
+    public static String provinceStatsKey(ProvinceStatsRequest request) {
+        if (request == null) {
+            return "null";
+        }
+        return "provStats|ids=" + sortAndJoinIntegers(request.getProvinceIds())
+             + "|codes=" + sortAndJoinStrings(request.getProvinceCodes())
+             + "|addressType=" + Objects.toString(request.getAddressType(), "")
+             + "|verifiedOnly=" + Objects.toString(request.getVerifiedOnly(), "false");
+    }
+
+    private static String sortAndJoinIntegers(List<Integer> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        return values.stream()
+            .filter(Objects::nonNull)
+            .sorted()
+            .map(String::valueOf)
+            .collect(Collectors.joining(","));
+    }
+
+    private static String sortAndJoinStrings(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        return values.stream()
+            .filter(Objects::nonNull)
+            .sorted()
+            .collect(Collectors.joining(","));
     }
 
     private static String sortAndJoinLongs(List<Long> values) {

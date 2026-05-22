@@ -1525,6 +1525,9 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_STATS_PROVINCES,
+            key = "T(com.smartrent.util.CacheKeyBuilder).provinceStatsKey(#request)",
+            unless = "#result == null || #result.isEmpty()")
     public List<ProvinceListingStatsResponse> getProvinceStats(ProvinceStatsRequest request) {
         log.info("Getting province stats - provinceIds: {}, provinceCodes: {}, verifiedOnly: {}",
                 request.getProvinceIds(), request.getProvinceCodes(), request.getVerifiedOnly());
