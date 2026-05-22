@@ -72,6 +72,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 
 import java.math.BigDecimal;
@@ -1529,6 +1530,27 @@ public class ListingServiceImpl implements ListingService {
             key = "T(com.smartrent.util.CacheKeyBuilder).provinceStatsKey(#request)",
             unless = "#result == null || #result.isEmpty()")
     public List<ProvinceListingStatsResponse> getProvinceStats(ProvinceStatsRequest request) {
+        return computeProvinceStats(request);
+    }
+
+    /**
+     * Recompute province stats and OVERWRITE the cached entry in place (@CachePut
+     * always runs the body, then writes the result under the same key the read
+     * path uses). Used by the daily midnight refresh: the old value stays
+     * readable throughout the recompute and is replaced atomically, so the
+     * homepage never sees an empty cache. {@code unless} guards against
+     * clobbering good data with an empty result.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    @CachePut(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_STATS_PROVINCES,
+            key = "T(com.smartrent.util.CacheKeyBuilder).provinceStatsKey(#request)",
+            unless = "#result == null || #result.isEmpty()")
+    public List<ProvinceListingStatsResponse> refreshProvinceStats(ProvinceStatsRequest request) {
+        return computeProvinceStats(request);
+    }
+
+    private List<ProvinceListingStatsResponse> computeProvinceStats(ProvinceStatsRequest request) {
         log.info("Getting province stats - provinceIds: {}, provinceCodes: {}, verifiedOnly: {}",
                 request.getProvinceIds(), request.getProvinceCodes(), request.getVerifiedOnly());
 
@@ -1657,6 +1679,23 @@ public class ListingServiceImpl implements ListingService {
             key = "T(com.smartrent.util.CacheKeyBuilder).categoryStatsKey(#request)",
             unless = "#result == null || #result.isEmpty()")
     public List<CategoryListingStatsResponse> getCategoryStats(CategoryStatsRequest request) {
+        return computeCategoryStats(request);
+    }
+
+    /**
+     * Recompute category stats and OVERWRITE the cached entry in place — see
+     * {@link #refreshProvinceStats} for the in-place-update rationale.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    @CachePut(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_STATS_CATEGORIES,
+            key = "T(com.smartrent.util.CacheKeyBuilder).categoryStatsKey(#request)",
+            unless = "#result == null || #result.isEmpty()")
+    public List<CategoryListingStatsResponse> refreshCategoryStats(CategoryStatsRequest request) {
+        return computeCategoryStats(request);
+    }
+
+    private List<CategoryListingStatsResponse> computeCategoryStats(CategoryStatsRequest request) {
         log.info("Getting category stats - categoryIds: {}, verifiedOnly: {}",
                 request.getCategoryIds(), request.getVerifiedOnly());
 

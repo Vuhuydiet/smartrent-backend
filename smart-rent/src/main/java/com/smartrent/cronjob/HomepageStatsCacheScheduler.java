@@ -1,6 +1,5 @@
 package com.smartrent.cronjob;
 
-import com.smartrent.config.Constants;
 import com.smartrent.dto.request.CategoryStatsRequest;
 import com.smartrent.dto.request.ProvinceStatsRequest;
 import com.smartrent.service.listing.ListingService;
@@ -9,8 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -25,9 +22,11 @@ import java.util.List;
  * <p>Both caches are configured with no TTL (see application.yml), i.e. they
  * live in Redis permanently. Counting public listings per province/category is
  * expensive (one COUNT query each), so we don't want it to run on the hot path.
- * Instead this scheduler refreshes the numbers once a day at midnight: it
- * evicts the cached entries and immediately recomputes them by calling the
- * {@code @Cacheable} service methods, which repopulates Redis with fresh data.
+ * Instead this scheduler refreshes the numbers once a day at midnight via the
+ * {@code refresh*} ({@code @CachePut}) service methods, which recompute and
+ * OVERWRITE the entries in place — no eviction. The old value stays readable
+ * throughout the recompute and is replaced atomically, so the homepage never
+ * hits an empty cache (no cold recompute on the request path).
  *
  * <p>The warm-up parameters MUST mirror exactly what the homepage sends, because
  * the cache key is derived from the request. They are the fixed constants from
@@ -51,52 +50,36 @@ public class HomepageStatsCacheScheduler {
     private static final String HOMEPAGE_ADDRESS_TYPE = "NEW";
 
     ListingService listingService;
-    CacheManager cacheManager;
 
     /**
-     * Runs every day at 00:00 Asia/Ho_Chi_Minh. Evicts then recomputes both
-     * homepage stats caches so the permanent Redis entries carry fresh numbers
-     * for the rest of the day.
+     * Runs every day at 00:00 Asia/Ho_Chi_Minh. Recomputes both homepage stats
+     * and overwrites the permanent Redis entries in place (via {@code @CachePut})
+     * so they carry fresh numbers for the rest of the day, with no cache gap.
      */
     @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Ho_Chi_Minh")
     public void refreshHomepageStats() {
         log.info("=== Refreshing homepage stats caches (daily 00:00) ===");
-        evictAndWarm();
+        listingService.refreshCategoryStats(buildCategoryRequest());
+        listingService.refreshProvinceStats(buildProvinceRequest());
         log.info("=== Homepage stats caches refreshed ===");
     }
 
     /**
      * Populate the caches on startup if Redis was flushed or this is a fresh
-     * deploy, so the first homepage visitor doesn't pay the cold cost. A failure
-     * here is logged but never blocks application startup.
+     * deploy, so the first homepage visitor doesn't pay the cold cost. Uses the
+     * {@code @Cacheable} read path: it only computes when the entry is missing,
+     * so a restart with a warm Redis is a no-op. A failure here is logged but
+     * never blocks application startup.
      */
     @EventListener(ApplicationReadyEvent.class)
     public void warmOnStartup() {
         try {
             log.info("Warming homepage stats caches on startup");
-            warm();
+            listingService.getCategoryStats(buildCategoryRequest());
+            listingService.getProvinceStats(buildProvinceRequest());
         } catch (Exception e) {
             log.warn("Startup warm of homepage stats caches failed (will populate lazily): {}",
                     e.getMessage());
-        }
-    }
-
-    private void evictAndWarm() {
-        clearCache(Constants.CacheNames.LISTING_STATS_CATEGORIES);
-        clearCache(Constants.CacheNames.LISTING_STATS_PROVINCES);
-        warm();
-    }
-
-    /** Calls the {@code @Cacheable} service methods so Redis is repopulated. */
-    private void warm() {
-        listingService.getCategoryStats(buildCategoryRequest());
-        listingService.getProvinceStats(buildProvinceRequest());
-    }
-
-    private void clearCache(String name) {
-        Cache cache = cacheManager.getCache(name);
-        if (cache != null) {
-            cache.clear();
         }
     }
 
