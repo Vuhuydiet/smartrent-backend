@@ -54,9 +54,19 @@ public class MagicLinkServiceImpl implements MagicLinkService {
   @Value("${application.authentication.jwt.access-signer-key}")
   String ACCESS_SIGNER_KEY;
 
+  // Read both keys raw and fall back in Java. The previous YAML form
+  // ${MAGIC_LINK_SIGNER_KEY:${RESET_PASSWORD_SIGNER_KEY}} is not reliably
+  // resolved across Spring versions — when the outer var is unset the inner
+  // placeholder can land as a literal string ("${RESET_PASSWORD_SIGNER_KEY}"),
+  // which is far below the 64-byte (512-bit) minimum HS512 needs and makes
+  // MACSigner throw KeyLengthException at sign time.
   @NonFinal
-  @Value("${application.authentication.jwt.magic-link-signer-key}")
+  @Value("${application.authentication.jwt.magic-link-signer-key:}")
   String MAGIC_LINK_SIGNER_KEY;
+
+  @NonFinal
+  @Value("${application.authentication.jwt.reset-password-signer-key:}")
+  String RESET_PASSWORD_SIGNER_KEY;
 
   @NonFinal
   @Value("${application.authentication.jwt.valid-duration}")
@@ -139,10 +149,24 @@ public class MagicLinkServiceImpl implements MagicLinkService {
         .build();
   }
 
+  private String effectiveMagicLinkSignerKey() {
+    if (MAGIC_LINK_SIGNER_KEY != null
+        && !MAGIC_LINK_SIGNER_KEY.isBlank()
+        && !MAGIC_LINK_SIGNER_KEY.startsWith("${")) {
+      return MAGIC_LINK_SIGNER_KEY;
+    }
+    if (RESET_PASSWORD_SIGNER_KEY == null || RESET_PASSWORD_SIGNER_KEY.isBlank()) {
+      log.error("Magic-link signer key is not configured: both MAGIC_LINK_SIGNER_KEY"
+          + " and RESET_PASSWORD_SIGNER_KEY are unset/blank");
+      throw new DomainException(DomainCode.UNKNOWN_ERROR);
+    }
+    return RESET_PASSWORD_SIGNER_KEY;
+  }
+
   private SignedJWT parseAndVerifyMagicLink(String token) {
     try {
       SignedJWT signedJWT = SignedJWT.parse(token);
-      JWSVerifier verifier = new MACVerifier(MAGIC_LINK_SIGNER_KEY);
+      JWSVerifier verifier = new MACVerifier(effectiveMagicLinkSignerKey());
 
       if (!signedJWT.verify(verifier)) {
         throw new DomainException(DomainCode.MAGIC_LINK_INVALID);
@@ -169,7 +193,7 @@ public class MagicLinkServiceImpl implements MagicLinkService {
         .claim("email", email)
         .claim("type", "MAGIC_LINK")
         .build();
-    return sign(header, claims, MAGIC_LINK_SIGNER_KEY);
+    return sign(header, claims, effectiveMagicLinkSignerKey());
   }
 
   private String generateGuestAccessToken(String guestId, String email) {
@@ -200,6 +224,11 @@ public class MagicLinkServiceImpl implements MagicLinkService {
       jwsObject.sign(new MACSigner(signerKey));
       return jwsObject.serialize();
     } catch (JOSEException e) {
+      // Most common cause: signer key shorter than 64 bytes (HS512 minimum).
+      // Logging the algorithm + key byte length without leaking the key itself.
+      int keyBytes = signerKey == null ? 0 : signerKey.getBytes(StandardCharsets.UTF_8).length;
+      log.error("Failed to sign magic-link JWT (alg={}, keyBytes={}): {}",
+          header.getAlgorithm(), keyBytes, e.getMessage(), e);
       throw new DomainException(DomainCode.UNKNOWN_ERROR);
     }
   }
