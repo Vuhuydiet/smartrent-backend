@@ -6,13 +6,18 @@ import com.smartrent.dto.request.ChangePasswordRequest;
 import com.smartrent.dto.request.ForgotPasswordRequest;
 import com.smartrent.dto.request.IntrospectRequest;
 import com.smartrent.dto.request.LogoutRequest;
+import com.smartrent.dto.request.MagicLinkRequest;
+import com.smartrent.dto.request.MagicLinkVerifyRequest;
 import com.smartrent.dto.request.RefreshTokenRequest;
 import com.smartrent.dto.request.ResetPasswordRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.AuthenticationResponse;
 import com.smartrent.dto.response.ForgotPasswordResponse;
 import com.smartrent.dto.response.IntrospectResponse;
+import com.smartrent.dto.response.MagicLinkResponse;
+import com.smartrent.dto.response.MagicLinkVerifyResponse;
 import com.smartrent.service.authentication.AuthenticationService;
+import com.smartrent.service.authentication.MagicLinkService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -35,10 +40,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthenticationController {
 
   AuthenticationService authenticationService;
+  MagicLinkService magicLinkService;
 
   @Autowired
-  public AuthenticationController(@Qualifier(Constants.AUTHENTICATION_SERVICE) AuthenticationService authenticationService) {
+  public AuthenticationController(
+      @Qualifier(Constants.AUTHENTICATION_SERVICE) AuthenticationService authenticationService,
+      MagicLinkService magicLinkService) {
     this.authenticationService = authenticationService;
+    this.magicLinkService = magicLinkService;
   }
 
   @PostMapping("/introspect")
@@ -576,6 +585,150 @@ public class AuthenticationController {
   public ApiResponse<Void> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
     authenticationService.resetPassword(request);
     return ApiResponse.<Void>builder().build();
+  }
+
+  @PostMapping("/magic-link/request")
+  @Operation(
+      summary = "Request a guest magic-link login email",
+      description = "Sends a one-time login link to the supplied email. No account is required and no row is stored — the email is embedded inside the signed link. Always returns 200 so callers cannot enumerate accounts.",
+      requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+          description = "Email to send the magic link to",
+          required = true,
+          content = @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = MagicLinkRequest.class),
+              examples = @ExampleObject(
+                  name = "Magic Link Request Example",
+                  value = """
+                      {
+                        "email": "guest@example.com"
+                      }
+                      """
+              )
+          )
+      )
+  )
+  @ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "200",
+          description = "Magic link dispatched",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  name = "Success",
+                  value = """
+                      {
+                        "code": "999999",
+                        "message": null,
+                        "data": {
+                          "email": "guest@example.com",
+                          "expiresInSeconds": 600
+                        }
+                      }
+                      """
+              )
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "400",
+          description = "Invalid email",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  value = """
+                      {
+                        "code": "2004",
+                        "message": "INVALID_EMAIL",
+                        "data": null
+                      }
+                      """
+              )
+          )
+      )
+  })
+  public ApiResponse<MagicLinkResponse> requestMagicLink(@RequestBody @Valid MagicLinkRequest request) {
+    return ApiResponse.<MagicLinkResponse>builder()
+        .data(magicLinkService.requestLink(request))
+        .build();
+  }
+
+  @PostMapping("/magic-link/verify")
+  @Operation(
+      summary = "Exchange a magic-link token for a guest access token",
+      description = "Validates the single-use magic-link token (signature, expiry, not previously redeemed) and returns a short-lived guest access token. No refresh token is issued — when the access token expires the user must request a new link.",
+      requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+          description = "The token extracted from the magic-link URL's `token` query parameter",
+          required = true,
+          content = @Content(
+              mediaType = "application/json",
+              schema = @Schema(implementation = MagicLinkVerifyRequest.class),
+              examples = @ExampleObject(
+                  name = "Magic Link Verify Example",
+                  value = """
+                      {
+                        "token": "eyJhbGciOiJIUzUxMiJ9..."
+                      }
+                      """
+              )
+          )
+      )
+  )
+  @ApiResponses(value = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "200",
+          description = "Token accepted, guest access token issued",
+          content = @Content(
+              mediaType = "application/json",
+              examples = @ExampleObject(
+                  value = """
+                      {
+                        "code": "999999",
+                        "message": null,
+                        "data": {
+                          "accessToken": "eyJhbGciOiJIUzUxMiJ9...",
+                          "expiresInSeconds": 3600,
+                          "email": "guest@example.com",
+                          "guest": true
+                        }
+                      }
+                      """
+              )
+          )
+      ),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(
+          responseCode = "401",
+          description = "Link is invalid, expired, or already used",
+          content = @Content(
+              mediaType = "application/json",
+              examples = {
+                  @ExampleObject(
+                      name = "Invalid or expired",
+                      value = """
+                          {
+                            "code": "20001",
+                            "message": "Magic link is invalid or has expired",
+                            "data": null
+                          }
+                          """
+                  ),
+                  @ExampleObject(
+                      name = "Already used",
+                      value = """
+                          {
+                            "code": "20002",
+                            "message": "Magic link has already been used",
+                            "data": null
+                          }
+                          """
+                  )
+              }
+          )
+      )
+  })
+  public ApiResponse<MagicLinkVerifyResponse> verifyMagicLink(@RequestBody @Valid MagicLinkVerifyRequest request) {
+    return ApiResponse.<MagicLinkVerifyResponse>builder()
+        .data(magicLinkService.verifyLink(request))
+        .build();
   }
 
 }

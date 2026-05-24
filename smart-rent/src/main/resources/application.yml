@@ -213,9 +213,16 @@ application:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
       refresh-signer-key: "${REFRESH_SIGNER_KEY}"
       reset-password-signer-key: "${RESET_PASSWORD_SIGNER_KEY}"
+      magic-link-signer-key: "${MAGIC_LINK_SIGNER_KEY:${RESET_PASSWORD_SIGNER_KEY}}"
       valid-duration: "${VALID_DURATION}"
       refreshable-duration: "${REFRESHABLE_DURATION}"
       reset_password_duration: "${RESET_PASSWORD_DURATION}"
+      magic-link-duration: "${MAGIC_LINK_DURATION:600}" # 10 minutes
+    magic-link:
+      # Frontend route that handles the click. Combined with application.client-url
+      # to build the link emailed to the user (e.g. https://app.smartrent.io.vn/auth/magic-link?token=...).
+      callback-path: "${MAGIC_LINK_CALLBACK_PATH:/auth/magic-link}"
+      email-subject: "${MAGIC_LINK_EMAIL_SUBJECT:SmartRent - Đăng nhập với liên kết}"
   api-key:
     brevo: "${BREVO_API_KEY}"
   email:

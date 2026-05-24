@@ -134,7 +134,10 @@ public enum DomainCode {
   PUSH_LIMIT_EXCEEDED("18001", HttpStatus.TOO_MANY_REQUESTS, "Hệ thống đang quá tải yêu cầu đẩy tin. Vui lòng chờ %d phút nữa để tiếp tục đẩy tin."),
   //    User Follow Error 19xxx
   USER_FOLLOW_SELF_NOT_ALLOWED("19001", HttpStatus.BAD_REQUEST, "You cannot follow yourself"),
-  USER_FOLLOW_TARGET_NOT_FOUND("19002", HttpStatus.NOT_FOUND, "Target user to follow was not found")
+  USER_FOLLOW_TARGET_NOT_FOUND("19002", HttpStatus.NOT_FOUND, "Target user to follow was not found"),
+  //    Magic Link Error 20xxx
+  MAGIC_LINK_INVALID("20001", HttpStatus.UNAUTHORIZED, "Magic link is invalid or has expired"),
+  MAGIC_LINK_ALREADY_USED("20002", HttpStatus.UNAUTHORIZED, "Magic link has already been used")
   ;
 
   private final String value;
