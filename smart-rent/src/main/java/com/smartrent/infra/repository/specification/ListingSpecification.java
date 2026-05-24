@@ -289,13 +289,42 @@ public class ListingSpecification {
                 ));
             }
 
+            // ============ ADMIN DATE-RANGE FILTERS ============
+            // Format: YYYY-MM-DD..YYYY-MM-DD ; either side may be omitted for open-ended range.
+            DateRangeBounds postRange = parseDateRange(filter.getPostDate());
+            if (postRange != null) {
+                if (postRange.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                        root.get("postDate"), postRange.from()));
+                }
+                if (postRange.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(
+                        root.get("postDate"), postRange.to()));
+                }
+            }
+
+            DateRangeBounds expiryRange = parseDateRange(filter.getExpiryDate());
+            if (expiryRange != null) {
+                if (expiryRange.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(
+                        root.get("expiryDate"), expiryRange.from()));
+                }
+                if (expiryRange.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(
+                        root.get("expiryDate"), expiryRange.to()));
+                }
+            }
+
             // ============ PRICING FILTERS ============
             // Basic price range filter
-            if (filter.getMinPrice() != null) {
-                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("price"), filter.getMinPrice()));
-            }
-            if (filter.getMaxPrice() != null) {
-                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("price"), filter.getMaxPrice()));
+            BigDecimalRangeBounds priceRange = parseBigDecimalRange(filter.getPrice());
+            if (priceRange != null) {
+                if (priceRange.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("price"), priceRange.from()));
+                }
+                if (priceRange.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("price"), priceRange.to()));
+                }
             }
 
             // Price unit filter
@@ -375,7 +404,8 @@ public class ListingSpecification {
             }
 
             // Price reduction percentage filter - filter by discount percentage
-            if (filter.getMinPriceReductionPercent() != null || filter.getMaxPriceReductionPercent() != null) {
+            BigDecimalRangeBounds priceReductionRange = parseBigDecimalRange(filter.getPriceReductionPercent());
+            if (priceReductionRange != null) {
                 Subquery<Long> pricePercentSubquery = query.subquery(Long.class);
                 var priceHistoryRoot = pricePercentSubquery.from(PricingHistory.class);
 
@@ -394,17 +424,17 @@ public class ListingSpecification {
                 ));
 
                 // Filter by percentage range
-                if (filter.getMinPriceReductionPercent() != null) {
+                if (priceReductionRange.from() != null) {
                     // Use ABS because changePercentage for DECREASE is stored as negative value
                     pricePercentPredicates.add(criteriaBuilder.greaterThanOrEqualTo(
                         criteriaBuilder.abs(priceHistoryRoot.get("changePercentage")),
-                        filter.getMinPriceReductionPercent()
+                        priceReductionRange.from()
                     ));
                 }
-                if (filter.getMaxPriceReductionPercent() != null) {
+                if (priceReductionRange.to() != null) {
                     pricePercentPredicates.add(criteriaBuilder.lessThanOrEqualTo(
                         criteriaBuilder.abs(priceHistoryRoot.get("changePercentage")),
-                        filter.getMaxPriceReductionPercent()
+                        priceReductionRange.to()
                     ));
                 }
 
@@ -426,7 +456,7 @@ public class ListingSpecification {
             // General price changed within days filter (any type of change)
             if (filter.getPriceChangedWithinDays() != null && filter.getPriceChangedWithinDays() > 0
                 && filter.getHasPriceReduction() == null && filter.getHasPriceIncrease() == null
-                && filter.getMinPriceReductionPercent() == null && filter.getMaxPriceReductionPercent() == null) {
+                && priceReductionRange == null) {
 
                 Subquery<Long> priceChangeSubquery = query.subquery(Long.class);
                 var priceHistoryRoot = priceChangeSubquery.from(PricingHistory.class);
@@ -461,22 +491,28 @@ public class ListingSpecification {
             }
 
             // Area range filter
-            if (filter.getMinArea() != null) {
-                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("area"), filter.getMinArea()));
-            }
-            if (filter.getMaxArea() != null) {
-                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("area"), filter.getMaxArea()));
+            FloatRangeBounds areaRange = parseFloatRange(filter.getArea());
+            if (areaRange != null) {
+                if (areaRange.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("area"), areaRange.from()));
+                }
+                if (areaRange.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("area"), areaRange.to()));
+                }
             }
 
             // Bedrooms filter - exact or range
             if (filter.getBedrooms() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("bedrooms"), filter.getBedrooms()));
             } else {
-                if (filter.getMinBedrooms() != null) {
-                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("bedrooms"), filter.getMinBedrooms()));
-                }
-                if (filter.getMaxBedrooms() != null) {
-                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("bedrooms"), filter.getMaxBedrooms()));
+                IntRangeBounds bedroomsRange = parseIntRange(filter.getBedroomsRange());
+                if (bedroomsRange != null) {
+                    if (bedroomsRange.from() != null) {
+                        predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("bedrooms"), bedroomsRange.from()));
+                    }
+                    if (bedroomsRange.to() != null) {
+                        predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("bedrooms"), bedroomsRange.to()));
+                    }
                 }
             }
 
@@ -484,11 +520,14 @@ public class ListingSpecification {
             if (filter.getBathrooms() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("bathrooms"), filter.getBathrooms()));
             } else {
-                if (filter.getMinBathrooms() != null) {
-                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("bathrooms"), filter.getMinBathrooms()));
-                }
-                if (filter.getMaxBathrooms() != null) {
-                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("bathrooms"), filter.getMaxBathrooms()));
+                IntRangeBounds bathroomsRange = parseIntRange(filter.getBathroomsRange());
+                if (bathroomsRange != null) {
+                    if (bathroomsRange.from() != null) {
+                        predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("bathrooms"), bathroomsRange.from()));
+                    }
+                    if (bathroomsRange.to() != null) {
+                        predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("bathrooms"), bathroomsRange.to()));
+                    }
                 }
             }
 
@@ -510,11 +549,14 @@ public class ListingSpecification {
             }
 
             // Room capacity range
-            if (filter.getMinRoomCapacity() != null) {
-                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("roomCapacity"), filter.getMinRoomCapacity()));
-            }
-            if (filter.getMaxRoomCapacity() != null) {
-                predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("roomCapacity"), filter.getMaxRoomCapacity()));
+            IntRangeBounds roomCapacityRange = parseIntRange(filter.getRoomCapacity());
+            if (roomCapacityRange != null) {
+                if (roomCapacityRange.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("roomCapacity"), roomCapacityRange.from()));
+                }
+                if (roomCapacityRange.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("roomCapacity"), roomCapacityRange.to()));
+                }
             }
 
             // ============ AMENITIES & MEDIA FILTERS ============
@@ -611,6 +653,36 @@ public class ListingSpecification {
                             0.0));
                     }
                 }
+            }
+
+            // ============ ADMIN: TITLE-ONLY SEARCH ============
+            if (filter.getTitle() != null && !filter.getTitle().trim().isEmpty()) {
+                String titleNeedle = "%" + filter.getTitle().trim().toLowerCase() + "%";
+                predicates.add(criteriaBuilder.like(
+                    criteriaBuilder.lower(root.get("title")), titleNeedle));
+            }
+
+            // ============ ADMIN: OWNER NAME / PHONE SEARCH ============
+            // Matches owner firstName, lastName, contactPhoneNumber, or phoneNumber (case-insensitive contains).
+            if (filter.getOwnerSearch() != null && !filter.getOwnerSearch().trim().isEmpty()) {
+                String ownerNeedle = "%" + filter.getOwnerSearch().trim().toLowerCase() + "%";
+                Subquery<String> ownerSubquery = query.subquery(String.class);
+                var ownerRoot = ownerSubquery.from(User.class);
+                ownerSubquery.select(ownerRoot.get("userId"))
+                        .where(criteriaBuilder.and(
+                                criteriaBuilder.equal(ownerRoot.get("userId"), root.get("userId")),
+                                criteriaBuilder.or(
+                                        criteriaBuilder.like(
+                                                criteriaBuilder.lower(ownerRoot.get("firstName")), ownerNeedle),
+                                        criteriaBuilder.like(
+                                                criteriaBuilder.lower(ownerRoot.get("lastName")), ownerNeedle),
+                                        criteriaBuilder.like(
+                                                criteriaBuilder.lower(ownerRoot.get("contactPhoneNumber")), ownerNeedle),
+                                        criteriaBuilder.like(
+                                                criteriaBuilder.lower(ownerRoot.get("phoneNumber")), ownerNeedle)
+                                )
+                        ));
+                predicates.add(root.get("userId").in(ownerSubquery));
             }
 
             // ============ CONTACT FILTERS ============
@@ -1091,4 +1163,71 @@ public class ListingSpecification {
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
     }
+
+    /**
+     * Split a `from..to` range string. Returns the two raw sides (trimmed) or
+     * {@code null} if the input is blank, has no `..` separator, or both sides are empty.
+     * Caller is responsible for parsing each side into the target type.
+     */
+    static String[] splitRange(String raw) {
+        if (raw == null) return null;
+        String s = raw.trim();
+        if (s.isEmpty()) return null;
+        int idx = s.indexOf("..");
+        if (idx < 0) return null;
+        String fromStr = s.substring(0, idx).trim();
+        String toStr   = s.substring(idx + 2).trim();
+        if (fromStr.isEmpty() && toStr.isEmpty()) return null;
+        return new String[] { fromStr, toStr };
+    }
+
+    /**
+     * Parse a date-range filter of the form {@code YYYY-MM-DD..YYYY-MM-DD}.
+     * Either side may be omitted (e.g. {@code "2026-03-01.."} or {@code "..2026-03-31"}).
+     * Returns {@code null} if the input is unusable.
+     * Malformed dates throw {@link java.time.format.DateTimeParseException}.
+     */
+    static DateRangeBounds parseDateRange(String raw) {
+        String[] parts = splitRange(raw);
+        if (parts == null) return null;
+        LocalDateTime from = parts[0].isEmpty() ? null : java.time.LocalDate.parse(parts[0]).atStartOfDay();
+        LocalDateTime to   = parts[1].isEmpty() ? null : java.time.LocalDate.parse(parts[1]).atTime(java.time.LocalTime.MAX);
+        if (from == null && to == null) return null;
+        return new DateRangeBounds(from, to);
+    }
+
+    /** Parse a `from..to` range into BigDecimal bounds. */
+    static BigDecimalRangeBounds parseBigDecimalRange(String raw) {
+        String[] parts = splitRange(raw);
+        if (parts == null) return null;
+        BigDecimal from = parts[0].isEmpty() ? null : new BigDecimal(parts[0]);
+        BigDecimal to   = parts[1].isEmpty() ? null : new BigDecimal(parts[1]);
+        if (from == null && to == null) return null;
+        return new BigDecimalRangeBounds(from, to);
+    }
+
+    /** Parse a `from..to` range into Float bounds. */
+    static FloatRangeBounds parseFloatRange(String raw) {
+        String[] parts = splitRange(raw);
+        if (parts == null) return null;
+        Float from = parts[0].isEmpty() ? null : Float.valueOf(parts[0]);
+        Float to   = parts[1].isEmpty() ? null : Float.valueOf(parts[1]);
+        if (from == null && to == null) return null;
+        return new FloatRangeBounds(from, to);
+    }
+
+    /** Parse a `from..to` range into Integer bounds. */
+    static IntRangeBounds parseIntRange(String raw) {
+        String[] parts = splitRange(raw);
+        if (parts == null) return null;
+        Integer from = parts[0].isEmpty() ? null : Integer.valueOf(parts[0]);
+        Integer to   = parts[1].isEmpty() ? null : Integer.valueOf(parts[1]);
+        if (from == null && to == null) return null;
+        return new IntRangeBounds(from, to);
+    }
+
+    record DateRangeBounds(LocalDateTime from, LocalDateTime to) {}
+    record BigDecimalRangeBounds(BigDecimal from, BigDecimal to) {}
+    record FloatRangeBounds(Float from, Float to) {}
+    record IntRangeBounds(Integer from, Integer to) {}
 }

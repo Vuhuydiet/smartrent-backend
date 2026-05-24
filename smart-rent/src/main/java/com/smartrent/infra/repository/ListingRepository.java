@@ -193,8 +193,9 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     );
 
     /**
-     * Get admin statistics in a single query instead of 10 separate COUNT queries.
-     * Returns: [pendingVerification, verified, expired, rejected, drafts, shadows, normalListings, silverListings, goldListings, diamondListings]
+     * Get admin statistics in a single query instead of 11 separate COUNT queries.
+     * Returns: [pendingVerification, verified, expired, rejected, drafts, shadows,
+     *          normalListings, silverListings, goldListings, diamondListings, totalListings]
      */
     @Query("""
         SELECT
@@ -207,7 +208,8 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
             SUM(CASE WHEN l.vipType = 'NORMAL' THEN 1 ELSE 0 END),
             SUM(CASE WHEN l.vipType = 'SILVER' THEN 1 ELSE 0 END),
             SUM(CASE WHEN l.vipType = 'GOLD' THEN 1 ELSE 0 END),
-            SUM(CASE WHEN l.vipType = 'DIAMOND' THEN 1 ELSE 0 END)
+            SUM(CASE WHEN l.vipType = 'DIAMOND' THEN 1 ELSE 0 END),
+            COUNT(l)
         FROM listings l
     """)
     List<Object[]> getAdminStatistics();

@@ -48,27 +48,21 @@ public final class CacheKeyBuilder {
         append(sb, "vipType", filter.getVipType());
         append(sb, "productType", filter.getProductType());
 
-        append(sb, "minPrice", filter.getMinPrice());
-        append(sb, "maxPrice", filter.getMaxPrice());
+        append(sb, "price", filter.getPrice());
         append(sb, "priceUnit", filter.getPriceUnit());
         append(sb, "hasPriceReduction", filter.getHasPriceReduction());
         append(sb, "hasPriceIncrease", filter.getHasPriceIncrease());
-        append(sb, "minPriceReductionPercent", filter.getMinPriceReductionPercent());
-        append(sb, "maxPriceReductionPercent", filter.getMaxPriceReductionPercent());
+        append(sb, "priceReductionPercent", filter.getPriceReductionPercent());
         append(sb, "priceChangedWithinDays", filter.getPriceChangedWithinDays());
 
-        append(sb, "minArea", filter.getMinArea());
-        append(sb, "maxArea", filter.getMaxArea());
+        append(sb, "area", filter.getArea());
         append(sb, "bedrooms", filter.getBedrooms());
         append(sb, "bathrooms", filter.getBathrooms());
-        append(sb, "minBedrooms", filter.getMinBedrooms());
-        append(sb, "maxBedrooms", filter.getMaxBedrooms());
-        append(sb, "minBathrooms", filter.getMinBathrooms());
-        append(sb, "maxBathrooms", filter.getMaxBathrooms());
+        append(sb, "bedroomsRange", filter.getBedroomsRange());
+        append(sb, "bathroomsRange", filter.getBathroomsRange());
         append(sb, "furnishing", filter.getFurnishing());
         append(sb, "direction", filter.getDirection());
-        append(sb, "minRoomCapacity", filter.getMinRoomCapacity());
-        append(sb, "maxRoomCapacity", filter.getMaxRoomCapacity());
+        append(sb, "roomCapacity", filter.getRoomCapacity());
 
         append(sb, "waterPrice", filter.getWaterPrice());
         append(sb, "electricityPrice", filter.getElectricityPrice());

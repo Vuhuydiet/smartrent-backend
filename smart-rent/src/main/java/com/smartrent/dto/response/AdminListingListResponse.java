@@ -23,8 +23,8 @@ import java.util.List;
 @Schema(description = "Paginated listing response for admin with count and filters")
 public class AdminListingListResponse {
 
-    @Schema(description = "List of listings for the current page with admin information")
-    List<ListingResponseWithAdmin> listings;
+    @Schema(description = "List of listings for the current page (slim summary). Call GET /v1/listings/admin/{id} for the full record.")
+    List<AdminListingSummary> listings;
 
     @Schema(description = "Total number of listings matching the filter criteria", example = "150")
     Long totalCount;
@@ -84,5 +84,8 @@ public class AdminListingListResponse {
 
         @Schema(description = "Total number of DIAMOND listings", example = "100")
         Long diamondListings;
+
+        @Schema(description = "Total number of listings in the system (all states)", example = "101810")
+        Long totalListings;
     }
 }

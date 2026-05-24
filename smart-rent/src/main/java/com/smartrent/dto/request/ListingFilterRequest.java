@@ -152,12 +152,13 @@ public class ListingFilterRequest {
     String productType;
 
     // ============ PROPERTY SPECS FILTERS ============
-    // Basic price range filters
-    @Schema(description = "Minimum price (in VND)")
-    java.math.BigDecimal minPrice;
-
-    @Schema(description = "Maximum price (in VND)")
-    java.math.BigDecimal maxPrice;
+    // Range filters use a single string field with `..` separator. Format: "from..to".
+    // Either side may be omitted for an open-ended range, e.g. "5000000..", "..15000000".
+    @Schema(description = """
+            Price range (VND). Format: `from..to`. Either side may be omitted.
+            Examples: `5000000..15000000`, `5000000..` (≥ 5M), `..15000000` (≤ 15M).
+            """, example = "5000000..15000000")
+    String price;
 
     // Price unit filter
     @Schema(description = "Filter by price unit", example = "MONTH", allowableValues = {"MONTH", "DAY", "YEAR"})
@@ -170,38 +171,40 @@ public class ListingFilterRequest {
     @Schema(description = "Only show listings with recent price increases", example = "false")
     Boolean hasPriceIncrease;
 
-    @Schema(description = "Minimum price reduction percentage (e.g., 10 for 10% off)", example = "10")
-    java.math.BigDecimal minPriceReductionPercent;
-
-    @Schema(description = "Maximum price reduction percentage (e.g., 50 for up to 50% off)", example = "50")
-    java.math.BigDecimal maxPriceReductionPercent;
+    @Schema(description = """
+            Price reduction percentage range. Format: `from..to`. Either side optional.
+            Examples: `10..50` (10–50% off), `10..` (≥ 10%), `..50` (≤ 50%).
+            """, example = "10..50")
+    String priceReductionPercent;
 
     @Schema(description = "Filter listings with price changes within last X days", example = "30")
     Integer priceChangedWithinDays;
 
-    @Schema(description = "Minimum area in square meters")
-    Float minArea;
+    @Schema(description = """
+            Area range in square meters. Format: `from..to`. Either side optional.
+            Examples: `30..60`, `30..`, `..60`.
+            """, example = "30..60")
+    String area;
 
-    @Schema(description = "Maximum area in square meters")
-    Float maxArea;
-
-    @Schema(description = "Exact number of bedrooms (use minBedrooms/maxBedrooms for range)")
+    @Schema(description = "Exact number of bedrooms (use `bedroomsRange` for a range)")
     Integer bedrooms;
 
-    @Schema(description = "Exact number of bathrooms (use minBathrooms/maxBathrooms for range)")
+    @Schema(description = "Exact number of bathrooms (use `bathroomsRange` for a range)")
     Integer bathrooms;
 
-    @Schema(description = "Minimum number of bedrooms")
-    Integer minBedrooms;
+    @Schema(description = """
+            Bedrooms range. Format: `from..to`. Either side optional.
+            Ignored when `bedrooms` (exact) is set.
+            Examples: `2..4`, `2..`, `..4`.
+            """, example = "2..4")
+    String bedroomsRange;
 
-    @Schema(description = "Maximum number of bedrooms")
-    Integer maxBedrooms;
-
-    @Schema(description = "Minimum number of bathrooms")
-    Integer minBathrooms;
-
-    @Schema(description = "Maximum number of bathrooms")
-    Integer maxBathrooms;
+    @Schema(description = """
+            Bathrooms range. Format: `from..to`. Either side optional.
+            Ignored when `bathrooms` (exact) is set.
+            Examples: `1..3`, `1..`, `..3`.
+            """, example = "1..3")
+    String bathroomsRange;
 
     @Schema(description = "Furnishing type", allowableValues = {"FULLY_FURNISHED", "SEMI_FURNISHED", "UNFURNISHED"})
     String furnishing;
@@ -209,11 +212,11 @@ public class ListingFilterRequest {
     @Schema(description = "Direction", allowableValues = {"NORTH", "SOUTH", "EAST", "WEST", "NORTHEAST", "NORTHWEST", "SOUTHEAST", "SOUTHWEST"})
     String direction;
 
-    @Schema(description = "Minimum room capacity")
-    Integer minRoomCapacity;
-
-    @Schema(description = "Maximum room capacity")
-    Integer maxRoomCapacity;
+    @Schema(description = """
+            Room capacity range. Format: `from..to`. Either side optional.
+            Examples: `2..6`, `2..`, `..6`.
+            """, example = "2..6")
+    String roomCapacity;
 
     // ============ UTILITY PRICE FILTERS ============
     @Schema(description = "Water price filter (e.g., 'LOW', 'MEDIUM', 'HIGH', or specific range)", example = "LOW")
@@ -244,8 +247,18 @@ public class ListingFilterRequest {
     Integer minMediaCount;
 
     // ============ CONTENT SEARCH ============
-    @Schema(description = "Keyword search in title and description", example = "căn hộ cao cấp view đẹp")
+    @Schema(description = "Keyword search in title and description (FULLTEXT)", example = "căn hộ cao cấp view đẹp")
     String keyword;
+
+    @Schema(description = "Case-insensitive substring search on listing TITLE only (admin table view)", example = "Tân Bình")
+    String title;
+
+    @Schema(description = """
+            Admin-only search across owner first name, last name, and phone numbers
+            (matches contactPhoneNumber OR phoneNumber). Case-insensitive substring match.
+            Useful for finding all listings posted by a given user from the admin list.
+            """, example = "0367919024")
+    String ownerSearch;
 
     // ============ CONTACT FILTERS ============
     @Schema(description = "Only show listings with verified owner phone number", example = "true")
@@ -260,6 +273,22 @@ public class ListingFilterRequest {
 
     @Schema(description = "Show only listings updated within last X days", example = "3")
     Integer updatedWithinDays;
+
+    @Schema(description = """
+            Post date range — single field using `..` as separator. Format: `YYYY-MM-DD..YYYY-MM-DD`.
+            Inclusive on both ends. Either side may be omitted for an open-ended range:
+            - `2026-03-01..2026-03-31` — posted within March 2026
+            - `2026-03-01..` — posted on or after Mar 1
+            - `..2026-03-31` — posted on or before Mar 31
+            Server pads the lower bound to start-of-day and the upper bound to end-of-day.
+            """, example = "2026-03-01..2026-03-31")
+    String postDate;
+
+    @Schema(description = """
+            Expiry date range — same `..` format as `postDate`.
+            Examples: `2026-08-01..2026-08-31`, `2026-08-01..`, `..2026-08-31`.
+            """, example = "2026-08-01..2026-08-31")
+    String expiryDate;
 
     // ============ PAGINATION & SORTING ============
     @Schema(description = "Page number (one-based)", example = "1", defaultValue = "1")
