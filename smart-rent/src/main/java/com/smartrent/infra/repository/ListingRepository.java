@@ -36,7 +36,16 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     Optional<Listing> findByTransactionId(String transactionId);
 
     /**
-     * Find listings that need AI verification
+     * Find listings that need AI verification.
+     *
+     * <p>Exclusion rules:
+     * <ul>
+     *   <li>{@code lam IS NULL} → new listing, never processed → include</li>
+     *   <li>{@code lam.verificationStatus = PENDING} AND retryCount < 3 → needs processing → include</li>
+     *   <li>{@code l.moderationStatus IN (APPROVED, REJECTED, SUSPENDED, REVISION_REQUIRED)} → already resolved → exclude</li>
+     *   <li>{@code l.verified = true} → already approved → exclude</li>
+     *   <li>{@code lam.manualOverride = true} → human took over → exclude</li>
+     * </ul>
      */
     @Query("""
         SELECT l FROM listings l
@@ -46,6 +55,10 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isDraft = false
         AND l.isShadow = false
         AND l.postDate IS NOT NULL
+        AND (l.verified IS NULL OR l.verified = false)
+        AND (l.moderationStatus IS NULL
+             OR l.moderationStatus = com.smartrent.enums.ModerationStatus.PENDING_REVIEW
+             OR l.moderationStatus = com.smartrent.enums.ModerationStatus.RESUBMITTED)
         ORDER BY l.createdAt DESC
     """)
     Page<Listing> findListingsNeedingAiVerification(Pageable pageable);

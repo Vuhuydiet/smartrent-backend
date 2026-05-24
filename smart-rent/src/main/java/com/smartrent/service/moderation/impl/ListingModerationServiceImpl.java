@@ -267,6 +267,27 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         listing.setRevisionCount(listing.getRevisionCount() + 1);
         listingRepository.save(listing);
 
+        // --- AI Moderation Integration ---
+        listingAiModerationRepository.findById(listing.getListingId())
+                .ifPresentOrElse(moderation -> {
+                    moderation.setVerificationStatus(com.smartrent.infra.repository.entity.enums.VerificationStatus.PENDING);
+                    moderation.setRetryCount(0);
+                    moderation.setManualOverride(false);
+                    listingAiModerationRepository.save(moderation);
+                    log.info("Reset AI moderation to PENDING for resubmitted listing {}", listing.getListingId());
+                }, () -> {
+                    com.smartrent.infra.repository.entity.ListingAiModeration moderation = 
+                        com.smartrent.infra.repository.entity.ListingAiModeration.builder()
+                            .listingId(listing.getListingId())
+                            .verificationStatus(com.smartrent.infra.repository.entity.enums.VerificationStatus.PENDING)
+                            .retryCount(0)
+                            .manualOverride(false)
+                            .build();
+                    listingAiModerationRepository.save(moderation);
+                    log.info("Created new AI moderation entry for resubmitted listing {}", listing.getListingId());
+                });
+        // ---------------------------------
+
         // Advance any pending owner actions
         List<ListingOwnerAction> pendingActions = ownerActionRepository
                 .findByListingIdAndStatus(listingId, OwnerActionStatus.PENDING_OWNER);
@@ -370,6 +391,27 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         listing.setRevisionCount(listing.getRevisionCount() + 1);
         listingRepository.save(listing);
 
+        // --- AI Moderation Integration ---
+        listingAiModerationRepository.findById(listing.getListingId())
+                .ifPresentOrElse(moderation -> {
+                    moderation.setVerificationStatus(com.smartrent.infra.repository.entity.enums.VerificationStatus.PENDING);
+                    moderation.setRetryCount(0);
+                    moderation.setManualOverride(false);
+                    listingAiModerationRepository.save(moderation);
+                    log.info("Reset AI moderation to PENDING for updated listing {}", listing.getListingId());
+                }, () -> {
+                    com.smartrent.infra.repository.entity.ListingAiModeration moderation = 
+                        com.smartrent.infra.repository.entity.ListingAiModeration.builder()
+                            .listingId(listing.getListingId())
+                            .verificationStatus(com.smartrent.infra.repository.entity.enums.VerificationStatus.PENDING)
+                            .retryCount(0)
+                            .manualOverride(false)
+                            .build();
+                    listingAiModerationRepository.save(moderation);
+                    log.info("Created new AI moderation entry for updated listing {}", listing.getListingId());
+                });
+        // ---------------------------------
+
         // Advance any pending owner actions
         List<ListingOwnerAction> pendingActions = ownerActionRepository
                 .findByListingIdAndStatus(listingId, OwnerActionStatus.PENDING_OWNER);
@@ -438,7 +480,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     private void handleApprove(Listing listing, String adminId) {
         listing.setModerationStatus(ModerationStatus.APPROVED);
         listing.setVerified(true);
-        listing.setIsVerify(true);
+        listing.setIsVerify(false); // clear pending-review flag so computeListingStatus() returns DISPLAYING, not IN_REVIEW
         listing.setLastModeratedBy(adminId);
         listing.setLastModeratedAt(LocalDateTime.now());
 
