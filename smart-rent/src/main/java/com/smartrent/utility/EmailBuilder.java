@@ -49,8 +49,6 @@ public class EmailBuilder {
     htmlContent.append(".footer { background-color: #f9fafb; border-top: 1px solid #e5e7eb; padding: 20px 32px; text-align: center; color: #6b7280; font-size: 13px; line-height: 1.6; }");
     htmlContent.append(".cta-container { text-align: center; margin: 28px 0 8px; }");
     htmlContent.append(".cta-button { display: inline-block; background-color: #007BFF; color: #ffffff !important; font-size: 15px; font-weight: 600; padding: 12px 28px; border-radius: 8px; text-decoration: none; border: 1px solid #0063CC; }");
-    htmlContent.append(".cta-fallback { font-size: 12px; color: #6b7280; text-align: center; margin-top: 14px; word-break: break-all; }");
-    htmlContent.append(".cta-fallback a { color: #007BFF; text-decoration: none; }");
     htmlContent.append(".divider { height: 1px; background-color: #e5e7eb; margin: 24px 0; border: 0; }");
     htmlContent.append("</style>");
     htmlContent.append("</head>");
@@ -135,8 +133,6 @@ public class EmailBuilder {
     htmlContent.append("<div class=\"cta-container\">");
     htmlContent.append("<a href=\"%s\" class=\"cta-button\">Đăng nhập ngay</a>"
         .formatted(magicLinkUrl));
-    htmlContent.append("<div class=\"cta-fallback\">Hoặc mở liên kết: "
-        + "<a href=\"%s\">%s</a></div>".formatted(magicLinkUrl, magicLinkUrl));
     htmlContent.append("</div>");
 
     // Expiry information
@@ -206,8 +202,6 @@ public class EmailBuilder {
     htmlContent.append("<div class=\"cta-container\">");
     htmlContent.append("<a href=\"%s\" class=\"cta-button\">Quản lý tin đăng của tôi</a>"
         .formatted(manageUrl));
-    htmlContent.append("<div class=\"cta-fallback\">Hoặc mở liên kết: "
-        + "<a href=\"%s\">%s</a></div>".formatted(manageUrl, manageUrl));
     htmlContent.append("</div>");
 
     htmlContent.append("</div>"); // End content
