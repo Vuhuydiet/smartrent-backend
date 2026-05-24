@@ -195,6 +195,7 @@ public class ListingMapperImpl implements ListingMapper {
                     .userId(user.getUserId())
                     .firstName(user.getFirstName())
                     .lastName(user.getLastName())
+                    .email(user.getEmail())
                     .contactPhoneNumber(user.getContactPhoneNumber())
                     .contactPhoneVerified(user.getContactPhoneVerified())
                     .avatarUrl(user.getAvatarUrl())
