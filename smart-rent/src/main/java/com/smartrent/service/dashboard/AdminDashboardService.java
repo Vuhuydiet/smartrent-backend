@@ -16,7 +16,13 @@ public interface AdminDashboardService {
 
     TimeSeriesResponse getUserGrowth(int days);
 
+    TimeSeriesResponse getUserGrowth(LocalDate from, LocalDate to);
+
     TimeSeriesResponse getReportCount(int days);
 
+    TimeSeriesResponse getReportCount(LocalDate from, LocalDate to);
+
     TimeSeriesResponse getListingCreation(int days);
+
+    TimeSeriesResponse getListingCreation(LocalDate from, LocalDate to);
 }

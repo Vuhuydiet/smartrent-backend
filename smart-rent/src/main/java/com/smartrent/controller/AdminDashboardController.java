@@ -146,7 +146,11 @@ public class AdminDashboardController {
     @GetMapping("/users/growth")
     @Operation(
             summary = "Get user growth over time",
-            description = "Returns count of new user registrations grouped by day (7/30 days) or month (360 days).",
+            description = """
+                    Returns count of new user registrations.
+                    Use `days` for preset ranges (7, 30, 360) with automatic granularity (day for 7/30, month for 360),
+                    or `from`/`to` for custom date ranges (always daily granularity).
+                    When `days` is provided, `from`/`to` are ignored. If no parameter is given, defaults to last 7 days.""",
             security = @SecurityRequirement(name = "Bearer Authentication")
     )
     @ApiResponses(value = {
@@ -176,20 +180,32 @@ public class AdminDashboardController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden — admin role required")
     })
     public ApiResponse<TimeSeriesResponse> getUserGrowth(
-            @Parameter(description = "Time range in days (7, 30, or 360)", example = "7")
-            @RequestParam(defaultValue = "7") int days
+            @Parameter(description = "Preset range in days (7, 30, or 360). Takes priority over from/to.", example = "7")
+            @RequestParam(required = false) Integer days,
+
+            @Parameter(description = "Start date (inclusive), defaults to 7 days ago when from/to is used", example = "2026-03-01")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+
+            @Parameter(description = "End date (inclusive), defaults to today", example = "2026-03-29")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        log.info("Admin requesting user growth for last {} days", days);
         return ApiResponse.<TimeSeriesResponse>builder()
                 .code("999999")
-                .data(adminDashboardService.getUserGrowth(days))
+                .data(resolveTimeSeries(days, from, to,
+                        adminDashboardService::getUserGrowth,
+                        adminDashboardService::getUserGrowth,
+                        "user growth"))
                 .build();
     }
 
     @GetMapping("/reports/count")
     @Operation(
             summary = "Get report count over time",
-            description = "Returns count of listing reports created, grouped by day (7/30 days) or month (360 days).",
+            description = """
+                    Returns count of listing reports created.
+                    Use `days` for preset ranges (7, 30, 360) with automatic granularity (day for 7/30, month for 360),
+                    or `from`/`to` for custom date ranges (always daily granularity).
+                    When `days` is provided, `from`/`to` are ignored. If no parameter is given, defaults to last 7 days.""",
             security = @SecurityRequirement(name = "Bearer Authentication")
     )
     @ApiResponses(value = {
@@ -219,20 +235,32 @@ public class AdminDashboardController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden — admin role required")
     })
     public ApiResponse<TimeSeriesResponse> getReportCount(
-            @Parameter(description = "Time range in days (7, 30, or 360)", example = "7")
-            @RequestParam(defaultValue = "7") int days
+            @Parameter(description = "Preset range in days (7, 30, or 360). Takes priority over from/to.", example = "7")
+            @RequestParam(required = false) Integer days,
+
+            @Parameter(description = "Start date (inclusive), defaults to 7 days ago when from/to is used", example = "2026-03-01")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+
+            @Parameter(description = "End date (inclusive), defaults to today", example = "2026-03-29")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        log.info("Admin requesting report count for last {} days", days);
         return ApiResponse.<TimeSeriesResponse>builder()
                 .code("999999")
-                .data(adminDashboardService.getReportCount(days))
+                .data(resolveTimeSeries(days, from, to,
+                        adminDashboardService::getReportCount,
+                        adminDashboardService::getReportCount,
+                        "report count"))
                 .build();
     }
 
     @GetMapping("/listings/creation")
     @Operation(
             summary = "Get listing creation over time",
-            description = "Returns count of new listings created (excluding drafts and shadows), grouped by day (7/30 days) or month (360 days).",
+            description = """
+                    Returns count of new listings created (excluding drafts and shadows).
+                    Use `days` for preset ranges (7, 30, 360) with automatic granularity (day for 7/30, month for 360),
+                    or `from`/`to` for custom date ranges (always daily granularity).
+                    When `days` is provided, `from`/`to` are ignored. If no parameter is given, defaults to last 7 days.""",
             security = @SecurityRequirement(name = "Bearer Authentication")
     )
     @ApiResponses(value = {
@@ -262,13 +290,43 @@ public class AdminDashboardController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden — admin role required")
     })
     public ApiResponse<TimeSeriesResponse> getListingCreation(
-            @Parameter(description = "Time range in days (7, 30, or 360)", example = "7")
-            @RequestParam(defaultValue = "7") int days
+            @Parameter(description = "Preset range in days (7, 30, or 360). Takes priority over from/to.", example = "7")
+            @RequestParam(required = false) Integer days,
+
+            @Parameter(description = "Start date (inclusive), defaults to 7 days ago when from/to is used", example = "2026-03-01")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+
+            @Parameter(description = "End date (inclusive), defaults to today", example = "2026-03-29")
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        log.info("Admin requesting listing creation for last {} days", days);
         return ApiResponse.<TimeSeriesResponse>builder()
                 .code("999999")
-                .data(adminDashboardService.getListingCreation(days))
+                .data(resolveTimeSeries(days, from, to,
+                        adminDashboardService::getListingCreation,
+                        adminDashboardService::getListingCreation,
+                        "listing creation"))
                 .build();
+    }
+
+    private TimeSeriesResponse resolveTimeSeries(
+            Integer days,
+            LocalDate from,
+            LocalDate to,
+            java.util.function.IntFunction<TimeSeriesResponse> byDays,
+            java.util.function.BiFunction<LocalDate, LocalDate, TimeSeriesResponse> byRange,
+            String label
+    ) {
+        if (days != null) {
+            log.info("Admin requesting {} for last {} days", label, days);
+            return byDays.apply(days);
+        }
+        if (from != null || to != null) {
+            LocalDate endDate = (to != null) ? to : LocalDate.now();
+            LocalDate startDate = (from != null) ? from : endDate.minusDays(7);
+            log.info("Admin requesting {} from {} to {}", label, startDate, endDate);
+            return byRange.apply(startDate, endDate);
+        }
+        log.info("Admin requesting {} for default last 7 days", label);
+        return byDays.apply(7);
     }
 }

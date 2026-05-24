@@ -158,6 +158,14 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         return buildTimeSeriesResponse(rows, range.monthly);
     }
 
+    @Override
+    public TimeSeriesResponse getUserGrowth(LocalDate from, LocalDate to) {
+        log.info("Fetching user growth from {} to {}", from, to);
+        DateRange range = resolveDateRange(from, to);
+        List<Object[]> rows = userRepository.countNewUsersByDay(range.start, range.end);
+        return buildTimeSeriesResponse(rows, range.monthly);
+    }
+
     // ─── Report Count ───
 
     @Override
@@ -170,6 +178,14 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         return buildTimeSeriesResponse(rows, range.monthly);
     }
 
+    @Override
+    public TimeSeriesResponse getReportCount(LocalDate from, LocalDate to) {
+        log.info("Fetching report count from {} to {}", from, to);
+        DateRange range = resolveDateRange(from, to);
+        List<Object[]> rows = listingReportRepository.countReportsByDay(range.start, range.end);
+        return buildTimeSeriesResponse(rows, range.monthly);
+    }
+
     // ─── Listing Creation ───
 
     @Override
@@ -179,6 +195,14 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
         List<Object[]> rows = range.monthly
                 ? listingRepository.countNewListingsByMonth(range.start, range.end)
                 : listingRepository.countNewListingsByDay(range.start, range.end);
+        return buildTimeSeriesResponse(rows, range.monthly);
+    }
+
+    @Override
+    public TimeSeriesResponse getListingCreation(LocalDate from, LocalDate to) {
+        log.info("Fetching listing creation from {} to {}", from, to);
+        DateRange range = resolveDateRange(from, to);
+        List<Object[]> rows = listingRepository.countNewListingsByDay(range.start, range.end);
         return buildTimeSeriesResponse(rows, range.monthly);
     }
 
@@ -209,6 +233,14 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 startDate.atStartOfDay(),
                 endDate.atTime(LocalTime.MAX),
                 days > 30
+        );
+    }
+
+    private DateRange resolveDateRange(LocalDate from, LocalDate to) {
+        return new DateRange(
+                from.atStartOfDay(),
+                to.atTime(LocalTime.MAX),
+                false
         );
     }
 
