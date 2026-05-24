@@ -17,14 +17,20 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@Schema(description = "Guest access token issued after a magic link is verified")
+@Schema(description = "Tokens issued after a magic link is verified. Shape depends on whether the email maps to an existing user: registered users receive a full access+refresh pair (`guest=false`); unknown emails receive a short-lived guest access token only (`guest=true`).")
 public class MagicLinkVerifyResponse {
 
   @Schema(
-      description = "Short-lived JWT to send on the Authorization header as `Bearer <token>`. No refresh token is issued for guest sessions — request a new link when this expires.",
+      description = "JWT to send on the Authorization header as `Bearer <token>`.",
       example = "eyJhbGciOiJIUzUxMiJ9..."
   )
   String accessToken;
+
+  @Schema(
+      description = "Refresh token. Returned only when the email matches a registered user (`guest=false`). Null/omitted for guest sessions — guests must request a new magic link when their access token expires.",
+      example = "eyJhbGciOiJIUzUxMiJ9..."
+  )
+  String refreshToken;
 
   @Schema(
       description = "Number of seconds the access token remains valid.",
@@ -33,14 +39,20 @@ public class MagicLinkVerifyResponse {
   long expiresInSeconds;
 
   @Schema(
-      description = "Email tied to this guest session (same as the one used to request the link).",
-      example = "guest@example.com"
+      description = "Email tied to this session (same as the one used to request the link).",
+      example = "user@example.com"
   )
   String email;
 
   @Schema(
-      description = "Always `true` for tokens issued through the magic-link flow. Useful for the FE to render a \"guest mode\" badge.",
-      example = "true"
+      description = "`true` when no matching user was found and a guest session was issued; `false` when the email matches a registered user and a full session was issued.",
+      example = "false"
   )
   Boolean guest;
+
+  @Schema(
+      description = "Registered user's ID. Present only when `guest=false`. Useful for FE to fetch profile after login.",
+      example = "550e8400-e29b-41d4-a716-446655440000"
+  )
+  String userId;
 }
