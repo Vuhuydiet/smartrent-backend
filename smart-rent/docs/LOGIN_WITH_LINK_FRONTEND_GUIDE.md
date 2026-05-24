@@ -1,34 +1,30 @@
-# Login with Link (Guest Magic-Link) – Frontend Integration Guide
+# Login with Link (Magic-Link) – Frontend Integration Guide
 
 ## Overview
 
-This guide explains how to integrate the **passwordless guest login** feature into the frontend.
+This guide explains how to integrate the **passwordless magic-link login** feature into the frontend.
 
-Customers type only their email, receive a one-time login link, click it, and are signed in as a **guest** — no account creation, no password, no profile data stored on our side. The email lives inside the signed link itself.
+Customers type only their email, receive a one-time login link, and click it. What happens next depends on whether the email is already in our database:
 
-> **Mental model:** think Slack/Notion "Sign in with email". The backend never inserts a row in `users`. The session is just a short-lived JWT scoped to the email address.
+| Caller's email                  | Outcome of verify                                                  |
+|---------------------------------|--------------------------------------------------------------------|
+| Matches a registered user       | **Full session**: access + refresh tokens for that user. Same as a normal login. If they were unverified, we also flip `isVerified=true`. |
+| Doesn't match any user          | **Guest session**: short-lived access token only, no DB row, no refresh. |
 
----
+The FE flow is identical in both cases — the only difference is in the verify response (`guest: true/false` and the presence/absence of `refreshToken`).
 
-## When to use this flow
-
-Use it for visitors who want a *lightweight* identity — enough to save listings, follow brokers, or chat — but who don't want to register a full account yet.
-
-**Do not** use it for:
-
-- Owners / brokers / admins. They must register normally.
-- Anything that requires loading the user's record from the database (e.g. profile edit, broker dashboard, KYC). Guest tokens carry only an email — the backend won't find a `User` row for `sub = "guest:<uuid>"` and the call will return `4001 USER_NOT_FOUND`.
-
-If you need to gate the UI, read the `guest` boolean from the verify response (or decode the JWT and look for `"guest": true` / `"scope": "ROLE_USER"` together with `sub` starting with `guest:`).
+> **Important:** the `/magic-link/request` endpoint **never** reveals which branch you'll get. The response is the same regardless of whether the email exists. Do not show "no account found" — that would let attackers enumerate accounts.
 
 ---
 
 ## High-level flow
 
 ```
-┌──────────────────┐   1. POST /magic-link/request   ┌──────────────────────────┐
-│  FE: email form  │ ──────────────────────────────▶ │  BE: sign JWT, send mail │
-└──────────────────┘                                  └────────────┬─────────────┘
+┌──────────────────┐   1. POST /magic-link/request   ┌──────────────────────────────────┐
+│  FE: email form  │ ──────────────────────────────▶ │  BE: lookup user by email,       │
+└──────────────────┘                                  │       sign JWT (carries userId   │
+                                                      │       or guest:<uuid>), send mail│
+                                                      └────────────┬─────────────────────┘
                                                                    │
                                                                    ▼
                                                         ┌─────────────────────┐
@@ -44,15 +40,18 @@ If you need to gate the UI, read the `guest` boolean from the verify response (o
                                                                    │
                                   2. POST /magic-link/verify       │
                                                                    ▼
-                                                        ┌─────────────────────┐
-                                                        │  BE: invalidate jti │
-                                                        │  return accessToken │
-                                                        └──────────┬──────────┘
-                                                                   ▼
-                                                        ┌─────────────────────┐
-                                                        │  FE stores token,   │
-                                                        │  routes to /home    │
-                                                        └─────────────────────┘
+                                                ┌─────────────────────────────────┐
+                                                │  BE: invalidate jti             │
+                                                │  if userId: load user, mint     │
+                                                │     access+refresh; mark        │
+                                                │     verified if needed          │
+                                                │  else: mint guest access only   │
+                                                └────────────┬────────────────────┘
+                                                             ▼
+                                                ┌─────────────────────────────────┐
+                                                │  FE stores token(s),            │
+                                                │  branches on `guest`            │
+                                                └─────────────────────────────────┘
 ```
 
 The token in the URL is **single-use**. Calling `/verify` a second time with the same token returns `20002 MAGIC_LINK_ALREADY_USED`.
@@ -72,29 +71,27 @@ Both endpoints are public — **do not** send an `Authorization` header.
 **Request**
 
 ```json
-{ "email": "guest@example.com" }
+{ "email": "user@example.com" }
 ```
 
 | Field   | Type   | Required | Notes                                                  |
 |---------|--------|----------|--------------------------------------------------------|
 | `email` | string | ✅       | Standard email format. Normalized to lowercase server-side. |
 
-**Success — `200`**
+**Success — `200`** (identical whether or not the email is registered):
 
 ```json
 {
   "code": "999999",
   "message": null,
   "data": {
-    "email": "guest@example.com",
+    "email": "user@example.com",
     "expiresInSeconds": 600
   }
 }
 ```
 
 `expiresInSeconds` is the TTL of the **link**, not the access token. Use it to drive the "resend link" countdown on the FE.
-
-> The response is intentionally the same regardless of whether the email exists in our database. Do **not** show the user "no account found" — that would leak account existence.
 
 **Errors**
 
@@ -121,7 +118,24 @@ Call this from the FE route that handles the `?token=…` URL — **not** from a
 |---------|--------|----------|--------------------------------------------------------|
 | `token` | string | ✅       | Exactly the value of the `token` query param from the email URL. URL-decode if your router didn't do it for you. |
 
-**Success — `200`**
+**Success — `200` (registered user)**
+
+```json
+{
+  "code": "999999",
+  "message": null,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzUxMiJ9...",
+    "refreshToken": "eyJhbGciOiJIUzUxMiJ9...",
+    "expiresInSeconds": 3600,
+    "email": "user@example.com",
+    "guest": false,
+    "userId": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
+```
+
+**Success — `200` (guest, no account)**
 
 ```json
 {
@@ -130,7 +144,7 @@ Call this from the FE route that handles the `?token=…` URL — **not** from a
   "data": {
     "accessToken": "eyJhbGciOiJIUzUxMiJ9...",
     "expiresInSeconds": 3600,
-    "email": "guest@example.com",
+    "email": "stranger@example.com",
     "guest": true
   }
 }
@@ -138,20 +152,37 @@ Call this from the FE route that handles the `?token=…` URL — **not** from a
 
 | Field              | Type    | Notes |
 |--------------------|---------|-------|
-| `accessToken`      | string  | Send as `Authorization: Bearer <accessToken>` on subsequent calls. |
-| `expiresInSeconds` | number  | TTL of the access token. When it expires the user must request a new link — **there is no refresh token**. |
-| `email`            | string  | Same email the user typed. Use it to render "Logged in as guest@…". |
-| `guest`            | boolean | Always `true` here. Use it to render a guest badge / upsell the user to register. |
+| `accessToken`      | string  | Send as `Authorization: Bearer <accessToken>` on subsequent calls. Same shape and signer as a normal login token. |
+| `refreshToken`     | string  | **Present only when `guest=false`.** Use it against `POST /v1/auth/refresh` exactly like after a normal login. |
+| `expiresInSeconds` | number  | TTL of the access token. |
+| `email`            | string  | Same email the user typed. |
+| `guest`            | boolean | `true` → no DB row, no refresh token, limited capabilities. `false` → real user, full access. |
+| `userId`           | string  | UUID of the registered user. Present only when `guest=false`. |
 
 **Errors**
 
 | HTTP | code     | message                                  | When                                                  |
 |------|----------|------------------------------------------|-------------------------------------------------------|
 | 400  | `2001`   | `EMPTY_INPUT`                            | Token missing                                         |
-| 401  | `20001`  | Magic link is invalid or has expired     | Bad signature, expired, malformed, wrong signer key  |
+| 401  | `20001`  | Magic link is invalid or has expired     | Bad signature, expired, malformed, user row gone     |
 | 401  | `20002`  | Magic link has already been used         | jti is in the invalidation cache (single-use enforced) |
 
-Show a friendly "This link no longer works — request a new one" message for both `20001` and `20002`. Don't differentiate; both mean "request a fresh link".
+Show a friendly "This link no longer works — request a new one" message for both `20001` and `20002`.
+
+---
+
+## What "guest" mode can and can't do
+
+A guest token is signed with the same `ACCESS_SIGNER_KEY` as a regular user token, so it passes Spring Security's `authenticated()` check. **But** the `sub` claim looks like `"guest:<uuid>"` and points to no DB row.
+
+| Backend code path                                      | Works for guest? |
+|--------------------------------------------------------|------------------|
+| Endpoints that check only `Authentication != null`     | ✅               |
+| Endpoints that read `Authentication.getName()` (user-id) and use it as an opaque key | ⚠️ Works syntactically — the key is `guest:<uuid>` — but cross-session continuity is impossible. |
+| Endpoints that do `userRepository.findById(authName)`  | ❌ Returns `4001 USER_NOT_FOUND` |
+| Anything tied to `User` data: profile, packages, broker, payments, push, follow | ❌               |
+
+Use the `guest` flag on the verify response to gate UI accordingly — show registered features as locked behind an "Upgrade to a full account" CTA.
 
 ---
 
@@ -162,18 +193,50 @@ Show a friendly "This link no longer works — request a new one" message for bo
 | Route                       | What it does                                                      |
 |-----------------------------|-------------------------------------------------------------------|
 | `/login` (or wherever)      | Hosts the email form that calls `/magic-link/request`.            |
-| `/auth/magic-link`          | Reads `?token=…`, calls `/magic-link/verify`, stores access token, redirects to `/`. **This path must match `application.authentication.magic-link.callback-path` in the backend config** (default `/auth/magic-link`). |
+| `/auth/magic-link`          | Reads `?token=…`, calls `/magic-link/verify`, stores tokens, branches on `guest`. **This path must match `application.authentication.magic-link.callback-path` in the backend config** (default `/auth/magic-link`). |
 
-If you want a different callback path, ask backend to update `MAGIC_LINK_CALLBACK_PATH` env var — don't hard-code an alternative in FE only, since the link inside the email comes from the backend.
+If you want a different callback path, ask backend to update `MAGIC_LINK_CALLBACK_PATH` env var — don't hard-code an alternative on the FE only, since the link inside the email is built server-side.
 
-### Storing the token
+### Storing the tokens
 
-Because there is no refresh token, treat the guest access token as ephemeral:
+```ts
+function persistSession(data: {
+  accessToken: string;
+  refreshToken?: string;
+  expiresInSeconds: number;
+  email: string;
+  guest: boolean;
+  userId?: string;
+}) {
+  // Registered users: behave exactly like normal login — use the same
+  // storage/refresh logic you already have for /v1/auth POST /login.
+  if (!data.guest) {
+    localStorage.setItem("accessToken", data.accessToken);
+    localStorage.setItem("refreshToken", data.refreshToken!);
+    localStorage.setItem("userId", data.userId!);
+    return;
+  }
+  // Guests: ephemeral. No refresh token to spend, so a tab-scoped store
+  // is the safest default.
+  sessionStorage.setItem("accessToken", data.accessToken);
+  sessionStorage.setItem("guestEmail", data.email);
+  setTimeout(() => {
+    sessionStorage.removeItem("accessToken");
+    sessionStorage.removeItem("guestEmail");
+  }, data.expiresInSeconds * 1000);
+}
+```
 
-- **Storage:** `sessionStorage` is the safest default (cleared on tab close). `localStorage` is fine if you want the session to survive a refresh, but be explicit in the UI.
-- **Header:** add `Authorization: Bearer <accessToken>` exactly the way you do for regular logged-in users.
-- **Expiry:** schedule a timer for `expiresInSeconds`. When it fires, drop the token and bounce the user back to `/login` (or pop a "Session expired — get a new link" modal).
-- **Logout:** clear the storage entry client-side. **Do not** call `POST /v1/auth/logout` — that endpoint expects a refresh token claim (`rfId`) that guest tokens don't have, and it will 500.
+### Header usage
+
+Add `Authorization: Bearer <accessToken>` on every authenticated call, regardless of guest/user. Your existing interceptor should not need changes.
+
+### Logout
+
+| Session | How to log out |
+|---|---|
+| Registered user (`guest=false`) | Call `POST /v1/auth/logout` with the access token — same as normal logout. Clear storage. |
+| Guest (`guest=true`)            | **Do not** call `/v1/auth/logout` — guest tokens have no `rfId` claim and the endpoint will fail. Just clear `sessionStorage`. |
 
 ### React example — request form
 
@@ -262,14 +325,22 @@ export default function MagicLinkCallback() {
         const json = await res.json();
 
         if (json.code === "999999") {
-          sessionStorage.setItem("accessToken", json.data.accessToken);
-          sessionStorage.setItem("guestEmail", json.data.email);
-          // schedule auto-clear
-          setTimeout(() => {
-            sessionStorage.removeItem("accessToken");
-            sessionStorage.removeItem("guestEmail");
-          }, json.data.expiresInSeconds * 1000);
-          router.replace("/");
+          const { accessToken, refreshToken, email, guest, userId, expiresInSeconds } = json.data;
+
+          if (guest) {
+            sessionStorage.setItem("accessToken", accessToken);
+            sessionStorage.setItem("guestEmail", email);
+            setTimeout(() => {
+              sessionStorage.removeItem("accessToken");
+              sessionStorage.removeItem("guestEmail");
+            }, expiresInSeconds * 1000);
+            router.replace("/?welcome=guest");
+          } else {
+            localStorage.setItem("accessToken", accessToken);
+            localStorage.setItem("refreshToken", refreshToken);
+            localStorage.setItem("userId", userId);
+            router.replace("/");
+          }
         } else if (json.code === "20001" || json.code === "20002") {
           setError("Liên kết đã hết hạn hoặc đã được sử dụng. Vui lòng yêu cầu liên kết mới.");
         } else {
@@ -298,6 +369,15 @@ export default function MagicLinkCallback() {
 If you decode the JWT, look at the payload:
 
 ```json
+// Registered user
+{
+  "sub": "550e8400-e29b-41d4-a716-446655440000",
+  "scope": "ROLE_USER",
+  "rfId": "…",
+  "user": { "userId": "550e…", "email": "user@example.com", "isVerified": true, "isBroker": false }
+}
+
+// Guest
 {
   "sub": "guest:1f3c…",
   "scope": "ROLE_USER",
@@ -315,7 +395,7 @@ function isGuest(claims: { sub?: string; guest?: boolean }) {
 }
 ```
 
-Use it to hide or stub out features that need a real `User` row (profile edit, broker registration, payments, etc.) and show an "Upgrade to a full account" CTA instead.
+The cleanest source of truth, however, is the `guest` flag returned by `/magic-link/verify` — persist it next to the token so you don't need to decode the JWT later.
 
 ---
 
@@ -323,21 +403,25 @@ Use it to hide or stub out features that need a real `User` row (profile edit, b
 
 | Scenario                                          | Suggested UX |
 |---------------------------------------------------|--------------|
-| User clicks the link in a different browser/device | It still works — the JWT is self-contained, no cookies/sessions tied to the originating browser. |
+| User has an account but uses magic-link instead of password | Works — they get the same access+refresh pair as a normal login. Treat as a logged-in user; the `guest` flag is `false`. |
+| User is registered but never verified their email | Still works — clicking the link counts as email verification. The backend flips `isVerified=true` and returns full tokens. |
+| User has no account                               | Gets a guest session. Show guest UI and offer registration. |
 | User clicks the link twice                        | First click logs in. Second returns `20002` — show "already used, request a new link". |
 | User waits >10 minutes before clicking            | Returns `20001` — show "link expired". |
-| User wants to switch identities                   | Clear `sessionStorage`, return them to the email form. |
-| User accidentally requests two links              | The older one still works until it expires; once verified it burns immediately. There is no "only-latest-wins" rule. |
-| Access token expires while user is active         | Show a non-blocking toast "Session expired" and route to `/login`. |
+| User account was deleted between request and click | Returns `20001` (the userId no longer resolves). Show the same "link expired" message. |
+| User clicks the link in a different browser/device | Works — the JWT is self-contained. |
+| User wants to switch identities                   | Clear stored tokens, return them to the email form. |
+| Access token expires while user is active         | Guest: bounce to `/login`. Registered: use the refresh token like normal. |
 
 ---
 
 ## Security notes (for awareness, not action)
 
-- The link is signed with `HS512` using `MAGIC_LINK_SIGNER_KEY` and carries `email`, `sub` (`guest:<uuid>`), `jti`, `exp` (10 min default). Tampering breaks the signature → `20001`.
+- The magic-link JWT is signed with `HS512` using `MAGIC_LINK_SIGNER_KEY` and carries `sub` (`userId` for registered users or `guest:<uuid>` for non-users), `email`, `jti`, `guest` (boolean), and `exp` (10 min default).
 - After verify, the `jti` is added to the `auth.invalidatedTokens` Redis cache (24h TTL) — that's how we enforce single-use.
-- Issued guest access token is signed with the same `ACCESS_SIGNER_KEY` regular users use, so it flows through the existing `CustomJwtDecoder` / Spring Security pipeline transparently.
+- The session token issued on verify uses the same signer keys as normal login (`ACCESS_SIGNER_KEY`, `REFRESH_SIGNER_KEY`), so it flows through the existing `CustomJwtDecoder` / Spring Security pipeline transparently.
 - We deliberately do **not** reveal whether the email is registered when `/request` is called — same response either way. Don't change that on the FE either.
+- Clicking the link is treated as proof of email ownership; we use that to auto-verify previously unverified accounts (same security guarantee as the OTP flow).
 
 ---
 
@@ -347,9 +431,10 @@ These are set in `application.yml`; the FE doesn't read them but it helps to kno
 
 | Property | Default | Notes |
 |---|---|---|
-| `application.authentication.jwt.magic-link-signer-key` | falls back to `RESET_PASSWORD_SIGNER_KEY` | Set `MAGIC_LINK_SIGNER_KEY` in prod. |
+| `application.authentication.jwt.magic-link-signer-key` | falls back to `RESET_PASSWORD_SIGNER_KEY` | Set `MAGIC_LINK_SIGNER_KEY` env var in prod. |
 | `application.authentication.jwt.magic-link-duration` | `600` (seconds, 10 min) | TTL of the link. |
-| `application.authentication.jwt.valid-duration` | env `VALID_DURATION` | TTL of the **guest access token** (same as regular access token). |
+| `application.authentication.jwt.valid-duration` | env `VALID_DURATION` | TTL of the access token (guest and user). |
+| `application.authentication.jwt.refreshable-duration` | env `REFRESHABLE_DURATION` | TTL of the refresh token (registered users only). |
 | `application.authentication.magic-link.callback-path` | `/auth/magic-link` | Path appended to `client-url` when building the email link. Must match the FE route. |
 | `application.authentication.magic-link.email-subject` | `SmartRent - Đăng nhập với liên kết` | Email subject line. |
 | `application.client-url` | env `CLIENT_URL` | Base URL of the FE app. |
@@ -359,13 +444,19 @@ These are set in `application.yml`; the FE doesn't read them but it helps to kno
 ## FAQ
 
 **Q: Can I make guest sessions persist across browser tabs?**
-Yes — use `localStorage` instead of `sessionStorage`. Just be sure to honor the expiry timer; the backend won't refresh the token for you.
+Yes — use `localStorage` instead of `sessionStorage`. Just honor the expiry timer; the backend won't refresh a guest token.
 
-**Q: Can a guest become a registered user later?**
-Yes — when they click "Create account" route them to the normal `/v1/users` registration flow, prefilling `email` from `sessionStorage.getItem("guestEmail")`. The two identities are completely independent on the backend.
+**Q: Can a guest later become a registered user?**
+Yes — route them to the normal `/v1/users` registration flow, prefilling the email from `sessionStorage.getItem("guestEmail")`. The two identities are independent on the backend until they finish registration, at which point future magic-link requests will resolve to the new `User` row.
+
+**Q: Does the magic-link work for admins?**
+No. The lookup is against the `users` table only. Admins use `POST /v1/admins/auth`.
+
+**Q: Does it work for brokers?**
+Yes — a broker is just a `User` with `isBroker=true`. The magic-link returns their normal session and the FE can show broker features as usual.
 
 **Q: What's the rate-limit on `/magic-link/request`?**
-There isn't one yet — it goes through Brevo's rate limits only. If you see abuse during rollout, ping backend to add a per-email/per-IP throttle.
+There isn't one yet. If you see abuse during rollout, ping backend to add a per-email/per-IP throttle.
 
 **Q: Can I use a deep link (iOS/Android) instead of a web URL?**
-Yes — change `MAGIC_LINK_CALLBACK_PATH` to your app's deep-link path (e.g. `smartrent://auth/magic-link`) and `CLIENT_URL` to the scheme prefix. Both endpoints are scheme-agnostic.
+Yes — change `MAGIC_LINK_CALLBACK_PATH` to your app's deep-link path (e.g. `smartrent://auth/magic-link`) and `CLIENT_URL` to the scheme prefix.

@@ -654,8 +654,8 @@ public class AuthenticationController {
 
   @PostMapping("/magic-link/verify")
   @Operation(
-      summary = "Exchange a magic-link token for a guest access token",
-      description = "Validates the single-use magic-link token (signature, expiry, not previously redeemed) and returns a short-lived guest access token. No refresh token is issued — when the access token expires the user must request a new link.",
+      summary = "Exchange a magic-link token for a session",
+      description = "Validates the single-use magic-link token (signature, expiry, not previously redeemed). If the email matches a registered user, returns a full session (`accessToken` + `refreshToken`, `guest=false`) and marks the user verified if needed. Otherwise returns a short-lived guest access token only (`guest=true`, no refresh token — request a new link when it expires).",
       requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
           description = "The token extracted from the magic-link URL's `token` query parameter",
           required = true,
@@ -676,23 +676,43 @@ public class AuthenticationController {
   @ApiResponses(value = {
       @io.swagger.v3.oas.annotations.responses.ApiResponse(
           responseCode = "200",
-          description = "Token accepted, guest access token issued",
+          description = "Token accepted; session issued (guest or registered user)",
           content = @Content(
               mediaType = "application/json",
-              examples = @ExampleObject(
-                  value = """
-                      {
-                        "code": "999999",
-                        "message": null,
-                        "data": {
-                          "accessToken": "eyJhbGciOiJIUzUxMiJ9...",
-                          "expiresInSeconds": 3600,
-                          "email": "guest@example.com",
-                          "guest": true
-                        }
-                      }
-                      """
-              )
+              examples = {
+                  @ExampleObject(
+                      name = "Registered user",
+                      value = """
+                          {
+                            "code": "999999",
+                            "message": null,
+                            "data": {
+                              "accessToken": "eyJhbGciOiJIUzUxMiJ9...",
+                              "refreshToken": "eyJhbGciOiJIUzUxMiJ9...",
+                              "expiresInSeconds": 3600,
+                              "email": "user@example.com",
+                              "guest": false,
+                              "userId": "550e8400-e29b-41d4-a716-446655440000"
+                            }
+                          }
+                          """
+                  ),
+                  @ExampleObject(
+                      name = "Guest (no account)",
+                      value = """
+                          {
+                            "code": "999999",
+                            "message": null,
+                            "data": {
+                              "accessToken": "eyJhbGciOiJIUzUxMiJ9...",
+                              "expiresInSeconds": 3600,
+                              "email": "guest@example.com",
+                              "guest": true
+                            }
+                          }
+                          """
+                  )
+              }
           )
       ),
       @io.swagger.v3.oas.annotations.responses.ApiResponse(
