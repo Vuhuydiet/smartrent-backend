@@ -110,6 +110,63 @@ public class EmailBuilder {
     return htmlContent.toString();
   }
 
+  public static String buildMagicLinkHtmlContent(String senderName, String email,
+                                                 String magicLinkUrl, int expiryMinutes) {
+    StringBuilder htmlContent = buildHtmlHeader("Đăng nhập với liên kết");
+
+    htmlContent.append("<div class=\"container\">");
+
+    // Header
+    htmlContent.append("<div class=\"header\">");
+    htmlContent.append("<h1>Đăng nhập vào %s</h1>".formatted(senderName));
+    htmlContent.append("</div>");
+
+    // Content
+    htmlContent.append("<div class=\"content\">");
+    htmlContent.append("<div class=\"greeting\">Xin chào,</div>");
+
+    htmlContent.append("<div class=\"message\">");
+    htmlContent.append("Bạn vừa yêu cầu đăng nhập với địa chỉ <strong>%s</strong>. "
+        .formatted(email));
+    htmlContent.append("Nhấn vào nút bên dưới để hoàn tất đăng nhập — không cần mật khẩu.");
+    htmlContent.append("</div>");
+
+    // CTA button
+    htmlContent.append("<div class=\"cta-container\">");
+    htmlContent.append("<a href=\"%s\" class=\"cta-button\">Đăng nhập ngay</a>"
+        .formatted(magicLinkUrl));
+    htmlContent.append("<div class=\"cta-fallback\">Hoặc mở liên kết: "
+        + "<a href=\"%s\">%s</a></div>".formatted(magicLinkUrl, magicLinkUrl));
+    htmlContent.append("</div>");
+
+    // Expiry information
+    htmlContent.append("<div class=\"card card-warning\">");
+    htmlContent.append("<div class=\"card-title\">Thời gian hiệu lực</div>");
+    htmlContent.append("<div class=\"card-body\">Liên kết này sẽ hết hạn sau "
+        + "<strong>%d phút</strong> và chỉ dùng được một lần.</div>".formatted(expiryMinutes));
+    htmlContent.append("</div>");
+
+    // Security note
+    htmlContent.append("<div class=\"card card-info\">");
+    htmlContent.append("<div class=\"card-title\">Lưu ý bảo mật</div>");
+    htmlContent.append("<div class=\"card-body\">Nếu bạn không yêu cầu đăng nhập, "
+        + "hãy bỏ qua email này — không có thao tác nào được thực hiện trên tài khoản của bạn.</div>");
+    htmlContent.append("</div>");
+
+    htmlContent.append("</div>"); // End content
+
+    // Footer
+    htmlContent.append("<div class=\"footer\">");
+    htmlContent.append("Email này được gửi tự động &mdash; bạn không cần phản hồi.<br>");
+    htmlContent.append("&copy; %d %s. Bản quyền được bảo lưu.".formatted(currentYear(), senderName));
+    htmlContent.append("</div>");
+
+    htmlContent.append("</div>"); // End container
+    htmlContent.append("</body></html>");
+
+    return htmlContent.toString();
+  }
+
   public static String buildExpiringListingHtmlContent(String senderName, String firstName,
                                                       String lastName, int count, long daysToSoonest,
                                                       String manageUrl) {
