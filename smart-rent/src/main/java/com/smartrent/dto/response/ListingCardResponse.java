@@ -74,6 +74,7 @@ public class ListingCardResponse {
         String userId;
         String firstName;
         String lastName;
+        String email;
         String contactPhoneNumber;
         Boolean contactPhoneVerified;
         String avatarUrl;
