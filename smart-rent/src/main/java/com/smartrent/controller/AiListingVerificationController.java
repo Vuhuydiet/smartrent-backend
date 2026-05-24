@@ -298,4 +298,70 @@ public class AiListingVerificationController {
                 })
                 .build());
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Admin: AI scheduler toggle
+    // ─────────────────────────────────────────────────────────────────────────
+
+    @GetMapping("/scheduler/status")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(
+        summary = "Get AI auto-moderation scheduler status (Admin only)",
+        description = "Returns whether the AI auto-moderation scheduler is currently enabled or disabled.",
+        parameters = {
+            @Parameter(name = "X-Admin-Id", description = "Admin ID", required = true)
+        }
+    )
+    public ResponseEntity<ApiResponse<Object>> getSchedulerStatus(
+            @RequestHeader("X-Admin-Id") String adminId) {
+        boolean enabled = aiListingAutoModerationScheduler.isEnabled();
+        return ResponseEntity.ok(ApiResponse.builder()
+                .message("AI scheduler status retrieved successfully")
+                .data(new Object() {
+                    public final boolean aiSchedulerEnabled = enabled;
+                    public final String checkedAt = java.time.LocalDateTime.now().toString();
+                })
+                .build());
+    }
+
+    @PutMapping("/scheduler/toggle")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(
+        summary = "Toggle AI auto-moderation scheduler on/off (Admin only)",
+        description = """
+            Enables or disables the AI automatic listing moderation scheduler at runtime.
+
+            - **enabled=true** → scheduler will process pending listings every 5 minutes.
+            - **enabled=false** → scheduler is paused; listings stay in PENDING state until manually reviewed or re-enabled.
+
+            This does NOT restart the server — the change takes effect immediately for the next scheduled run.
+            """,
+        parameters = {
+            @Parameter(name = "X-Admin-Id", description = "Admin ID", required = true),
+            @Parameter(name = "enabled", description = "true to enable, false to disable", required = true, example = "false")
+        }
+    )
+    public ResponseEntity<ApiResponse<Object>> toggleScheduler(
+            @RequestHeader("X-Admin-Id") String adminId,
+            @RequestParam boolean enabled) {
+        if (enabled) {
+            aiListingAutoModerationScheduler.enable();
+        } else {
+            aiListingAutoModerationScheduler.disable();
+        }
+        log.info("Admin {} {} the AI Auto Moderation Scheduler", adminId, enabled ? "ENABLED" : "DISABLED");
+        String message = enabled
+                ? "AI auto-moderation scheduler has been enabled. Listings will be processed automatically."
+                : "AI auto-moderation scheduler has been disabled. Listings will require manual review.";
+        return ResponseEntity.ok(ApiResponse.builder()
+                .message(message)
+                .data(new Object() {
+                    public final boolean aiSchedulerEnabled = enabled;
+                    public final String updatedAt = java.time.LocalDateTime.now().toString();
+                    public final String updatedBy = adminId;
+                })
+                .build());
+    }
 }

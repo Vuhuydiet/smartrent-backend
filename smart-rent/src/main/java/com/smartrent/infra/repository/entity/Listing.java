@@ -432,8 +432,19 @@ public class Listing {
                 case REJECTED:
                     return com.smartrent.enums.ListingStatus.REJECTED;
                 case APPROVED:
-                    // fall through to legacy expiry/display checks below
-                    break;
+                    if (this.expired != null && this.expired) {
+                        return com.smartrent.enums.ListingStatus.EXPIRED;
+                    }
+                    if (this.expiryDate != null && this.expiryDate.isBefore(now)) {
+                        return com.smartrent.enums.ListingStatus.EXPIRED;
+                    }
+                    if (this.expiryDate != null) {
+                        long daysUntilExpiry = java.time.Duration.between(now, this.expiryDate).toDays();
+                        if (daysUntilExpiry >= 0 && daysUntilExpiry <= 7) {
+                            return com.smartrent.enums.ListingStatus.EXPIRING_SOON;
+                        }
+                    }
+                    return com.smartrent.enums.ListingStatus.DISPLAYING;
             }
         }
 
