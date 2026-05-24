@@ -2,6 +2,7 @@ package com.smartrent.mapper.impl;
 
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.response.AddressResponse;
+import com.smartrent.dto.response.AdminListingSummary;
 import com.smartrent.dto.response.AdminVerificationInfo;
 import com.smartrent.dto.response.AmenityResponse;
 import com.smartrent.dto.response.ListingCardResponse;
@@ -347,6 +348,44 @@ public class ListingMapperImpl implements ListingMapper {
                 .lastModerationReasonCode(entity.getLastModerationReasonCode())
                 .lastModerationReasonText(entity.getLastModerationReasonText())
                 .propertyInfo(propertyInfo)
+                .build();
+    }
+
+    @Override
+    public AdminListingSummary toAdminSummary(Listing entity, User owner, String verificationStatus) {
+        AdminListingSummary.OwnerSummary ownerSummary = owner == null ? null
+                : AdminListingSummary.OwnerSummary.builder()
+                        .firstName(owner.getFirstName())
+                        .lastName(owner.getLastName())
+                        .contactPhoneNumber(owner.getContactPhoneNumber())
+                        .build();
+
+        AdminListingSummary.AdminVerificationSummary verification = AdminListingSummary.AdminVerificationSummary.builder()
+                .verifiedAt(entity.getUpdatedAt())
+                .verificationStatus(verificationStatus)
+                .build();
+
+        return AdminListingSummary.builder()
+                .listingId(entity.getListingId())
+                .title(entity.getTitle())
+                .user(ownerSummary)
+                .postDate(entity.getPostDate())
+                .expiryDate(entity.getExpiryDate())
+                .listingType(entity.getListingType() != null ? entity.getListingType().name() : null)
+                .verified(entity.getVerified())
+                .expired(entity.getExpired())
+                .listingStatus(entity.computeListingStatus().name())
+                .vipType(entity.getVipType() != null ? entity.getVipType().name() : null)
+                .categoryId(entity.getCategoryId())
+                .productType(entity.getProductType() != null ? entity.getProductType().name() : null)
+                .price(entity.getPrice())
+                .priceUnit(entity.getPriceUnit() != null ? entity.getPriceUnit().name() : null)
+                .area(entity.getArea())
+                .adminVerification(verification)
+                .moderationStatus(entity.getModerationStatus() != null ? entity.getModerationStatus().name() : null)
+                .revisionCount(entity.getRevisionCount())
+                .lastModerationReasonCode(entity.getLastModerationReasonCode())
+                .lastModerationReasonText(entity.getLastModerationReasonText())
                 .build();
     }
 

@@ -2,6 +2,7 @@ package com.smartrent.mapper;
 
 import com.smartrent.dto.request.ListingCreationRequest;
 import com.smartrent.dto.response.AddressResponse;
+import com.smartrent.dto.response.AdminListingSummary;
 import com.smartrent.dto.response.ListingCardResponse;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingResponse;
@@ -11,6 +12,7 @@ import com.smartrent.dto.response.MediaResponse;
 import com.smartrent.dto.response.UserCreationResponse;
 import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.Listing;
+import com.smartrent.infra.repository.entity.User;
 
 import java.util.List;
 
@@ -44,6 +46,17 @@ public interface ListingMapper {
      * @return ListingResponseWithAdmin
      */
     ListingResponseWithAdmin toResponseWithAdmin(Listing entity, UserCreationResponse user, Admin verifyingAdmin, String verificationStatus, String verificationNotes);
+
+    /**
+     * Map Listing entity to slim AdminListingSummary used by the admin list/table view.
+     * Drops description, media, amenities, address/extra-fee fields, etc. — call
+     * GET /v1/listings/admin/{id} for the full record.
+     *
+     * @param entity Listing entity
+     * @param owner Listing owner entity (nullable). Used to build the slim OwnerSummary.
+     * @param verificationStatus Verification status (PENDING/APPROVED/REJECTED/NOT_SUBMITTED)
+     */
+    AdminListingSummary toAdminSummary(Listing entity, User owner, String verificationStatus);
 
     /**
      * Map Listing entity to ListingResponseForOwner with owner-specific information

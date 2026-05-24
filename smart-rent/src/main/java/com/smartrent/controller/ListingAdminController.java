@@ -21,8 +21,9 @@ import org.springframework.web.bind.annotation.*;
         Admin listing management. All endpoints require `X-Admin-Id` header.
 
         **Endpoints:**
-        - `GET /{id}/admin` - Get listing with admin verification info (verificationStatus, adminName, notes)
-        - `POST /admin/list` - Paginated admin listing view with filters and dashboard statistics
+        - `GET /admin/{id}` - Get full listing detail with admin verification info (use after picking a row from the list)
+        - `GET /{id}/admin` - Legacy alias for the detail endpoint above; same payload
+        - `POST /admin/list` - Paginated admin listing view returning a SLIM summary per row + dashboard statistics
 
         **Dashboard statistics:** pendingVerification, verified, expired, rejected counts, VIP tier breakdown.
 
@@ -30,6 +31,16 @@ import org.springframework.web.bind.annotation.*;
         - Pending review: `{"verified": false, "isVerify": true}`
         - By moderation status: `{"moderationStatus": "PENDING_REVIEW"}`
         - By VIP tier: `{"vipType": "GOLD"}`
+        - Title contains: `{"title": "Tân Bình"}`
+        - Owner name/phone: `{"ownerSearch": "0367919024"}`
+        - Posted in a date range: `{"postDate": "2026-03-01..2026-03-31"}` (open-ended: `"2026-03-01.."` or `"..2026-03-31"`)
+        - Expiring in a date range: `{"expiryDate": "2026-08-01..2026-08-31"}`
+        - By type: `{"listingType": "RENT", "productType": "APARTMENT", "verified": true}`
+        - Price range: `{"price": "5000000..15000000"}` (open-ended: `"5000000.."` or `"..15000000"`)
+        - Area / bedrooms / bathrooms range: `{"area": "30..60", "bedroomsRange": "2..4", "bathroomsRange": "1..3"}`
+
+        **Range format**: all range filters use the `..` separator (`from..to`). Either side may be omitted.
+        Applies to: `price`, `area`, `bedroomsRange`, `bathroomsRange`, `roomCapacity`, `priceReductionPercent`, `postDate`, `expiryDate`.
         """
 )
 @RequiredArgsConstructor
@@ -37,10 +48,16 @@ public class ListingAdminController {
 
     private final ListingService listingService;
 
-    @GetMapping("/{id}/admin")
+    @GetMapping("/admin/{id}")
     @Operation(
-        summary = "Get listing with admin verification info (Admin only)",
-        description = "Retrieves listing details including admin verification information and status. This endpoint is for administrators only.",
+        summary = "Get full listing detail for admin (Admin only)",
+        description = """
+            Returns the full listing record including description, media, amenities, address,
+            owner contact details, moderation context, and admin verification info.
+
+            Use this endpoint after picking a row from `POST /v1/listings/admin/list`
+            (which returns a slim summary per row).
+            """,
         parameters = {
             @Parameter(name = "id", description = "Listing ID", required = true),
             @Parameter(name = "X-Admin-Id", description = "Admin ID from authentication header", required = true)
@@ -54,11 +71,27 @@ public class ListingAdminController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Listing not found")
         }
     )
-    public ApiResponse<ListingResponseWithAdmin> getListingByIdWithAdmin(
+    public ApiResponse<ListingResponseWithAdmin> getAdminListingDetail(
             @PathVariable Long id,
             @RequestHeader("X-Admin-Id") String adminId) {
         ListingResponseWithAdmin response = listingService.getListingByIdWithAdmin(id, adminId);
         return ApiResponse.<ListingResponseWithAdmin>builder().data(response).build();
+    }
+
+    @GetMapping("/{id}/admin")
+    @Operation(
+        summary = "Get full listing detail for admin (legacy alias)",
+        description = "Identical to `GET /v1/listings/admin/{id}`. Kept for backward compatibility; prefer the new admin-prefixed route in new code.",
+        deprecated = true,
+        parameters = {
+            @Parameter(name = "id", description = "Listing ID", required = true),
+            @Parameter(name = "X-Admin-Id", description = "Admin ID from authentication header", required = true)
+        }
+    )
+    public ApiResponse<ListingResponseWithAdmin> getListingByIdWithAdmin(
+            @PathVariable Long id,
+            @RequestHeader("X-Admin-Id") String adminId) {
+        return getAdminListingDetail(id, adminId);
     }
 
     @PostMapping("/admin/list")
@@ -106,6 +139,79 @@ public class ListingAdminController {
                               "page": 1,
                               "size": 20,
                               "moderationStatus": "PENDING_REVIEW"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Search by title",
+                        summary = "Case-insensitive substring match on title",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "title": "Tân Bình"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Find listings by owner",
+                        summary = "Match owner name or phone (firstName / lastName / contactPhoneNumber / phoneNumber)",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "ownerSearch": "0367919024"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Date range filter",
+                        summary = "Listings posted in March 2026, expiring in August 2026 (single field with `..` separator)",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "postDate": "2026-03-01..2026-03-31",
+                              "expiryDate": "2026-08-01..2026-08-31"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Open-ended date range",
+                        summary = "Posted on or after Mar 1 (no upper bound); expiring on or before Aug 31 (no lower bound)",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "postDate": "2026-03-01..",
+                              "expiryDate": "..2026-08-31"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Combined admin filter",
+                        summary = "Verified APARTMENT rentals posted in April 2026",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "verified": true,
+                              "listingType": "RENT",
+                              "productType": "APARTMENT",
+                              "postDate": "2026-04-01..2026-04-30"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Numeric range filters",
+                        summary = "Price 5M–15M VND, 30–60 m², 2–4 bedrooms — all using `..` separator",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "price": "5000000..15000000",
+                              "area": "30..60",
+                              "bedroomsRange": "2..4"
                             }
                             """
                     )

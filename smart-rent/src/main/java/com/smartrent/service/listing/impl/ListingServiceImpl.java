@@ -1810,18 +1810,10 @@ public class ListingServiceImpl implements ListingService {
 
         List<Listing> content = page.getContent();
 
-        List<com.smartrent.dto.response.ListingResponseWithAdmin> listings;
+        List<com.smartrent.dto.response.AdminListingSummary> listings;
 
         if (!content.isEmpty()) {
-            List<Long> listingIds = content.stream()
-                    .map(Listing::getListingId).collect(Collectors.toList());
-
-            // ---- Batch-load all related data (avoids N+1) ----
-
-            // 1. Batch-load addresses into Hibernate session cache
-            listingRepository.findByIdsWithAmenities(listingIds);
-
-            // 2. Batch-load all distinct users — 1 query
+            // ---- Batch-load owners — 1 query ----
             Set<String> userIds = content.stream()
                     .map(Listing::getUserId).filter(id -> id != null).collect(Collectors.toSet());
             Map<String, com.smartrent.infra.repository.entity.User> userMap = userIds.isEmpty()
@@ -1831,23 +1823,10 @@ public class ListingServiceImpl implements ListingService {
                                     com.smartrent.infra.repository.entity.User::getUserId,
                                     Function.identity()));
 
-            // 3. Batch-load all distinct admins who updated listings — 1 query
-            Set<String> adminIds = content.stream()
-                    .map(Listing::getUpdatedBy).filter(id -> id != null)
-                    .map(String::valueOf).collect(Collectors.toSet());
-            Map<String, Admin> adminMap = adminIds.isEmpty()
-                    ? Collections.emptyMap()
-                    : adminRepository.findAllById(adminIds).stream()
-                            .collect(Collectors.toMap(Admin::getAdminId, Function.identity()));
-
-            // ---- Map to response DTOs ----
+            // ---- Map to slim AdminListingSummary DTOs ----
+            // (No amenity/media/address fetch — list view does not need them.)
             listings = content.stream()
                     .map(listing -> {
-                        // Look up admin from batch-loaded map
-                        Admin verifyingAdmin = listing.getUpdatedBy() != null
-                                ? adminMap.get(String.valueOf(listing.getUpdatedBy()))
-                                : null;
-
                         String verificationStatus;
                         if (listing.getVerified()) {
                             verificationStatus = "APPROVED";
@@ -1856,14 +1835,8 @@ public class ListingServiceImpl implements ListingService {
                         } else {
                             verificationStatus = "NOT_SUBMITTED";
                         }
-
-                        // Look up user from batch-loaded map
-                        com.smartrent.infra.repository.entity.User userEntity = userMap.get(listing.getUserId());
-                        com.smartrent.dto.response.UserCreationResponse user = userEntity != null
-                                ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity)
-                                : null;
-
-                        return listingMapper.toResponseWithAdmin(listing, user, verifyingAdmin, verificationStatus, null);
+                        com.smartrent.infra.repository.entity.User owner = userMap.get(listing.getUserId());
+                        return listingMapper.toAdminSummary(listing, owner, verificationStatus);
                     })
                     .collect(Collectors.toList());
         } else {
@@ -1886,7 +1859,7 @@ public class ListingServiceImpl implements ListingService {
     }
 
     /**
-     * Calculate admin statistics in a single query instead of 10 separate COUNT queries
+     * Calculate admin statistics in a single query instead of 11 separate COUNT queries
      */
     private com.smartrent.dto.response.AdminListingListResponse.AdminStatistics calculateAdminStatistics() {
         List<Object[]> results = listingRepository.getAdminStatistics();
@@ -1895,6 +1868,7 @@ public class ListingServiceImpl implements ListingService {
                     .pendingVerification(0L).verified(0L).expired(0L).rejected(0L)
                     .drafts(0L).shadows(0L)
                     .normalListings(0L).silverListings(0L).goldListings(0L).diamondListings(0L)
+                    .totalListings(0L)
                     .build();
         }
         Object[] row = results.get(0);
@@ -1909,6 +1883,7 @@ public class ListingServiceImpl implements ListingService {
                 .silverListings(toLong(row[7]))
                 .goldListings(toLong(row[8]))
                 .diamondListings(toLong(row[9]))
+                .totalListings(toLong(row[10]))
                 .build();
     }
 
