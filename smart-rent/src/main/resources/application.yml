@@ -213,7 +213,11 @@ application:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
       refresh-signer-key: "${REFRESH_SIGNER_KEY}"
       reset-password-signer-key: "${RESET_PASSWORD_SIGNER_KEY}"
-      magic-link-signer-key: "${MAGIC_LINK_SIGNER_KEY:${RESET_PASSWORD_SIGNER_KEY}}"
+      # Empty default — MagicLinkServiceImpl falls back to reset-password-signer-key
+      # in Java. Avoid nested YAML placeholders here because their resolution
+      # depended on Spring version, and a literal "${...}" leaked into the key
+      # produced HS512 KeyLengthException at runtime (manifested as 9999).
+      magic-link-signer-key: "${MAGIC_LINK_SIGNER_KEY:}"
       valid-duration: "${VALID_DURATION}"
       refreshable-duration: "${REFRESHABLE_DURATION}"
       reset_password_duration: "${RESET_PASSWORD_DURATION}"
