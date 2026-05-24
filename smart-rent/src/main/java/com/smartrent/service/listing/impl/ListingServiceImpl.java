@@ -72,8 +72,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -586,6 +588,10 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_DETAIL, key = "#id"),
+            @CacheEvict(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_BROWSE, allEntries = true)
+    })
     public ListingResponse updateListing(Long id, ListingRequest request, String userId) {
         Listing existing = listingRepository.findById(id)
                 .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
