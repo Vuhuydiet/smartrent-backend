@@ -645,6 +645,12 @@ public class ListingServiceImpl implements ListingService {
             }
         }
 
+        // Handle amenity update if provided (empty set clears all amenities)
+        if (request.getAmenityIds() != null) {
+            log.info("Updating amenities for listing {}: {} amenities", id, request.getAmenityIds().size());
+            linkAmenitiesToListing(existing, request.getAmenityIds());
+        }
+
         Listing saved = listingRepository.save(existing);
         com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(saved.getUserId());
         com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(saved.getAddress());
@@ -786,6 +792,16 @@ public class ListingServiceImpl implements ListingService {
      * @throws AppException if validation fails
      */
     private void linkAmenitiesToListing(Listing listing, Set<Long> amenityIds) {
+        // Initialize or clear the managed @ManyToMany collection in place so Hibernate
+        // tracks the diff on the listing_amenities join table correctly. Replacing the
+        // reference via setAmenities(new ArrayList<>(...)) on a managed entity is the
+        // source of "amenities don't update" bugs.
+        if (listing.getAmenities() == null) {
+            listing.setAmenities(new ArrayList<>());
+        } else {
+            listing.getAmenities().clear();
+        }
+
         if (amenityIds == null || amenityIds.isEmpty()) {
             return;
         }
@@ -793,7 +809,6 @@ public class ListingServiceImpl implements ListingService {
         log.info("Linking {} amenities to listing {}",
                 amenityIds.size(), listing.getListingId());
 
-        List<Amenity> amenities = new ArrayList<>();
         for (Long amenityId : amenityIds) {
             // Fetch amenity
             Amenity amenity = amenityRepository.findById(amenityId)
@@ -806,15 +821,12 @@ public class ListingServiceImpl implements ListingService {
                         "Amenity " + amenityId + " is not active");
             }
 
-            amenities.add(amenity);
-            log.debug("Amenity {} will be linked to listing {}", amenityId, listing.getListingId());
+            listing.getAmenities().add(amenity);
+            log.debug("Amenity {} linked to listing {}", amenityId, listing.getListingId());
         }
 
-        // Set amenities to listing - JPA will handle the join table
-        listing.setAmenities(amenities);
-
         log.info("Successfully linked {} amenities to listing {}",
-                amenities.size(), listing.getListingId());
+                amenityIds.size(), listing.getListingId());
     }
 
     /**
