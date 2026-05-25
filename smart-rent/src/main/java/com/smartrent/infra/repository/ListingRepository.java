@@ -456,16 +456,11 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     List<Listing> findWithAddressByListingIds(@Param("ids") Collection<Long> ids);
 
     /**
-     * Candidate pool for "similar listings": same province (legacyProvinceId or newProvinceCode),
-     * same productType and listingType, excluding the target listing itself.
-     * Active, verified, non-draft, non-expired listings only.
+     * Candidate pool for "similar listings" by legacy province ID.
      */
     @Query("""
         SELECT l FROM listings l LEFT JOIN FETCH l.address a
-        WHERE (
-            (:provinceId IS NOT NULL AND a.legacyProvinceId = :provinceId)
-            OR (:provinceCode IS NOT NULL AND a.newProvinceCode = :provinceCode)
-        )
+        WHERE a.legacyProvinceId = :provinceId
         AND l.productType = :productType
         AND l.listingType = :listingType
         AND l.listingId <> :excludeId
@@ -475,8 +470,30 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.expired = false
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
-    List<Listing> findCandidatesForSimilar(
+    List<Listing> findCandidatesForSimilarByLegacyProvince(
         @Param("provinceId") Integer provinceId,
+        @Param("productType") Listing.ProductType productType,
+        @Param("listingType") Listing.ListingType listingType,
+        @Param("excludeId") Long excludeId,
+        Pageable pageable
+    );
+
+    /**
+     * Candidate pool for "similar listings" by new province code.
+     */
+    @Query("""
+        SELECT l FROM listings l LEFT JOIN FETCH l.address a
+        WHERE a.newProvinceCode = :provinceCode
+        AND l.productType = :productType
+        AND l.listingType = :listingType
+        AND l.listingId <> :excludeId
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForSimilarByNewProvince(
         @Param("provinceCode") String provinceCode,
         @Param("productType") Listing.ProductType productType,
         @Param("listingType") Listing.ListingType listingType,
@@ -506,15 +523,11 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     );
 
     /**
-     * Candidate pool for personalized feed: preferred province (legacyProvinceId or newProvinceCode),
-     * excluding already-interacted listings.
+     * Candidate pool for personalized feed by legacy province ID.
      */
     @Query("""
         SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
-        WHERE (
-            (:provinceId IS NOT NULL AND a.legacyProvinceId = :provinceId)
-            OR (:provinceCode IS NOT NULL AND a.newProvinceCode = :provinceCode)
-        )
+        WHERE a.legacyProvinceId = :provinceId
         AND l.listingId NOT IN :excludedIds
         AND l.isDraft = false
         AND l.isShadow = false
@@ -522,22 +535,37 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.expired = false
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
-    List<Listing> findCandidatesForPersonalized(
+    List<Listing> findCandidatesForPersonalizedByLegacyProvince(
         @Param("provinceId") Integer provinceId,
+        @Param("excludedIds") java.util.List<Long> excludedIds,
+        Pageable pageable
+    );
+
+    /**
+     * Candidate pool for personalized feed by new province code.
+     */
+    @Query("""
+        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
+        WHERE a.newProvinceCode = :provinceCode
+        AND l.listingId NOT IN :excludedIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesForPersonalizedByNewProvince(
         @Param("provinceCode") String provinceCode,
         @Param("excludedIds") java.util.List<Long> excludedIds,
         Pageable pageable
     );
 
     /**
-     * Candidate pool for personalized feed: Same Ward
+     * Candidate pool for personalized feed: Same Legacy Ward
      */
     @Query("""
         SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
-        WHERE (
-            (:wardId IS NOT NULL AND a.legacyWardId = :wardId)
-            OR (:wardCode IS NOT NULL AND a.newWardCode = :wardCode)
-        )
+        WHERE a.legacyWardId = :wardId
         AND l.listingId NOT IN :excludedIds
         AND l.isDraft = false
         AND l.isShadow = false
@@ -545,8 +573,26 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.expired = false
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
-    List<Listing> findCandidatesByWard(
+    List<Listing> findCandidatesByLegacyWard(
         @Param("wardId") Integer wardId,
+        @Param("excludedIds") java.util.List<Long> excludedIds,
+        Pageable pageable
+    );
+
+    /**
+     * Candidate pool for personalized feed: Same New Ward
+     */
+    @Query("""
+        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
+        WHERE a.newWardCode = :wardCode
+        AND l.listingId NOT IN :excludedIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findCandidatesByNewWard(
         @Param("wardCode") String wardCode,
         @Param("excludedIds") java.util.List<Long> excludedIds,
         Pageable pageable

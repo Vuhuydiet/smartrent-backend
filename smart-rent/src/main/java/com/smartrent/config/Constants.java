@@ -32,6 +32,8 @@ public class Constants {
      * {@code HomepageStatsCacheScheduler}.
      */
     public static final String LISTING_STATS_PROVINCES = LISTING + "stats.provinces";
+    public static final String LISTING_RECOMMENDATION_SIMILAR = LISTING + "recommendation.similar";
+    public static final String LISTING_RECOMMENDATION_PERSONALIZED = LISTING + "recommendation.personalized";
   }
 
   @NoArgsConstructor(access = AccessLevel.NONE)

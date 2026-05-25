@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.CacheManager;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,6 +33,25 @@ public class SavedListingServiceImpl implements SavedListingService {
 
     SavedListingRepository savedListingRepository;
     SavedListingMapper savedListingMapper;
+    CacheManager cacheManager;
+
+    private void evictPersonalizedCache(String userId) {
+        try {
+            org.springframework.cache.Cache cache = cacheManager.getCache(com.smartrent.config.Constants.CacheNames.LISTING_RECOMMENDATION_PERSONALIZED);
+            if (cache != null) {
+                cache.evict("user:" + userId + ":topN:8");
+                cache.evict("user:" + userId + ":topN:9");
+                cache.evict("user:" + userId + ":topN:10");
+                cache.evict("user:" + userId + ":topN:11");
+                cache.evict("user:" + userId + ":topN:12");
+                cache.evict("user:" + userId + ":topN:15");
+                cache.evict("user:" + userId + ":topN:20");
+                log.info("Successfully evicted recommendation cache for user: {}", userId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to evict recommendation cache for user " + userId, e);
+        }
+    }
 
     @Override
     @Transactional
@@ -47,6 +68,7 @@ public class SavedListingServiceImpl implements SavedListingService {
         SavedListing saved = savedListingRepository.save(savedListing);
         
         log.info("Successfully saved listing {} for user {}", request.getListingId(), userId);
+        evictPersonalizedCache(userId);
         return savedListingMapper.toResponse(saved);
     }
 
@@ -63,6 +85,7 @@ public class SavedListingServiceImpl implements SavedListingService {
         
         savedListingRepository.deleteByIdUserIdAndIdListingId(userId, listingId);
         log.info("Successfully unsaved listing {} for user {}", listingId, userId);
+        evictPersonalizedCache(userId);
     }
 
     @Override

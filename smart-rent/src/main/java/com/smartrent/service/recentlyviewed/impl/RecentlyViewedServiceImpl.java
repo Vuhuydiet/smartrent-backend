@@ -21,6 +21,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.CacheManager;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,6 +34,25 @@ public class RecentlyViewedServiceImpl implements RecentlyViewedService {
 
     private final RedisTemplate<String, String> redisTemplate;
     private final ListingService listingService;
+    private final CacheManager cacheManager;
+
+    private void evictPersonalizedCache(String userId) {
+        try {
+            org.springframework.cache.Cache cache = cacheManager.getCache(com.smartrent.config.Constants.CacheNames.LISTING_RECOMMENDATION_PERSONALIZED);
+            if (cache != null) {
+                cache.evict("user:" + userId + ":topN:8");
+                cache.evict("user:" + userId + ":topN:9");
+                cache.evict("user:" + userId + ":topN:10");
+                cache.evict("user:" + userId + ":topN:11");
+                cache.evict("user:" + userId + ":topN:12");
+                cache.evict("user:" + userId + ":topN:15");
+                cache.evict("user:" + userId + ":topN:20");
+                log.info("Successfully evicted recommendation cache for user: {}", userId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to evict recommendation cache for user " + userId, e);
+        }
+    }
 
     @Override
     public List<RecentlyViewedItemResponse> syncRecentlyViewed(RecentlyViewedSyncRequest request) {
@@ -72,6 +93,11 @@ public class RecentlyViewedServiceImpl implements RecentlyViewedService {
             long removeCount = totalCount - MAX_LISTINGS;
             zSetOps.removeRange(redisKey, 0, removeCount - 1);
             log.info("Trimmed recently viewed list for user {}: removed {} old listings", userId, removeCount);
+        }
+
+        // Evict recommendation cache if there are new interactions
+        if (request.getListings() != null && !request.getListings().isEmpty()) {
+            evictPersonalizedCache(userId);
         }
 
         // Return merged and sorted list

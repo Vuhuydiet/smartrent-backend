@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.CacheManager;
+
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -37,6 +39,25 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
     PhoneClickDetailRepository phoneClickDetailRepository;
     ListingRepository listingRepository;
     UserRepository userRepository;
+    CacheManager cacheManager;
+
+    private void evictPersonalizedCache(String userId) {
+        try {
+            org.springframework.cache.Cache cache = cacheManager.getCache(com.smartrent.config.Constants.CacheNames.LISTING_RECOMMENDATION_PERSONALIZED);
+            if (cache != null) {
+                cache.evict("user:" + userId + ":topN:8");
+                cache.evict("user:" + userId + ":topN:9");
+                cache.evict("user:" + userId + ":topN:10");
+                cache.evict("user:" + userId + ":topN:11");
+                cache.evict("user:" + userId + ":topN:12");
+                cache.evict("user:" + userId + ":topN:15");
+                cache.evict("user:" + userId + ":topN:20");
+                log.info("Successfully evicted recommendation cache for user: {}", userId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to evict recommendation cache for user " + userId, e);
+        }
+    }
 
     @Override
     @Transactional
@@ -77,6 +98,7 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
 
         PhoneClickDetail saved = phoneClickDetailRepository.save(phoneClickDetail);
         log.info("Phone click tracked successfully with ID: {}", saved.getId());
+        evictPersonalizedCache(userId);
 
         return mapToResponse(saved);
     }
