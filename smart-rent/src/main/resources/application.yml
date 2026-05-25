@@ -5,6 +5,17 @@ server:
     connection-timeout: 300000 # 5 minutes for video uploads
     max-http-form-post-size: 110MB
     max-swallow-size: 110MB
+    # Connector ceilings — sized for the HikariCP pool (30 connections) and the
+    # ~600 MB heap each backend replica runs with. The defaults
+    # (max-threads=200, accept-count=100, no max-connections cap) let a
+    # concurrency-200 burst on cache-missing stats endpoints saturate Tomcat
+    # *and* HikariCP at the same time, with no admission control to shed load.
+    # Cap below override via env so we can tune in prod without a rebuild.
+    threads:
+      max: ${TOMCAT_MAX_THREADS:150}
+      min-spare: ${TOMCAT_MIN_SPARE_THREADS:20}
+    accept-count: ${TOMCAT_ACCEPT_COUNT:100}
+    max-connections: ${TOMCAT_MAX_CONNECTIONS:500}
   error:
     # Disable Spring Boot's default error page to ensure @ControllerAdvice handles all exceptions
     whitelabel:
