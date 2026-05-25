@@ -139,6 +139,8 @@ spring:
       - "listing.suggestions"
       - "listing.stats.categories"
       - "listing.stats.provinces"
+      - "listing.recommendation.similar"
+      - "listing.recommendation.personalized"
     type: "${CACHE_TYPE:redis}"
     redis:
       timeToLive: 1d
@@ -155,6 +157,8 @@ spring:
         # Asia/Ho_Chi_Minh by HomepageStatsCacheScheduler.
         "[listing.stats.categories]": 0s
         "[listing.stats.provinces]": 0s
+        "[listing.recommendation.similar]": 5m
+        "[listing.recommendation.personalized]": 2m
 
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"

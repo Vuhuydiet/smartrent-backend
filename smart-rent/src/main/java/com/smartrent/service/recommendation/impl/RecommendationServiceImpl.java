@@ -47,6 +47,11 @@ public class RecommendationServiceImpl implements RecommendationService {
     // ─────────────────────────────────────────────
 
     @Override
+    @org.springframework.cache.annotation.Cacheable(
+        cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_RECOMMENDATION_SIMILAR,
+        key = "'listing:' + #listingId + ':topN:' + #topN + ':user:' + (#userId != null ? #userId : 'anonymous')",
+        unless = "#result == null || #result.listings == null || #result.listings.isEmpty()"
+    )
     public RecommendationResponse getSimilarListings(Long listingId, int topN, String userId) {
         Listing target = listingRepository.findByIdWithAddress(listingId).orElse(null);
         if (target == null) {
@@ -58,10 +63,13 @@ public class RecommendationServiceImpl implements RecommendationService {
         String provinceCode = (targetAddr != null) ? targetAddr.getNewProvinceCode() : null;
 
         List<Listing> candidates;
-        if (provinceId != null || provinceCode != null) {
-            candidates = listingRepository.findCandidatesForSimilar(
-                    provinceId, provinceCode,
-                    target.getProductType(), target.getListingType(),
+        if (provinceCode != null && !provinceCode.isEmpty() && !provinceCode.equals("UNKNOWN")) {
+            candidates = listingRepository.findCandidatesForSimilarByNewProvince(
+                    provinceCode, target.getProductType(), target.getListingType(),
+                    listingId, PageRequest.of(0, 200));
+        } else if (provinceId != null) {
+            candidates = listingRepository.findCandidatesForSimilarByLegacyProvince(
+                    provinceId, target.getProductType(), target.getListingType(),
                     listingId, PageRequest.of(0, 200));
         } else {
             candidates = listingRepository.findCandidatesForSimilarGlobal(
@@ -128,6 +136,11 @@ public class RecommendationServiceImpl implements RecommendationService {
     // ─────────────────────────────────────────────
 
     @Override
+    @org.springframework.cache.annotation.Cacheable(
+        cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_RECOMMENDATION_PERSONALIZED,
+        key = "'user:' + #userId + ':topN:' + #topN",
+        unless = "#result == null || #result.listings == null || #result.listings.isEmpty()"
+    )
     public RecommendationResponse getPersonalizedFeed(String userId, int topN) {
         Map<Long, Double> interactionWeightMap = new LinkedHashMap<>();
         List<SavedListing> savedListings = savedListingRepository.findByUserIdOrderByCreatedAtDesc(userId);
@@ -235,9 +248,14 @@ public class RecommendationServiceImpl implements RecommendationService {
         if (excludedIds.isEmpty()) excludedIds.add(-1L); // Prevent empty list error in SQL IN clause
 
         // Tier 1: Same Ward (50 items)
-        if (preferredWardCode != null || preferredWardId != null) {
-            List<Listing> t1 = listingRepository.findCandidatesByWard(
-                    preferredWardId, preferredWardCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
+        if (preferredWardCode != null && !preferredWardCode.isEmpty()) {
+            List<Listing> t1 = listingRepository.findCandidatesByNewWard(
+                    preferredWardCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
+            candidates.addAll(t1);
+            t1.forEach(c -> excludedIds.add(c.getListingId()));
+        } else if (preferredWardId != null) {
+            List<Listing> t1 = listingRepository.findCandidatesByLegacyWard(
+                    preferredWardId, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
             candidates.addAll(t1);
             t1.forEach(c -> excludedIds.add(c.getListingId()));
         }
@@ -268,9 +286,12 @@ public class RecommendationServiceImpl implements RecommendationService {
             List<Listing> t3 = new ArrayList<>();
             
             // 1. Try Ward
-            if (discoveryWardCode != null || discoveryWardId != null) {
-                t3 = listingRepository.findCandidatesByWard(
-                        discoveryWardId, discoveryWardCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
+            if (discoveryWardCode != null && !discoveryWardCode.isEmpty()) {
+                t3 = listingRepository.findCandidatesByNewWard(
+                        discoveryWardCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
+            } else if (discoveryWardId != null) {
+                t3 = listingRepository.findCandidatesByLegacyWard(
+                        discoveryWardId, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
             }
             
             // 2. Try District (if not enough)
@@ -281,10 +302,18 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
             
             // 3. Try Province (if still not enough)
-            if (t3.size() < 10 && discoveryProvinceCode != null) {
-                List<Listing> t3Province = listingRepository.findCandidatesForPersonalized(
-                        null, discoveryProvinceCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50 - t3.size()));
+            if (t3.size() < 10 && discoveryProvinceCode != null && !discoveryProvinceCode.isEmpty() && !discoveryProvinceCode.equals("UNKNOWN")) {
+                List<Listing> t3Province = listingRepository.findCandidatesForPersonalizedByNewProvince(
+                        discoveryProvinceCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50 - t3.size()));
                 t3.addAll(t3Province);
+            } else if (t3.size() < 10 && discoveryProvinceCode != null) {
+                Integer pId = null;
+                try { pId = Integer.parseInt(discoveryProvinceCode); } catch (Exception ignored) {}
+                if (pId != null) {
+                    List<Listing> t3Province = listingRepository.findCandidatesForPersonalizedByLegacyProvince(
+                            pId, new ArrayList<>(excludedIds), PageRequest.of(0, 50 - t3.size()));
+                    t3.addAll(t3Province);
+                }
             }
             
             candidates.addAll(t3);
@@ -294,15 +323,25 @@ public class RecommendationServiceImpl implements RecommendationService {
 
 
         // Tier 4: Same Province (up to 300 total)
-        if (preferredProvinceCode != null) {
-            Integer pId = null;
-            try { pId = Integer.parseInt(preferredProvinceCode); } catch (Exception ignored) {}
+        if (preferredProvinceCode != null && !preferredProvinceCode.isEmpty() && !preferredProvinceCode.equals("UNKNOWN")) {
             int remaining = Math.max(0, 300 - candidates.size());
             if (remaining > 0) {
-                List<Listing> t4 = listingRepository.findCandidatesForPersonalized(
-                        pId, preferredProvinceCode, new ArrayList<>(excludedIds), PageRequest.of(0, remaining));
+                List<Listing> t4 = listingRepository.findCandidatesForPersonalizedByNewProvince(
+                        preferredProvinceCode, new ArrayList<>(excludedIds), PageRequest.of(0, remaining));
                 candidates.addAll(t4);
                 t4.forEach(c -> excludedIds.add(c.getListingId()));
+            }
+        } else if (preferredProvinceCode != null) {
+            Integer pId = null;
+            try { pId = Integer.parseInt(preferredProvinceCode); } catch (Exception ignored) {}
+            if (pId != null) {
+                int remaining = Math.max(0, 300 - candidates.size());
+                if (remaining > 0) {
+                    List<Listing> t4 = listingRepository.findCandidatesForPersonalizedByLegacyProvince(
+                            pId, new ArrayList<>(excludedIds), PageRequest.of(0, remaining));
+                    candidates.addAll(t4);
+                    t4.forEach(c -> excludedIds.add(c.getListingId()));
+                }
             }
         }
 
@@ -438,9 +477,14 @@ public class RecommendationServiceImpl implements RecommendationService {
                     List<Listing> backupListings = new ArrayList<>();
                     
                     // 1. Try Ward
-                    if (discoveryWardCode != null || discoveryWardId != null) {
-                        List<Listing> bWard = listingRepository.findCandidatesByWard(
-                                discoveryWardId, discoveryWardCode, queryExcludedIds, PageRequest.of(0, 3));
+                    if (discoveryWardCode != null && !discoveryWardCode.isEmpty()) {
+                        List<Listing> bWard = listingRepository.findCandidatesByNewWard(
+                                discoveryWardCode, queryExcludedIds, PageRequest.of(0, 3));
+                        backupListings.addAll(bWard);
+                        bWard.forEach(b -> queryExcludedIds.add(b.getListingId()));
+                    } else if (discoveryWardId != null) {
+                        List<Listing> bWard = listingRepository.findCandidatesByLegacyWard(
+                                discoveryWardId, queryExcludedIds, PageRequest.of(0, 3));
                         backupListings.addAll(bWard);
                         bWard.forEach(b -> queryExcludedIds.add(b.getListingId()));
                     }
@@ -454,12 +498,18 @@ public class RecommendationServiceImpl implements RecommendationService {
                     }
                     
                     // 3. Try Province
-                    if (backupListings.size() < 3 && discoveryProvinceCode != null) {
+                    if (backupListings.size() < 3 && discoveryProvinceCode != null && !discoveryProvinceCode.isEmpty() && !discoveryProvinceCode.equals("UNKNOWN")) {
+                        List<Listing> bProvince = listingRepository.findCandidatesForPersonalizedByNewProvince(
+                                discoveryProvinceCode, queryExcludedIds, PageRequest.of(0, 3 - backupListings.size()));
+                        backupListings.addAll(bProvince);
+                    } else if (backupListings.size() < 3 && discoveryProvinceCode != null) {
                         Integer pId = null;
                         try { pId = Integer.parseInt(discoveryProvinceCode); } catch (Exception ignored) {}
-                        List<Listing> bProvince = listingRepository.findCandidatesForPersonalized(
-                                pId, discoveryProvinceCode, queryExcludedIds, PageRequest.of(0, 3 - backupListings.size()));
-                        backupListings.addAll(bProvince);
+                        if (pId != null) {
+                            List<Listing> bProvince = listingRepository.findCandidatesForPersonalizedByLegacyProvince(
+                                    pId, queryExcludedIds, PageRequest.of(0, 3 - backupListings.size()));
+                            backupListings.addAll(bProvince);
+                        }
                     }
                             
                     if (!backupListings.isEmpty()) {
