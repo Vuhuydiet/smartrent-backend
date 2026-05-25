@@ -92,7 +92,7 @@ State mapping to the primary `listings` table:
 
 `POST /v1/ai/listings/verify`
 
-Send a full listing payload directly to trigger AI verification without touching the database.
+No authentication required. Send a full listing payload directly to trigger AI verification without touching the database.
 
 Request body:
 
@@ -127,7 +127,7 @@ Request fields:
 | `description` | string | yes | 10–5000 chars |
 | `price` | number | yes | In VND (e.g. `5000000` = 5 triệu) |
 | `address` | string | yes | Min 5 chars |
-| `property_type` | string | no | `APARTMENT`, `ROOM`, `HOUSE`, `STUDIO`, `OFFICE` |
+| `property_type` | string | no | `APARTMENT`, `ROOM`, `HOUSE`, `STUDIO` |
 | `area` | number | no | In m² |
 | `amenities` | string[] | no | List of amenity names |
 | `images` | string[] | no | Public URLs; downloaded and sent as binary to Gemini |
@@ -157,9 +157,9 @@ Example response:
     },
     "video_validation": {
       "is_valid": true,
-      "total_videos": 0,
-      "valid_videos": 0,
-      "quality_score": 1.0,
+      "total_videos": 1,
+      "valid_videos": 1,
+      "quality_score": 0.9,
       "issues": []
     },
     "content_validation": {
@@ -210,7 +210,7 @@ Example response:
 
 `GET /v1/ai/listings/service-status`
 
-Returns whether the Python AI service is reachable.
+No authentication required. Returns whether the Python AI service is reachable.
 
 ```json
 {
@@ -222,6 +222,99 @@ Returns whether the Python AI service is reachable.
   }
 }
 ```
+
+---
+
+## Admin Scheduler APIs
+
+> **Authentication required**: All scheduler endpoints require an admin Bearer token and `X-Admin-Id` header.
+> Roles allowed: `SA` (Super Admin), `UA` (User Admin), `SPA` (Support Admin).
+
+### Get Scheduler Status
+
+`GET /v1/ai/listings/scheduler/status`
+
+Returns whether the background AI auto-moderation cronjob is currently enabled or paused.
+
+Request headers:
+
+| Header | Required | Description |
+|---|---|---|
+| `Authorization` | yes | `Bearer <admin_access_token>` |
+| `X-Admin-Id` | yes | Admin's ID string |
+
+Example response:
+
+```json
+{
+  "code": "999999",
+  "message": "AI scheduler status retrieved successfully",
+  "data": {
+    "aiSchedulerEnabled": true,
+    "checkedAt": "2026-05-25T23:04:44.318239"
+  }
+}
+```
+
+### Toggle Scheduler ON / OFF
+
+`PUT /v1/ai/listings/scheduler/toggle?enabled={true|false}`
+
+Enables or disables the AI automatic moderation scheduler **at runtime without restarting the server**.
+
+- `enabled=true` → scheduler resumes; processes pending listings every 5 minutes.
+- `enabled=false` → scheduler pauses; listings remain in `PENDING` state until manually reviewed or re-enabled.
+
+Request headers:
+
+| Header | Required | Description |
+|---|---|---|
+| `Authorization` | yes | `Bearer <admin_access_token>` |
+| `X-Admin-Id` | yes | Admin's ID string |
+
+Query parameters:
+
+| Param | Type | Required | Description |
+|---|---|---|---|
+| `enabled` | boolean | yes | `true` to enable, `false` to disable |
+
+Example — turn OFF:
+
+```
+PUT /v1/ai/listings/scheduler/toggle?enabled=false
+```
+
+```json
+{
+  "code": "999999",
+  "message": "AI auto-moderation scheduler has been disabled. Listings will require manual review.",
+  "data": {
+    "aiSchedulerEnabled": false,
+    "updatedAt": "2026-05-25T23:04:44.348705600",
+    "updatedBy": "admin-123e4567-e89b-12d3-a456-426614174000"
+  }
+}
+```
+
+Example — turn ON:
+
+```
+PUT /v1/ai/listings/scheduler/toggle?enabled=true
+```
+
+```json
+{
+  "code": "999999",
+  "message": "AI auto-moderation scheduler has been enabled. Listings will be processed automatically.",
+  "data": {
+    "aiSchedulerEnabled": true,
+    "updatedAt": "2026-05-25T23:04:44.361215900",
+    "updatedBy": "admin-123e4567-e89b-12d3-a456-426614174000"
+  }
+}
+```
+
+> **Note**: The toggle is an **in-memory runtime flag** (`AtomicBoolean`). It resets to `true` (enabled) whenever the Spring Boot server restarts, regardless of what value was set before shutdown.
 
 ---
 
