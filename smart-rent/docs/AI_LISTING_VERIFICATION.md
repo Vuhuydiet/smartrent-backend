@@ -223,6 +223,56 @@ Returns whether the Python AI service is reachable.
 }
 ```
 
+### AI Scheduler Toggle APIs (Admin Only)
+
+These endpoints allow administrators to check and toggle the AI auto-moderation scheduler at runtime without restarting the server.
+
+#### Get Scheduler Status
+
+`GET /v1/ai/listings/scheduler/status`
+
+- **Role required**: `ROLE_SA`, `ROLE_UA`, `ROLE_SPA` (Admin only)
+- **Headers**:
+  - `X-Admin-Id`: (String, required) Admin ID performing the check
+  - `Authorization`: `Bearer <token>` (Admin authorization)
+- **Response**:
+  ```json
+  {
+    "code": "999999",
+    "message": "AI scheduler status retrieved successfully",
+    "data": {
+      "aiSchedulerEnabled": true,
+      "checkedAt": "2026-05-25T22:30:15.123"
+    }
+  }
+  ```
+
+#### Toggle Scheduler On/Off
+
+`PUT /v1/ai/listings/scheduler/toggle`
+
+- **Role required**: `ROLE_SA`, `ROLE_UA`, `ROLE_SPA` (Admin only)
+- **Headers**:
+  - `X-Admin-Id`: (String, required) Admin ID performing the change
+  - `Authorization`: `Bearer <token>` (Admin authorization)
+- **Request Parameters**:
+  - `enabled`: (Boolean, required) `true` to enable, `false` to disable (e.g., `?enabled=false`)
+- **Description**:
+  - `enabled=true`: Enables the AI automatic listing moderation scheduler. Pending listings will be processed every 5 minutes (or the configured interval).
+  - `enabled=false`: Pauses/disables the scheduler immediately. Pending listings will remain in the `PENDING` state and require manual review or re-enabling the scheduler to be verified.
+- **Response**:
+  ```json
+  {
+    "code": "999999",
+    "message": "AI auto-moderation scheduler has been disabled. Listings will require manual review.",
+    "data": {
+      "aiSchedulerEnabled": false,
+      "updatedAt": "2026-05-25T22:31:00.456",
+      "updatedBy": "ADMIN_123"
+    }
+  }
+  ```
+
 ---
 
 ## AI Response Fields
@@ -374,3 +424,82 @@ It gives a modern "AI-powered content moderation" demo while staying maintainabl
 4. Add per-listing moderation history log for audit trail.
 5. Resolve `HHH90000026` Hibernate dialect deprecation warning by migrating to `MySQLDialect`.
 6. Add Prometheus/Micrometer metrics for batch size, processing latency, and retry rate.
+
+---
+
+## Frontend Integration Guide
+
+This guide helps frontend developers integrate the **AI Listing Verification** and **AI Auto-Moderation Control Panel** into the Admin Dashboard.
+
+### 1. AI Auto-Moderation Scheduler Toggle
+
+Create a control card in the Admin Settings panel allowing administrators to turn the background AI scheduler on/off.
+
+```
+┌────────────────────────────────────────────────────────┐
+│ 🤖 AI Auto-Moderation Settings                         │
+│                                                        │
+│   Enable Gemini AI to automatically moderate and verify│
+│   newly submitted rental property listings.            │
+│                                                        │
+│   [ Toggle Switch ]  AI Auto-Moderation Scheduler      │
+│                                                        │
+│   Status: Active (Last checked at 22:30:15)            │
+└────────────────────────────────────────────────────────┘
+```
+
+#### Step A: Fetch Initial Status (on Component Mount)
+- **Endpoint**: `GET /v1/ai/listings/scheduler/status`
+- **Headers**:
+  - `Authorization: Bearer <admin_token>`
+  - `X-Admin-Id: <admin_uuid>`
+- **Javascript Integration Example**:
+```javascript
+async function fetchSchedulerStatus() {
+  try {
+    const response = await axios.get('/v1/ai/listings/scheduler/status', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Admin-Id': adminId
+      }
+    });
+    // Set UI toggle state
+    setAiSchedulerEnabled(response.data.data.aiSchedulerEnabled);
+  } catch (error) {
+    showToast('error', 'Không thể lấy trạng thái AI Scheduler');
+  }
+}
+```
+
+#### Step B: Handle Toggle Changes
+- **Endpoint**: `PUT /v1/ai/listings/scheduler/toggle`
+- **Request Parameters**: `enabled` (boolean)
+- **Headers**: Same as above.
+- **UX Best Practices**:
+  1. Set the toggle to a **disabled/loading state** during the API request to prevent duplicate double-clicks.
+  2. If successful, display a **success toast** with the backend's Vietnamese message.
+  3. If failed, **revert the toggle state** to its previous value and display an error toast.
+- **Javascript Integration Example**:
+```javascript
+async function handleToggle(newValue) {
+  setIsLoading(true);
+  try {
+    const response = await axios.put(`/v1/ai/listings/scheduler/toggle?enabled=${newValue}`, {}, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Admin-Id': adminId
+      }
+    });
+    setAiSchedulerEnabled(response.data.data.aiSchedulerEnabled);
+    showToast('success', response.data.message); // Displays action confirmation
+  } catch (error) {
+    showToast('error', 'Không thể thay đổi cấu hình AI Scheduler');
+    // Revert switch UI on failure
+    setAiSchedulerEnabled(!newValue);
+  } finally {
+    setIsLoading(false);
+  }
+}
+```
+```
+

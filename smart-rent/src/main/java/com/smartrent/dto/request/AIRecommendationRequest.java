@@ -55,6 +55,12 @@ public class AIRecommendationRequest {
 
         @JsonProperty("post_date_days_ago")
         Integer postDateDaysAgo;
+
+        @JsonProperty("latitude")
+        Double latitude;
+
+        @JsonProperty("longitude")
+        Double longitude;
     }
 
     @Getter

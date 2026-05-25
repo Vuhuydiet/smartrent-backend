@@ -62,19 +62,79 @@ public class RecommendationServiceImpl implements RecommendationService {
         Integer provinceId = (targetAddr != null) ? targetAddr.getLegacyProvinceId() : null;
         String provinceCode = (targetAddr != null) ? targetAddr.getNewProvinceCode() : null;
 
+        java.util.concurrent.CompletableFuture<List<Listing>> proximityFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            Integer districtId = (targetAddr != null) ? targetAddr.getLegacyDistrictId() : null;
+            if (districtId != null) {
+                return listingRepository.findSimilarProximityCandidates(
+                        provinceCode, provinceId, districtId, target.getProductType(), target.getListingType(),
+                        listingId, PageRequest.of(0, 250));
+            }
+            return java.util.Collections.emptyList();
+        });
+
+        java.util.concurrent.CompletableFuture<List<Listing>> priceFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            java.math.BigDecimal price = target.getPrice();
+            if (price != null) {
+                java.math.BigDecimal minPrice = price.multiply(java.math.BigDecimal.valueOf(0.8));
+                java.math.BigDecimal maxPrice = price.multiply(java.math.BigDecimal.valueOf(1.2));
+                return listingRepository.findSimilarPriceCandidates(
+                        provinceCode, provinceId, minPrice, maxPrice, target.getProductType(), target.getListingType(),
+                        listingId, PageRequest.of(0, 200));
+            }
+            return java.util.Collections.emptyList();
+        });
+
+        java.util.concurrent.CompletableFuture<List<Listing>> freshFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            if (provinceCode != null && !provinceCode.isEmpty() && !provinceCode.equals("UNKNOWN")) {
+                return listingRepository.findCandidatesForSimilarByNewProvince(
+                        provinceCode, target.getProductType(), target.getListingType(),
+                        listingId, PageRequest.of(0, 100));
+            } else if (provinceId != null) {
+                return listingRepository.findCandidatesForSimilarByLegacyProvince(
+                        provinceId, target.getProductType(), target.getListingType(),
+                        listingId, PageRequest.of(0, 100));
+            } else {
+                return listingRepository.findCandidatesForSimilarGlobal(
+                        target.getProductType(), target.getListingType(),
+                        listingId, PageRequest.of(0, 100));
+            }
+        });
+
         List<Listing> candidates;
-        if (provinceCode != null && !provinceCode.isEmpty() && !provinceCode.equals("UNKNOWN")) {
-            candidates = listingRepository.findCandidatesForSimilarByNewProvince(
-                    provinceCode, target.getProductType(), target.getListingType(),
-                    listingId, PageRequest.of(0, 200));
-        } else if (provinceId != null) {
-            candidates = listingRepository.findCandidatesForSimilarByLegacyProvince(
-                    provinceId, target.getProductType(), target.getListingType(),
-                    listingId, PageRequest.of(0, 200));
-        } else {
-            candidates = listingRepository.findCandidatesForSimilarGlobal(
-                    target.getProductType(), target.getListingType(),
-                    listingId, PageRequest.of(0, 200));
+        try {
+            java.util.concurrent.CompletableFuture.allOf(proximityFuture, priceFuture, freshFuture).join();
+            
+            Set<Listing> candidateSet = new LinkedHashSet<>();
+            candidateSet.addAll(proximityFuture.get());
+            candidateSet.addAll(priceFuture.get());
+            candidateSet.addAll(freshFuture.get());
+            
+            // Stage-2 Fallback Top-up if candidate pool is less than 150 (prevent candidate starvation)
+            if (candidateSet.size() < 150) {
+                int needed = 300 - candidateSet.size();
+                List<Listing> topUp;
+                if (provinceCode != null && !provinceCode.isEmpty() && !provinceCode.equals("UNKNOWN")) {
+                    topUp = listingRepository.findCandidatesForSimilarByNewProvince(
+                            provinceCode, target.getProductType(), target.getListingType(),
+                            listingId, PageRequest.of(0, needed));
+                } else if (provinceId != null) {
+                    topUp = listingRepository.findCandidatesForSimilarByLegacyProvince(
+                            provinceId, target.getProductType(), target.getListingType(),
+                            listingId, PageRequest.of(0, needed));
+                } else {
+                    topUp = listingRepository.findCandidatesForSimilarGlobal(
+                            target.getProductType(), target.getListingType(),
+                            listingId, PageRequest.of(0, needed));
+                }
+                candidateSet.addAll(topUp);
+            }
+            
+            candidates = candidateSet.stream()
+                    .limit(300)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Error executing parallel multi-channel retrieval for similar listings", e);
+            candidates = freshFuture.join();
         }
 
         if (candidates.isEmpty()) {
@@ -242,114 +302,110 @@ public class RecommendationServiceImpl implements RecommendationService {
 
 
 
-        // 4. Hierarchical candidate pool (4-tier strategy)
-        List<Listing> candidates = new ArrayList<>();
-        Set<Long> excludedIds = new HashSet<>(interactedListingIds);
-        if (excludedIds.isEmpty()) excludedIds.add(-1L); // Prevent empty list error in SQL IN clause
+        final Integer finalDiscoveryDistrictId = discoveryDistrictId;
+        final String finalDiscoveryWardCode = discoveryWardCode;
+        final Integer finalDiscoveryWardId = discoveryWardId;
 
-        // Tier 1: Same Ward (50 items)
-        if (preferredWardCode != null && !preferredWardCode.isEmpty()) {
-            List<Listing> t1 = listingRepository.findCandidatesByNewWard(
-                    preferredWardCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
-            candidates.addAll(t1);
-            t1.forEach(c -> excludedIds.add(c.getListingId()));
-        } else if (preferredWardId != null) {
-            List<Listing> t1 = listingRepository.findCandidatesByLegacyWard(
-                    preferredWardId, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
-            candidates.addAll(t1);
-            t1.forEach(c -> excludedIds.add(c.getListingId()));
-        }
+        // 4. Parallel Multi-channel candidate pool retrieval with over-fetching
+        java.util.concurrent.CompletableFuture<List<Listing>> proximityFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            List<Listing> list = new ArrayList<>();
+            List<Long> threadExclusions = new ArrayList<>(interactedListingIds);
+            if (threadExclusions.isEmpty()) threadExclusions.add(-1L);
 
-        // Tier 2: Same District (100 items)
-        if (preferredDistrictId != null) {
-            List<Listing> t2 = listingRepository.findCandidatesByDistrict(
-                    preferredDistrictId, new ArrayList<>(excludedIds), PageRequest.of(0, 100));
-            candidates.addAll(t2);
-            t2.forEach(c -> excludedIds.add(c.getListingId()));
-        }
-
-        // Tier 3: Discovery Zone (up to 50 items from latest location - cascading Ward -> District -> Province)
-        boolean isShift = false;
-        if (discoveryProvinceCode != null && preferredProvinceCode != null && !discoveryProvinceCode.equals(preferredProvinceCode)) {
-            isShift = true;
-        } else if (discoveryDistrictId != null && preferredDistrictId != null && !discoveryDistrictId.equals(preferredDistrictId)) {
-            isShift = true;
-        } else if (discoveryWardCode != null && preferredWardCode != null && !discoveryWardCode.equals(preferredWardCode)) {
-            isShift = true;
-        } else if (discoveryWardId != null && preferredWardId != null && !discoveryWardId.equals(preferredWardId)) {
-            isShift = true;
-        }        log.info("[Recommendation Test] isShift evaluated to: {}", isShift);
-
-        if (isShift) {
-
-            
-            List<Listing> t3 = new ArrayList<>();
-            
-            // 1. Try Ward
-            if (discoveryWardCode != null && !discoveryWardCode.isEmpty()) {
-                t3 = listingRepository.findCandidatesByNewWard(
-                        discoveryWardCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
-            } else if (discoveryWardId != null) {
-                t3 = listingRepository.findCandidatesByLegacyWard(
-                        discoveryWardId, new ArrayList<>(excludedIds), PageRequest.of(0, 50));
+            // Preferred location (up to 150)
+            if (preferredDistrictId != null) {
+                list.addAll(listingRepository.findCandidatesByDistrict(
+                        preferredDistrictId, threadExclusions, PageRequest.of(0, 150)));
+            } else if (preferredWardCode != null && !preferredWardCode.isEmpty()) {
+                list.addAll(listingRepository.findCandidatesByNewWard(
+                        preferredWardCode, threadExclusions, PageRequest.of(0, 150)));
+            } else if (preferredWardId != null) {
+                list.addAll(listingRepository.findCandidatesByLegacyWard(
+                        preferredWardId, threadExclusions, PageRequest.of(0, 150)));
             }
-            
-            // 2. Try District (if not enough)
-            if (t3.size() < 10 && discoveryDistrictId != null) {
-                List<Listing> t3District = listingRepository.findCandidatesByDistrict(
-                        discoveryDistrictId, new ArrayList<>(excludedIds), PageRequest.of(0, 50 - t3.size()));
-                t3.addAll(t3District);
-            }
-            
-            // 3. Try Province (if still not enough)
-            if (t3.size() < 10 && discoveryProvinceCode != null && !discoveryProvinceCode.isEmpty() && !discoveryProvinceCode.equals("UNKNOWN")) {
-                List<Listing> t3Province = listingRepository.findCandidatesForPersonalizedByNewProvince(
-                        discoveryProvinceCode, new ArrayList<>(excludedIds), PageRequest.of(0, 50 - t3.size()));
-                t3.addAll(t3Province);
-            } else if (t3.size() < 10 && discoveryProvinceCode != null) {
-                Integer pId = null;
-                try { pId = Integer.parseInt(discoveryProvinceCode); } catch (Exception ignored) {}
-                if (pId != null) {
-                    List<Listing> t3Province = listingRepository.findCandidatesForPersonalizedByLegacyProvince(
-                            pId, new ArrayList<>(excludedIds), PageRequest.of(0, 50 - t3.size()));
-                    t3.addAll(t3Province);
-                }
-            }
-            
-            candidates.addAll(t3);
-            t3.forEach(c -> excludedIds.add(c.getListingId()));
-            log.info("[Recommendation] User {} → added {} discovery candidates cascading from ward/district/province", userId, t3.size());
-        }
 
-
-        // Tier 4: Same Province (up to 300 total)
-        if (preferredProvinceCode != null && !preferredProvinceCode.isEmpty() && !preferredProvinceCode.equals("UNKNOWN")) {
-            int remaining = Math.max(0, 300 - candidates.size());
-            if (remaining > 0) {
-                List<Listing> t4 = listingRepository.findCandidatesForPersonalizedByNewProvince(
-                        preferredProvinceCode, new ArrayList<>(excludedIds), PageRequest.of(0, remaining));
-                candidates.addAll(t4);
-                t4.forEach(c -> excludedIds.add(c.getListingId()));
+            // Discovery shift location (up to 100)
+            if (finalDiscoveryDistrictId != null) {
+                list.addAll(listingRepository.findCandidatesByDistrict(
+                        finalDiscoveryDistrictId, threadExclusions, PageRequest.of(0, 100)));
+            } else if (finalDiscoveryWardCode != null && !finalDiscoveryWardCode.isEmpty()) {
+                list.addAll(listingRepository.findCandidatesByNewWard(
+                        finalDiscoveryWardCode, threadExclusions, PageRequest.of(0, 100)));
+            } else if (finalDiscoveryWardId != null) {
+                list.addAll(listingRepository.findCandidatesByLegacyWard(
+                        finalDiscoveryWardId, threadExclusions, PageRequest.of(0, 100)));
             }
-        } else if (preferredProvinceCode != null) {
+            return list;
+        });
+
+        java.util.concurrent.CompletableFuture<List<Listing>> priceFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            List<Long> threadExclusions = new ArrayList<>(interactedListingIds);
+            if (threadExclusions.isEmpty()) threadExclusions.add(-1L);
+
+            double avgPrice = interactionFeatures.stream()
+                    .mapToDouble(AIRecommendationRequest.ListingFeatureDto::getPrice)
+                    .average().orElse(5000000.0);
+            java.math.BigDecimal minPrice = java.math.BigDecimal.valueOf(avgPrice * 0.8);
+            java.math.BigDecimal maxPrice = java.math.BigDecimal.valueOf(avgPrice * 1.2);
+
             Integer pId = null;
-            try { pId = Integer.parseInt(preferredProvinceCode); } catch (Exception ignored) {}
-            if (pId != null) {
-                int remaining = Math.max(0, 300 - candidates.size());
-                if (remaining > 0) {
-                    List<Listing> t4 = listingRepository.findCandidatesForPersonalizedByLegacyProvince(
-                            pId, new ArrayList<>(excludedIds), PageRequest.of(0, remaining));
-                    candidates.addAll(t4);
-                    t4.forEach(c -> excludedIds.add(c.getListingId()));
+            if (preferredProvinceCode != null) {
+                try { pId = Integer.parseInt(preferredProvinceCode); } catch (Exception ignored) {}
+            }
+            return listingRepository.findPersonalizedPriceCandidates(
+                    preferredProvinceCode, pId, minPrice, maxPrice, threadExclusions, PageRequest.of(0, 200));
+        });
+
+        java.util.concurrent.CompletableFuture<List<Listing>> freshFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+            List<Listing> list = new ArrayList<>();
+            List<Long> threadExclusions = new ArrayList<>(interactedListingIds);
+            if (threadExclusions.isEmpty()) threadExclusions.add(-1L);
+
+            if (preferredProvinceCode != null && !preferredProvinceCode.isEmpty() && !preferredProvinceCode.equals("UNKNOWN")) {
+                list.addAll(listingRepository.findCandidatesForPersonalizedByNewProvince(
+                        preferredProvinceCode, threadExclusions, PageRequest.of(0, 100)));
+            } else {
+                Integer pId = null;
+                if (preferredProvinceCode != null) {
+                    try { pId = Integer.parseInt(preferredProvinceCode); } catch (Exception ignored) {}
+                }
+                if (pId != null) {
+                    list.addAll(listingRepository.findCandidatesForPersonalizedByLegacyProvince(
+                            pId, threadExclusions, PageRequest.of(0, 100)));
                 }
             }
-        }
+            // Global top-up to ensure we always have candidates
+            list.addAll(listingRepository.findCandidatesForPersonalizedGlobal(
+                    threadExclusions, PageRequest.of(0, 100)));
+            return list;
+        });
 
-        // Fallback global top-up if still less than 150
-        if (candidates.size() < 150) {
-            int globalSize = 300 - candidates.size();
-            candidates.addAll(listingRepository.findCandidatesForPersonalizedGlobal(
-                    new ArrayList<>(excludedIds), PageRequest.of(0, globalSize)));
+        List<Listing> candidates;
+        try {
+            java.util.concurrent.CompletableFuture.allOf(proximityFuture, priceFuture, freshFuture).join();
+            
+            Set<Listing> candidateSet = new LinkedHashSet<>();
+            candidateSet.addAll(proximityFuture.get());
+            candidateSet.addAll(priceFuture.get());
+            candidateSet.addAll(freshFuture.get());
+            
+            // Stage-2 Fallback Top-up if candidate pool is less than 150 (prevent candidate starvation)
+            if (candidateSet.size() < 150) {
+                int needed = 300 - candidateSet.size();
+                List<Long> threadExclusions = new ArrayList<>(interactedListingIds);
+                if (threadExclusions.isEmpty()) threadExclusions.add(-1L);
+                
+                List<Listing> topUp = listingRepository.findCandidatesForPersonalizedGlobal(
+                        threadExclusions, PageRequest.of(0, needed));
+                candidateSet.addAll(topUp);
+            }
+            
+            candidates = candidateSet.stream()
+                    .limit(300)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("Error executing parallel multi-channel retrieval for personalized feed", e);
+            candidates = freshFuture.join();
         }
 
         if (candidates.isEmpty()) {
@@ -399,7 +455,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             RecommendationResponse response = buildResponse(result, "personalized", false, true);
 
             // Apply Discovery Shift slot pinning (Slots 8, 9, 10 for Discovery Zone)
-            isShift = false;
+            boolean isShift = false;
             if (discoveryProvinceCode != null && preferredProvinceCode != null && !discoveryProvinceCode.equals(preferredProvinceCode)) {
                 isShift = true;
             } else if (discoveryDistrictId != null && preferredDistrictId != null && !discoveryDistrictId.equals(preferredDistrictId)) {
@@ -728,12 +784,17 @@ public class RecommendationServiceImpl implements RecommendationService {
         Integer dId = null;
         Integer wId = null;
 
+        Double latitude = null;
+        Double longitude = null;
+
         if (listing.getAddress() != null) {
             var addr = listing.getAddress();
             pCode = addr.getNewProvinceCode();
             wCode = addr.getNewWardCode();
             dId = addr.getLegacyDistrictId();
             wId = addr.getLegacyWardId();
+            latitude = addr.getLatitude() != null ? addr.getLatitude().doubleValue() : null;
+            longitude = addr.getLongitude() != null ? addr.getLongitude().doubleValue() : null;
 
             // Fallback: If new codes are missing, try to resolve from mapping
             if (pCode == null || pCode.isEmpty()) {
@@ -771,6 +832,8 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .newWardCode(wCode)
                 .vipType(listing.getVipType() != null ? listing.getVipType().name() : "NORMAL")
                 .postDateDaysAgo(Math.max(0, daysAgo))
+                .latitude(latitude)
+                .longitude(longitude)
                 .build();
     }
 
