@@ -353,7 +353,7 @@ public class ListingMapperImpl implements ListingMapper {
     }
 
     @Override
-    public AdminListingSummary toAdminSummary(Listing entity, User owner, String verificationStatus) {
+    public AdminListingSummary toAdminSummary(Listing entity, User owner, String verificationStatus, List<String> images) {
         AdminListingSummary.OwnerSummary ownerSummary = owner == null ? null
                 : AdminListingSummary.OwnerSummary.builder()
                         .firstName(owner.getFirstName())
@@ -382,6 +382,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .price(entity.getPrice())
                 .priceUnit(entity.getPriceUnit() != null ? entity.getPriceUnit().name() : null)
                 .area(entity.getArea())
+                .images(images)
                 .adminVerification(verification)
                 .moderationStatus(entity.getModerationStatus() != null ? entity.getModerationStatus().name() : null)
                 .revisionCount(entity.getRevisionCount())
