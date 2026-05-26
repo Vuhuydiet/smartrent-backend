@@ -49,14 +49,15 @@ public interface ListingMapper {
 
     /**
      * Map Listing entity to slim AdminListingSummary used by the admin list/table view.
-     * Drops description, media, amenities, address/extra-fee fields, etc. — call
+     * Drops description, amenities, address/extra-fee fields, etc. — call
      * GET /v1/listings/admin/{id} for the full record.
      *
      * @param entity Listing entity
      * @param owner Listing owner entity (nullable). Used to build the slim OwnerSummary.
      * @param verificationStatus Verification status (PENDING/APPROVED/REJECTED/NOT_SUBMITTED)
+     * @param images Pre-resolved image URLs for the listing (primary first, then sortOrder).
      */
-    AdminListingSummary toAdminSummary(Listing entity, User owner, String verificationStatus);
+    AdminListingSummary toAdminSummary(Listing entity, User owner, String verificationStatus, List<String> images);
 
     /**
      * Map Listing entity to ListingResponseForOwner with owner-specific information

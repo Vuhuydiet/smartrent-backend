@@ -13,6 +13,7 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -70,6 +71,10 @@ public class AdminListingSummary {
 
     @Schema(description = "Area in m²", example = "34.1")
     Float area;
+
+    @Schema(description = "Image URLs (primary first, then sorted by sortOrder)",
+            example = "[\"https://cdn.example.com/img1.jpg\", \"https://cdn.example.com/img2.jpg\"]")
+    List<String> images;
 
     @Schema(description = "Admin verification summary (verifiedAt + verificationStatus only)")
     AdminVerificationSummary adminVerification;

@@ -1835,8 +1835,27 @@ public class ListingServiceImpl implements ListingService {
                                     com.smartrent.infra.repository.entity.User::getUserId,
                                     Function.identity()));
 
+            // ---- Batch-load active images for the page — 1 query ----
+            // Primary first, then by sortOrder (matches detail-view ordering).
+            Set<Long> listingIds = content.stream()
+                    .map(Listing::getListingId).collect(Collectors.toSet());
+            Map<Long, List<String>> imagesByListingId = mediaRepository.findActiveMediaByListingIds(listingIds).stream()
+                    .filter(m -> m.getMediaType() == Media.MediaType.IMAGE)
+                    .filter(m -> m.getUrl() != null && !m.getUrl().isBlank())
+                    .sorted((m1, m2) -> {
+                        if (Boolean.TRUE.equals(m1.getIsPrimary()) && !Boolean.TRUE.equals(m2.getIsPrimary())) return -1;
+                        if (!Boolean.TRUE.equals(m1.getIsPrimary()) && Boolean.TRUE.equals(m2.getIsPrimary())) return 1;
+                        return Integer.compare(
+                                m1.getSortOrder() != null ? m1.getSortOrder() : 0,
+                                m2.getSortOrder() != null ? m2.getSortOrder() : 0);
+                    })
+                    .collect(Collectors.groupingBy(
+                            m -> m.getListing().getListingId(),
+                            LinkedHashMap::new,
+                            Collectors.mapping(Media::getUrl, Collectors.toList())));
+
             // ---- Map to slim AdminListingSummary DTOs ----
-            // (No amenity/media/address fetch — list view does not need them.)
+            // (No amenity/address fetch — list view does not need them.)
             listings = content.stream()
                     .map(listing -> {
                         String verificationStatus;
@@ -1848,7 +1867,8 @@ public class ListingServiceImpl implements ListingService {
                             verificationStatus = "NOT_SUBMITTED";
                         }
                         com.smartrent.infra.repository.entity.User owner = userMap.get(listing.getUserId());
-                        return listingMapper.toAdminSummary(listing, owner, verificationStatus);
+                        List<String> images = imagesByListingId.getOrDefault(listing.getListingId(), Collections.emptyList());
+                        return listingMapper.toAdminSummary(listing, owner, verificationStatus, images);
                     })
                     .collect(Collectors.toList());
         } else {
