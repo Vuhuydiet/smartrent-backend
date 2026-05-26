@@ -2,6 +2,7 @@ package com.smartrent.controller;
 
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.VipTierDetailResponse;
+import com.smartrent.dto.response.VipTierMediaLimitResponse;
 import com.smartrent.service.viptier.VipTierDetailService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -157,6 +158,52 @@ public class VipTierDetailController {
         List<VipTierDetailResponse> tiers = vipTierDetailService.getAllTiers();
         return ApiResponse.<List<VipTierDetailResponse>>builder()
                 .data(tiers)
+                .build();
+    }
+
+    @GetMapping("/{tierCode}/media-limits")
+    @Operation(
+        summary = "Get image/video upload limits for a VIP tier",
+        description = "Returns just the maxImages and maxVideos of the tier so the frontend " +
+                "can render the upload-quota UI without fetching the full pricing payload. " +
+                "Use this on the create-listing screen once the user has picked (or is implied to use) " +
+                "a tier. For the update-listing screen, prefer GET /v1/listings/{listingId}/media-limits " +
+                "which also returns current usage.",
+        parameters = {
+            @Parameter(name = "tierCode", description = "Tier code", required = true, example = "SILVER")
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Limits returned",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = VipTierMediaLimitResponse.class),
+                    examples = @ExampleObject(value = """
+                        {
+                          "code": "999999",
+                          "message": null,
+                          "data": {
+                            "tierCode": "SILVER",
+                            "maxImages": 10,
+                            "maxVideos": 2,
+                            "currentImages": null,
+                            "currentVideos": null,
+                            "remainingImages": null,
+                            "remainingVideos": null
+                          }
+                        }
+                        """)
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404",
+                description = "Tier code not configured")
+        }
+    )
+    public ApiResponse<VipTierMediaLimitResponse> getMediaLimits(@PathVariable String tierCode) {
+        log.info("Getting media limits for VIP tier: {}", tierCode);
+        return ApiResponse.<VipTierMediaLimitResponse>builder()
+                .data(vipTierDetailService.getMediaLimitsByTierCode(tierCode))
                 .build();
     }
 }

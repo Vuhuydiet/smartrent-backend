@@ -46,6 +46,16 @@ public class UserMembershipBenefitResponse {
     @Schema(description = "Benefit status", example = "ACTIVE", allowableValues = {"ACTIVE", "EXPIRED", "CONSUMED"})
     String status;
 
+    @Schema(description = "VIP tier code this benefit will create a listing under (NORMAL/SILVER/GOLD/DIAMOND). " +
+            "Null when benefitType is non-post (e.g. PUSH).", example = "SILVER")
+    String vipTierCode;
+
+    @Schema(description = "Maximum number of images for a listing created with this benefit", example = "10")
+    Integer maxImages;
+
+    @Schema(description = "Maximum number of videos for a listing created with this benefit", example = "2")
+    Integer maxVideos;
+
     @Schema(description = "Creation timestamp")
     LocalDateTime createdAt;
 

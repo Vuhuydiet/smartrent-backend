@@ -31,6 +31,18 @@ public class MembershipPackageBenefitResponse {
     @Schema(description = "Quantity granted per month", example = "5")
     Integer quantityPerMonth;
 
+    @Schema(description = "VIP tier code this benefit produces a listing for (NORMAL/SILVER/GOLD/DIAMOND). " +
+            "Null when benefitType is non-post (e.g. PUSH).", example = "SILVER")
+    String vipTierCode;
+
+    @Schema(description = "Maximum number of images a listing posted with this benefit can have. " +
+            "Use this to render the image upload limit in the listing-create UI.", example = "10")
+    Integer maxImages;
+
+    @Schema(description = "Maximum number of videos a listing posted with this benefit can have. " +
+            "Use this to render the video upload limit in the listing-create UI.", example = "2")
+    Integer maxVideos;
+
     @Schema(description = "Creation timestamp")
     LocalDateTime createdAt;
 }

@@ -137,7 +137,14 @@ public enum DomainCode {
   USER_FOLLOW_TARGET_NOT_FOUND("19002", HttpStatus.NOT_FOUND, "Target user to follow was not found"),
   //    Magic Link Error 20xxx
   MAGIC_LINK_INVALID("20001", HttpStatus.UNAUTHORIZED, "Magic link is invalid or has expired"),
-  MAGIC_LINK_ALREADY_USED("20002", HttpStatus.UNAUTHORIZED, "Magic link has already been used")
+  MAGIC_LINK_ALREADY_USED("20002", HttpStatus.UNAUTHORIZED, "Magic link has already been used"),
+  //    VIP Tier Media Limit Error 21xxx
+  VIP_TIER_IMAGE_LIMIT_EXCEEDED("21001", HttpStatus.BAD_REQUEST,
+      "Số lượng ảnh vượt quá giới hạn của gói %s. Tối đa %d ảnh, bạn đang muốn đăng %d ảnh."),
+  VIP_TIER_VIDEO_LIMIT_EXCEEDED("21002", HttpStatus.BAD_REQUEST,
+      "Số lượng video vượt quá giới hạn của gói %s. Tối đa %d video, bạn đang muốn đăng %d video."),
+  VIP_TIER_NOT_CONFIGURED("21003", HttpStatus.INTERNAL_SERVER_ERROR,
+      "Không tìm thấy cấu hình giới hạn cho gói VIP: %s")
   ;
 
   private final String value;
