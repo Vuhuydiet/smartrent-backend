@@ -53,6 +53,7 @@ public class MembershipServiceImpl implements MembershipService {
     TransactionService transactionService;
     PaymentService paymentService;
     QuotaService quotaService;
+    VipTierDetailRepository vipTierDetailRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -537,13 +538,34 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     private MembershipPackageBenefitResponse mapToBenefitResponse(MembershipPackageBenefit benefit) {
+        String tierCode = resolveTierCode(benefit.getBenefitType());
+        VipTierDetail tier = tierCode != null
+                ? vipTierDetailRepository.findByTierCode(tierCode).orElse(null)
+                : null;
         return MembershipPackageBenefitResponse.builder()
                 .benefitId(benefit.getBenefitId())
                 .benefitType(benefit.getBenefitType().name())
                 .benefitNameDisplay(benefit.getBenefitNameDisplay())
                 .quantityPerMonth(benefit.getQuantityPerMonth())
+                .vipTierCode(tierCode)
+                .maxImages(tier != null ? tier.getMaxImages() : null)
+                .maxVideos(tier != null ? tier.getMaxVideos() : null)
                 .createdAt(benefit.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Map a {@link BenefitType} to the VIP tier code the resulting listing will use.
+     * Returns null for benefit types that don't create listings (e.g. PUSH).
+     */
+    private String resolveTierCode(BenefitType benefitType) {
+        if (benefitType == null) return null;
+        return switch (benefitType) {
+            case POST_SILVER -> "SILVER";
+            case POST_GOLD -> "GOLD";
+            case POST_DIAMOND -> "DIAMOND";
+            default -> null;
+        };
     }
 
     private UserMembershipResponse mapToUserMembershipResponse(UserMembership userMembership) {
@@ -572,6 +594,10 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     private UserMembershipBenefitResponse mapToUserBenefitResponse(UserMembershipBenefit benefit) {
+        String tierCode = resolveTierCode(benefit.getBenefitType());
+        VipTierDetail tier = tierCode != null
+                ? vipTierDetailRepository.findByTierCode(tierCode).orElse(null)
+                : null;
         return UserMembershipBenefitResponse.builder()
                 .userBenefitId(benefit.getUserBenefitId())
                 .benefitType(benefit.getBenefitType().name())
@@ -582,6 +608,9 @@ public class MembershipServiceImpl implements MembershipService {
                 .quantityUsed(benefit.getQuantityUsed())
                 .quantityRemaining(benefit.getQuantityRemaining())
                 .status(benefit.getStatus().name())
+                .vipTierCode(tierCode)
+                .maxImages(tier != null ? tier.getMaxImages() : null)
+                .maxVideos(tier != null ? tier.getMaxVideos() : null)
                 .createdAt(benefit.getCreatedAt())
                 .updatedAt(benefit.getUpdatedAt())
                 .build();

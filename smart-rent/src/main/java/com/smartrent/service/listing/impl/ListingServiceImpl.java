@@ -57,6 +57,7 @@ import com.smartrent.service.listing.cache.ListingRequestCacheService;
 import com.smartrent.util.TextNormalizer;
 // import com.smartrent.service.pricing.LocationPricingService;  // DISABLED: Not in use
 import com.smartrent.service.quota.QuotaService;
+import com.smartrent.service.viptier.VipTierLimitValidator;
 import com.smartrent.service.payment.PaymentService;
 import com.smartrent.service.transaction.TransactionService;
 import com.smartrent.service.address.AddressCreationService;
@@ -118,6 +119,7 @@ public class ListingServiceImpl implements ListingService {
     com.smartrent.mapper.UserMapper userMapper;
     // LocationPricingService locationPricingService;  // DISABLED: Service not in use
     QuotaService quotaService;
+    VipTierLimitValidator vipTierLimitValidator;
     TransactionService transactionService;
     TransactionRepository transactionRepository;
     VipTierDetailRepository vipTierDetailRepository;
@@ -201,6 +203,10 @@ public class ListingServiceImpl implements ListingService {
         }
 
         log.info("Inferred vipType {} from benefit type {}", vipType, benefitType);
+
+        // Fail fast on image/video limit BEFORE consuming any quota so the user
+        // doesn't burn a post benefit on a request we'd reject afterwards.
+        vipTierLimitValidator.validateForCreate(vipType, request.getMediaIds());
 
         // Consume quota from specified benefit IDs (this also validates all benefits have the same type)
         try {
@@ -286,6 +292,11 @@ public class ListingServiceImpl implements ListingService {
         // Calculate price based on VIP tier and duration
         BigDecimal amount = vipTier.getPriceForDuration(durationDays);
 
+        // Fail fast on image/video limit before creating the payment transaction so
+        // the user is not charged for a request that will fail when the listing is
+        // materialised from the Redis cache after the payment callback.
+        vipTierLimitValidator.validateForCreate(vipType, request.getMediaIds());
+
         // Create PENDING transaction (no listing yet - will be created after payment)
         String transactionId = transactionService.createPostFeeTransaction(
                 request.getUserId(),
@@ -330,6 +341,10 @@ public class ListingServiceImpl implements ListingService {
     @Transactional
     public Object createVipListing(VipListingCreationRequest request) {
         log.info("Creating VIP listing for user: {}, vipType: {}", request.getUserId(), request.getVipType());
+
+        // Fail fast on image/video limit before doing any quota/payment work so the
+        // caller gets a 400 instead of consuming a benefit or being redirected to VNPay.
+        vipTierLimitValidator.validateForCreate(request.getVipType(), request.getMediaIds());
 
         // Determine benefit type based on vipType
         BenefitType benefitType = switch (request.getVipType().toUpperCase()) {
@@ -635,6 +650,12 @@ public class ListingServiceImpl implements ListingService {
         if (request.getMediaIds() != null) {
             log.info("Updating media for listing {}: {} media items", id, request.getMediaIds().size());
 
+            // Validate against the (possibly just-updated) vipType BEFORE unlinking
+            // existing media so a rejected update leaves the listing's media intact.
+            String effectiveVipType = existing.getVipType() != null
+                    ? existing.getVipType().name() : "NORMAL";
+            vipTierLimitValidator.validateForCreate(effectiveVipType, request.getMediaIds());
+
             // Unlink existing media (set listing to null)
             List<Media> existingMedia = mediaRepository.findByListing_ListingIdAndStatusOrderBySortOrderAsc(
                     id, Media.MediaStatus.ACTIVE);
@@ -747,6 +768,12 @@ public class ListingServiceImpl implements ListingService {
     private void linkMediaToListing(Listing listing, Set<Long> mediaIds, String userId) {
         log.info("Linking {} media items to listing {} for user {}",
                 mediaIds.size(), listing.getListingId(), userId);
+
+        // Enforce per-tier image/video limits before we mutate any media row.
+        // Existing media is already unlinked by the caller on update flow, so the
+        // new set is the full set the listing will end up with.
+        String vipType = listing.getVipType() != null ? listing.getVipType().name() : "NORMAL";
+        vipTierLimitValidator.validateForCreate(vipType, mediaIds);
 
         for (Long mediaId : mediaIds) {
             // Fetch media

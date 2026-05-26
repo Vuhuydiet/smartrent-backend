@@ -5,6 +5,7 @@ import com.smartrent.dto.request.ListingRequest;
 import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.*;
 import com.smartrent.service.listing.ListingService;
+import com.smartrent.service.viptier.VipTierDetailService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -49,6 +50,7 @@ import java.util.Set;
 public class ListingController {
 
     private final ListingService listingService;
+    private final VipTierDetailService vipTierDetailService;
 
     @Operation(
         summary = "Create a new listing with transactional address",
@@ -266,6 +268,57 @@ public class ListingController {
     public ApiResponse<Void> deleteListing(@PathVariable Long id) {
         listingService.deleteListing(id);
         return ApiResponse.<Void>builder().build();
+    }
+
+    @Operation(
+        summary = "Get image/video upload limits and current usage for a listing",
+        description = """
+                Returns the listing's VIP tier media quota (`maxImages`, `maxVideos`) together with the
+                current number of ACTIVE images/videos already attached, plus the remaining slots.
+
+                **Use this on the edit-listing screen** to render counters like "3 / 10 images" and
+                disable the upload button when `remainingImages` (or `remainingVideos`) is 0.
+
+                For the **create-listing screen** (no listingId yet), call
+                `GET /v1/vip-tiers/{tierCode}/media-limits` instead — it returns the same shape
+                with `currentImages`/`currentVideos`/`remaining*` set to `null`.
+                """,
+        parameters = {
+            @Parameter(name = "id", description = "Listing ID", required = true, example = "1234")
+        },
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Limits and usage returned",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = VipTierMediaLimitResponse.class),
+                    examples = @ExampleObject(value = """
+                            {
+                              "code": "999999",
+                              "message": null,
+                              "data": {
+                                "tierCode": "SILVER",
+                                "maxImages": 10,
+                                "maxVideos": 2,
+                                "currentImages": 3,
+                                "currentVideos": 1,
+                                "remainingImages": 7,
+                                "remainingVideos": 1
+                              }
+                            }
+                            """)
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404",
+                description = "Listing not found")
+        }
+    )
+    @GetMapping("/{id}/media-limits")
+    public ApiResponse<VipTierMediaLimitResponse> getListingMediaLimits(@PathVariable Long id) {
+        return ApiResponse.<VipTierMediaLimitResponse>builder()
+                .data(vipTierDetailService.getMediaLimitsForListing(id))
+                .build();
     }
 
     /**
