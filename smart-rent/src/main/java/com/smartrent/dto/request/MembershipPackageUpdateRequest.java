@@ -1,6 +1,7 @@
 package com.smartrent.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -15,7 +16,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
-@Schema(description = "Request object for updating a membership package")
+@Schema(description = "Request object for updating a membership package. Sale price is automatically calculated by the server from originalPrice and discountPercentage; admins do not provide salePrice directly.")
 public class MembershipPackageUpdateRequest {
 
     @Size(max = 100, message = "Package name must not exceed 100 characters")
@@ -42,21 +43,18 @@ public class MembershipPackageUpdateRequest {
 
     @DecimalMin(value = "0.0", inclusive = false, message = "Original price must be greater than 0")
     @Schema(
-        description = "Original price of the package",
+        description = "Original price of the package (before discount)",
         example = "1200000"
     )
     BigDecimal originalPrice;
 
-    @DecimalMin(value = "0.0", inclusive = false, message = "Sale price must be greater than 0")
+    @DecimalMin(value = "0.00", inclusive = true, message = "Discount percentage must be at least 0")
+    @DecimalMax(value = "100.00", inclusive = true, message = "Discount percentage must not exceed 100")
     @Schema(
-        description = "Sale price of the package",
-        example = "999000"
-    )
-    BigDecimal salePrice;
-
-    @Schema(
-        description = "Discount percentage",
-        example = "16.75"
+        description = "Discount percentage (0-100). Server will automatically recalculate salePrice = originalPrice * (1 - discountPercentage / 100), rounded to 0 decimal places.",
+        example = "20.00",
+        minimum = "0",
+        maximum = "100"
     )
     BigDecimal discountPercentage;
 
@@ -72,4 +70,3 @@ public class MembershipPackageUpdateRequest {
     )
     String description;
 }
-
