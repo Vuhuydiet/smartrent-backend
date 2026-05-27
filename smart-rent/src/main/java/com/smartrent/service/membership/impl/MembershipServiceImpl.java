@@ -91,6 +91,29 @@ public class MembershipServiceImpl implements MembershipService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<MembershipPackageResponse> getAllPackages(int page, int size) {
+        log.info("Getting all membership packages (admin) with pagination - page: {}, size: {}", page, size);
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<MembershipPackage> packagePage = membershipPackageRepository.findAll(pageable);
+
+        List<MembershipPackageResponse> packageResponses = packagePage.getContent().stream()
+                .map(this::mapToPackageResponse)
+                .collect(Collectors.toList());
+
+        log.info("Successfully retrieved {} membership packages", packageResponses.size());
+
+        return PageResponse.<MembershipPackageResponse>builder()
+                .page(page)
+                .size(packagePage.getSize())
+                .totalPages(packagePage.getTotalPages())
+                .totalElements(packagePage.getTotalElements())
+                .data(packageResponses)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public MembershipPackageResponse getPackageById(Long membershipId) {
         log.info("Getting membership package by ID: {}", membershipId);
         MembershipPackage membershipPackage = membershipPackageRepository.findById(membershipId)

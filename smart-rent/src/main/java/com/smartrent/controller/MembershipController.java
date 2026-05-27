@@ -1,7 +1,6 @@
 package com.smartrent.controller;
 
 import com.smartrent.dto.request.MembershipPackageCreateRequest;
-import com.smartrent.dto.request.MembershipPackageUpdateRequest;
 import com.smartrent.dto.request.MembershipPurchaseRequest;
 import com.smartrent.dto.request.MembershipUpgradeRequest;
 import com.smartrent.dto.response.*;
@@ -183,103 +182,6 @@ public class MembershipController {
         return ApiResponse.<MembershipPackageResponse>builder()
                 .data(response)
                 .build();
-    }
-
-    @PutMapping("/packages/{membershipId}")
-    @Operation(
-        summary = "Update membership package (Admin operation)",
-        description = "Updates an existing membership package. This is an admin operation.",
-        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = true,
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = MembershipPackageUpdateRequest.class),
-                examples = @ExampleObject(
-                    name = "Update Package Request",
-                    value = """
-                        {
-                          "packageName": "Premium 12 Months - Updated",
-                          "salePrice": 8990000,
-                          "discountPercentage": 25.08,
-                          "isActive": true
-                        }
-                        """
-                )
-            )
-        ),
-        responses = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "200",
-                description = "Package updated successfully",
-                content = @Content(
-                    mediaType = "application/json",
-                    schema = @Schema(implementation = MembershipPackageResponse.class)
-                )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "404",
-                description = "Package not found",
-                content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                        name = "Not Found Error",
-                        value = """
-                            {
-                              "code": "4015",
-                              "message": "Membership package not found"
-                            }
-                            """
-                    )
-                )
-            )
-        }
-    )
-    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<MembershipPackageResponse> updatePackage(
-            @Parameter(description = "Membership package ID", required = true)
-            @PathVariable Long membershipId,
-            @Valid @RequestBody MembershipPackageUpdateRequest request) {
-        log.info("Updating membership package: {}", membershipId);
-        MembershipPackageResponse response = membershipService.updatePackage(membershipId, request);
-        return ApiResponse.<MembershipPackageResponse>builder()
-                .data(response)
-                .build();
-    }
-
-    @DeleteMapping("/packages/{membershipId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Operation(
-        summary = "Delete membership package (Admin operation)",
-        description = "Deletes a membership package. This is an admin operation.",
-        responses = {
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "204",
-                description = "Package deleted successfully"
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "404",
-                description = "Package not found",
-                content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                        name = "Not Found Error",
-                        value = """
-                            {
-                              "code": "4015",
-                              "message": "Membership package not found"
-                            }
-                            """
-                    )
-                )
-            )
-        }
-    )
-    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public void deletePackage(
-            @Parameter(description = "Membership package ID", required = true)
-            @PathVariable Long membershipId) {
-        log.info("Deleting membership package: {}", membershipId);
-        membershipService.deletePackage(membershipId);
     }
 
     @PostMapping("/initiate-purchase")
