@@ -28,6 +28,11 @@ public interface MembershipService {
     PageResponse<MembershipPackageResponse> getAllActivePackages(int page, int size);
 
     /**
+     * Get all membership packages (active and inactive) with pagination - admin use
+     */
+    PageResponse<MembershipPackageResponse> getAllPackages(int page, int size);
+
+    /**
      * Get membership package by ID
      */
     MembershipPackageResponse getPackageById(Long membershipId);
