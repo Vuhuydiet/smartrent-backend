@@ -189,12 +189,16 @@ public class MembershipServiceImpl implements MembershipService {
             membershipPackage.setOriginalPrice(request.getOriginalPrice());
         }
 
-        if (request.getSalePrice() != null) {
-            membershipPackage.setSalePrice(request.getSalePrice());
-        }
-
         if (request.getDiscountPercentage() != null) {
             membershipPackage.setDiscountPercentage(request.getDiscountPercentage());
+        }
+
+        // Auto-recalculate salePrice from originalPrice and discountPercentage
+        // whenever either of them is touched. Admin never provides salePrice directly.
+        if (request.getOriginalPrice() != null || request.getDiscountPercentage() != null) {
+            membershipPackage.setSalePrice(
+                    calculateSalePrice(membershipPackage.getOriginalPrice(),
+                            membershipPackage.getDiscountPercentage()));
         }
 
         if (request.getIsActive() != null) {
@@ -206,7 +210,8 @@ public class MembershipServiceImpl implements MembershipService {
         }
 
         membershipPackage = membershipPackageRepository.save(membershipPackage);
-        log.info("Successfully updated membership package with ID: {}", membershipId);
+        log.info("Successfully updated membership package with ID: {} (salePrice={}, discountPercentage={})",
+                membershipId, membershipPackage.getSalePrice(), membershipPackage.getDiscountPercentage());
 
         return mapToPackageResponse(membershipPackage);
     }
@@ -496,6 +501,19 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     // Helper methods
+
+    /**
+     * Compute salePrice = originalPrice * (1 - discountPercentage / 100), rounded to 0 decimals.
+     * Treats null discount as 0%. Result is clamped to >= 0 in case of out-of-range input.
+     */
+    private BigDecimal calculateSalePrice(BigDecimal originalPrice, BigDecimal discountPercentage) {
+        BigDecimal discount = discountPercentage != null ? discountPercentage : BigDecimal.ZERO;
+        BigDecimal multiplier = BigDecimal.ONE.subtract(
+                discount.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP));
+        BigDecimal salePrice = originalPrice.multiply(multiplier).max(BigDecimal.ZERO);
+        return salePrice.setScale(0, RoundingMode.HALF_UP);
+    }
+
     private Transaction createMembershipTransaction(String userId, MembershipPackage membershipPackage, String paymentProvider) {
         return Transaction.builder()
                 .transactionId(UUID.randomUUID().toString())

@@ -80,12 +80,12 @@ public class AdminMembershipController {
 
         @PutMapping("/packages/{membershipId}")
         @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
-        @Operation(summary = "Update membership package (Admin)", description = "Updates an existing membership package.", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @Content(mediaType = "application/json", schema = @Schema(implementation = MembershipPackageUpdateRequest.class), examples = @ExampleObject(name = "Update Package Request", value = """
+        @Operation(summary = "Update membership package (Admin)", description = "Updates an existing membership package. "
+                        + "Sale price is automatically computed by the server as "
+                        + "salePrice = originalPrice * (1 - discountPercentage / 100). "
+                        + "Admins only need to provide discountPercentage (0-100); do NOT send salePrice.", requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true, content = @Content(mediaType = "application/json", schema = @Schema(implementation = MembershipPackageUpdateRequest.class), examples = @ExampleObject(name = "Update Discount Only", value = """
                         {
-                          "packageName": "Premium 12 Months - Updated",
-                          "salePrice": 8990000,
-                          "discountPercentage": 25.08,
-                          "isActive": true
+                          "discountPercentage": 25
                         }
                         """))), responses = {
                                         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Package updated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = MembershipPackageResponse.class))),
