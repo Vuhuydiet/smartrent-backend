@@ -1741,6 +1741,7 @@ public class ListingServiceImpl implements ListingService {
     }
 
     private List<CategoryListingStatsResponse> computeCategoryStats(CategoryStatsRequest request) {
+
         log.info("Getting category stats - categoryIds: {}, verifiedOnly: {}",
                 request.getCategoryIds(), request.getVerifiedOnly());
 
