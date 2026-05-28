@@ -282,6 +282,21 @@ public class RecommendationServiceImpl implements RecommendationService {
                         Collectors.counting()))
                 .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
 
+        // 3.1.2 Calculate condition counts for Discovery Shift triggering
+        long diffLocViews = 0;
+        if (viewedListings != null) {
+            for (RecentlyViewedItemResponse rv : viewedListings) {
+                if (rv.getListing() != null && isDifferentLocation(rv.getListing(), preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode)) {
+                    diffLocViews++;
+                }
+            }
+        }
+        List<PhoneClickDetail> phoneClicks = phoneClickDetailRepository.findByUser_UserIdOrderByClickedAtDesc(userId);
+        int phoneClickCount = phoneClicks != null ? phoneClicks.size() : 0;
+        int savedCount = savedListings != null ? savedListings.size() : 0;
+
+        boolean meetsShiftCondition = (diffLocViews >= 3) || (savedCount >= 2) || (phoneClickCount >= 2);
+
         // 3.2 Find latest interacted location (Discovery Zone)
         // 3.2 Find latest interacted location (Discovery Zone)
         Long latestListingId = null;
@@ -483,17 +498,19 @@ public class RecommendationServiceImpl implements RecommendationService {
 
             // Apply Discovery Shift slot pinning (Slots 8, 9, 10 for Discovery Zone)
             boolean isShift = false;
-            if (discoveryProvinceCode != null && preferredProvinceCode != null
-                    && !discoveryProvinceCode.equals(preferredProvinceCode)) {
-                isShift = true;
-            } else if (discoveryDistrictId != null && preferredDistrictId != null
-                    && !discoveryDistrictId.equals(preferredDistrictId)) {
-                isShift = true;
-            } else if (discoveryWardCode != null && preferredWardCode != null
-                    && !discoveryWardCode.equals(preferredWardCode)) {
-                isShift = true;
-            } else if (discoveryWardId != null && preferredWardId != null && !discoveryWardId.equals(preferredWardId)) {
-                isShift = true;
+            if (meetsShiftCondition) {
+                if (discoveryProvinceCode != null && preferredProvinceCode != null
+                        && !discoveryProvinceCode.equals(preferredProvinceCode)) {
+                    isShift = true;
+                } else if (discoveryDistrictId != null && preferredDistrictId != null
+                        && !discoveryDistrictId.equals(preferredDistrictId)) {
+                    isShift = true;
+                } else if (discoveryWardCode != null && preferredWardCode != null
+                        && !discoveryWardCode.equals(preferredWardCode)) {
+                    isShift = true;
+                } else if (discoveryWardId != null && preferredWardId != null && !discoveryWardId.equals(preferredWardId)) {
+                    isShift = true;
+                }
             }
 
             if (isShift && response.getListings() != null && response.getListings().size() >= 10) {
@@ -530,6 +547,17 @@ public class RecommendationServiceImpl implements RecommendationService {
                         otherItems.add(res);
                     }
                 }
+
+                // Sort otherItems by preferred location match level descending to prioritize most viewed locations
+                otherItems.sort((a, b) -> {
+                    int levelA = preferredMatchLevel(entityById.get(a.getListingId()),
+                            preferredProvinceCode, preferredDistrictId,
+                            preferredWardId, preferredWardCode);
+                    int levelB = preferredMatchLevel(entityById.get(b.getListingId()),
+                            preferredProvinceCode, preferredDistrictId,
+                            preferredWardId, preferredWardCode);
+                    return Integer.compare(levelB, levelA);
+                });
 
                 // Combine into discoveryItems with Priority: Ward > District > Province
                 List<ListingResponse> rawDiscoveryItems = new ArrayList<>();
@@ -819,6 +847,58 @@ public class RecommendationServiceImpl implements RecommendationService {
             return 1;
         }
         return 0;
+    }
+
+    private int preferredMatchLevel(Listing listing, String preferredProvinceCode,
+            Integer preferredDistrictId, Integer preferredWardId, String preferredWardCode) {
+        if (listing == null) {
+            return 0;
+        }
+        AIRecommendationRequest.ListingFeatureDto f = toFeatureDto(listing);
+        if ((preferredWardCode != null && preferredWardCode.equals(f.getNewWardCode()))
+                || (preferredWardId != null && preferredWardId.equals(f.getWardId()))) {
+            return 3;
+        }
+        if (preferredDistrictId != null && preferredDistrictId.equals(f.getDistrictId())) {
+            return 2;
+        }
+        if (preferredProvinceCode != null && preferredProvinceCode.equals(f.getProvinceCode())) {
+            return 1;
+        }
+        return 0;
+    }
+
+    private boolean isDifferentLocation(ListingResponse res, String preferredProvinceCode,
+            Integer preferredDistrictId, Integer preferredWardId, String preferredWardCode) {
+        if (res == null || res.getAddress() == null) {
+            return false;
+        }
+        var addr = res.getAddress();
+        String pCode = addr.getNewProvinceCode();
+        if (pCode == null || pCode.isEmpty()) {
+            if (addr.getLegacyProvinceId() != null) {
+                pCode = String.valueOf(addr.getLegacyProvinceId());
+            } else {
+                pCode = "UNKNOWN";
+            }
+        }
+        String wCode = addr.getNewWardCode();
+        Integer dId = addr.getLegacyDistrictId();
+        Integer wId = addr.getLegacyWardId();
+
+        if (preferredProvinceCode != null && !preferredProvinceCode.equals(pCode)) {
+            return true;
+        }
+        if (preferredDistrictId != null && !preferredDistrictId.equals(dId)) {
+            return true;
+        }
+        if (preferredWardCode != null && !preferredWardCode.equals(wCode)) {
+            return true;
+        }
+        if (preferredWardId != null && !preferredWardId.equals(wId)) {
+            return true;
+        }
+        return false;
     }
 
     private AIRecommendationRequest.ListingFeatureDto toFeatureDto(Listing listing) {
