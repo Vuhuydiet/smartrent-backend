@@ -55,6 +55,12 @@ public class AIRecommendationRequest {
 
         @JsonProperty("post_date_days_ago")
         Integer postDateDaysAgo;
+
+        @JsonProperty("latitude")
+        Double latitude;
+
+        @JsonProperty("longitude")
+        Double longitude;
     }
 
     @Getter
@@ -90,9 +96,6 @@ public class AIRecommendationRequest {
         @JsonProperty("top_n")
         Integer top_n;
 
-        @JsonProperty("alpha")
-        Double alpha;
-
         @JsonProperty("user_interactions")
         List<InteractionEntryDto> userInteractions; // Optional: null for anonymous users
 
@@ -121,9 +124,6 @@ public class AIRecommendationRequest {
 
         @JsonProperty("top_n")
         Integer top_n;
-
-        @JsonProperty("alpha")
-        Double alpha;
 
         @JsonProperty("interaction_features")
         List<ListingFeatureDto> interactionFeatures;

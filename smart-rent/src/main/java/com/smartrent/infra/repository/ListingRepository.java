@@ -456,6 +456,53 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     List<Listing> findWithAddressByListingIds(@Param("ids") Collection<Long> ids);
 
     /**
+     * Proximity-based candidate pool (same district) for similar listings multi-channel retrieval.
+     */
+    @Query("""
+        SELECT l FROM listings l JOIN FETCH l.address a
+        WHERE (a.newProvinceCode = :provinceCode OR (a.legacyProvinceId = :provinceId AND :provinceId IS NOT NULL))
+        AND a.legacyDistrictId = :districtId
+        AND l.productType = :productType
+        AND l.listingType = :listingType
+        AND l.listingId <> :excludeId
+        AND l.isDraft = false AND l.isShadow = false AND l.verified = true AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findSimilarProximityCandidates(
+        @Param("provinceCode") String provinceCode,
+        @Param("provinceId") Integer provinceId,
+        @Param("districtId") Integer districtId,
+        @Param("productType") Listing.ProductType productType,
+        @Param("listingType") Listing.ListingType listingType,
+        @Param("excludeId") Long excludeId,
+        Pageable pageable
+    );
+
+    /**
+     * Price-based candidate pool (matching price range) for similar listings multi-channel retrieval.
+     */
+    @Query("""
+        SELECT l FROM listings l JOIN FETCH l.address a
+        WHERE (a.newProvinceCode = :provinceCode OR (a.legacyProvinceId = :provinceId AND :provinceId IS NOT NULL))
+        AND l.price BETWEEN :minPrice AND :maxPrice
+        AND l.productType = :productType
+        AND l.listingType = :listingType
+        AND l.listingId <> :excludeId
+        AND l.isDraft = false AND l.isShadow = false AND l.verified = true AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findSimilarPriceCandidates(
+        @Param("provinceCode") String provinceCode,
+        @Param("provinceId") Integer provinceId,
+        @Param("minPrice") java.math.BigDecimal minPrice,
+        @Param("maxPrice") java.math.BigDecimal maxPrice,
+        @Param("productType") Listing.ProductType productType,
+        @Param("listingType") Listing.ListingType listingType,
+        @Param("excludeId") Long excludeId,
+        Pageable pageable
+    );
+
+    /**
      * Candidate pool for "similar listings" by legacy province ID.
      */
     @Query("""
@@ -519,6 +566,26 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         @Param("productType") Listing.ProductType productType,
         @Param("listingType") Listing.ListingType listingType,
         @Param("excludeId") Long excludeId,
+        Pageable pageable
+    );
+
+    /**
+     * Budget-based candidate pool for personalized feed multi-channel retrieval.
+     */
+    @Query("""
+        SELECT DISTINCT l FROM listings l JOIN FETCH l.address a
+        WHERE (a.newProvinceCode = :provinceCode OR (a.legacyProvinceId = :provinceId AND :provinceId IS NOT NULL))
+        AND l.price BETWEEN :minPrice AND :maxPrice
+        AND l.listingId NOT IN :excludedIds
+        AND l.isDraft = false AND l.isShadow = false AND l.verified = true AND l.expired = false
+        ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
+    """)
+    List<Listing> findPersonalizedPriceCandidates(
+        @Param("provinceCode") String provinceCode,
+        @Param("provinceId") Integer provinceId,
+        @Param("minPrice") java.math.BigDecimal minPrice,
+        @Param("maxPrice") java.math.BigDecimal maxPrice,
+        @Param("excludedIds") java.util.List<Long> excludedIds,
         Pageable pageable
     );
 
