@@ -50,6 +50,9 @@ public class RecommendationServiceImplTest {
     @Mock
     AddressMappingRepository addressMappingRepository;
 
+    @Mock
+    com.smartrent.service.recommendation.RecommendationExecutor recommendationExecutor;
+
     RecommendationServiceImpl recommendationService;
 
     @BeforeEach
@@ -61,8 +64,10 @@ public class RecommendationServiceImplTest {
                 recentlyViewedService,
                 aiConnector,
                 listingService,
-                addressMappingRepository
+                addressMappingRepository,
+                recommendationExecutor
         );
+        org.mockito.Mockito.lenient().when(recommendationExecutor.pool()).thenReturn(Runnable::run);
     }
 
     @Test

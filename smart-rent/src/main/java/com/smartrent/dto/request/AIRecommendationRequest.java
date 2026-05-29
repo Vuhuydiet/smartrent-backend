@@ -127,5 +127,8 @@ public class AIRecommendationRequest {
 
         @JsonProperty("interaction_features")
         List<ListingFeatureDto> interactionFeatures;
+
+        @JsonProperty("meets_shift_condition")
+        Boolean meetsShiftCondition;
     }
 }
