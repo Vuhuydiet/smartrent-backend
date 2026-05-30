@@ -573,7 +573,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * Budget-based candidate pool for personalized feed multi-channel retrieval.
      */
     @Query("""
-        SELECT DISTINCT l FROM listings l JOIN FETCH l.address a
+        SELECT l FROM listings l JOIN FETCH l.address a
         WHERE (a.newProvinceCode = :provinceCode OR (a.legacyProvinceId = :provinceId AND :provinceId IS NOT NULL))
         AND l.price BETWEEN :minPrice AND :maxPrice
         AND l.listingId NOT IN :excludedIds
@@ -593,7 +593,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * Candidate pool for personalized feed by legacy province ID.
      */
     @Query("""
-        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
+        SELECT l FROM listings l LEFT JOIN FETCH l.address a
         WHERE a.legacyProvinceId = :provinceId
         AND l.listingId NOT IN :excludedIds
         AND l.isDraft = false
@@ -612,7 +612,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * Candidate pool for personalized feed by new province code.
      */
     @Query("""
-        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
+        SELECT l FROM listings l LEFT JOIN FETCH l.address a
         WHERE a.newProvinceCode = :provinceCode
         AND l.listingId NOT IN :excludedIds
         AND l.isDraft = false
@@ -631,7 +631,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * Candidate pool for personalized feed: Same Legacy Ward
      */
     @Query("""
-        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
+        SELECT l FROM listings l LEFT JOIN FETCH l.address a
         WHERE a.legacyWardId = :wardId
         AND l.listingId NOT IN :excludedIds
         AND l.isDraft = false
@@ -650,7 +650,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * Candidate pool for personalized feed: Same New Ward
      */
     @Query("""
-        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
+        SELECT l FROM listings l LEFT JOIN FETCH l.address a
         WHERE a.newWardCode = :wardCode
         AND l.listingId NOT IN :excludedIds
         AND l.isDraft = false
@@ -669,7 +669,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * Candidate pool for personalized feed: Same District
      */
     @Query("""
-        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address a
+        SELECT l FROM listings l LEFT JOIN FETCH l.address a
         WHERE a.legacyDistrictId = :districtId
         AND l.listingId NOT IN :excludedIds
         AND l.isDraft = false
@@ -689,7 +689,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * Used as Stage-2 top-up or full fallback.
      */
     @Query("""
-        SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.address
+        SELECT l FROM listings l LEFT JOIN FETCH l.address
         WHERE l.listingId NOT IN :excludedIds
         AND l.isDraft = false
         AND l.isShadow = false

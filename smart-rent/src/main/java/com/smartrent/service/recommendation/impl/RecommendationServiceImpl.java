@@ -41,6 +41,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     SmartRentAiConnector aiConnector;
     ListingService listingService;
     AddressMappingRepository addressMappingRepository;
+    com.smartrent.service.recommendation.RecommendationExecutor recommendationExecutor;
 
     // Memoizes legacy→new address-mapping lookups (static reference data) to
     // collapse the per-candidate N+1 in toFeatureDto when new codes are missing.
@@ -205,6 +206,7 @@ public class RecommendationServiceImpl implements RecommendationService {
     @Override
     @org.springframework.cache.annotation.Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_RECOMMENDATION_PERSONALIZED, key = "'user:' + #userId + ':topN:' + #topN", unless = "#result == null || #result.listings == null || #result.listings.isEmpty()")
     public RecommendationResponse getPersonalizedFeed(String userId, int topN) {
+        long tStart = System.nanoTime();
         Map<Long, Double> interactionWeightMap = new LinkedHashMap<>();
         List<SavedListing> savedListings = savedListingRepository.findByUserIdOrderByCreatedAtDesc(userId);
 
@@ -237,8 +239,10 @@ public class RecommendationServiceImpl implements RecommendationService {
         Set<Long> interactedListingIds = interactionWeightMap.keySet();
         List<Listing> interactedListings = listingRepository.findWithAddressByListingIds(interactedListingIds);
 
-        // Sort interactedListings so that the most recently viewed items come FIRST
-        List<Long> recencyOrder = recentlyViewedService.getRecentlyViewed(userId).stream()
+        // Sort interactedListings so that the most recently viewed items come FIRST.
+        // Reuse the viewedListings already fetched above — re-calling getRecentlyViewed
+        // re-hits Redis AND re-runs batchMapListings (~4 DB queries + full DTO build).
+        List<Long> recencyOrder = viewedListings.stream()
                 .map(rv -> rv.getListing().getListingId())
                 .collect(Collectors.toList());
 
@@ -255,6 +259,7 @@ public class RecommendationServiceImpl implements RecommendationService {
 
         List<AIRecommendationRequest.ListingFeatureDto> interactionFeatures = interactedListings.stream()
                 .map(this::toFeatureDto).collect(Collectors.toList());
+        long tAfterInteractions = System.nanoTime();
 
         // 3. Location profiling
         // 3.1 Find most frequent (preferred) locations
@@ -282,30 +287,85 @@ public class RecommendationServiceImpl implements RecommendationService {
                         Collectors.counting()))
                 .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
 
-        // 3.1.2 Calculate condition counts for Discovery Shift triggering
-        long diffLocViews = 0;
-        if (viewedListings != null) {
-            for (RecentlyViewedItemResponse rv : viewedListings) {
-                if (rv.getListing() != null && isDifferentLocation(rv.getListing(), preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode)) {
-                    diffLocViews++;
+        // 3.1.2 Calculate condition counts for Discovery Shift triggering.
+        // Spec: shift only when the user has explored a NEW place — 3 views OR
+        // 2 saves OR 2 phone clicks whose location differs from the preferred one.
+        // All three are measured against the preferred location with the same
+        // toFeatureDto representation (new province/ward code + legacy district/ward
+        // id) the rest of the discovery flow uses, so legacy/new codes compare like
+        // for like instead of silently mismatching.
+        Map<Long, AIRecommendationRequest.ListingFeatureDto> featureById = new HashMap<>();
+        for (AIRecommendationRequest.ListingFeatureDto f : interactionFeatures) {
+            featureById.put(f.getListingId(), f);
+        }
+
+        long diffLocViews = viewedListings.stream()
+                .map(rv -> rv.getListing() != null ? rv.getListing().getListingId() : null)
+                .filter(Objects::nonNull)
+                .distinct()
+                .filter(id -> isDifferentFromPreferred(featureById.get(id),
+                        preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode))
+                .count();
+
+        long diffLocSaved = savedListings.stream()
+                .map(s -> s.getId().getListingId())
+                .filter(id -> isDifferentFromPreferred(featureById.get(id),
+                        preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode))
+                .count();
+
+        long diffLocPhoneClicks = clickedListingIds.stream()
+                .filter(id -> isDifferentFromPreferred(featureById.get(id),
+                        preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode))
+                .count();
+
+        boolean meetsShiftCondition = (diffLocViews >= 3) || (diffLocSaved >= 2) || (diffLocPhoneClicks >= 2);
+        log.info("[Discovery Shift] user={} diffLocViews={} diffLocSaved={} diffLocPhoneClicks={} meetsShiftCondition={}",
+                userId, diffLocViews, diffLocSaved, diffLocPhoneClicks, meetsShiftCondition);
+
+        // 3.2 Find the Discovery Zone: the most-recent interaction that sits in a
+        // NEW place (different from preferred). Anchoring the zone to a
+        // different-place listing keeps it consistent with meetsShiftCondition — so
+        // whenever the shift triggers we pin listings from the place the user is
+        // actually exploring, not whichever listing they happened to touch last.
+        // Scan by recency: views (recency-ordered) → saves (createdAt desc) → clicks.
+        // Fall back to the plain latest interaction when nothing differs (isShift
+        // stays false in that case).
+        Long latestListingId = null;
+        for (RecentlyViewedItemResponse rv : viewedListings) {
+            Long id = rv.getListing() != null ? rv.getListing().getListingId() : null;
+            if (id != null && isDifferentFromPreferred(featureById.get(id),
+                    preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode)) {
+                latestListingId = id;
+                break;
+            }
+        }
+        if (latestListingId == null) {
+            for (SavedListing s : savedListings) {
+                Long id = s.getId().getListingId();
+                if (isDifferentFromPreferred(featureById.get(id),
+                        preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode)) {
+                    latestListingId = id;
+                    break;
                 }
             }
         }
-        List<PhoneClickDetail> phoneClicks = phoneClickDetailRepository.findByUser_UserIdOrderByClickedAtDesc(userId);
-        int phoneClickCount = phoneClicks != null ? phoneClicks.size() : 0;
-        int savedCount = savedListings != null ? savedListings.size() : 0;
-
-        boolean meetsShiftCondition = (diffLocViews >= 3) || (savedCount >= 2) || (phoneClickCount >= 2);
-
-        // 3.2 Find latest interacted location (Discovery Zone)
-        // 3.2 Find latest interacted location (Discovery Zone)
-        Long latestListingId = null;
-        if (!viewedListings.isEmpty()) {
-            latestListingId = viewedListings.get(0).getListing().getListingId();
-        } else if (!savedListings.isEmpty()) {
-            latestListingId = savedListings.get(0).getId().getListingId();
-        } else if (!clickedListingIds.isEmpty()) {
-            latestListingId = clickedListingIds.get(0);
+        if (latestListingId == null) {
+            for (Long id : clickedListingIds) {
+                if (isDifferentFromPreferred(featureById.get(id),
+                        preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode)) {
+                    latestListingId = id;
+                    break;
+                }
+            }
+        }
+        if (latestListingId == null) {
+            if (!viewedListings.isEmpty()) {
+                latestListingId = viewedListings.get(0).getListing().getListingId();
+            } else if (!savedListings.isEmpty()) {
+                latestListingId = savedListings.get(0).getId().getListingId();
+            } else if (!clickedListingIds.isEmpty()) {
+                latestListingId = clickedListingIds.get(0);
+            }
         }
 
         String discoveryWardCode = null;
@@ -362,7 +422,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                                 finalDiscoveryWardId, threadExclusions, PageRequest.of(0, 100)));
                     }
                     return list;
-                });
+                }, recommendationExecutor.pool());
 
         java.util.concurrent.CompletableFuture<List<Listing>> priceFuture = java.util.concurrent.CompletableFuture
                 .supplyAsync(() -> {
@@ -385,7 +445,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                     }
                     return listingRepository.findPersonalizedPriceCandidates(
                             preferredProvinceCode, pId, minPrice, maxPrice, threadExclusions, PageRequest.of(0, 200));
-                });
+                }, recommendationExecutor.pool());
 
         java.util.concurrent.CompletableFuture<List<Listing>> freshFuture = java.util.concurrent.CompletableFuture
                 .supplyAsync(() -> {
@@ -411,11 +471,16 @@ public class RecommendationServiceImpl implements RecommendationService {
                                     pId, threadExclusions, PageRequest.of(0, 100)));
                         }
                     }
-                    // Global top-up to ensure we always have candidates
-                    list.addAll(listingRepository.findCandidatesForPersonalizedGlobal(
-                            threadExclusions, PageRequest.of(0, 100)));
+                    // No inline global top-up: the global pool query is a
+                    // full-table scan + filesort (no index covers its
+                    // public-visibility booleans + pushed_at/post_date sort), and
+                    // it dominated the cold-path latency. The stage-2 starvation
+                    // top-up below already fetches the global pool, but ONLY when
+                    // the combined proximity+price+province pool is < 150 — so the
+                    // common path (users with enough local candidates) no longer
+                    // pays for it.
                     return list;
-                });
+                }, recommendationExecutor.pool());
 
         List<Listing> candidates;
         try {
@@ -446,6 +511,8 @@ public class RecommendationServiceImpl implements RecommendationService {
             log.error("Error executing parallel multi-channel retrieval for personalized feed", e);
             candidates = freshFuture.join();
         }
+
+        long tAfterCandidates = System.nanoTime();
 
         if (candidates.isEmpty()) {
             return getColdStartFeed(topN);
@@ -486,10 +553,20 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .candidates(distinctCandidates)
                 .top_n(topN)
                 .interactionFeatures(interactionFeatures)
+                .meetsShiftCondition(meetsShiftCondition)
                 .build();
 
         try {
+            long tBeforeAi = System.nanoTime();
             List<RecommendationItemDto> result = aiConnector.getPersonalizedFeed(aiRequest);
+            long tAfterAi = System.nanoTime();
+            log.info("[PerfTrace] personalized userId={} candidatePool={} | interactions={}ms candidateRetrieval={}ms cfGlobal+features={}ms feignAi={}ms total(soFar)={}ms",
+                    userId, candidates.size(),
+                    (tAfterInteractions - tStart) / 1_000_000,
+                    (tAfterCandidates - tAfterInteractions) / 1_000_000,
+                    (tBeforeAi - tAfterCandidates) / 1_000_000,
+                    (tAfterAi - tBeforeAi) / 1_000_000,
+                    (tAfterAi - tStart) / 1_000_000);
             // applyRanking=false: trust the AI service's hybrid score (which already
             // includes the tuned VIP + freshness boosts) instead of re-applying them
             // here — re-applying double-counted VIP/freshness. Backend still owns the
@@ -707,6 +784,16 @@ public class RecommendationServiceImpl implements RecommendationService {
                         }
                     }
 
+                    // Keep the feed at exactly topN. The hard-fallback backup can add
+                    // discovery items that were NOT in the AI's original topN, which
+                    // would otherwise grow the list past topN. The 3 pinned discovery
+                    // items live at slots 8/9/10 (indices 7-9 < topN, since pinning
+                    // only runs when the feed already has >= 10 items), so trimming
+                    // the tail drops the lowest-ranked overflow, never the pins.
+                    if (pinnedListings.size() > topN) {
+                        pinnedListings = new ArrayList<>(pinnedListings.subList(0, topN));
+                    }
+
                     response.setListings(pinnedListings);
                     response.setTotalReturned(pinnedListings.size());
                     log.info(
@@ -868,34 +955,30 @@ public class RecommendationServiceImpl implements RecommendationService {
         return 0;
     }
 
-    private boolean isDifferentLocation(ListingResponse res, String preferredProvinceCode,
-            Integer preferredDistrictId, Integer preferredWardId, String preferredWardCode) {
-        if (res == null || res.getAddress() == null) {
+    /**
+     * Whether an interacted listing sits in a DIFFERENT place than the user's
+     * preferred location. Operates on the toFeatureDto feature (new province/ward
+     * code + legacy district/ward id) so it compares like-for-like with the
+     * preferred values derived the same way. Returns true as soon as any populated
+     * preferred field fails to match; a null feature (listing not resolvable) does
+     * not count as different, to avoid over-triggering the shift.
+     */
+    private boolean isDifferentFromPreferred(AIRecommendationRequest.ListingFeatureDto f,
+            String preferredProvinceCode, Integer preferredDistrictId,
+            Integer preferredWardId, String preferredWardCode) {
+        if (f == null) {
             return false;
         }
-        var addr = res.getAddress();
-        String pCode = addr.getNewProvinceCode();
-        if (pCode == null || pCode.isEmpty()) {
-            if (addr.getLegacyProvinceId() != null) {
-                pCode = String.valueOf(addr.getLegacyProvinceId());
-            } else {
-                pCode = "UNKNOWN";
-            }
-        }
-        String wCode = addr.getNewWardCode();
-        Integer dId = addr.getLegacyDistrictId();
-        Integer wId = addr.getLegacyWardId();
-
-        if (preferredProvinceCode != null && !preferredProvinceCode.equals(pCode)) {
+        if (preferredProvinceCode != null && !preferredProvinceCode.equals(f.getProvinceCode())) {
             return true;
         }
-        if (preferredDistrictId != null && !preferredDistrictId.equals(dId)) {
+        if (preferredDistrictId != null && !preferredDistrictId.equals(f.getDistrictId())) {
             return true;
         }
-        if (preferredWardCode != null && !preferredWardCode.equals(wCode)) {
+        if (preferredWardCode != null && !preferredWardCode.equals(f.getNewWardCode())) {
             return true;
         }
-        if (preferredWardId != null && !preferredWardId.equals(wId)) {
+        if (preferredWardId != null && !preferredWardId.equals(f.getWardId())) {
             return true;
         }
         return false;
