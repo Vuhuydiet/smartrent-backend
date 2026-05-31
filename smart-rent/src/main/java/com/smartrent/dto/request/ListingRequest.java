@@ -66,7 +66,7 @@ public class ListingRequest {
     @NotNull
     Long categoryId;
 
-    @Pattern(regexp = "ROOM|APARTMENT|HOUSE|OFFICE|STUDIO", message = "productType must be ROOM, APARTMENT, HOUSE, OFFICE, or STUDIO")
+    @Pattern(regexp = "ROOM|APARTMENT|HOUSE|OFFICE|STUDIO|STORE", message = "productType must be ROOM, APARTMENT, HOUSE, OFFICE, STUDIO, or STORE")
     String productType;
 
     @DecimalMin(value = "0.0", inclusive = false, message = "price must be positive")

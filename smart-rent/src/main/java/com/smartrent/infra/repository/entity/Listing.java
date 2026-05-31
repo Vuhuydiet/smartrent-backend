@@ -260,7 +260,7 @@ public class Listing {
     }
 
     public enum ProductType {
-        ROOM, APARTMENT, HOUSE, OFFICE, STUDIO
+        ROOM, APARTMENT, HOUSE, OFFICE, STUDIO, STORE
     }
 
     public enum PriceUnit {
