@@ -366,6 +366,46 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
         // Get distinct user IDs who clicked on any of the owner's listings (paginated)
         Page<String> userIdsPage = phoneClickDetailRepository.findDistinctUserIdsByListingOwnerId(ownerId, pageable);
 
+        return buildUsersWhoClickedResponse(ownerId, userIdsPage, page);
+    }
+
+    @Override
+    public PageResponse<UserPhoneClickDetailResponse> searchUsersWhoClickedOnMyListings(String ownerId, String keyword, int page, int size) {
+        log.info("Searching users who clicked on listings owned by user {} with keyword '{}' - page: {}, size: {}",
+                ownerId, keyword, page, size);
+
+        // Verify user exists
+        userRepository.findById(ownerId)
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + ownerId));
+
+        // Validate pagination parameters
+        if (page < 1) {
+            throw new RuntimeException("Page number must be greater than 0");
+        }
+        if (size <= 0) {
+            throw new RuntimeException("Page size must be greater than 0");
+        }
+
+        // Blank keyword falls back to the unfiltered listing
+        if (keyword == null || keyword.isBlank()) {
+            return getUsersWhoClickedOnMyListings(ownerId, page, size);
+        }
+
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        // Get distinct user IDs matching the keyword (paginated)
+        Page<String> userIdsPage = phoneClickDetailRepository.searchDistinctUserIdsByListingOwnerId(
+                ownerId, keyword.trim(), pageable);
+
+        return buildUsersWhoClickedResponse(ownerId, userIdsPage, page);
+    }
+
+    /**
+     * Build the paginated user detail response for a page of clicking user IDs.
+     * For each user, loads their details and the owner's listings they clicked on.
+     */
+    private PageResponse<UserPhoneClickDetailResponse> buildUsersWhoClickedResponse(
+            String ownerId, Page<String> userIdsPage, int page) {
         // For each user, get their details and all owner's listings they clicked on
         List<UserPhoneClickDetailResponse> responses = new ArrayList<>();
         for (String clickingUserId : userIdsPage.getContent()) {

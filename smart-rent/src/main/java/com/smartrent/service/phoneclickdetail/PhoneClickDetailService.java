@@ -95,5 +95,17 @@ public interface PhoneClickDetailService {
      * @return Paginated user phone click detail responses
      */
     PageResponse<UserPhoneClickDetailResponse> getUsersWhoClickedOnMyListings(String ownerId, int page, int size);
+
+    /**
+     * Search users who clicked on any of the owner's listings, filtered by a keyword
+     * matched against the clicking user's name, email or contact phone (paginated)
+     *
+     * @param ownerId Owner/renter user ID
+     * @param keyword Keyword to match against user name, email or contact phone
+     * @param page Page number (1-indexed)
+     * @param size Page size
+     * @return Paginated user phone click detail responses
+     */
+    PageResponse<UserPhoneClickDetailResponse> searchUsersWhoClickedOnMyListings(String ownerId, String keyword, int page, int size);
 }
 
