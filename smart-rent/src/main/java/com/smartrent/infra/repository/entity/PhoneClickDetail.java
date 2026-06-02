@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_listing_id", columnList = "listing_id"),
                 @Index(name = "idx_user_id", columnList = "user_id"),
                 @Index(name = "idx_listing_user", columnList = "listing_id, user_id"),
+                @Index(name = "idx_phone_clicks_user_listing", columnList = "user_id, listing_id"),
                 @Index(name = "idx_clicked_at", columnList = "clicked_at")
         })
 @Getter

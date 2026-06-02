@@ -370,6 +370,7 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PageResponse<UserPhoneClickDetailResponse> searchUsersWhoClickedOnMyListings(String ownerId, String keyword, int page, int size) {
         log.info("Searching users who clicked on listings owned by user {} with keyword '{}' - page: {}, size: {}",
                 ownerId, keyword, page, size);
