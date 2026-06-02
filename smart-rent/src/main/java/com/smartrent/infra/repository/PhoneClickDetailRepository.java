@@ -142,6 +142,22 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
     Page<String> findDistinctUserIdsByListingOwnerId(@Param("ownerId") String ownerId, Pageable pageable);
 
     /**
+     * Search distinct user IDs who clicked on any listing owned by a specific user,
+     * filtered by a keyword matched against the clicking user's name, email or contact phone (paginated)
+     */
+    @Query("SELECT DISTINCT pc.user.userId FROM phone_clicks pc " +
+           "WHERE pc.listing.userId = :ownerId " +
+           "AND (LOWER(pc.user.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(pc.user.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(CONCAT(pc.user.firstName, ' ', pc.user.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(pc.user.email) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(pc.user.contactPhoneNumber) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    Page<String> searchDistinctUserIdsByListingOwnerId(
+            @Param("ownerId") String ownerId,
+            @Param("keyword") String keyword,
+            Pageable pageable);
+
+    /**
      * Get all phone clicks for listings owned by a specific user, filtered by clicking user
      */
     @Query("SELECT pc FROM phone_clicks pc " +

@@ -669,9 +669,13 @@ public class PhoneClickDetailController {
                     Get all users who clicked on phone numbers in any of the authenticated user's listings (paginated).
                     Each user detail contains a list of the owner's listings they have clicked on.
 
+                    Optionally filter by a `keyword` matched (case-insensitive, partial) against the
+                    clicking user's first name, last name, full name, email or contact phone number.
+
                     **Use Case:**
                     - Renter views listing management dashboard
                     - See all users who showed interest in any of their listings
+                    - Search interested users by name, email or phone
                     - Click on a user to see which specific listings they were interested in
                     - Contact interested users
                     """,
@@ -746,6 +750,8 @@ public class PhoneClickDetailController {
             )
     })
     public ApiResponse<PageResponse<UserPhoneClickDetailResponse>> getUsersWhoClickedOnMyListings(
+            @Parameter(description = "Optional keyword to filter users by name, email or contact phone", example = "john")
+            @RequestParam(required = false) String keyword,
             @Parameter(description = "Page number (1-indexed)", example = "1")
             @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Number of items per page", example = "10")
@@ -755,9 +761,13 @@ public class PhoneClickDetailController {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userId = authentication.getName();
 
-        log.info("Getting users who clicked on listings owned by user {} - page: {}, size: {}", userId, page, size);
+        boolean hasKeyword = keyword != null && !keyword.isBlank();
+        log.info("Getting users who clicked on listings owned by user {} - keyword: '{}', page: {}, size: {}",
+                userId, keyword, page, size);
 
-        PageResponse<UserPhoneClickDetailResponse> responses = phoneClickDetailService.getUsersWhoClickedOnMyListings(userId, page, size);
+        PageResponse<UserPhoneClickDetailResponse> responses = hasKeyword
+                ? phoneClickDetailService.searchUsersWhoClickedOnMyListings(userId, keyword, page, size)
+                : phoneClickDetailService.getUsersWhoClickedOnMyListings(userId, page, size);
 
         return ApiResponse.<PageResponse<UserPhoneClickDetailResponse>>builder()
                 .code("999999")
