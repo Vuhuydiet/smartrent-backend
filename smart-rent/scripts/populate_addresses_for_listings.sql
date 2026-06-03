@@ -45,6 +45,11 @@ BEGIN
 
     -- Legacy ward fields
     DECLARE v_legacy_ward_id INT;
+    -- Surrogate PKs of the parent province/district (NOT the GSO codes). These
+    -- are what addresses.legacy_province_id / legacy_district_id must store so
+    -- they match ListingSpecification + the FE province dropdown (province.id).
+    DECLARE v_legacy_province_id INT;
+    DECLARE v_legacy_district_id INT;
     DECLARE v_legacy_province_code VARCHAR(10);
     DECLARE v_legacy_district_code VARCHAR(10);
     DECLARE v_legacy_ward_code VARCHAR(10);
@@ -88,6 +93,8 @@ BEGIN
     DECLARE ward_cursor CURSOR FOR
         SELECT
             lw.legacy_ward_id,
+            lp.legacy_province_id,
+            ld.legacy_district_id,
             lw.province_code,
             lw.district_code,
             lw.ward_code,
@@ -106,6 +113,8 @@ BEGIN
             am.new_ward_lat,
             am.new_ward_lon
         FROM legacy_wards lw
+        JOIN legacy_provinces lp ON lp.province_code = lw.province_code
+        JOIN legacy_districts ld ON ld.district_code = lw.district_code
         LEFT JOIN address_mapping am
             ON lw.province_code = am.legacy_province_code
             AND lw.district_code = am.legacy_district_code
@@ -133,6 +142,7 @@ BEGIN
     ward_loop: LOOP
         FETCH ward_cursor INTO
             v_legacy_ward_id,
+            v_legacy_province_id, v_legacy_district_id,
             v_legacy_province_code, v_legacy_district_code, v_legacy_ward_code,
             v_legacy_province_name, v_legacy_province_short,
             v_legacy_district_name, v_legacy_district_short,
@@ -212,8 +222,10 @@ BEGIN
                 latitude, longitude
             ) VALUES (
                 v_full_address,
-                CAST(v_legacy_province_code AS UNSIGNED),
-                CAST(v_legacy_district_code AS UNSIGNED),
+                -- Store the surrogate PKs (NOT the GSO codes) so the values
+                -- match legacy_provinces/legacy_districts and the FE filter.
+                v_legacy_province_id,
+                v_legacy_district_id,
                 v_legacy_ward_id,
                 CONCAT('Số ', v_street_num, ' Đường ', v_street_name),
                 v_full_newaddress,
