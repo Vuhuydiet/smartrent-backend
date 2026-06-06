@@ -340,15 +340,17 @@ open:
         - video/webm
         - video/quicktime
 
-# SePay Payment Gateway Configuration (VietQR + IPN/webhook bank-transfer reconciliation)
+# SePay Payment Gateway (Cổng thanh toán) Configuration - hosted checkout + IPN
+# Docs: https://developer.sepay.vn/vi/cong-thanh-toan
 sepay:
+  env: ${SEPAY_ENV:sandbox}                    # sandbox | production
   merchant-id: ${SEPAY_MERCHANT_ID:}
   secret-key: ${SEPAY_SECRET_KEY:}
-  account-number: ${SEPAY_ACCOUNT_NUMBER:}
-  bank-code: ${SEPAY_BANK_CODE:MBBank}
-  account-name: ${SEPAY_ACCOUNT_NAME:}
-  qr-base-url: ${SEPAY_QR_BASE_URL:https://qr.sepay.vn/img}
-  code-prefix: ${SEPAY_CODE_PREFIX:SR}
+  payment-method: ${SEPAY_PAYMENT_METHOD:BANK_TRANSFER}   # BANK_TRANSFER | NAPAS_BANK_TRANSFER | CARD
+  currency: ${SEPAY_CURRENCY:VND}
+  success-url: ${SEPAY_SUCCESS_URL:${CLIENT_URL:http://localhost:3000}/payment/result?status=success}
+  error-url: ${SEPAY_ERROR_URL:${CLIENT_URL:http://localhost:3000}/payment/result?status=error}
+  cancel-url: ${SEPAY_CANCEL_URL:${CLIENT_URL:http://localhost:3000}/payment/result?status=cancel}
   ipn-url: ${SEPAY_IPN_URL:https://dev.api.smartrent.io.vn/v1/payments/webhook/sepay}
   expiry-minutes: ${SEPAY_EXPIRY_MINUTES:15}
 

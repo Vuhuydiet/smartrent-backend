@@ -185,5 +185,24 @@ public class PaymentUtil {
             throw new RuntimeException("Failed to generate HMAC-SHA256", e);
         }
     }
+
+    /**
+     * Generate a base64-encoded HMAC-SHA256 hash.
+     *
+     * <p>Used by the SePay Payment Gateway checkout: the signature is
+     * {@code base64(HMAC_SHA256(secret_key, "field1=value1,field2=value2,..."))}.
+     */
+    public static String hmacSHA256Base64(String key, String data) {
+        try {
+            Mac hmacSHA256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSHA256.init(secretKeySpec);
+            byte[] hash = hmacSHA256.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return java.util.Base64.getEncoder().encodeToString(hash);
+        } catch (Exception e) {
+            log.error("Error generating base64 HMAC-SHA256", e);
+            throw new RuntimeException("Failed to generate base64 HMAC-SHA256", e);
+        }
+    }
 }
 

@@ -219,45 +219,52 @@ public class PaymentController {
 
     @PostMapping("/webhook/sepay")
     @Operation(
-            summary = "SePay webhook (bank-transfer notification)",
+            summary = "SePay Payment Gateway IPN",
             description = """
-                    Receives the webhook SePay sends when a matching bank transfer is detected.
+                    Receives the IPN (Instant Payment Notification) the SePay Payment Gateway sends when a
+                    payment result is known.
 
                     **This is a PUBLIC endpoint - SePay calls it directly.**
 
-                    Authenticated with an `Authorization: Apikey <SEPAY_API_KEY>` header (configured in the
-                    SePay dashboard). The endpoint matches the transfer to a pending transaction by the code
-                    embedded in the transfer content, verifies the amount, marks it COMPLETED and triggers
-                    business-logic completion. This is the authoritative confirmation of payment.
+                    Authenticated with an `X-Secret-Key: <SEPAY_SECRET_KEY>` header (configured in the SePay
+                    dashboard with auth type = Secret Key). The nested JSON payload carries
+                    `notification_type` (`ORDER_PAID` / `TRANSACTION_VOID`), an `order` object (matched to a
+                    transaction by `order_invoice_number`) and a `transaction` object. The endpoint verifies
+                    the amount/status, marks the transaction COMPLETED and triggers business-logic completion.
+                    This is the authoritative confirmation of payment.
 
-                    Returns `{ "success": true }` with HTTP 200 so SePay marks the webhook delivered.
+                    Returns `{ "success": true }` with HTTP 200 so SePay marks the IPN delivered.
                     """
     )
     public ResponseEntity<Map<String, Object>> handleSePayWebhook(
             @org.springframework.web.bind.annotation.RequestBody com.fasterxml.jackson.databind.JsonNode body,
-            @org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String authorization,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "X-Secret-Key", required = false) String secretKeyHeader,
             HttpServletRequest httpRequest) {
 
-        log.info("Received SePay webhook");
+        log.info("Received SePay PG IPN");
 
-        // Verify the Apikey header (SePay sends the Secret Key here) before trusting the payload.
+        // Verify the X-Secret-Key header (SePay sends our Secret Key here) before trusting the payload.
         String secretKey = sePayConfig.getSecretKey();
-        String expected = (secretKey == null || secretKey.isBlank()) ? null : "Apikey " + secretKey;
-        if (expected == null || !expected.equals(authorization)) {
-            log.warn("SePay webhook rejected: invalid or missing Authorization header");
+        if (secretKey == null || secretKey.isBlank() || !secretKey.equals(secretKeyHeader)) {
+            log.warn("SePay IPN rejected: invalid or missing X-Secret-Key header");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("success", false, "message", "Invalid API key"));
+                    .body(Map.of("success", false, "message", "Invalid secret key"));
         }
 
         try {
+            // Flatten the nested IPN JSON (order{} + transaction{}) into the params the provider expects.
             Map<String, String> flat = new java.util.HashMap<>();
-            if (body.isObject()) {
-                body.fieldNames().forEachRemaining(field -> {
-                    com.fasterxml.jackson.databind.JsonNode value = body.path(field);
-                    flat.put(field, value.isNull() ? "" : value.asText());
-                });
-            }
-            flat.put("_source", "sepay_webhook");
+            putText(flat, "notification_type", body.path("notification_type"));
+            com.fasterxml.jackson.databind.JsonNode order = body.path("order");
+            putText(flat, "order_invoice_number", order.path("order_invoice_number"));
+            putText(flat, "order_status", order.path("order_status"));
+            putText(flat, "order_amount", order.path("order_amount"));
+            com.fasterxml.jackson.databind.JsonNode txn = body.path("transaction");
+            putText(flat, "transaction_id", txn.path("transaction_id"));
+            putText(flat, "transaction_status", txn.path("transaction_status"));
+            putText(flat, "transaction_amount", txn.path("transaction_amount"));
+            putText(flat, "payment_method", txn.path("payment_method"));
+            flat.put("_source", "sepay_ipn");
 
             PaymentCallbackRequest callbackRequest = PaymentCallbackRequest.builder()
                     .provider(PaymentProvider.SEPAY)
@@ -758,6 +765,13 @@ public class PaymentController {
     }
 
     // Private helper methods
+
+    /** Copy a JSON node's text value into the flat params map (skips missing/null nodes). */
+    private void putText(Map<String, String> target, String key, com.fasterxml.jackson.databind.JsonNode node) {
+        if (node != null && !node.isMissingNode() && !node.isNull()) {
+            target.put(key, node.asText());
+        }
+    }
 
     /**
      * Trigger business logic completion based on transaction type
