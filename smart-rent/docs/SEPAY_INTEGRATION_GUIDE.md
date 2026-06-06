@@ -198,9 +198,9 @@ SEPAY_MERCHANT_ID=...             # Payment Gateway Merchant ID (my.sepay.vn →
 SEPAY_SECRET_KEY=...              # Payment Gateway Secret Key (signs checkout; verifies IPN)
 SEPAY_PAYMENT_METHOD=BANK_TRANSFER  # BANK_TRANSFER | NAPAS_BANK_TRANSFER | CARD
 SEPAY_CURRENCY=VND
-SEPAY_SUCCESS_URL=http://localhost:3000/payment/result?status=success
-SEPAY_ERROR_URL=http://localhost:3000/payment/result?status=error
-SEPAY_CANCEL_URL=http://localhost:3000/payment/result?status=cancel
+SEPAY_SUCCESS_URL=https://www.smartrent.io.vn/payment/result?status=success
+SEPAY_ERROR_URL=https://www.smartrent.io.vn/payment/result?status=error
+SEPAY_CANCEL_URL=https://www.smartrent.io.vn/payment/result?status=cancel
 SEPAY_IPN_URL=https://<your-api-host>/v1/payments/webhook/sepay
 ```
 
