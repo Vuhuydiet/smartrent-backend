@@ -39,7 +39,6 @@ logging:
     com.smartrent.service.role: INFO
     com.smartrent.service.listing: INFO
     com.smartrent.service.payment: INFO
-    com.smartrent.service.vnpay: INFO
     com.smartrent.service.analytics: INFO
     com.smartrent.service.communication: INFO
     com.smartrent.service.content: INFO
@@ -212,6 +211,7 @@ application:
         - "/v1/users/*/following"
       post:
         - "/v1/auth/**"
+        - "/v1/payments/webhook/**"
         - "/v1/users"
         - "/v1/admins"
         - "/v1/verification/**"
@@ -298,8 +298,6 @@ feign:
           grant_type: "authorization_code"
         client:
           url: "https://www.googleapis.com"
-      vnpay:
-        url: "${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}"
       google-maps:
         url: "${GOOGLE_MAPS_API_URL:https://maps.googleapis.com/maps/api}"
 
@@ -342,20 +340,17 @@ open:
         - video/webm
         - video/quicktime
 
-# VNPay Payment Gateway Configuration
-vnpay:
-  tmn-code: ${VNPAY_TMN_CODE:DEMO}
-  hash-secret: ${VNPAY_HASH_SECRET:DEMOSECRETKEY}
-  payment-url: ${VNPAY_PAYMENT_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-  query-url: ${VNPAY_QUERY_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
-  return-url: ${VNPAY_RETURN_URL:http://localhost:3000/payment/result}
-  ipn-url: ${VNPAY_IPN_URL:http://localhost:8080/v1/payments/ipn/VNPAY}
-  version: "2.1.0"
-  command: "pay"
-  currency-code: "VND"
-  locale: "vn"
-  order-type: "other"
-  timeout-minutes: 15
+# SePay Payment Gateway Configuration (VietQR + IPN/webhook bank-transfer reconciliation)
+sepay:
+  merchant-id: ${SEPAY_MERCHANT_ID:}
+  secret-key: ${SEPAY_SECRET_KEY:}
+  account-number: ${SEPAY_ACCOUNT_NUMBER:}
+  bank-code: ${SEPAY_BANK_CODE:MBBank}
+  account-name: ${SEPAY_ACCOUNT_NAME:}
+  qr-base-url: ${SEPAY_QR_BASE_URL:https://qr.sepay.vn/img}
+  code-prefix: ${SEPAY_CODE_PREFIX:SR}
+  ipn-url: ${SEPAY_IPN_URL:https://dev.api.smartrent.io.vn/v1/payments/webhook/sepay}
+  expiry-minutes: ${SEPAY_EXPIRY_MINUTES:15}
 
 # ZaloPay Payment Gateway Configuration
 zalopay:

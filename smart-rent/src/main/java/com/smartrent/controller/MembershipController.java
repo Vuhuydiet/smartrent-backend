@@ -199,7 +199,7 @@ public class MembershipController {
                     value = """
                         {
                           "membershipId": 2,
-                          "paymentProvider": "VNPAY"
+                          "paymentProvider": "SEPAY"
                         }
                         """
                 )
@@ -219,10 +219,10 @@ public class MembershipController {
                               "code": "200000",
                               "message": "Success",
                               "data": {
-                                "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?...",
+                                "paymentUrl": "https://qr.sepay.vn/img?acc=...&bank=MBBank&amount=299000&des=SR...",
                                 "transactionRef": "abc123-def456-ghi789",
                                 "amount": 299000,
-                                "provider": "VNPAY"
+                                "provider": "SEPAY"
                               }
                             }
                             """
@@ -620,7 +620,7 @@ public class MembershipController {
                     value = """
                         {
                           "targetMembershipId": 2,
-                          "paymentProvider": "VNPAY"
+                          "paymentProvider": "SEPAY"
                         }
                         """
                 )
@@ -642,8 +642,8 @@ public class MembershipController {
                                   "message": null,
                                   "data": {
                                     "transactionRef": "abc123-def456",
-                                    "paymentUrl": "https://sandbox.vnpayment.vn/paymentv2/...",
-                                    "paymentProvider": "VNPAY",
+                                    "paymentUrl": "https://qr.sepay.vn/img?acc=...&bank=MBBank&amount=...&des=SR...",
+                                    "paymentProvider": "SEPAY",
                                     "previousMembershipId": 1,
                                     "newMembershipPackageId": 2,
                                     "newPackageName": "Standard Monthly",
@@ -666,7 +666,7 @@ public class MembershipController {
                                   "data": {
                                     "transactionRef": "abc123-def456",
                                     "paymentUrl": null,
-                                    "paymentProvider": "VNPAY",
+                                    "paymentProvider": "SEPAY",
                                     "previousMembershipId": 1,
                                     "newMembershipPackageId": 2,
                                     "newPackageName": "Standard Monthly",

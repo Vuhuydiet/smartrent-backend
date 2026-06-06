@@ -46,7 +46,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .referenceType(ReferenceType.MEMBERSHIP)
                 .referenceId(membershipId.toString())
                 .status(TransactionStatus.PENDING)
-                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "VNPAY"))
+                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "SEPAY"))
                 .additionalInfo("Membership package purchase")
                 .build();
 
@@ -73,7 +73,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .previousMembershipId(previousMembershipId)
                 .discountAmount(discountAmount)
                 .status(TransactionStatus.PENDING)
-                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "VNPAY"))
+                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "SEPAY"))
                 .additionalInfo("Membership upgrade from ID " + previousMembershipId + " to package " + targetMembershipId +
                         " with discount " + discountAmount)
                 .build();
@@ -97,7 +97,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .referenceType(ReferenceType.LISTING)
                 .referenceId(vipType) // Store vipType temporarily
                 .status(TransactionStatus.PENDING)
-                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "VNPAY"))
+                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "SEPAY"))
                 .additionalInfo("Pay-per-post " + vipType + " listing fee for " + durationDays + " days")
                 .build();
 
@@ -120,7 +120,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .referenceType(ReferenceType.PUSH)
                 .referenceId(listingId.toString())
                 .status(TransactionStatus.PENDING)
-                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "VNPAY"))
+                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "SEPAY"))
                 .additionalInfo("Pay-per-push fee")
                 .build();
 
@@ -145,7 +145,7 @@ public class TransactionServiceImpl implements TransactionService {
                 .referenceType(ReferenceType.REPOST)
                 .referenceId(listingId.toString())
                 .status(TransactionStatus.PENDING)
-                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "VNPAY"))
+                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "SEPAY"))
                 .additionalInfo("Pay-per-repost fee for " + durationDays + " days")
                 .build();
 

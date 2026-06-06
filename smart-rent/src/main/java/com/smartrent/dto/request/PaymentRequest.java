@@ -19,7 +19,7 @@ import java.util.Map;
 public class PaymentRequest {
 
     @NotNull(message = "Payment provider is required")
-    @Schema(description = "Payment provider", example = "VNPAY")
+    @Schema(description = "Payment provider", example = "SEPAY")
     PaymentProvider provider;
 
     @NotNull(message = "Amount is required")

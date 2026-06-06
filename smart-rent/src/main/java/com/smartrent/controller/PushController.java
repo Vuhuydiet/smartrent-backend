@@ -61,7 +61,7 @@ public class PushController {
                             {
                               "listingId": 123,
                               "useMembershipQuota": false,
-                              "paymentProvider": "VNPAY"
+                              "paymentProvider": "SEPAY"
                             }
                             """
                     )

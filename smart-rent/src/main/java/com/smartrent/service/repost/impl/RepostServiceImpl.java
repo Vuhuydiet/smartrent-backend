@@ -111,13 +111,13 @@ public class RepostServiceImpl implements RepostService {
                 request.getListingId(),
                 feeAmount,
                 durationDays,
-                request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+                request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"
         );
 
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId)
                 .provider(PaymentProvider.valueOf(
-                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
+                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"))
                 .amount(feeAmount)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("SmartRent Repost Listing " + request.getListingId())

@@ -303,7 +303,7 @@ public class ListingServiceImpl implements ListingService {
                 amount,
                 vipType,
                 durationDays,
-                request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+                request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"
         );
 
         // Cache the listing request in Redis for payment callback (30 min TTL)
@@ -317,7 +317,7 @@ public class ListingServiceImpl implements ListingService {
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId)
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
-                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
+                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"))
                 .amount(amount)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("SmartRent " + vipType + " Listing " + durationDays + " days")
@@ -420,7 +420,7 @@ public class ListingServiceImpl implements ListingService {
                 amount,
                 request.getVipType(),
                 durationDays,
-                request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+                request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"
         );
 
         // Cache the VIP listing request in Redis for payment callback (30 min TTL)
@@ -432,7 +432,7 @@ public class ListingServiceImpl implements ListingService {
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId) // Reuse the transaction created above
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
-                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
+                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"))
                 .amount(amount)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("SmartRent " + request.getVipType() + " Listing " + request.getDurationDays() + " days")

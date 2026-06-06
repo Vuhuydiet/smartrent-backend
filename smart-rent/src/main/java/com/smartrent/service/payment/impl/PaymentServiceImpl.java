@@ -204,8 +204,8 @@ public class PaymentServiceImpl implements PaymentService {
     // Private helper methods
 
     private PaymentProvider determineProviderFromTransactionRef(String transactionRef) {
-        if (transactionRef.startsWith("VNPAY_")) {
-            return PaymentProvider.VNPAY;
+        if (transactionRef.startsWith("SEPAY_")) {
+            return PaymentProvider.SEPAY;
         } else if (transactionRef.startsWith("PAYPAL_")) {
             return PaymentProvider.PAYPAL;
         } else if (transactionRef.startsWith("MOMO_")) {
@@ -218,13 +218,13 @@ public class PaymentServiceImpl implements PaymentService {
         paymentRepository.findByTransactionRef(transactionRef)
                 .orElseThrow(() -> new RuntimeException("Payment not found: " + transactionRef));
 
-        // Default to VNPay if no prefix found (for backward compatibility)
-        return PaymentProvider.VNPAY;
+        // Default to SePay if no prefix found (for backward compatibility)
+        return PaymentProvider.SEPAY;
     }
 
     private String extractTransactionRef(Map<String, String> params, PaymentProvider providerType) {
         return switch (providerType) {
-            case VNPAY -> params.get("vnp_TxnRef");
+            case SEPAY -> params.get("code");
             case PAYPAL -> params.get("token");
             case MOMO -> params.get("orderId");
             case ZALOPAY -> params.get("apptransid");

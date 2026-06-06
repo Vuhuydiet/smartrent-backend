@@ -140,7 +140,7 @@ public class ListingCreationRequest {
     Set<Long> benefitIds;
 
     /**
-     * Payment provider to use (VNPAY, etc.)
+     * Payment provider to use (SEPAY, etc.)
      * Required when useMembershipQuota is false
      */
     String paymentProvider;

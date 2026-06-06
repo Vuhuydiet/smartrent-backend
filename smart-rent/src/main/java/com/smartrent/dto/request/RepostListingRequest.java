@@ -24,7 +24,7 @@ public class RepostListingRequest {
     /** true = consume matching membership quota; false = direct payment. */
     Boolean useMembershipQuota;
 
-    /** Only used when useMembershipQuota = false. Defaults to VNPAY. */
+    /** Only used when useMembershipQuota = false. Defaults to SEPAY. */
     String paymentProvider;
 
     /**

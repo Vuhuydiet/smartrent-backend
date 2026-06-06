@@ -48,12 +48,10 @@ R2_ACCESS_KEY_ID: "test-access-key"
 R2_SECRET_ACCESS_KEY: "test-secret-key"
 R2_BUCKET_NAME: "test-bucket"
 R2_PUBLIC_BASE_URL: "https://test-public-url.com"
-VNPAY_TMN_CODE: "TESTCODE"
-VNPAY_HASH_SECRET: "TESTSECRET"
-VNPAY_PAYMENT_URL: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-VNPAY_QUERY_URL: "https://sandbox.vnpayment.vn"
-VNPAY_RETURN_URL: "http://localhost:3000/payment/result"
-VNPAY_IPN_URL: "http://localhost:8080/v1/payments/ipn/VNPAY"
+SEPAY_MERCHANT_ID: "test-merchant-id"
+SEPAY_SECRET_KEY: "test-secret-key"
+SEPAY_ACCOUNT_NUMBER: "0123456789"
+SEPAY_BANK_CODE: "MBBank"
 CLIENT_URL: "http://localhost:3000"
 ADMIN_URL: "http://localhost:3001"
 
@@ -95,21 +93,17 @@ feign:
     config:
       brevo:
         url: "https://api.brevo.com"
-      vnpay:
-        url: "https://sandbox.vnpayment.vn"
 
-vnpay:
-  tmn-code: "TESTCODE"
-  hash-secret: "TESTSECRET"
-  payment-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-  query-url: "sandbox.vnpayment.vn"
-  return-url: "http://localhost:3000/payment/result"
-  ipn-url: "http://localhost:8080/v1/payments/ipn/VNPAY"
-  version: "2.1.0"
-  command: "pay"
-  order-type: "other"
-  currency-code: "VND"
-  locale: "vn"
+sepay:
+  merchant-id: "test-merchant-id"
+  secret-key: "test-secret-key"
+  account-number: "0123456789"
+  bank-code: "MBBank"
+  account-name: "SMARTRENT TEST"
+  qr-base-url: "https://qr.sepay.vn/img"
+  code-prefix: "SR"
+  ipn-url: "http://localhost:8080/v1/payments/webhook/sepay"
+  expiry-minutes: 15
   secure-hash-type: "SHA512"
   timeout-minutes: 15
 

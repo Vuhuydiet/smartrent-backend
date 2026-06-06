@@ -129,7 +129,7 @@ public class ListingDraftUpdateRequest {
     @Schema(description = "Duration in days for the listing", example = "30")
     Integer durationDays;
 
-    @Schema(description = "Payment provider if paid", example = "VNPAY")
+    @Schema(description = "Payment provider if paid", example = "SEPAY")
     String paymentProvider;
 
     @Schema(description = "JSON string containing additional draft data")

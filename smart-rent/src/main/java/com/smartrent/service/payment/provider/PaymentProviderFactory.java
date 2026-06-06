@@ -76,9 +76,9 @@ public class PaymentProviderFactory {
      * Get default payment provider
      */
     public com.smartrent.service.payment.provider.PaymentProvider getDefaultProvider() {
-        // Return VNPay as default, or first available provider
-        if (isProviderAvailable(PaymentProvider.VNPAY)) {
-            return getProvider(PaymentProvider.VNPAY);
+        // Return SePay as default, or first available provider
+        if (isProviderAvailable(PaymentProvider.SEPAY)) {
+            return getProvider(PaymentProvider.SEPAY);
         }
 
         return getAllProviders().stream()
