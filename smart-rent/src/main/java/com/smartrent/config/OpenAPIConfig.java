@@ -87,11 +87,11 @@ public class OpenAPIConfig {
                 "2. Send verification code via `/v1/verification/code`\n" +
                 "3. Verify email using `/v1/verification` with the received code\n\n" +
 
-                "## VNPay Payment Integration\n" +
-                "SmartRent uses VNPay as the exclusive payment gateway:\n" +
-                "- **No Wallet System**: All payments go directly through VNPay\n" +
+                "## SePay Payment Integration\n" +
+                "SmartRent uses SePay (VietQR bank transfer) as the primary payment gateway:\n" +
+                "- **No Wallet System**: All payments go directly via bank transfer through SePay\n" +
                 "- **Dual Payment Model**: Use membership quota (free) or pay-per-action\n" +
-                "- **Secure Transactions**: HMAC-SHA512 signature verification\n" +
+                "- **Automated Reconciliation**: SePay webhook confirms the matching transfer\n" +
                 "- **Payment Flows**: Membership purchase, pay-per-post, pay-per-push\n" +
                 "- **Transaction Tracking**: Complete history of all payments\n" +
                 "- Initiate payments via `/v1/payments/*`\n" +
@@ -232,8 +232,8 @@ public class OpenAPIConfig {
                 )
                 .addSchemas("PaymentResponse", new Schema<>()
                         .type("object")
-                        .description("VNPay payment URL response")
-                        .addProperty("paymentUrl", new Schema<>().type("string").description("VNPay payment URL to redirect user"))
+                        .description("SePay VietQR payment response")
+                        .addProperty("paymentUrl", new Schema<>().type("string").description("SePay VietQR image URL to display"))
                         .addProperty("transactionId", new Schema<>().type("string").description("Internal transaction ID"))
                         .addProperty("orderInfo", new Schema<>().type("string").description("Order description"))
                         .addProperty("amount", new Schema<>().type("number").description("Payment amount in VND"))
@@ -246,8 +246,8 @@ public class OpenAPIConfig {
                         .addProperty("transactionType", new Schema<>().type("string").description("Type: MEMBERSHIP_PURCHASE, POST_FEE, PUSH_FEE"))
                         .addProperty("amount", new Schema<>().type("number").description("Amount in VND"))
                         .addProperty("status", new Schema<>().type("string").description("Status: PENDING, COMPLETED, FAILED"))
-                        .addProperty("paymentProvider", new Schema<>().type("string").description("Payment provider: VNPAY"))
-                        .addProperty("providerTransactionId", new Schema<>().type("string").description("VNPay transaction ID"))
+                        .addProperty("paymentProvider", new Schema<>().type("string").description("Payment provider: SEPAY"))
+                        .addProperty("providerTransactionId", new Schema<>().type("string").description("SePay transaction ID"))
                         .addProperty("createdAt", new Schema<>().type("string").format("date-time").description("Creation timestamp"))
                 )
                 .addSchemas("QuotaStatusResponse", new Schema<>()
@@ -735,7 +735,7 @@ public class OpenAPIConfig {
     public GroupedOpenApi paymentApi(@Value("${open.api.group.package-to-scan}") String packageToScan) {
             return GroupedOpenApi.builder()
                             .group("payments")
-                            .displayName("VNPay Payments & Transactions")
+                            .displayName("SePay Payments & Transactions")
                             .packagesToScan(packageToScan)
                             .pathsToMatch("/v1/payments/**")
                             .addOpenApiCustomizer(securityCustomizer())

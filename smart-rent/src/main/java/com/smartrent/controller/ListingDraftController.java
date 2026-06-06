@@ -189,7 +189,7 @@ public class ListingDraftController {
             - useMembershipQuota: true/false
             - benefitIds: [1, 2] (when using quota)
             - durationDays: 10/15/30 (when paying)
-            - paymentProvider: VNPAY (when paying)
+            - paymentProvider: SEPAY (when paying)
             """,
         parameters = {
             @Parameter(name = "draftId", description = "Draft ID", required = true, example = "123")
@@ -215,7 +215,7 @@ public class ListingDraftController {
                             {
                               "vipType": "GOLD",
                               "durationDays": 30,
-                              "paymentProvider": "VNPAY"
+                              "paymentProvider": "SEPAY"
                             }
                             """
                     )

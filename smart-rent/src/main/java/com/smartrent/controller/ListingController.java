@@ -123,7 +123,7 @@ public class ListingController {
                               "mediaIds": [101, 102, 103],
                               "durationDays": 30,
                               "useMembershipQuota": false,
-                              "paymentProvider": "VNPAY"
+                              "paymentProvider": "SEPAY"
                             }
                             """
                     ),

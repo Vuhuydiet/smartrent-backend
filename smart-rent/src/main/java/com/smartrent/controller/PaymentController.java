@@ -49,8 +49,8 @@ import java.util.Map;
         APIs for payment management and transaction processing.
 
         **Features:**
-        - Process payments via multiple providers (VNPay, etc.)
-        - Handle Instant Payment Notifications (IPN)
+        - Process payments via multiple providers (SePay, ZaloPay, etc.)
+        - Handle Instant Payment Notifications (IPN) / webhooks
         - Query transaction status and history
         - Refund and cancel payments
 
@@ -75,6 +75,7 @@ public class PaymentController {
     ListingService listingService;
     PushService pushService;
     com.smartrent.service.repost.RepostService repostService;
+    com.smartrent.config.SePayConfig sePayConfig;
 
     // Generic Payment Endpoints (Provider-agnostic)
 
@@ -87,17 +88,12 @@ public class PaymentController {
                     **This is a PUBLIC endpoint - no authentication required.**
 
                     **Use Case:**
-                    After user completes payment on VNPAY, they are redirected to frontend with query parameters.
-                    Frontend should call this endpoint with those same parameters to update transaction status.
+                    For gateways that redirect the browser back with result params (e.g. ZaloPay), the
+                    frontend calls this endpoint with those params to update/confirm the transaction.
 
-                    **Flow:**
-                    1. User pays on VNPAY
-                    2. VNPAY redirects to: `{frontend}/payment/result?vnp_TxnRef=xxx&vnp_ResponseCode=00&...`
-                    3. Frontend calls: `GET /v1/payments/callback/VNPAY?vnp_TxnRef=xxx&vnp_ResponseCode=00&...`
-                    4. Backend validates signature, updates transaction, triggers business logic
-                    5. Frontend displays result to user
-
-                    **Note:** This achieves the same result as IPN but is initiated by frontend instead of VNPAY server.
+                    **Note on SePay:** SePay does NOT redirect — it confirms payments via the server-to-server
+                    webhook (`POST /v1/payments/webhook/sepay`). With SePay the frontend simply renders the
+                    VietQR and polls `GET /v1/payments/transactions/{txnRef}` until the status is COMPLETED.
                     """
     )
     @io.swagger.v3.oas.annotations.responses.ApiResponses(value = {
@@ -160,7 +156,7 @@ public class PaymentController {
             )
     })
     public ApiResponse<PaymentCallbackResponse> handlePaymentCallback(
-            @Parameter(description = "Payment provider (e.g., VNPAY)", example = "VNPAY") @PathVariable PaymentProvider provider,
+            @Parameter(description = "Payment provider (e.g., SEPAY)", example = "SEPAY") @PathVariable PaymentProvider provider,
             @Parameter(description = "All query parameters from payment provider redirect") @RequestParam Map<String, String> params,
             HttpServletRequest httpRequest) {
 
@@ -218,6 +214,74 @@ public class PaymentController {
                     .code("500000")
                     .message("Error processing payment callback: " + e.getMessage())
                     .build();
+        }
+    }
+
+    @PostMapping("/webhook/sepay")
+    @Operation(
+            summary = "SePay webhook (bank-transfer notification)",
+            description = """
+                    Receives the webhook SePay sends when a matching bank transfer is detected.
+
+                    **This is a PUBLIC endpoint - SePay calls it directly.**
+
+                    Authenticated with an `Authorization: Apikey <SEPAY_API_KEY>` header (configured in the
+                    SePay dashboard). The endpoint matches the transfer to a pending transaction by the code
+                    embedded in the transfer content, verifies the amount, marks it COMPLETED and triggers
+                    business-logic completion. This is the authoritative confirmation of payment.
+
+                    Returns `{ "success": true }` with HTTP 200 so SePay marks the webhook delivered.
+                    """
+    )
+    public ResponseEntity<Map<String, Object>> handleSePayWebhook(
+            @org.springframework.web.bind.annotation.RequestBody com.fasterxml.jackson.databind.JsonNode body,
+            @org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String authorization,
+            HttpServletRequest httpRequest) {
+
+        log.info("Received SePay webhook");
+
+        // Verify the Apikey header (SePay sends the Secret Key here) before trusting the payload.
+        String secretKey = sePayConfig.getSecretKey();
+        String expected = (secretKey == null || secretKey.isBlank()) ? null : "Apikey " + secretKey;
+        if (expected == null || !expected.equals(authorization)) {
+            log.warn("SePay webhook rejected: invalid or missing Authorization header");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("success", false, "message", "Invalid API key"));
+        }
+
+        try {
+            Map<String, String> flat = new java.util.HashMap<>();
+            if (body.isObject()) {
+                body.fieldNames().forEachRemaining(field -> {
+                    com.fasterxml.jackson.databind.JsonNode value = body.path(field);
+                    flat.put(field, value.isNull() ? "" : value.asText());
+                });
+            }
+            flat.put("_source", "sepay_webhook");
+
+            PaymentCallbackRequest callbackRequest = PaymentCallbackRequest.builder()
+                    .provider(PaymentProvider.SEPAY)
+                    .params(flat)
+                    .build();
+            PaymentCallbackResponse response = paymentService.processIPN(callbackRequest, httpRequest);
+
+            if (Boolean.TRUE.equals(response.getSuccess()) && response.getTransactionRef() != null) {
+                try {
+                    log.info("SePay webhook confirmed payment, triggering business logic for transaction: {}",
+                            response.getTransactionRef());
+                    triggerBusinessLogicCompletion(response.getTransactionRef());
+                } catch (Exception e) {
+                    log.error("Error triggering business logic for SePay webhook transaction: {} - {}",
+                            response.getTransactionRef(), e.getMessage(), e);
+                }
+            }
+
+            // SePay only needs { "success": true } + HTTP 200/201 to mark the webhook delivered.
+            return ResponseEntity.ok(Map.of("success", true));
+        } catch (Exception e) {
+            log.error("Error processing SePay webhook", e);
+            // Still ack so SePay doesn't retry endlessly on an unrecoverable payload.
+            return ResponseEntity.ok(Map.of("success", true));
         }
     }
 
@@ -316,7 +380,7 @@ public class PaymentController {
                                             {
                                               "code": "999999",
                                               "message": "Available providers retrieved successfully",
-                                              "data": ["VNPAY"]
+                                              "data": ["SEPAY"]
                                             }
                                             """
                             )
@@ -578,7 +642,7 @@ public class PaymentController {
                                                 "type": "MEMBERSHIP_PURCHASE",
                                                 "amount": 100000,
                                                 "currency": "VND",
-                                                "provider": "VNPAY",
+                                                "provider": "SEPAY",
                                                 "createdAt": "2024-01-15T10:30:00",
                                                 "updatedAt": "2024-01-15T10:35:00"
                                               }

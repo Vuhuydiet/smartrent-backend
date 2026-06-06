@@ -148,7 +148,7 @@ public class PushServiceImpl implements PushService {
                 userId,
                 request.getListingId(),
                 PricingConstants.PUSH_PER_TIME,
-                request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+                request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"
         );
 
         // Generate payment URL - pass transactionId to reuse existing transaction
@@ -156,7 +156,7 @@ public class PushServiceImpl implements PushService {
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId) // Reuse the transaction created above
                 .provider(PaymentProvider.valueOf(
-                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
+                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"))
                 .amount(PricingConstants.PUSH_PER_TIME)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("SmartRent Push Listing " + request.getListingId())
@@ -267,7 +267,7 @@ public class PushServiceImpl implements PushService {
                     userId,
                     request.getListingId(),
                     PricingConstants.PUSH_PER_TIME.multiply(java.math.BigDecimal.valueOf(request.getTotalPushes())),
-                    request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+                    request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"
             );
 
             transaction = transactionRepository.findById(txnId).orElse(null);

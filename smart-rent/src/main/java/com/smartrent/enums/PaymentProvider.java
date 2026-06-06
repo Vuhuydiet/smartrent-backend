@@ -9,7 +9,7 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public enum PaymentProvider {
-    VNPAY("vnpay", "VNPay Payment Gateway"),
+    SEPAY("sepay", "SePay Payment Gateway"),
     PAYPAL("paypal", "PayPal Payment Gateway"),
     MOMO("momo", "MoMo Payment Gateway"),
     ZALOPAY("zalopay", "ZaloPay Payment Gateway");

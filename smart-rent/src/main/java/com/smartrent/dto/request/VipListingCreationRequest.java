@@ -106,6 +106,6 @@ public class VipListingCreationRequest {
     )
     Integer durationDays;
 
-    @Schema(description = "Payment provider (only needed if useMembershipQuota = false)", example = "VNPAY")
+    @Schema(description = "Payment provider (only needed if useMembershipQuota = false)", example = "SEPAY")
     String paymentProvider;
 }

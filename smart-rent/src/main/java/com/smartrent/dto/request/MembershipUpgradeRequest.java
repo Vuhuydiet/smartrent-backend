@@ -25,7 +25,7 @@ public class MembershipUpgradeRequest {
 
     /**
      * Payment provider to use for the upgrade payment
-     * Defaults to VNPAY if not specified
+     * Defaults to SEPAY if not specified
      */
     String paymentProvider;
 }

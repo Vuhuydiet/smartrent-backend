@@ -44,7 +44,7 @@ public class ListingResponseForOwner extends ListingResponse {
     @Schema(description = "Whether membership quota was used for this listing", example = "false")
     Boolean useMembershipQuota;
 
-    @Schema(description = "Payment provider used", example = "VNPAY")
+    @Schema(description = "Payment provider used", example = "SEPAY")
     String paymentProvider;
 
     @Schema(description = "Amount paid for this listing (VND)", example = "1800000")
@@ -90,7 +90,7 @@ public class ListingResponseForOwner extends ListingResponse {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Schema(description = "Payment information")
     public static class PaymentInfo {
-        @Schema(description = "Payment provider", example = "VNPAY")
+        @Schema(description = "Payment provider", example = "SEPAY")
         String provider;
 
         @Schema(description = "Payment status", example = "SUCCESS")

@@ -67,7 +67,7 @@ public class RepostController {
                             {
                               "listingId": 123,
                               "useMembershipQuota": false,
-                              "paymentProvider": "VNPAY",
+                              "paymentProvider": "SEPAY",
                               "durationDays": 30
                             }
                             """

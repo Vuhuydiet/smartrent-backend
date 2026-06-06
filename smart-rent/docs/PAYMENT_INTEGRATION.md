@@ -1,5 +1,9 @@
 # Payment Integration Guide
 
+> ⚠️ **DEPRECATED — VNPay has been removed.** SmartRent now uses **SePay** (VietQR bank transfer)
+> as its payment gateway. This document is kept for historical reference only. For the current
+> integration, see **[SEPAY_INTEGRATION_GUIDE.md](./SEPAY_INTEGRATION_GUIDE.md)**.
+
 This document explains how to integrate VNPAY payment in the frontend application.
 
 ## Payment Flow Overview

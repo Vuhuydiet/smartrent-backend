@@ -15,6 +15,6 @@ public class MembershipPurchaseRequest {
     @NotNull(message = "Membership package ID is required")
     Long membershipId;
 
-    String paymentProvider; // VNPAY, MOMO, WALLET, etc.
+    String paymentProvider; // SEPAY, ZALOPAY, etc.
 }
 

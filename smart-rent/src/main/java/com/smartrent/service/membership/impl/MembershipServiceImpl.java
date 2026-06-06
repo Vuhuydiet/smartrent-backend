@@ -317,7 +317,7 @@ public class MembershipServiceImpl implements MembershipService {
                 userId,
                 request.getMembershipId(),
                 membershipPackage.getSalePrice(),
-                request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+                request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"
         );
 
         // Generate payment URL - pass transactionId to reuse existing transaction
@@ -325,7 +325,7 @@ public class MembershipServiceImpl implements MembershipService {
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId) // Reuse the transaction created above
                 .provider(com.smartrent.enums.PaymentProvider.valueOf(
-                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
+                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"))
                 .amount(membershipPackage.getSalePrice())
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("SmartRent Membership " + membershipPackage.getPackageName())
@@ -523,7 +523,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .referenceType(ReferenceType.MEMBERSHIP)
                 .referenceId(membershipPackage.getMembershipId().toString())
                 .status(TransactionStatus.PENDING)
-                .paymentProvider(paymentProvider != null ? PaymentProvider.valueOf(paymentProvider) : PaymentProvider.VNPAY)
+                .paymentProvider(paymentProvider != null ? PaymentProvider.valueOf(paymentProvider) : PaymentProvider.SEPAY)
                 .build();
     }
 
@@ -808,7 +808,7 @@ public class MembershipServiceImpl implements MembershipService {
                 currentMembership.getUserMembershipId(),
                 finalAmount,
                 discountAmount,
-                request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"
+                request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"
         );
 
         // If final amount is 0 or less, complete upgrade immediately without payment
@@ -826,7 +826,7 @@ public class MembershipServiceImpl implements MembershipService {
             return MembershipUpgradeResponse.builder()
                     .transactionRef(transactionId)
                     .paymentUrl(null)
-                    .paymentProvider(request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY")
+                    .paymentProvider(request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY")
                     .previousMembershipId(currentMembership.getUserMembershipId())
                     .newMembershipPackageId(targetPackage.getMembershipId())
                     .newPackageName(targetPackage.getPackageName())
@@ -844,7 +844,7 @@ public class MembershipServiceImpl implements MembershipService {
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId)
                 .provider(PaymentProvider.valueOf(
-                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY"))
+                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"))
                 .amount(finalAmount)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("SmartRent Membership Upgrade to " + targetPackage.getPackageName())
@@ -855,7 +855,7 @@ public class MembershipServiceImpl implements MembershipService {
         return MembershipUpgradeResponse.builder()
                 .transactionRef(transactionId)
                 .paymentUrl(paymentResponse.getPaymentUrl())
-                .paymentProvider(request.getPaymentProvider() != null ? request.getPaymentProvider() : "VNPAY")
+                .paymentProvider(request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY")
                 .previousMembershipId(currentMembership.getUserMembershipId())
                 .newMembershipPackageId(targetPackage.getMembershipId())
                 .newPackageName(targetPackage.getPackageName())

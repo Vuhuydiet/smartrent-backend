@@ -19,7 +19,7 @@ public interface TransactionService {
      * @param userId User ID
      * @param membershipId Membership package ID
      * @param amount Payment amount
-     * @param paymentProvider Payment provider (VNPAY, etc.)
+     * @param paymentProvider Payment provider (SEPAY, etc.)
      * @return Transaction ID
      */
     String createMembershipTransaction(String userId, Long membershipId, BigDecimal amount, String paymentProvider);
@@ -32,7 +32,7 @@ public interface TransactionService {
      * @param previousMembershipId Current membership ID being upgraded from
      * @param amount Payment amount (after discount)
      * @param discountAmount Discount amount applied
-     * @param paymentProvider Payment provider (VNPAY, etc.)
+     * @param paymentProvider Payment provider (SEPAY, etc.)
      * @return Transaction ID
      */
     String createMembershipUpgradeTransaction(String userId, Long targetMembershipId, Long previousMembershipId,
