@@ -32,6 +32,13 @@ public class Constants {
      * {@code HomepageStatsCacheScheduler}.
      */
     public static final String LISTING_STATS_PROVINCES = LISTING + "stats.provinces";
+    /**
+     * Short-TTL cache for POST /v1/listings/map-bounds (interactive map pins).
+     * Keyed by quantized bounding box + zoom + filters. Map browsing is bursty
+     * (pan/zoom around the same city, many concurrent users on the same area),
+     * so even a 60s TTL absorbs most repeat hits while keeping pins fresh.
+     */
+    public static final String LISTING_MAP = LISTING + "map";
     public static final String LISTING_RECOMMENDATION_SIMILAR = LISTING + "recommendation.similar";
     public static final String LISTING_RECOMMENDATION_PERSONALIZED = LISTING + "recommendation.personalized";
   }

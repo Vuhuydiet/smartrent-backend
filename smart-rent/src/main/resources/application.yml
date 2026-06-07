@@ -147,6 +147,7 @@ spring:
       - "listing.browse"
       - "listing.detail"
       - "listing.suggestions"
+      - "listing.map"
       - "listing.stats.categories"
       - "listing.stats.provinces"
       - "listing.recommendation.similar"
@@ -163,6 +164,7 @@ spring:
         "[listing.browse]": 3m
         "[listing.detail]": 3m
         "[listing.suggestions]": 2m
+        "[listing.map]": 1m
         # Homepage stats: permanent (0s = no TTL). Refreshed daily at 00:00
         # Asia/Ho_Chi_Minh by HomepageStatsCacheScheduler.
         "[listing.stats.categories]": 0s
