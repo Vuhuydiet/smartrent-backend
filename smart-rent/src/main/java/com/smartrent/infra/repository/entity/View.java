@@ -36,8 +36,8 @@ public class View {
     @JoinColumn(name = "listing_id", nullable = false)
     Listing listing;
 
-    @Column(name = "user_id") // Can be null for anonymous views
-    Long userId; // Reference to User.id
+    @Column(name = "user_id", length = 36) // Can be null for anonymous views
+    String userId; // Reference to User.userId (UUID), matches users.user_id VARCHAR(36)
 
     @Column(name = "ip_address", length = 45)
     String ipAddress;
