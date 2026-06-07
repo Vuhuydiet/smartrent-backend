@@ -2970,6 +2970,9 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_MAP,
+            key = "T(com.smartrent.util.CacheKeyBuilder).mapBoundsKey(#request)",
+            unless = "#result == null")
     public com.smartrent.dto.response.MapListingsResponse getListingsByMapBounds(
             MapBoundsRequest request) {
         log.info("Getting listings by map bounds - NE: ({}, {}), SW: ({}, {}), zoom: {}, limit: {}",

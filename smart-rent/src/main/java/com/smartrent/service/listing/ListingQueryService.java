@@ -169,9 +169,20 @@ public class ListingQueryService {
         Specification<Listing> spec = ListingSpecification.withinMapBounds(
                 neLat, neLng, swLat, swLng, verifiedOnly, categoryId, vipType);
 
-        // Create pageable with limit (no default sorting)
+        // Deterministic ordering is REQUIRED for the map: the query is capped by
+        // `limit`, so without a stable ORDER BY the database is free to return a
+        // different subset (and different order) for the same bounding box on each
+        // call — which is exactly the "points flicker / disappear in the same area"
+        // bug. Sort by VIP tier (DIAMOND first) so the most relevant pins always
+        // win the cap, then newest first, then listingId as a final tie-breaker so
+        // the result set is fully reproducible.
+        Sort sort = Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                .and(Sort.by(Sort.Direction.DESC, "updatedAt"))
+                .and(Sort.by(Sort.Direction.ASC, "listingId"));
+
+        // Create pageable with limit and the deterministic sort
         int safeLimit = Math.min(Math.max(limit, 1), 500); // Max 500 for map queries
-        Pageable pageable = PageRequest.of(0, safeLimit);
+        Pageable pageable = PageRequest.of(0, safeLimit, sort);
 
         // Execute query
         Page<Listing> results = listingRepository.findAll(spec, pageable);

@@ -184,6 +184,31 @@ public final class CacheKeyBuilder {
             .collect(Collectors.joining(","));
     }
 
+    /**
+     * Cache key for {@code POST /v1/listings/map-bounds}.
+     * Encodes the bounding box, zoom, limit and filters. The frontend already
+     * rounds the bounds to 4 decimals (~11m) before sending, so identical
+     * viewports — the same user returning to a spot, or many users browsing the
+     * same area — collapse to a single entry instead of each re-running the geo
+     * query.
+     *
+     * @param request Map bounds request (must not be {@code null} at call time —
+     *                guarded for safety)
+     * @return Cache key string prefixed with {@code "map|"}
+     */
+    public static String mapBoundsKey(com.smartrent.dto.request.MapBoundsRequest request) {
+        if (request == null) {
+            return "null";
+        }
+        return "map|ne=" + Objects.toString(request.getNeLat(), "") + ',' + Objects.toString(request.getNeLng(), "")
+             + "|sw=" + Objects.toString(request.getSwLat(), "") + ',' + Objects.toString(request.getSwLng(), "")
+             + "|z=" + Objects.toString(request.getZoom(), "")
+             + "|lim=" + Objects.toString(request.getLimit(), "")
+             + "|cat=" + Objects.toString(request.getCategoryId(), "")
+             + "|vip=" + Objects.toString(request.getVipType(), "")
+             + "|ver=" + Objects.toString(request.getVerifiedOnly(), "false");
+    }
+
     public static String suggestionKey(String query, String provinceId, Long categoryId, int limit) {
         String norm = SearchTextCanonicalizer.cacheCanonical(query);
         return "sugg|q="  + Objects.toString(norm, "")
