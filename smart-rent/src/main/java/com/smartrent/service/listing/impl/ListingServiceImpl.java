@@ -1055,6 +1055,10 @@ public class ListingServiceImpl implements ListingService {
             // Remove from cache
             listingRequestCacheService.removeNormalListingRequest(transactionId);
 
+            // If this listing was published from a draft, the draft was kept until now
+            // (so a failed payment wouldn't lose it). Payment succeeded - delete it.
+            deleteSourceDraftIfPresent(request);
+
             return listingMapper.toCreationResponse(saved);
 
         } catch (Exception e) {
@@ -2319,6 +2323,9 @@ public class ListingServiceImpl implements ListingService {
         // Merge draft data with request (request takes precedence)
         ListingCreationRequest mergedRequest = mergeDraftWithRequest(draft, request);
         mergedRequest.setUserId(userId);
+        // Carry the draft id through the (Redis-cached) request so the post-payment
+        // callback can delete the draft only once the listing is actually created.
+        mergedRequest.setSourceDraftId(draftId);
 
         // Validate required fields
         validateDraftForPublish(mergedRequest);
@@ -2326,10 +2333,18 @@ public class ListingServiceImpl implements ListingService {
         // Create the listing using the normal flow
         ListingCreationResponse response = createListing(mergedRequest);
 
-        // Delete the draft after successful publish
-        listingDraftRepository.delete(draft);
-        log.info("Draft {} deleted after successful publish, listing created with id: {}",
-                draftId, response.getListingId());
+        if (Boolean.TRUE.equals(response.getPaymentRequired())) {
+            // Listing is not created yet - it will be materialised from the cache after
+            // payment succeeds, and the draft is deleted there. Keep the draft for now so a
+            // failed/abandoned payment doesn't lose the user's work.
+            log.info("Draft {} kept pending payment for transaction {}",
+                    draftId, response.getTransactionId());
+        } else {
+            // Listing created immediately (quota path) - safe to delete the draft now.
+            listingDraftRepository.delete(draft);
+            log.info("Draft {} deleted after successful publish, listing created with id: {}",
+                    draftId, response.getListingId());
+        }
 
         return response;
     }
@@ -2346,6 +2361,22 @@ public class ListingServiceImpl implements ListingService {
 
         listingDraftRepository.delete(draft);
         log.info("Draft listing {} deleted successfully", draftId);
+    }
+
+    /**
+     * Delete the originating draft after a payment-gated publish completes successfully.
+     * No-op when the request did not come from a draft, or the draft is already gone.
+     */
+    private void deleteSourceDraftIfPresent(ListingCreationRequest request) {
+        Long draftId = request.getSourceDraftId();
+        if (draftId == null) {
+            return;
+        }
+        listingDraftRepository.findByDraftIdAndUserId(draftId, request.getUserId())
+                .ifPresent(draft -> {
+                    listingDraftRepository.delete(draft);
+                    log.info("Draft {} deleted after payment-completed publish", draftId);
+                });
     }
 
     /**

@@ -144,4 +144,13 @@ public class ListingCreationRequest {
      * Required when useMembershipQuota is false
      */
     String paymentProvider;
+
+    /**
+     * Internal: the draft this publish request originated from.
+     * Set server-side by publishDraft (never sent by the client) so the draft can be
+     * deleted only after the listing is actually materialised — i.e. after a successful
+     * payment. If payment fails or never completes, the draft is preserved.
+     */
+    @Schema(hidden = true)
+    Long sourceDraftId;
 }
