@@ -228,6 +228,8 @@ public class PaymentServiceImpl implements PaymentService {
             case PAYPAL -> params.get("token");
             case MOMO -> params.get("orderId");
             case ZALOPAY -> params.get("apptransid");
+            // Legacy provider; no new callbacks expected, but kept for exhaustiveness.
+            case VNPAY -> params.get("vnp_TxnRef");
         };
     }
 
