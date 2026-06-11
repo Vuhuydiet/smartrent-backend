@@ -22,15 +22,17 @@ If the current backend keeps `/v1/payments/history?userId=...` temporarily, trea
 
 Use these UI statuses:
 
+Use these UI statuses (these are the raw values the API returns in `status`):
+
 | Status | Meaning | UI Treatment |
 | --- | --- | --- |
 | `PENDING` | Payment created but gateway result is not final | Yellow or neutral badge |
-| `SUCCESS` | Payment confirmed and business action completed or queued | Green badge |
+| `COMPLETED` | Payment confirmed and business action completed or queued | Green badge |
 | `FAILED` | Gateway rejected payment or signature/result failed | Red badge |
 | `CANCELLED` | User or system cancelled before success | Gray badge |
 | `REFUNDED` | Successful payment was refunded | Blue or purple badge |
 
-Backend note: the current code uses `COMPLETED`. For the new API, either expose `SUCCESS` to the frontend and map `COMPLETED -> SUCCESS`, or migrate the enum from `COMPLETED` to `SUCCESS` with a database migration. Do not expose both in new UI filters unless the backend needs a transition period.
+Backend note: the API exposes the raw `TransactionStatus` enum values, so a confirmed payment is returned as `COMPLETED` (not `SUCCESS`). The `status` **filter** query param additionally accepts `SUCCESS` as a backward-compatible alias for `COMPLETED` (see `CustomerTransactionController#parseStatus` / `AdminTransactionController#parseStatus`), but responses and the detail timeline always use `COMPLETED`. Frontends should map on `COMPLETED`.
 
 ## Payment Types
 
@@ -126,7 +128,7 @@ Query parameters:
 | --- | --- | --- | --- |
 | `page` | number | No | 1-based. Default `1`. |
 | `size` | number | No | Default `20`, max `100`. |
-| `status` | string | No | `PENDING`, `SUCCESS`, `FAILED`, `CANCELLED`, `REFUNDED`. |
+| `status` | string | No | `PENDING`, `COMPLETED`, `FAILED`, `CANCELLED`, `REFUNDED`. `SUCCESS` is accepted as a backward-compatible alias for `COMPLETED`. |
 | `type` | string | No | Payment type enum. |
 | `fromDate` | date | No | Inclusive, `YYYY-MM-DD`. |
 | `toDate` | date | No | Inclusive, `YYYY-MM-DD`. |
@@ -152,7 +154,7 @@ Recommended response:
         "currency": "VND",
         "paymentGateway": "VNPAY",
         "paymentMethod": "ATM",
-        "status": "SUCCESS",
+        "status": "COMPLETED",
         "paymentType": "MONTHLY_INVOICE",
         "createdAt": "2026-05-16T10:15:30",
         "completedAt": "2026-05-16T10:17:02",
@@ -199,7 +201,7 @@ Response:
     "paymentGateway": "VNPAY",
     "paymentMethod": "ATM",
     "gatewayTransactionCode": "15356501",
-    "status": "SUCCESS",
+    "status": "COMPLETED",
     "paymentType": "MONTHLY_INVOICE",
     "createdAt": "2026-05-16T10:15:30",
     "completedAt": "2026-05-16T10:17:02",
@@ -228,7 +230,7 @@ Response:
         "note": "Payment created"
       },
       {
-        "status": "SUCCESS",
+        "status": "COMPLETED",
         "at": "2026-05-16T10:17:02",
         "note": "VNPay confirmed payment"
       }
@@ -258,7 +260,7 @@ Do not trust only the browser redirect result. The transaction page should show 
 ```ts
 export type TransactionStatus =
   | 'PENDING'
-  | 'SUCCESS'
+  | 'COMPLETED'
   | 'FAILED'
   | 'CANCELLED'
   | 'REFUNDED';
@@ -348,7 +350,7 @@ When a user initiates payment:
 For pending states:
 
 * Poll the transaction detail every 3-5 seconds for up to 60 seconds.
-* Stop polling when status becomes `SUCCESS`, `FAILED`, `CANCELLED`, or `REFUNDED`.
+* Stop polling when status becomes `COMPLETED`, `FAILED`, `CANCELLED`, or `REFUNDED`.
 * Show `Payment is still being confirmed` if the result stays pending.
 * Provide a `Refresh status` button.
 
@@ -373,7 +375,7 @@ The frontend should expect transaction rows to contain snapshot fields such as r
 * Do not create a new payment automatically when the user refreshes the result page.
 * If the same invoice already has a `PENDING` transaction, show `Continue payment` instead of creating another one.
 * Treat frontend status as display-only. Backend is the source of truth.
-* Never mark an invoice paid on the frontend without a backend `SUCCESS` transaction.
+* Never mark an invoice paid on the frontend without a backend `COMPLETED` transaction.
 
 ## Error Handling
 
@@ -399,7 +401,7 @@ Failure reason should be visible in detail view, not crowded into every table ro
 5. Add detail drawer or detail route.
 6. Add payment result polling flow.
 7. Add empty, loading, and error states.
-8. Test with statuses: `PENDING`, `SUCCESS`, `FAILED`, `CANCELLED`, `REFUNDED`.
+8. Test with statuses: `PENDING`, `COMPLETED`, `FAILED`, `CANCELLED`, `REFUNDED`.
 9. Test repeated refresh on payment result page.
 10. Test unauthorized access with expired token.
 

@@ -403,7 +403,10 @@ public class TransactionHistoryServiceImpl implements TransactionHistoryService 
         if (status == null) {
             return null;
         }
-        return status == TransactionStatus.COMPLETED ? "SUCCESS" : status.name();
+        // Expose the raw enum name (e.g. COMPLETED) so existing frontends that map on the
+        // canonical TransactionStatus values keep working without changes. SUCCESS is still
+        // accepted as an alias on the status filter input (see *Controller#parseStatus).
+        return status.name();
     }
 
     private String fullName(User user) {
