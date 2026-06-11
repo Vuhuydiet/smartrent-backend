@@ -855,6 +855,9 @@ public class MembershipServiceImpl implements MembershipService {
         return MembershipUpgradeResponse.builder()
                 .transactionRef(transactionId)
                 .paymentUrl(paymentResponse.getPaymentUrl())
+                // Carry the SePay hosted-checkout form fields so the frontend can POST them.
+                // Without this the frontend only has paymentUrl and GETs the checkout URL -> 404.
+                .providerData(paymentResponse.getProviderData())
                 .paymentProvider(request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY")
                 .previousMembershipId(currentMembership.getUserMembershipId())
                 .newMembershipPackageId(targetPackage.getMembershipId())

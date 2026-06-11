@@ -5,6 +5,7 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * Response DTO for membership upgrade initiation
@@ -22,6 +23,15 @@ public class MembershipUpgradeResponse {
     String transactionRef;
     String paymentUrl;
     String paymentProvider;
+
+    /**
+     * Provider-specific data needed to start the checkout, mirroring
+     * {@link PaymentResponse#getProviderData()}. For SePay this carries the hosted-checkout
+     * {@code method}, {@code checkoutUrl} and the signed {@code fields} the frontend must
+     * render as a hidden form and auto-submit via POST. Without it the frontend would only
+     * have {@code paymentUrl} and would navigate to it with a GET, which SePay answers with 404.
+     */
+    Map<String, Object> providerData;
 
     // Upgrade details
     Long previousMembershipId;

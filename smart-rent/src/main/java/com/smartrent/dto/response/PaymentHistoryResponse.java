@@ -1,7 +1,6 @@
 package com.smartrent.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.smartrent.enums.TransactionStatus;
 import com.smartrent.enums.TransactionType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -38,8 +37,10 @@ public class PaymentHistoryResponse {
     @Schema(description = "Transaction type")
     TransactionType transactionType;
 
-    @Schema(description = "Transaction status")
-    TransactionStatus status;
+    @Schema(description = "Transaction status: PENDING, SUCCESS, FAILED, CANCELLED, REFUNDED " +
+            "(the COMPLETED enum is exposed as SUCCESS to match the frontend status vocabulary)",
+            example = "SUCCESS")
+    String status;
 
     @Schema(description = "Order information", example = "Payment for listing rental")
     String orderInfo;
