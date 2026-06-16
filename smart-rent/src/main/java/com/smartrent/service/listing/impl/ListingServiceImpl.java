@@ -333,6 +333,8 @@ public class ListingServiceImpl implements ListingService {
                 .transactionId(transactionId)
                 .amount(amount.longValue())
                 .paymentUrl(paymentResponse.getPaymentUrl())
+                .provider(paymentResponse.getProvider() != null ? paymentResponse.getProvider().name() : null)
+                .providerData(paymentResponse.getProviderData())
                 .message("Payment required. Complete payment to create listing.")
                 .build();
     }
@@ -448,6 +450,8 @@ public class ListingServiceImpl implements ListingService {
                 .transactionId(transactionId)
                 .amount(amount.longValue())
                 .paymentUrl(paymentResponse.getPaymentUrl())
+                .provider(paymentResponse.getProvider() != null ? paymentResponse.getProvider().name() : null)
+                .providerData(paymentResponse.getProviderData())
                 .message("Payment required. Complete payment to activate VIP listing.")
                 .build();
     }

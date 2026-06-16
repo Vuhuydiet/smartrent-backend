@@ -134,6 +134,8 @@ public class RepostServiceImpl implements RepostService {
                 .message("Payment required")
                 .paymentUrl(paymentResponse.getPaymentUrl())
                 .transactionId(paymentResponse.getTransactionRef())
+                .provider(paymentResponse.getProvider() != null ? paymentResponse.getProvider().name() : null)
+                .providerData(paymentResponse.getProviderData())
                 .build();
     }
 

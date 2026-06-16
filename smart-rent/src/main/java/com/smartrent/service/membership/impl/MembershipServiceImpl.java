@@ -856,6 +856,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .transactionRef(transactionId)
                 .paymentUrl(paymentResponse.getPaymentUrl())
                 .paymentProvider(request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY")
+                .providerData(paymentResponse.getProviderData())
                 .previousMembershipId(currentMembership.getUserMembershipId())
                 .newMembershipPackageId(targetPackage.getMembershipId())
                 .newPackageName(targetPackage.getPackageName())

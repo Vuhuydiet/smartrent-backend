@@ -5,6 +5,7 @@ import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * Response DTO for membership upgrade initiation
@@ -22,6 +23,10 @@ public class MembershipUpgradeResponse {
     String transactionRef;
     String paymentUrl;
     String paymentProvider;
+    // Provider-specific checkout data. SePay returns signed form fields the FE
+    // must POST to the hosted checkout; without providerData the FE cannot
+    // start the SePay checkout.
+    Map<String, Object> providerData;
 
     // Upgrade details
     Long previousMembershipId;

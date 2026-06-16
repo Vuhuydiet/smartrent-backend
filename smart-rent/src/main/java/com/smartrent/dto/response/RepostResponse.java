@@ -4,6 +4,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * Response from repost (re-publish) operations.
@@ -38,4 +39,9 @@ public class RepostResponse {
     // Only populated when payment is required
     String paymentUrl;
     String transactionId;
+    // Payment provider (e.g. "SEPAY") + provider-specific checkout data. SePay
+    // returns signed form fields the FE must POST to the hosted checkout;
+    // without providerData the FE cannot start the SePay checkout.
+    String provider;
+    Map<String, Object> providerData;
 }
