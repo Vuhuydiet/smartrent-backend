@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
+import java.util.Map;
+
 @Getter
 @Setter
 @Builder
@@ -23,6 +25,11 @@ public class ListingCreationResponse {
     String transactionId;
     Long amount;
     String paymentUrl;
+    // Payment provider (e.g. "SEPAY") + provider-specific checkout data. SePay
+    // returns signed form fields that the FE must POST to the hosted checkout;
+    // without providerData the FE cannot start the SePay checkout.
+    String provider;
+    Map<String, Object> providerData;
     String message;
 }
 

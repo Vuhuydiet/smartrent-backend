@@ -859,6 +859,7 @@ public class MembershipServiceImpl implements MembershipService {
                 // Without this the frontend only has paymentUrl and GETs the checkout URL -> 404.
                 .providerData(paymentResponse.getProviderData())
                 .paymentProvider(request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY")
+                .providerData(paymentResponse.getProviderData())
                 .previousMembershipId(currentMembership.getUserMembershipId())
                 .newMembershipPackageId(targetPackage.getMembershipId())
                 .newPackageName(targetPackage.getPackageName())
