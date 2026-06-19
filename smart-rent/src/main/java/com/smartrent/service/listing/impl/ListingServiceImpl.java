@@ -588,6 +588,13 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<ListingResponse> getDisplayingListingsByIds(Set<Long> ids) {
+        List<Listing> listings = listingRepository.findDisplayingByListingIdIn(ids);
+        return batchMapListings(listings);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_BROWSE,
             key = "'page:' + #page + ':size:' + #size",
             unless = "#result == null || #result.isEmpty()")

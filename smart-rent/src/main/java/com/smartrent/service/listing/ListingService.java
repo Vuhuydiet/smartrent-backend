@@ -49,6 +49,12 @@ public interface ListingService {
 
     ListingResponse getListingById(Long id);
     List<ListingResponse> getListingsByIds(Set<Long> ids);
+
+    /**
+     * Same as {@link #getListingsByIds(Set)} but restricted to listings that are
+     * currently publicly displayed (not drafted, shadowed, unverified or expired).
+     */
+    List<ListingResponse> getDisplayingListingsByIds(Set<Long> ids);
     List<ListingResponse> getListings(int page, int size);
     ListingResponse updateListing(Long id, ListingRequest request, String userId);
     void deleteListing(Long id);

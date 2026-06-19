@@ -20,6 +20,22 @@ import org.springframework.transaction.annotation.Transactional;
 public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpecificationExecutor<Listing> {
     List<Listing> findByListingIdIn(Collection<Long> listingIds);
 
+    /**
+     * Fetch listings by id restricted to those currently publicly displayed
+     * (same visibility filter as {@link #findPublicListings}). Used so that
+     * features like "recently viewed" never surface listings that have since
+     * been hidden, expired, unverified, drafted or shadowed.
+     */
+    @Query("""
+        SELECT l FROM listings l
+        WHERE l.listingId IN :listingIds
+        AND l.isDraft = false
+        AND l.isShadow = false
+        AND l.verified = true
+        AND l.expired = false
+    """)
+    List<Listing> findDisplayingByListingIdIn(@Param("listingIds") Collection<Long> listingIds);
+
     List<Listing> findByUserId(String userId);
 
     Optional<Listing> findByParentListingId(Long parentListingId);
