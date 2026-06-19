@@ -82,10 +82,13 @@ public class SavedListingMapperImpl implements SavedListingMapper {
         if (entity.getListing() != null) {
             Listing listing = entity.getListing();
 
-            // Map user
+            // Map the listing's owner (poster), not the user who saved it
             UserCreationResponse user = null;
-            if (entity.getUser() != null) {
-                user = userMapper.mapFromUserEntityToUserCreationResponse(entity.getUser());
+            if (listing.getUserId() != null) {
+                User owner = userRepository.findById(listing.getUserId()).orElse(null);
+                if (owner != null) {
+                    user = userMapper.mapFromUserEntityToUserCreationResponse(owner);
+                }
             }
 
             // Map address
