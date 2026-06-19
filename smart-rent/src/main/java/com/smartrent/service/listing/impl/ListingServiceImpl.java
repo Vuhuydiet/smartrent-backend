@@ -1684,6 +1684,19 @@ public class ListingServiceImpl implements ListingService {
         Map<String, String> provinceNames = provinceRepository.findByCodeIn(provinceCodes)
                 .stream().collect(Collectors.toMap(Province::getCode, Province::getName));
 
+        // Fallback for codes that no longer exist in the new 34-province structure
+        // (e.g. provinces merged away on 2025-07-01 such as Bình Dương "74" → HCM "79").
+        // FE may still feature such a legacy code as a "top province" card; resolve its
+        // display name from legacy_provinces so the card shows the real name instead of
+        // the generic "Unknown Province" placeholder.
+        List<String> unresolvedCodes = provinceCodes.stream()
+                .filter(code -> !provinceNames.containsKey(code))
+                .collect(Collectors.toList());
+        if (!unresolvedCodes.isEmpty()) {
+            legacyProvinceRepository.findByCodeIn(unresolvedCodes)
+                    .forEach(lp -> provinceNames.putIfAbsent(lp.getCode(), lp.getName()));
+        }
+
         // Reverse mapping (new code → representative legacy id) for the response
         Map<String, Integer> codeToLegacyId = new HashMap<>();
         for (Map.Entry<Integer, String> entry : legacyIdToCode.entrySet()) {
