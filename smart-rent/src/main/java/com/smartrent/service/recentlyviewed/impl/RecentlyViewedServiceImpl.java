@@ -134,9 +134,10 @@ public class RecentlyViewedServiceImpl implements RecentlyViewedService {
                         tuple -> tuple.getScore().longValue()
                 ));
 
-        // Fetch full listing details
+        // Fetch full listing details, restricted to listings that are currently
+        // publicly displayed so hidden/expired/unverified ones are not surfaced.
         Set<Long> listingIds = listingIdToTimestamp.keySet();
-        List<ListingResponse> listings = listingService.getListingsByIds(listingIds);
+        List<ListingResponse> listings = listingService.getDisplayingListingsByIds(listingIds);
 
         // Create a map for quick lookup
         Map<Long, ListingResponse> listingMap = listings.stream()
