@@ -15,7 +15,9 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import com.smartrent.dto.request.DuplicateCheckRequest;
 import com.smartrent.dto.request.ListingVerificationRequest;
+import com.smartrent.dto.response.DuplicateCheckResponse;
 import com.smartrent.dto.response.ListingVerificationResponse;
 import java.util.List;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -62,6 +64,12 @@ public interface SmartRentAiConnector {
   @PostMapping(value = "/ai/verify-listing", consumes = MediaType.APPLICATION_JSON_VALUE)
   ListingVerificationResponse verifyListing(
       @RequestBody ListingVerificationRequest request);
+
+  /**
+   * Check whether a listing duplicates any existing one (TF-IDF + LLM pipeline).
+   */
+  @PostMapping(value = "/api/v1/listings/check-duplicate", consumes = MediaType.APPLICATION_JSON_VALUE)
+  DuplicateCheckResponse checkDuplicate(@RequestBody DuplicateCheckRequest request);
 }
 
 
