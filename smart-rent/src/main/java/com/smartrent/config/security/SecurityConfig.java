@@ -190,6 +190,7 @@ public class SecurityConfig {
         clientUrl,
         adminUrl,
         "https://smartrent.io.vn",
+        "https://www.thuenhatro.net",
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:8080"));
