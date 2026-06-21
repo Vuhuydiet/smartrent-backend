@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,11 +32,16 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Tag(name = "Admin Management", description = "APIs for managing administrator accounts and profiles")
+// Admin account management is staff-only. Listing/reading admins needs any
+// admin role; creating/updating/deleting admins is restricted to Super Admin
+// per-method below.
+@PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
 public class AdminController {
 
   AdminService adminService;
 
   @PostMapping
+  @PreAuthorize("hasAuthority('ROLE_SA')")
   @Operation(summary = "Create a new admin account", description = "Creates a new administrator account with the provided information and assigned roles. Only existing admins with appropriate permissions can create new admin accounts.", security = @SecurityRequirement(name = "Bearer Authentication"), requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Admin creation details including roles", required = true, content = @Content(mediaType = "application/json", schema = @Schema(implementation = AdminCreationRequest.class), examples = @ExampleObject(name = "Admin Creation Example", value = """
       {
         "phoneCode": "+1",
@@ -179,6 +185,7 @@ public class AdminController {
   }
 
   @PutMapping("/{adminId}")
+  @PreAuthorize("hasAuthority('ROLE_SA')")
   @Operation(summary = "Update admin", description = "Updates an existing administrator's information", security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses(value = {
       @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Admin updated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class), examples = @ExampleObject(name = "Success Response", value = """
@@ -214,6 +221,7 @@ public class AdminController {
   }
 
   @DeleteMapping("/{adminId}")
+  @PreAuthorize("hasAuthority('ROLE_SA')")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Delete admin", description = "Deletes an administrator from the system", security = @SecurityRequirement(name = "Bearer Authentication"))
   @ApiResponses(value = {
