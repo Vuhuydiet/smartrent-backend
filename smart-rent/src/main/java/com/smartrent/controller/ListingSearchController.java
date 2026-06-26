@@ -172,6 +172,28 @@ public class ListingSearchController {
         return ApiResponse.<ListingCardListResponse>builder().data(response).build();
     }
 
+    @GetMapping("/homepage-tier")
+    @Operation(
+        summary = "[PUBLIC API] Top listings of one VIP tier for homepage carousels",
+        description = """
+            **PUBLIC API - Không cần authentication**
+
+            Lấy nhanh `limit` tin mới nhất của MỘT tier VIP (DIAMOND/GOLD/SILVER/NORMAL)
+            cho carousel ở màn hình chính. Khác với `POST /search`: endpoint này KHÔNG
+            phân trang và KHÔNG đếm tổng (no COUNT) — chỉ trả top N — nên nhanh kể cả với
+            tier NORMAL (tin "Tin mới") vốn rất lớn. Frontend gọi 1 lần cho mỗi tier.
+
+            Sắp xếp: trong cùng tier là mới nhất trước (updatedAt DESC). Chỉ tin đã verify,
+            không nháp, không shadow. Không nhận tọa độ (không xếp theo khoảng cách).
+            """
+    )
+    public ApiResponse<List<ListingCardResponse>> getHomepageTier(
+            @RequestParam("vipType") String vipType,
+            @RequestParam(value = "limit", defaultValue = "10") int limit) {
+        List<ListingCardResponse> listings = listingService.getHomepageTierListings(vipType, limit);
+        return ApiResponse.<List<ListingCardResponse>>builder().data(listings).build();
+    }
+
     @GetMapping("/sellers/{userId}/diamond")
     @Operation(
         summary = "[PUBLIC API] Seller DIAMOND listings",
