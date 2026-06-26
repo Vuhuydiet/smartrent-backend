@@ -70,7 +70,6 @@ application:
         - "/v1/listings/*/reports"
         - "/v1/ai/listings/**"
         - "/v1/listings/search"
-        - "/v1/listings/search/sections"
         - "/v1/listings/map-bounds"
 # Enable debug logging for authentication
 logging:

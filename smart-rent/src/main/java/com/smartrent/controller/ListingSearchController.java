@@ -1,11 +1,9 @@
 package com.smartrent.controller;
 
 import com.smartrent.dto.request.ListingFilterRequest;
-import com.smartrent.dto.request.ListingSectionsRequest;
 import com.smartrent.dto.request.MapBoundsRequest;
 import com.smartrent.dto.response.ListingCardListResponse;
 import com.smartrent.dto.response.*;
-import com.smartrent.service.listing.ListingSectionsService;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.discovery.SearchSuggestionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,7 +40,6 @@ import java.util.List;
 public class ListingSearchController {
 
     private final ListingService listingService;
-    private final ListingSectionsService listingSectionsService;
     private final SearchSuggestionService searchSuggestionService;
 
     @PostMapping("/search")
@@ -173,29 +170,6 @@ public class ListingSearchController {
 
         ListingCardListResponse response = listingService.searchListings(filter);
         return ApiResponse.<ListingCardListResponse>builder().data(response).build();
-    }
-
-    @PostMapping("/search/sections")
-    @Operation(
-        summary = "[PUBLIC API] Lấy nhiều carousel VIP tier trong một lần gọi (homepage)",
-        description = """
-            **PUBLIC API - Không cần authentication**
-
-            Gộp nhiều section theo VIP tier (DIAMOND / GOLD / SILVER / NORMAL) vào MỘT request,
-            thay cho việc gọi `POST /search` riêng cho từng tier ở màn hình chính.
-
-            - `verified`, `page`, `size`: dùng chung cho mọi section (section có thể override `size`).
-            - Mỗi `sections[]` gồm `vipType` và `sortBy` (tùy chọn, ví dụ `NEWEST`).
-            - Mỗi section chạy qua đúng pipeline `searchListings` (cùng cache, cùng thứ tự ưu tiên
-              tin đẩy), nên kết quả giống hệt khi gọi `/search` cho từng tier — chỉ khác là 1 round-trip.
-
-            Không nhận tọa độ GPS: carousel theo tier không xếp hạng theo khoảng cách.
-            """
-    )
-    public ApiResponse<ListingSectionsResponse> searchListingSections(
-            @RequestBody(required = false) ListingSectionsRequest request) {
-        ListingSectionsResponse response = listingSectionsService.searchSections(request);
-        return ApiResponse.<ListingSectionsResponse>builder().data(response).build();
     }
 
     @GetMapping("/sellers/{userId}/diamond")
