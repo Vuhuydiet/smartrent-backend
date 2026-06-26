@@ -102,18 +102,24 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      *
      * <p>address is to-one, so JOIN FETCH + LIMIT is safe (no in-memory paging).
      *
-     * <p>PUSH ("đẩy tin") is preserved: this is the SAME filter + ORDER BY as the
-     * public search's homepage path (ListingSpecification.fromFilterRequest with
-     * verified=true, ordered by vipTypeSortOrder ASC then updatedAt DESC).
-     * Pushing a listing bumps updated_at (PushServiceImpl saves the row, and
-     * updatedAt is @UpdateTimestamp; it also stamps pushed_at/post_date), so a
-     * pushed listing rises to the top of `updatedAt DESC` exactly as before.
-     * Do NOT change this ORDER BY without also re-checking the push behaviour.
+     * <p>ORDER BY is just {@code updatedAt DESC}: vipType is pinned to a single
+     * value, so vip_type_sort_order is constant across the whole result set and
+     * adding it to the sort is redundant. Dropping it lets idx_listings_public_vip_tier
+     * — which ends in a plain (ascending) updated_at — satisfy the order with a
+     * backward index scan on EVERY MySQL version (no dependency on a descending
+     * index, no filesort), which is the difference between a 10-row read and
+     * sorting the entire (huge) NORMAL tier.
+     *
+     * <p>PUSH ("đẩy tin") is preserved: pushing bumps updated_at (PushServiceImpl
+     * saves the row, updatedAt is @UpdateTimestamp; it also stamps pushed_at/
+     * post_date), so a pushed listing rises to the top of {@code updatedAt DESC}
+     * exactly as on the old search path. This is the same effective order the
+     * homepage search produced (its vipTypeSortOrder key is constant per tier).
      */
     @Query("SELECT l FROM listings l LEFT JOIN FETCH l.address " +
            "WHERE l.vipType = :vipType AND l.verified = true " +
            "AND l.isDraft = false AND l.isShadow = false " +
-           "ORDER BY l.vipTypeSortOrder ASC, l.updatedAt DESC")
+           "ORDER BY l.updatedAt DESC")
     List<Listing> findHomepageTier(@Param("vipType") Listing.VipType vipType, Pageable pageable);
 
     /**
