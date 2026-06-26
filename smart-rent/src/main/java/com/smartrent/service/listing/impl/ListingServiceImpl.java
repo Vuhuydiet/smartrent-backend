@@ -1336,6 +1336,28 @@ public class ListingServiceImpl implements ListingService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_SEARCH,
+            key = "'homepage-tier:' + #vipType + ':' + #limit")
+    public List<ListingCardResponse> getHomepageTierListings(String vipType, int limit) {
+        Listing.VipType tier;
+        try {
+            tier = Listing.VipType.valueOf(vipType);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            log.warn("getHomepageTierListings: invalid vipType '{}'", vipType);
+            return Collections.emptyList();
+        }
+        int safeLimit = Math.min(Math.max(limit, 1), 50);
+
+        // List (not Page) → no COUNT(*). idx_listings_public_vip_tier serves the
+        // WHERE + ORDER BY, so this is a 10-row index read regardless of tier size.
+        List<Listing> listings = listingRepository.findHomepageTier(
+                tier, org.springframework.data.domain.PageRequest.of(0, safeLimit));
+
+        return batchMapCardListings(listings);
+    }
+
             @Override
             @Transactional(readOnly = true)
             public ListingCardListResponse getTopSavedListingsByUser(String userId, int limit) {

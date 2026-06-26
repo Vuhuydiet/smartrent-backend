@@ -85,6 +85,19 @@ public interface ListingService {
     ListingCardListResponse searchListings(ListingFilterRequest filter);
 
     /**
+     * Homepage carousel data source: the latest {@code limit} verified,
+     * non-draft, non-shadow listings of a single VIP tier. No pagination and no
+     * total count — the carousel only needs the top N, so this avoids the
+     * COUNT(*) that {@link #searchListings} runs over the (potentially huge)
+     * tier. Cached and coordinate-free, so it is shared across all users.
+     *
+     * @param vipType NORMAL / SILVER / GOLD / DIAMOND (invalid → empty list)
+     * @param limit   max items to return (clamped)
+     * @return up to {@code limit} card DTOs, newest first within the tier
+     */
+    List<com.smartrent.dto.response.ListingCardResponse> getHomepageTierListings(String vipType, int limit);
+
+    /**
      * Public endpoint data source: get top saved listings for a specific seller.
      * Sorted by number of saves descending.
      *

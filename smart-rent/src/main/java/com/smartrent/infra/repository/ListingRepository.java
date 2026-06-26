@@ -93,6 +93,30 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     List<Listing> findByIdsWithMedia(@Param("ids") Collection<Long> ids);
 
     /**
+     * Homepage VIP-tier carousel: the latest {@code N} verified, non-draft,
+     * non-shadow listings of one tier. Returns a plain {@code List} (not a
+     * {@code Page}) so Spring Data does NOT run a COUNT(*) — the carousel only
+     * needs the top N, and counting the whole tier (huge for NORMAL) was the
+     * main cost of reusing the paginated search. {@code Pageable} supplies only
+     * the LIMIT. Backed by idx_listings_public_vip_tier (no filesort).
+     *
+     * <p>address is to-one, so JOIN FETCH + LIMIT is safe (no in-memory paging).
+     *
+     * <p>PUSH ("đẩy tin") is preserved: this is the SAME filter + ORDER BY as the
+     * public search's homepage path (ListingSpecification.fromFilterRequest with
+     * verified=true, ordered by vipTypeSortOrder ASC then updatedAt DESC).
+     * Pushing a listing bumps updated_at (PushServiceImpl saves the row, and
+     * updatedAt is @UpdateTimestamp; it also stamps pushed_at/post_date), so a
+     * pushed listing rises to the top of `updatedAt DESC` exactly as before.
+     * Do NOT change this ORDER BY without also re-checking the push behaviour.
+     */
+    @Query("SELECT l FROM listings l LEFT JOIN FETCH l.address " +
+           "WHERE l.vipType = :vipType AND l.verified = true " +
+           "AND l.isDraft = false AND l.isShadow = false " +
+           "ORDER BY l.vipTypeSortOrder ASC, l.updatedAt DESC")
+    List<Listing> findHomepageTier(@Param("vipType") Listing.VipType vipType, Pageable pageable);
+
+    /**
      * Find listings by ward ID for location-based pricing
      */
     @Query("""
