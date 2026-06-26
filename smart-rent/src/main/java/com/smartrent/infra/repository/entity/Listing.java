@@ -37,8 +37,10 @@ import java.util.List;
                         columnList = "moderation_status, is_shadow, is_draft, expired, price"),
                 @Index(name = "idx_listings_product_type", columnList = "product_type, listing_type"),
                 @Index(name = "idx_listings_user_vip_updated", columnList = "user_id, vip_type, updated_at"),
-                // Public homepage VIP-tier carousels (POST /v1/listings/search/sections) — see V91.
-                @Index(name = "idx_listings_public_vip_tier", columnList = "vip_type, verified, is_draft, is_shadow, updated_at")
+                // Public homepage VIP-tier carousels (one POST /v1/listings/search per tier) — see V91/V92.
+                // Includes vip_type_sort_order before updated_at so ORDER BY (vip_type_sort_order, updated_at)
+                // is served by the index — no filesort. (Direction is set in V92; @Index can't express DESC.)
+                @Index(name = "idx_listings_public_vip_tier", columnList = "vip_type, verified, is_draft, is_shadow, vip_type_sort_order, updated_at")
         })
 @Getter
 @Setter

@@ -579,7 +579,6 @@ public class OpenAPIConfig {
                             .packagesToScan(packageToScan)
                             .pathsToMatch(
                                             "/v1/listings/search",
-                                            "/v1/listings/search/sections",
                                             "/v1/listings/autocomplete",
                                             "/v1/listings/map-bounds",
                                             "/v1/listings/search-suggestions",
