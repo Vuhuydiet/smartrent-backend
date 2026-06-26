@@ -220,6 +220,7 @@ application:
         - "/otp/**"
         - "/v1/listings/*/reports"
         - "/v1/listings/search"
+        - "/v1/listings/search/sections"
         - "/api/v1/advanced-search"
         - "/v1/listings/stats/provinces"
         - "/v1/listings/stats/categories"
