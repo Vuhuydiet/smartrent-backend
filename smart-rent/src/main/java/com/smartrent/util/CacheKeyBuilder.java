@@ -39,9 +39,14 @@ public final class CacheKeyBuilder {
         append(sb, "isLegacy", filter.getIsLegacy());
         append(sb, "latitude", filter.getLatitude());
         append(sb, "longitude", filter.getLongitude());
-        append(sb, "userLatitude", filter.getUserLatitude());
-        append(sb, "userLongitude", filter.getUserLongitude());
-        append(sb, "radiusKm", filter.getRadiusKm());
+        // NOTE: userLatitude/userLongitude/radiusKm are intentionally NOT part of
+        // the key. The search query (ListingSpecification + sort) ignores them
+        // entirely — two requests differing only in user coordinates produce an
+        // identical result — so including them only multiplied the key space by
+        // every distinct GPS fix and drove the cache hit-rate to ~0 (each user,
+        // and each GPS jitter, minted a brand-new key for the same result).
+        // If geo-proximity ranking is ever implemented, re-add these AND bucket
+        // the coordinates (e.g. round to ~2 decimals) so the cache still groups.
 
         append(sb, "categoryId", filter.getCategoryId());
         append(sb, "listingType", filter.getListingType());
