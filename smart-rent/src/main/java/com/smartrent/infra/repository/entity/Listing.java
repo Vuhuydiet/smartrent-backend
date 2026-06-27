@@ -40,7 +40,14 @@ import java.util.List;
                 // Public homepage VIP-tier carousels (GET /v1/listings/homepage-tier, one tier at a time) — see V91-V93.
                 // Single-tier query orders by updated_at DESC only (vip_type pinned ⇒ vip_type_sort_order constant),
                 // so a plain trailing updated_at serves it via backward index scan on any MySQL version — no filesort.
-                @Index(name = "idx_listings_public_vip_tier", columnList = "vip_type, verified, is_draft, is_shadow, updated_at")
+                @Index(name = "idx_listings_public_vip_tier", columnList = "vip_type, verified, is_draft, is_shadow, updated_at"),
+                // Public default cursor feed (/properties, POST /search/cursor) — see V94.
+                // ORDER BY vip_type_sort_order ASC, updated_at DESC, listing_id DESC with the equality prefix
+                // contiguous (no `expired` gap) so the keyset seek is an ordered index range scan, no filesort.
+                // Directions (updated_at/listing_id DESC) need MySQL 8; the real index is built by V94.
+                @Index(name = "idx_listings_public_cursor_default", columnList = "moderation_status, is_draft, is_shadow, vip_type_sort_order, updated_at, listing_id"),
+                // Category-filtered cursor feed (?categoryId=…) — leads with category_id. See V94.
+                @Index(name = "idx_listings_public_cursor_category", columnList = "category_id, moderation_status, is_draft, is_shadow, vip_type_sort_order, updated_at, listing_id")
         })
 @Getter
 @Setter
