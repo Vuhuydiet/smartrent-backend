@@ -98,6 +98,16 @@ public interface ListingService {
     List<com.smartrent.dto.response.ListingCardResponse> getHomepageTierListings(String vipType, int limit);
 
     /**
+     * Cursor (keyset) paginated listing feed — a drop-in alternative to
+     * {@link #searchListings} for the public listings page. Same filters, same
+     * sort, same indexes; only the paging differs: it seeks past an opaque
+     * {@code cursor} instead of OFFSET-ing by page number, so deep pages stay
+     * O(size) and there is no COUNT(*). Pass {@code cursor = null} for page one.
+     */
+    com.smartrent.dto.response.ListingCursorResponse searchListingsByCursor(
+            ListingFilterRequest filter, String cursor, int size);
+
+    /**
      * Public endpoint data source: get top saved listings for a specific seller.
      * Sorted by number of saves descending.
      *
