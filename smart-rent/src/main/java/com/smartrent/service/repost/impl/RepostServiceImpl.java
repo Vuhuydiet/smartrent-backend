@@ -10,6 +10,7 @@ import com.smartrent.dto.response.RenewListingResponse;
 import com.smartrent.dto.response.RepostResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.ListingStatus;
+import com.smartrent.enums.ModerationStatus;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.TransactionRepository;
@@ -262,6 +263,9 @@ public class RepostServiceImpl implements RepostService {
         listing.setPostDate(now);
         listing.setPushedAt(now);
         listing.setDurationDays(durationDays);
+        listing.setVerified(false);
+        listing.setIsVerify(true);
+        listing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
         listingRepository.save(listing);
 
         log.info("Successfully reactivated listing {} via {} — new expiry {}",
