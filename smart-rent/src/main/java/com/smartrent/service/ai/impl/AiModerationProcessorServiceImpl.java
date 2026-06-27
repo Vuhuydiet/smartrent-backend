@@ -2,6 +2,7 @@ package com.smartrent.service.ai.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.smartrent.config.Constants;
 import com.smartrent.dto.request.AiListingVerificationRequest;
 import com.smartrent.dto.response.AiListingVerificationResponse;
 import com.smartrent.enums.ModerationStatus;
@@ -14,6 +15,8 @@ import com.smartrent.service.ai.AiListingVerificationService;
 import com.smartrent.service.ai.AiModerationProcessorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +47,12 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
      */
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, key = "#listing.listingId"),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_STATS_CATEGORIES, allEntries = true)
+    })
     public void processSingleListing(Listing listing, ListingAiModeration moderation) {
         try {
             log.info("Processing listing ID: {}", listing.getListingId());
