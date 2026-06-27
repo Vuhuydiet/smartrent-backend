@@ -1358,6 +1358,48 @@ public class ListingServiceImpl implements ListingService {
         return batchMapCardListings(listings);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public com.smartrent.dto.response.ListingCursorResponse searchListingsByCursor(
+            ListingFilterRequest filter, String cursor, int size) {
+        int safeSize = Math.min(Math.max(size, 1), 100);
+
+        // Same filter resolution + specification as the offset search path.
+        resolveAddressMappings(filter);
+        Specification<Listing> spec = listingQueryService.buildSpecification(filter);
+
+        // Same ordering as buildSort, expressed as keyset keys (listingId tiebreaker appended).
+        java.util.List<com.smartrent.service.listing.cursor.ListingCursorSupport.CursorKey> keys =
+                com.smartrent.service.listing.cursor.ListingCursorSupport.keysFor(
+                        filter.getSortBy(), filter.getSortDirection());
+
+        if (cursor != null && !cursor.isBlank()) {
+            try {
+                Object[] values = com.smartrent.service.listing.cursor.ListingCursorSupport.decode(cursor, keys);
+                spec = spec.and(com.smartrent.service.listing.cursor.ListingCursorSupport.seek(keys, values));
+            } catch (RuntimeException e) {
+                log.warn("searchListingsByCursor: ignoring malformed cursor: {}", e.getMessage());
+            }
+        }
+
+        // Fetch size+1 to know whether another page exists — List, so NO COUNT(*).
+        List<Listing> rows = listingRepository.findByCursor(spec, keys, safeSize + 1);
+        boolean hasNext = rows.size() > safeSize;
+        List<Listing> pageRows = hasNext ? new ArrayList<>(rows.subList(0, safeSize)) : rows;
+
+        String nextCursor = (hasNext && !pageRows.isEmpty())
+                ? com.smartrent.service.listing.cursor.ListingCursorSupport.encode(
+                        keys, pageRows.get(pageRows.size() - 1))
+                : null;
+
+        return com.smartrent.dto.response.ListingCursorResponse.builder()
+                .items(batchMapCardListings(pageRows))
+                .nextCursor(nextCursor)
+                .hasNext(hasNext)
+                .size(safeSize)
+                .build();
+    }
+
             @Override
             @Transactional(readOnly = true)
             public ListingCardListResponse getTopSavedListingsByUser(String userId, int limit) {

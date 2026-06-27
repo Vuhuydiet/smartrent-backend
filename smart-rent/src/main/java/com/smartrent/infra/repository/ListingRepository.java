@@ -17,7 +17,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 @Repository
-public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpecificationExecutor<Listing> {
+public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpecificationExecutor<Listing>, ListingRepositoryCustom {
     List<Listing> findByListingIdIn(Collection<Long> listingIds);
 
     /**

@@ -172,6 +172,35 @@ public class ListingSearchController {
         return ApiResponse.<ListingCardListResponse>builder().data(response).build();
     }
 
+    @PostMapping("/search/cursor")
+    @Operation(
+        summary = "[PUBLIC API] Tìm kiếm bài đăng — phân trang bằng cursor (keyset)",
+        description = """
+            **PUBLIC API - Không cần authentication**
+
+            Giống hệt `POST /search` về bộ lọc, sắp xếp và index — chỉ khác cơ chế phân trang:
+            dùng **cursor (keyset)** thay cho `page`/OFFSET. Body là `ListingFilterRequest`
+            (mọi filter + `sortBy`/`sortDirection`); truyền `cursor` (rỗng cho trang đầu) và
+            `size` qua query param. Trả về `{ items, nextCursor, hasNext, size }` — KHÔNG có
+            tổng số (không COUNT), nên trang sâu vẫn nhanh O(size). Lấy `nextCursor` của lần
+            gọi trước để lấy trang kế.
+            """
+    )
+    public ApiResponse<ListingCursorResponse> searchListingsByCursor(
+            @RequestBody(required = false) ListingFilterRequest filter,
+            @RequestParam(value = "cursor", required = false) String cursor,
+            @RequestParam(value = "size", required = false) Integer size) {
+
+        if (filter == null) {
+            filter = ListingFilterRequest.builder().build();
+        }
+        int effectiveSize = size != null ? size
+                : (filter.getSize() != null ? filter.getSize() : 20);
+
+        ListingCursorResponse response = listingService.searchListingsByCursor(filter, cursor, effectiveSize);
+        return ApiResponse.<ListingCursorResponse>builder().data(response).build();
+    }
+
     @GetMapping("/homepage-tier")
     @Operation(
         summary = "[PUBLIC API] Top listings of one VIP tier for homepage carousels",
