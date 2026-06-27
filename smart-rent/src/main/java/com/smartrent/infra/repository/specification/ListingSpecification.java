@@ -1075,22 +1075,26 @@ public class ListingSpecification {
                 predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("bedrooms"), criteria.getBedrooms()));
             }
 
-            // Location filters using text pattern matching for simplicity,
-            // since AI returns raw string (e.g. "quận 1")
+            // Location filters using text pattern matching, since AI returns a
+            // raw string (e.g. "quận 1", "Bình Thạnh", "TP.HCM"). Address has NO
+            // per-component name columns — only the full address strings — so we
+            // match each term against fullAddress (legacy structure) OR
+            // fullNewAddress (post-2025 structure). Matching the non-existent
+            // districtName/provinceName/wardName attributes previously made
+            // Hibernate throw while building the query, 500-ing every
+            // location-filtered search.
             if (criteria.getDistrict() != null || criteria.getProvince() != null || criteria.getWard() != null) {
                 Join<Listing, Address> addressJoin = root.join("address", JoinType.INNER);
 
-                if (criteria.getDistrict() != null) {
-                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("districtName")),
-                        "%" + criteria.getDistrict().toLowerCase() + "%"));
-                }
-                if (criteria.getProvince() != null) {
-                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("provinceName")),
-                        "%" + criteria.getProvince().toLowerCase() + "%"));
-                }
-                if (criteria.getWard() != null) {
-                    predicates.add(criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("wardName")),
-                        "%" + criteria.getWard().toLowerCase() + "%"));
+                for (String locationTerm : new String[]{
+                        criteria.getDistrict(), criteria.getProvince(), criteria.getWard()}) {
+                    if (locationTerm != null && !locationTerm.isBlank()) {
+                        String pattern = "%" + locationTerm.toLowerCase() + "%";
+                        predicates.add(criteriaBuilder.or(
+                                criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("fullAddress")), pattern),
+                                criteriaBuilder.like(criteriaBuilder.lower(addressJoin.get("fullNewAddress")), pattern)
+                        ));
+                    }
                 }
             }
 
