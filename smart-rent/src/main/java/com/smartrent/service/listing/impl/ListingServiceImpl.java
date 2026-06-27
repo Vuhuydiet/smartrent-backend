@@ -1937,6 +1937,11 @@ public class ListingServiceImpl implements ListingService {
         adminRepository.findById(adminId)
                 .orElseThrow(() -> new AppException(DomainCode.UNAUTHORIZED, "Admin not found"));
 
+        // Admin must see ALL listings regardless of expiry — the DTO defaults
+        // excludeExpired=true (intended for public search), so we clear it here.
+        // Admins can still filter by `expired` or `expiryDate` explicitly.
+        filter.setExcludeExpired(false);
+
         // Execute query using shared query service
         Page<Listing> page = listingQueryService.executeQuery(filter);
 
