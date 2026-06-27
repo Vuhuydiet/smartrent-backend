@@ -8,6 +8,7 @@ import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.ModerationEventResponse;
 import com.smartrent.dto.response.OwnerActionResponse;
 import com.smartrent.dto.response.UserCreationResponse;
+import com.smartrent.config.Constants;
 import com.smartrent.enums.*;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.model.DomainCode;
@@ -39,6 +40,8 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -80,6 +83,12 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     // ───────────────────────────────────────────────────────────────
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, key = "#listingId"),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_STATS_CATEGORIES, allEntries = true)
+    })
     public ListingResponseWithAdmin moderateListing(Long listingId, ListingStatusChangeRequest request, String adminId) {
         Listing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
@@ -167,6 +176,11 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     // ───────────────────────────────────────────────────────────────
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, key = "#listingId"),
+    })
     public void handleReportResolutionOwnerAction(Long reportId, Long listingId, ResolveReportRequest request, String adminId) {
         if (!Boolean.TRUE.equals(request.getOwnerActionRequired())) {
             return; // No owner action needed
@@ -234,6 +248,11 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     // ───────────────────────────────────────────────────────────────
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, key = "#listingId"),
+    })
     public void resubmitForReview(Long listingId, String userId, ResubmitListingRequest request) {
         Listing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
@@ -321,6 +340,11 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     // ───────────────────────────────────────────────────────────────
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, key = "#listingId"),
+    })
     public void updateAndResubmitForReview(Long listingId, UpdateAndResubmitRequest request, String userId) {
         Listing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
