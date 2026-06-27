@@ -689,6 +689,13 @@ public class ListingServiceImpl implements ListingService {
             linkAmenitiesToListing(existing, request.getAmenityIds());
         }
 
+        // An approved listing edited by the owner must go back through review
+        if (existing.getModerationStatus() == ModerationStatus.APPROVED) {
+            existing.setVerified(false);
+            existing.setIsVerify(true);
+            existing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+        }
+
         Listing saved = listingRepository.save(existing);
         com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(saved.getUserId());
         com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(saved.getAddress());
