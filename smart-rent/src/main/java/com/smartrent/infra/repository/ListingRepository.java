@@ -95,7 +95,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND (l.moderationStatus IS NULL
              OR l.moderationStatus = com.smartrent.enums.ModerationStatus.PENDING_REVIEW
              OR l.moderationStatus = com.smartrent.enums.ModerationStatus.RESUBMITTED)
-        ORDER BY l.createdAt DESC
+        ORDER BY l.vipTypeSortOrder ASC, l.createdAt DESC
     """)
     Page<Listing> findListingsNeedingAiVerification(Pageable pageable);
 
