@@ -133,6 +133,22 @@ public class ListingSpecification {
                             criteriaBuilder.equal(root.get("moderationStatus"), moderationStatus),
                             criteriaBuilder.isNull(root.get("moderationStatus"))
                         ));
+                        // "Chờ duyệt" (IN_REVIEW) means the listing is active AND pending review.
+                        // An expired listing with PENDING_REVIEW belongs to "Hết hạn" (EXPIRED),
+                        // not "Chờ duyệt". Exclude it even though getAllListingsForAdmin sets
+                        // excludeExpired=false (admin general view), because this specific filter
+                        // implies the user wants only genuinely reviewable listings.
+                        LocalDateTime pendingReviewNow = LocalDateTime.now();
+                        predicates.add(criteriaBuilder.and(
+                            criteriaBuilder.or(
+                                criteriaBuilder.isFalse(root.get("expired")),
+                                criteriaBuilder.isNull(root.get("expired"))
+                            ),
+                            criteriaBuilder.or(
+                                criteriaBuilder.isNull(root.get("expiryDate")),
+                                criteriaBuilder.greaterThan(root.get("expiryDate"), pendingReviewNow)
+                            )
+                        ));
                     } else {
                         predicates.add(criteriaBuilder.equal(root.get("moderationStatus"), moderationStatus));
                     }
