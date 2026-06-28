@@ -292,6 +292,19 @@ application:
 google:
   maps:
     api-key: ${GOOGLE_API_KEY}
+
+# AI service (FastAPI) — used by the WebClient that relays chat SSE.
+ai:
+  base-url: "${AI_SERVICE_BASE_URL:http://localhost:8000}"
+  internal-api-key: "${INTERNAL_AI_API_KEY:}"
+
+# Per-user rate limit for the chat SSE endpoint (each call costs LLM tokens).
+# Caddy already caps /v1/* at 120/min/IP; this is a tighter per-identity cap.
+chat:
+  rate-limit:
+    max-per-window: ${CHAT_RATE_LIMIT_MAX:20}
+    window-seconds: ${CHAT_RATE_LIMIT_WINDOW_SECONDS:60}
+
 feign:
   client:
     config:
