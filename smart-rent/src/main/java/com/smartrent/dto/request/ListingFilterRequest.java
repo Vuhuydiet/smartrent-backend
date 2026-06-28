@@ -87,8 +87,16 @@ public class ListingFilterRequest {
     @Schema(hidden = true)
     List<String> resolvedNewProvinceCodes; // Populated by service layer when legacy provinceId is sent — NOT from API
 
-    @Schema(description = "District ID (OLD structure)", example = "5")
+    @Schema(description = "District ID (OLD structure) — the legacy_districts surrogate PK, "
+            + "NOT the GSO administrative code. Emitted by the FE district dropdown.", example = "5")
     Integer districtId;
+
+    @Schema(description = """
+            District GSO administrative code (e.g. '760' = Quận 1, '765' = Bình Thạnh).
+            Use this when you only know the official district code, not the internal
+            legacy_districts PK. The service resolves it to districtId before filtering.
+            """, example = "760")
+    String districtCode;
 
     @JsonIgnore
     @Schema(hidden = true)

@@ -560,7 +560,7 @@ public class ListingServiceImpl implements ListingService {
 
         // Fetch listing with amenities first
         Listing listing = listingRepository.findByIdWithAmenities(id)
-                .orElseThrow(() -> new RuntimeException("Listing not found"));
+                .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
 
         // Fetch media separately to avoid MultipleBagFetchException
         listingRepository.findByIdWithMedia(id);
@@ -1487,6 +1487,35 @@ public class ListingServiceImpl implements ListingService {
      * /properties listing-page total for the same navigation params.
      */
     private void resolveAddressMappings(ListingFilterRequest filter) {
+        // Resolve districtCode (GSO administrative code, e.g. "760" = Quận 1) to the
+        // legacy_districts surrogate PK that the spec actually filters on. Callers
+        // that only know the official code — the AI chatbot tool, external API
+        // clients — send districtCode; the FE dropdown sends the PK as districtId.
+        // legacy_districts.district_code is globally UNIQUE so the lookup is exact.
+        // Only fill districtId when it is absent so an explicit PK always wins.
+        if (filter.getDistrictId() == null
+                && filter.getDistrictCode() != null && !filter.getDistrictCode().isBlank()) {
+            String code = filter.getDistrictCode().trim();
+            District district = legacyDistrictRepository.findByCode(code).orElse(null);
+            if (district == null) {
+                // Seed stores codes without leading zeros (e.g. "1" not "001"), but a
+                // caller may send the zero-padded GSO form — retry on the stripped code.
+                String stripped = code.replaceFirst("^0+(?!$)", "");
+                if (!stripped.equals(code)) {
+                    district = legacyDistrictRepository.findByCode(stripped).orElse(null);
+                }
+            }
+            if (district != null) {
+                filter.setDistrictId(district.getId());
+                log.info("Resolved districtCode {} → legacy_district_id PK {}", code, district.getId());
+            } else {
+                // Fail loudly: a silently-dropped district filter returns
+                // over-broad/zero results that hide the caller's mistake.
+                log.warn("districtCode {} not found in legacy_districts — rejecting request", code);
+                throw new DomainException(DomainCode.INVALID_DISTRICT_CODE, code);
+            }
+        }
+
         // Merge single provinceCode into provinceCodes list (FE typically sends provinceCode singular)
         if (filter.getProvinceCode() != null && !filter.getProvinceCode().isBlank()) {
             List<String> merged = new ArrayList<>();
@@ -1529,7 +1558,12 @@ public class ListingServiceImpl implements ListingService {
                 if (!legacyIds.isEmpty()) {
                     log.info("Resolved province codes {} → legacy IDs {} (via direct LegacyProvince lookup)", codesToQuery, legacyIds);
                 } else {
-                    log.warn("No legacy IDs resolved for province codes {} — old-structure listings won't be included", codesToQuery);
+                    // Neither address_mapping nor a direct legacy lookup knows this
+                    // code → it is genuinely invalid. Fail loudly (400) instead of
+                    // returning a silent 0-result search that hides the mistake.
+                    log.warn("No legacy IDs resolved for province codes {} — rejecting request", codesToQuery);
+                    throw new DomainException(DomainCode.INVALID_PROVINCE_CODE,
+                            String.join(",", filter.getProvinceCodes()));
                 }
             }
             if (!legacyIds.isEmpty()) {
