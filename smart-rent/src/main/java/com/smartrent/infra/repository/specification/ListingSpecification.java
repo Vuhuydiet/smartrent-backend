@@ -84,9 +84,14 @@ public class ListingSpecification {
             }
 
             // Expired filter
+            // Note: @Builder.Default on excludeExpired is not applied by Jackson's no-args constructor
+            // deserialization, so we treat null as "true" (exclude expired) via !Boolean.FALSE.equals().
+            // Skip the default exclusion only when the caller explicitly requests EXPIRED listings
+            // via listingStatus=EXPIRED (that predicate gates on expired=true itself).
             if (filter.getExpired() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("expired"), filter.getExpired()));
-            } else if (Boolean.TRUE.equals(filter.getExcludeExpired())) {
+            } else if (!Boolean.FALSE.equals(filter.getExcludeExpired())
+                    && !"EXPIRED".equals(filter.getListingStatus())) {
                 LocalDateTime now = LocalDateTime.now();
                 predicates.add(criteriaBuilder.and(
                     criteriaBuilder.equal(root.get("expired"), false),
