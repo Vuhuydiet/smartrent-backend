@@ -474,10 +474,13 @@ otp:
       account-sid: ${TWILIO_ACCOUNT_SID:}
 
 # AI Service Configuration
-smarrent:
+smartrent:
   ai:
     verification:
       enabled: ${AI_VERIFICATION_ENABLED:true}
+      scheduler:
+        enabled: ${AI_SCHEDULER_ENABLED:true}
+        delay: ${AI_SCHEDULER_DELAY_MS:300000}
       url: ${AI_VERIFICATION_URL:http://localhost:8000/ai/verify-listing}
       timeout-seconds: ${AI_VERIFICATION_TIMEOUT:90}
       max-retry-attempts: ${AI_VERIFICATION_MAX_RETRY:3}
