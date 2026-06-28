@@ -59,6 +59,16 @@ logging:
     org.springframework.web: WARN
     org.springframework.security: WARN
     org.springframework.boot.actuate: WARN
+  # Emit logs as ECS JSON to stdout so the platform (Dokploy) aggregates
+  # machine-parseable, searchable logs. Spring Boot 3.4 native structured
+  # logging — no extra dependency. The console pattern below is the fallback
+  # used when structured format is disabled (e.g. LOGGING_STRUCTURED_FORMAT_CONSOLE=).
+  structured:
+    format:
+      console: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:ecs}
+    ecs:
+      service:
+        name: smartrent-backend
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
