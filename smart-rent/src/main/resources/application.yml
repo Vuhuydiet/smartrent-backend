@@ -292,6 +292,12 @@ application:
 google:
   maps:
     api-key: ${GOOGLE_API_KEY}
+
+# AI service (FastAPI) — used by the WebClient that relays chat SSE.
+ai:
+  base-url: "${AI_SERVICE_BASE_URL:http://localhost:8000}"
+  internal-api-key: "${INTERNAL_AI_API_KEY:}"
+
 feign:
   client:
     config:
