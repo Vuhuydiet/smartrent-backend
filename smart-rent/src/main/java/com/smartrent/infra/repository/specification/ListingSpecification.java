@@ -133,7 +133,40 @@ public class ListingSpecification {
                             criteriaBuilder.equal(root.get("moderationStatus"), moderationStatus),
                             criteriaBuilder.isNull(root.get("moderationStatus"))
                         ));
+                        // Both PENDING_REVIEW and RESUBMITTED map to IN_REVIEW in the seller view —
+                        // they represent listings actively awaiting admin action. Expired listings
+                        // with these statuses belong to "Hết hạn" (EXPIRED), not the review queue.
+                        // Exclude them even though getAllListingsForAdmin sets excludeExpired=false.
+                        LocalDateTime reviewNow = LocalDateTime.now();
+                        predicates.add(criteriaBuilder.and(
+                            criteriaBuilder.or(
+                                criteriaBuilder.isFalse(root.get("expired")),
+                                criteriaBuilder.isNull(root.get("expired"))
+                            ),
+                            criteriaBuilder.or(
+                                criteriaBuilder.isNull(root.get("expiryDate")),
+                                criteriaBuilder.greaterThan(root.get("expiryDate"), reviewNow)
+                            )
+                        ));
+                    } else if (moderationStatus == com.smartrent.enums.ModerationStatus.RESUBMITTED) {
+                        predicates.add(criteriaBuilder.equal(root.get("moderationStatus"), moderationStatus));
+                        // RESUBMITTED is the other sub-state of IN_REVIEW (owner resubmitted after
+                        // revision request). Same rule as PENDING_REVIEW: expired listings here
+                        // belong in "Hết hạn", not the active review queue.
+                        LocalDateTime resubmittedNow = LocalDateTime.now();
+                        predicates.add(criteriaBuilder.and(
+                            criteriaBuilder.or(
+                                criteriaBuilder.isFalse(root.get("expired")),
+                                criteriaBuilder.isNull(root.get("expired"))
+                            ),
+                            criteriaBuilder.or(
+                                criteriaBuilder.isNull(root.get("expiryDate")),
+                                criteriaBuilder.greaterThan(root.get("expiryDate"), resubmittedNow)
+                            )
+                        ));
                     } else {
+                        // APPROVED, REJECTED, REVISION_REQUIRED, SUSPENDED — admin views these
+                        // for history/tracking; expired listings remain visible intentionally.
                         predicates.add(criteriaBuilder.equal(root.get("moderationStatus"), moderationStatus));
                     }
                 } catch (IllegalArgumentException e) {
