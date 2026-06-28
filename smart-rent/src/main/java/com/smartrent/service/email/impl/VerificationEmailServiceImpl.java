@@ -9,8 +9,8 @@ import com.smartrent.infra.exception.UserNotFoundException;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.User;
 import com.smartrent.service.authentication.domain.OtpData;
-import com.smartrent.service.email.EmailService;
 import com.smartrent.service.email.VerificationEmailService;
+import com.smartrent.service.notification.NotificationPublisher;
 import com.smartrent.utility.EmailBuilder;
 import com.smartrent.utility.Utils;
 import java.time.LocalDateTime;
@@ -47,7 +47,7 @@ public class VerificationEmailServiceImpl implements VerificationEmailService {
   @Value("${application.otp.duration}")
   int otpDuration;
 
-  EmailService emailService;
+  NotificationPublisher notificationPublisher;
 
   UserRepository userRepository;
 
@@ -60,8 +60,9 @@ public class VerificationEmailServiceImpl implements VerificationEmailService {
     String htmlContent = EmailBuilder.buildVerifyHtmlContent(senderName, user.getFirstName(), user.getLastName(), otpData, otpDuration);
     EmailRequest emailRequest = buildEmailRequest(user, htmlContent);
 
-    // send email
-    emailService.sendEmail(emailRequest);
+    // enqueue email — actual provider send happens on a worker thread,
+    // off the request path (was a blocking emailService.sendEmail call).
+    notificationPublisher.publishEmail(emailRequest);
 
     return otpData;
   }

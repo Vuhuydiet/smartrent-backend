@@ -10,8 +10,8 @@ import com.smartrent.infra.exception.OtpException;
 import com.smartrent.infra.exception.OtpNotFoundException;
 import com.smartrent.infra.exception.OtpVerificationException;
 import com.smartrent.infra.exception.model.DomainCode;
-import com.smartrent.service.otp.provider.OtpProvider;
-import com.smartrent.service.otp.provider.OtpProviderResult;
+import com.smartrent.service.notification.NotificationPublisher;
+import com.smartrent.service.notification.OtpMessage;
 import com.smartrent.service.otp.store.OtpData;
 import com.smartrent.service.otp.store.OtpStore;
 import com.smartrent.service.otp.util.OtpUtil;
@@ -25,8 +25,9 @@ import java.time.Instant;
 import java.util.*;
 
 /**
- * Main OTP service handling send and verify operations
- * Implements channel fallback logic: Zalo -> SMS
+ * Main OTP service handling send and verify operations.
+ * Sending is delegated to a worker thread (Redis Streams) which runs the
+ * channel fallback logic: Zalo -> SMS.
  */
 @Slf4j
 @Service
@@ -37,34 +38,31 @@ public class OtpService {
     private final OtpUtil otpUtil;
     private final PhoneNumberUtil phoneNumberUtil;
     private final RateLimitService rateLimitService;
-    private final List<OtpProvider> providers;
-    private final Map<OtpChannel, OtpProvider> providerMap;
-    
+    private final NotificationPublisher notificationPublisher;
+
     // Metrics
     private final Counter otpSendSuccessCounter;
     private final Counter otpSendFailureCounter;
     private final Counter otpVerifySuccessCounter;
     private final Counter otpVerifyFailureCounter;
-    private final Counter otpFallbackCounter;
 
     public OtpService(OtpProperties otpProperties,
                      OtpStore otpStore,
                      OtpUtil otpUtil,
                      PhoneNumberUtil phoneNumberUtil,
                      RateLimitService rateLimitService,
-                     List<OtpProvider> providers,
+                     NotificationPublisher notificationPublisher,
                      MeterRegistry meterRegistry) {
         this.otpProperties = otpProperties;
         this.otpStore = otpStore;
         this.otpUtil = otpUtil;
         this.phoneNumberUtil = phoneNumberUtil;
         this.rateLimitService = rateLimitService;
-        this.providers = providers;
-        this.providerMap = buildProviderMap(providers);
-        
+        this.notificationPublisher = notificationPublisher;
+
         // Initialize metrics
         this.otpSendSuccessCounter = Counter.builder("otp.send.success")
-            .description("Number of successful OTP sends")
+            .description("Number of OTPs accepted and enqueued for delivery")
             .register(meterRegistry);
         this.otpSendFailureCounter = Counter.builder("otp.send.failure")
             .description("Number of failed OTP sends")
@@ -75,14 +73,14 @@ public class OtpService {
         this.otpVerifyFailureCounter = Counter.builder("otp.verify.failure")
             .description("Number of failed OTP verifications")
             .register(meterRegistry);
-        this.otpFallbackCounter = Counter.builder("otp.fallback")
-            .description("Number of OTP fallbacks to secondary channel")
-            .register(meterRegistry);
     }
 
     /**
-     * Send OTP to phone number
-     * Implements fallback logic: Zalo -> SMS
+     * Send OTP to phone number.
+     *
+     * <p>The OTP is generated and stored synchronously, then the actual delivery
+     * (with Zalo -> SMS fallback) is dispatched to a worker thread so the request
+     * thread is not blocked on the provider call.
      *
      * @param request OTP send request
      * @param ipAddress Client IP address for rate limiting
@@ -90,8 +88,8 @@ public class OtpService {
      */
     public OtpSendResponse sendOtp(OtpSendRequest request, String ipAddress) {
         String requestId = UUID.randomUUID().toString();
-        
-        log.info("OTP send request: requestId={}, phone={}", requestId, 
+
+        log.info("OTP send request: requestId={}, phone={}", requestId,
             phoneNumberUtil.maskPhoneNumber(request.getPhone()));
 
         try {
@@ -110,58 +108,15 @@ public class OtpService {
 
             // 4. Determine channel order
             List<OtpChannel> channelOrder = determineChannelOrder(request.getPreferredChannels());
+            OtpChannel primaryChannel = channelOrder.get(0);
 
-            // 5. Try sending via channels with fallback
-            OtpProviderResult result = null;
-            OtpChannel usedChannel = null;
-            
-            for (int i = 0; i < channelOrder.size(); i++) {
-                OtpChannel channel = channelOrder.get(i);
-                OtpProvider provider = providerMap.get(channel);
-                
-                if (provider == null || !provider.isAvailable()) {
-                    log.warn("Provider not available for channel: {}", channel);
-                    continue;
-                }
-
-                log.info("Attempting to send OTP via {}: requestId={}", channel, requestId);
-                
-                Map<String, Object> context = new HashMap<>();
-                context.put("requestId", requestId);
-                context.put("expiryMinutes", otpProperties.getTtlSeconds() / 60);
-                
-                result = provider.sendOtp(normalizedPhone, otpCode, context);
-                
-                if (result.isSuccess()) {
-                    usedChannel = channel;
-                    log.info("OTP sent successfully via {}: requestId={}, messageId={}", 
-                        channel, requestId, result.getMessageId());
-                    break;
-                } else {
-                    log.warn("Failed to send OTP via {}: requestId={}, error={}", 
-                        channel, requestId, result.getErrorMessage());
-                    
-                    // If this is not the last channel and error is not retryable, try fallback
-                    if (i < channelOrder.size() - 1) {
-                        otpFallbackCounter.increment();
-                        log.info("Falling back to next channel: {}", channelOrder.get(i + 1));
-                    }
-                }
-            }
-
-            // 6. Check if any channel succeeded
-            if (result == null || !result.isSuccess() || usedChannel == null) {
-                log.error("Failed to send OTP via all channels: requestId={}", requestId);
-                otpSendFailureCounter.increment();
-                throw new OtpException(DomainCode.OTP_SEND_FAILED);
-            }
-
-            // 7. Store OTP data
+            // 5. Store OTP data BEFORE dispatching so verification works regardless
+            //    of async send timing.
             OtpData otpData = OtpData.builder()
                 .hashedCode(hashedCode)
                 .phone(normalizedPhone)
                 .requestId(requestId)
-                .channel(usedChannel)
+                .channel(primaryChannel)
                 .attempts(0)
                 .maxAttempts(otpProperties.getMaxVerificationAttempts())
                 .createdAt(Instant.now())
@@ -175,11 +130,15 @@ public class OtpService {
                 throw new OtpException(DomainCode.OTP_GENERATION_FAILED);
             }
 
-            // 8. Build response
+            // 6. Dispatch the actual delivery (Zalo -> SMS fallback) to a worker.
+            notificationPublisher.publishOtp(new OtpMessage(
+                normalizedPhone, otpCode, channelOrder, requestId,
+                otpProperties.getTtlSeconds() / 60));
             otpSendSuccessCounter.increment();
-            
+
+            // 7. Build response
             return OtpSendResponse.builder()
-                .channel(usedChannel.getValue())
+                .channel(primaryChannel.getValue())
                 .requestId(requestId)
                 .ttlSeconds(otpProperties.getTtlSeconds())
                 .maskedPhone(phoneNumberUtil.maskPhoneNumber(normalizedPhone))
@@ -201,7 +160,7 @@ public class OtpService {
      * @return OTP verify response
      */
     public OtpVerifyResponse verifyOtp(OtpVerifyRequest request) {
-        log.info("OTP verify request: requestId={}, phone={}", 
+        log.info("OTP verify request: requestId={}, phone={}",
             request.getRequestId(), phoneNumberUtil.maskPhoneNumber(request.getPhone()));
 
         try {
@@ -211,7 +170,7 @@ public class OtpService {
             // 2. Retrieve OTP data
             Optional<OtpData> otpDataOpt = otpStore.retrieve(normalizedPhone, request.getRequestId());
             if (otpDataOpt.isEmpty()) {
-                log.warn("OTP not found: requestId={}, phone={}", 
+                log.warn("OTP not found: requestId={}, phone={}",
                     request.getRequestId(), phoneNumberUtil.maskPhoneNumber(normalizedPhone));
                 otpVerifyFailureCounter.increment();
                 throw new OtpNotFoundException();
@@ -246,10 +205,10 @@ public class OtpService {
                 // Success: mark as verified and delete
                 otpData.setVerified(true);
                 otpStore.delete(normalizedPhone, request.getRequestId());
-                
+
                 log.info("OTP verified successfully: requestId={}", request.getRequestId());
                 otpVerifySuccessCounter.increment();
-                
+
                 return OtpVerifyResponse.builder()
                     .verified(true)
                     .message("OTP verified successfully")
@@ -259,12 +218,12 @@ public class OtpService {
                 otpData.setAttempts(otpData.getAttempts() + 1);
                 int remainingSeconds = (int) (otpData.getExpiresAt().getEpochSecond() - Instant.now().getEpochSecond());
                 otpStore.update(otpData, Math.max(0, remainingSeconds));
-                
+
                 int remainingAttempts = otpData.getMaxAttempts() - otpData.getAttempts();
-                log.warn("OTP verification failed: requestId={}, remainingAttempts={}", 
+                log.warn("OTP verification failed: requestId={}, remainingAttempts={}",
                     request.getRequestId(), remainingAttempts);
                 otpVerifyFailureCounter.increment();
-                
+
                 return OtpVerifyResponse.builder()
                     .verified(false)
                     .message("Invalid OTP code")
@@ -287,7 +246,7 @@ public class OtpService {
      */
     private List<OtpChannel> determineChannelOrder(List<String> preferredChannels) {
         List<OtpChannel> channelOrder = new ArrayList<>();
-        
+
         if (preferredChannels != null && !preferredChannels.isEmpty()) {
             for (String channelStr : preferredChannels) {
                 try {
@@ -300,7 +259,7 @@ public class OtpService {
                 }
             }
         }
-        
+
         // Add default channels if not specified
         if (!channelOrder.contains(OtpChannel.ZALO)) {
             channelOrder.add(OtpChannel.ZALO);
@@ -308,21 +267,7 @@ public class OtpService {
         if (!channelOrder.contains(OtpChannel.SMS)) {
             channelOrder.add(OtpChannel.SMS);
         }
-        
+
         return channelOrder;
     }
-
-    /**
-     * Build provider map from provider list
-     */
-    private Map<OtpChannel, OtpProvider> buildProviderMap(List<OtpProvider> providers) {
-        Map<OtpChannel, OtpProvider> map = new HashMap<>();
-        for (OtpProvider provider : providers) {
-            map.put(provider.getChannel(), provider);
-            log.info("Registered OTP provider: {} for channel: {}", 
-                provider.getProviderName(), provider.getChannel());
-        }
-        return map;
-    }
 }
-

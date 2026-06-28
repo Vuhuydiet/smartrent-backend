@@ -22,6 +22,10 @@ spring:
     compatibility-verifier:
       enabled: false
 
+notifications:
+  async:
+    enabled: false
+
 # Mock environment variables for testing
 IDENTITY_SERVICE_DB_URL: "jdbc:h2:mem:testdb"
 DB_USERNAME: "sa"
