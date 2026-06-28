@@ -119,6 +119,8 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     @Query("SELECT l FROM listings l LEFT JOIN FETCH l.address " +
            "WHERE l.vipType = :vipType AND l.verified = true " +
            "AND l.isDraft = false AND l.isShadow = false " +
+           "AND l.expired = false " +
+           "AND (l.expiryDate IS NULL OR l.expiryDate > CURRENT_TIMESTAMP) " +
            "ORDER BY l.updatedAt DESC")
     List<Listing> findHomepageTier(@Param("vipType") Listing.VipType vipType, Pageable pageable);
 
