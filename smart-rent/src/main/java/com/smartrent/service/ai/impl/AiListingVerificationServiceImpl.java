@@ -248,29 +248,43 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
      * Normalize request by setting default values for optional fields
      * This handles cases where frontend doesn't send certain metadata fields
      */
-    private AiListingVerificationRequest normalizeRequest(AiListingVerificationRequest request) {
-        // Handle null metadata
-        if (request.getMetadata() == null) {
-            request.setMetadata(AiListingVerificationRequest.PropertyMetadata.builder()
-                    .build());
-        }
+    private static final int AI_TITLE_MAX_LEN       = 500;
+    private static final int AI_DESCRIPTION_MAX_LEN = 50000;
+    private static final int AI_ADDRESS_MAX_LEN      = 500;
+    private static final int AI_IMAGES_MAX_COUNT     = 20;
+    private static final int AI_VIDEOS_MAX_COUNT     = 5;
 
-        // Handle null amenities list
+    private AiListingVerificationRequest normalizeRequest(AiListingVerificationRequest request) {
+        if (request.getMetadata() == null) {
+            request.setMetadata(AiListingVerificationRequest.PropertyMetadata.builder().build());
+        }
         if (request.getAmenities() == null) {
             request.setAmenities(new ArrayList<>());
         }
-
-        // Handle null images list
         if (request.getImages() == null) {
             request.setImages(new ArrayList<>());
         }
-
-        // Handle null videos list
         if (request.getVideos() == null) {
             request.setVideos(new ArrayList<>());
         }
 
-        log.debug("Normalized AI verification request - metadata: bedrooms={}, bathrooms={}", 
+        if (request.getTitle() != null && request.getTitle().length() > AI_TITLE_MAX_LEN) {
+            request.setTitle(request.getTitle().substring(0, AI_TITLE_MAX_LEN));
+        }
+        if (request.getDescription() != null && request.getDescription().length() > AI_DESCRIPTION_MAX_LEN) {
+            request.setDescription(request.getDescription().substring(0, AI_DESCRIPTION_MAX_LEN));
+        }
+        if (request.getAddress() != null && request.getAddress().length() > AI_ADDRESS_MAX_LEN) {
+            request.setAddress(request.getAddress().substring(0, AI_ADDRESS_MAX_LEN));
+        }
+        if (request.getImages().size() > AI_IMAGES_MAX_COUNT) {
+            request.setImages(request.getImages().subList(0, AI_IMAGES_MAX_COUNT));
+        }
+        if (request.getVideos().size() > AI_VIDEOS_MAX_COUNT) {
+            request.setVideos(request.getVideos().subList(0, AI_VIDEOS_MAX_COUNT));
+        }
+
+        log.debug("Normalized AI verification request - metadata: bedrooms={}, bathrooms={}",
             request.getMetadata().getBedrooms(),
             request.getMetadata().getBathrooms());
 
