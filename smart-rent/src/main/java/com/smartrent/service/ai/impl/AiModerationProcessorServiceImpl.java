@@ -130,7 +130,14 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
             log.info("Finished processing listing ID: {}, verificationStatus: {}, moderationStatus: {}",
                     listing.getListingId(), moderation.getVerificationStatus(), listing.getModerationStatus());
 
-            sendOwnerNotification(listing, suggestedStatus);
+            boolean downgradedByDuplicate = duplicateResult != null
+                    && ("DUPLICATE".equals(duplicateResult.getDecision()) || "SUSPICIOUS".equals(duplicateResult.getDecision()))
+                    && "APPROVED".equals(suggestedStatus);
+
+            sendOwnerNotification(listing, suggestedStatus, downgradedByDuplicate);
+            if (downgradedByDuplicate) {
+                sendAdminDuplicateNotification(listing, duplicateResult);
+            }
 
         } catch (Exception e) {
             log.error("Failed to verify listing ID: {}", listing.getListingId(), e);
@@ -140,13 +147,16 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
         }
     }
 
-    private void sendOwnerNotification(Listing listing, String suggestedStatus) {
+    private void sendOwnerNotification(Listing listing, String suggestedStatus, boolean downgradedByDuplicate) {
         if (listing.getUserId() == null) return;
 
         NotificationType notifType;
         String notifMessage;
 
-        if ("APPROVED".equals(suggestedStatus)) {
+        if (downgradedByDuplicate) {
+            notifType = NotificationType.LISTING_PENDING_REVIEW;
+            notifMessage = "Tin đăng \"" + listing.getTitle() + "\" của bạn đang được xem xét thủ công do hệ thống phát hiện nội dung tương tự với tin đăng khác.";
+        } else if ("APPROVED".equals(suggestedStatus)) {
             notifType = NotificationType.LISTING_APPROVED;
             notifMessage = "Tin đăng \"" + listing.getTitle() + "\" của bạn đã được hệ thống duyệt tự động và hiện đã hiển thị.";
         } else if ("REJECTED".equals(suggestedStatus)) {
@@ -164,6 +174,21 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
                     listing.getListingId(), "LISTING");
         } catch (Exception e) {
             log.warn("Failed to send AI moderation notification for listing {}: {}", listing.getListingId(), e.getMessage());
+        }
+    }
+
+    private void sendAdminDuplicateNotification(Listing listing, DuplicateCheckResponse duplicateResult) {
+        String message = "Tin đăng \"" + listing.getTitle() + "\" (ID: " + listing.getListingId()
+                + ") bị phát hiện " + duplicateResult.getDecision()
+                + " (score=" + String.format("%.2f", duplicateResult.getHighestScore()) + "). Cần xem xét thủ công.";
+        try {
+            notificationService.sendToAllAdmins(
+                    NotificationType.LISTING_DUPLICATE_DETECTED,
+                    "Phát hiện tin đăng trùng lặp",
+                    message,
+                    listing.getListingId(), "LISTING");
+        } catch (Exception e) {
+            log.warn("Failed to send duplicate detection admin notification for listing {}: {}", listing.getListingId(), e.getMessage());
         }
     }
 
