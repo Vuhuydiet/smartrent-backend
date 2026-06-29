@@ -5,8 +5,10 @@ import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.ListingAiModeration;
 import com.smartrent.infra.repository.entity.enums.VerificationStatus;
+import com.smartrent.service.ai.AiModerationExecutor;
 import com.smartrent.service.ai.AiModerationProcessorService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -16,9 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
-import org.springframework.beans.factory.annotation.Value;
 
 @Component
 @Slf4j
@@ -38,6 +40,8 @@ public class AiListingAutoModerationScheduler {
      */
     private final AiModerationProcessorService aiModerationProcessorService;
 
+    private final AiModerationExecutor aiModerationExecutor;
+
     /**
      * Runtime toggle — controlled via the admin API.
      * Initialized from config so AI_SCHEDULER_ENABLED=false at startup
@@ -49,10 +53,12 @@ public class AiListingAutoModerationScheduler {
             ListingRepository listingRepository,
             ListingAiModerationRepository listingAiModerationRepository,
             AiModerationProcessorService aiModerationProcessorService,
+            AiModerationExecutor aiModerationExecutor,
             @Value("${smartrent.ai.verification.scheduler.enabled:true}") boolean initiallyEnabled) {
         this.listingRepository = listingRepository;
         this.listingAiModerationRepository = listingAiModerationRepository;
         this.aiModerationProcessorService = aiModerationProcessorService;
+        this.aiModerationExecutor = aiModerationExecutor;
         this.aiAutoModerationEnabled = new AtomicBoolean(initiallyEnabled);
     }
 
@@ -100,9 +106,12 @@ public class AiListingAutoModerationScheduler {
      * <p>Strategy:
      * <ol>
      *   <li>Load a page of pending listings in a single read transaction.</li>
-     *   <li>Mark each as IN_PROGRESS (batch commit) before dispatching to AI.</li>
+     *   <li>Batch-mark all as IN_PROGRESS in one query before dispatching.</li>
      *   <li>Call {@link AiModerationProcessorService#processSingleListing} for each listing
-     *       via the Spring proxy so each item runs in its own {@code REQUIRES_NEW} transaction.</li>
+     *       via the Spring proxy so each item runs in its own {@code REQUIRES_NEW} transaction.
+     *       Tasks run concurrently on {@link AiModerationExecutor#batchPool()} — a dedicated
+     *       I/O pool sized for the batch — instead of the shared ForkJoinPool which is
+     *       designed for CPU-bound work and limited to {@code cores - 1} threads.</li>
      * </ol>
      */
     @Scheduled(fixedDelayString = "${smartrent.ai.verification.scheduler.delay:300000}")
@@ -114,7 +123,6 @@ public class AiListingAutoModerationScheduler {
         log.info("Starting AI Auto Moderation Scheduler...");
 
         try {
-            // Process in batches of 20
             Page<Listing> pendingListings = listingRepository.findListingsNeedingAiVerification(PageRequest.of(0, 20));
             List<Listing> listings = pendingListings.getContent();
 
@@ -125,29 +133,35 @@ public class AiListingAutoModerationScheduler {
 
             log.info("Found {} listings to process", listings.size());
 
-            // 1. Mark each listing as IN_PROGRESS before dispatching
-            List<ListingAiModeration> moderations = listings.stream().map(listing -> {
-                ListingAiModeration moderation = listingAiModerationRepository.findById(listing.getListingId())
-                    .orElse(ListingAiModeration.builder()
+            // 1. Upsert moderation records, then batch-mark all as IN_PROGRESS in one query.
+            List<ListingAiModeration> moderations = listings.stream().map(listing ->
+                listingAiModerationRepository.findById(listing.getListingId())
+                    .orElseGet(() -> ListingAiModeration.builder()
                         .listingId(listing.getListingId())
                         .retryCount(0)
                         .manualOverride(false)
-                        .build());
-                moderation.setVerificationStatus(VerificationStatus.IN_PROGRESS);
-                return listingAiModerationRepository.saveAndFlush(moderation);
-            }).toList();
+                        .build())
+            ).toList();
+            listingAiModerationRepository.saveAll(moderations);
 
-            // 2. Process listings in parallel.
+            List<Long> listingIds = listings.stream().map(Listing::getListingId).toList();
+            listingAiModerationRepository.markListingsAsInProgress(listingIds);
+
+            // 2. Process listings concurrently on the dedicated I/O thread pool.
             //    Each call goes through the Spring AOP proxy on aiModerationProcessorService,
             //    so @Transactional(REQUIRES_NEW) is correctly applied per listing.
-            IntStream.range(0, listings.size()).parallel().forEach(i -> {
-                try {
-                    aiModerationProcessorService.processSingleListing(listings.get(i), moderations.get(i));
-                } catch (Exception e) {
-                    log.error("Failed to process listing ID: {} in parallel batch",
-                        listings.get(i).getListingId(), e);
-                }
-            });
+            List<CompletableFuture<Void>> futures = IntStream.range(0, listings.size())
+                .mapToObj(i -> CompletableFuture.runAsync(() -> {
+                    try {
+                        aiModerationProcessorService.processSingleListing(listings.get(i), moderations.get(i));
+                    } catch (Exception e) {
+                        log.error("Failed to process listing ID: {} in parallel batch",
+                            listings.get(i).getListingId(), e);
+                    }
+                }, aiModerationExecutor.batchPool()))
+                .toList();
+
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
         } catch (Exception e) {
             log.error("Error in AI Auto Moderation Scheduler", e);
