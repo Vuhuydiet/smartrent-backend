@@ -18,6 +18,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 
@@ -49,11 +51,22 @@ public class NotificationServiceImpl implements NotificationService {
             Notification saved = notificationRepository.save(notification);
             log.info("Notification saved: type={}, recipient={}:{}", type, recipientType, recipientId);
 
-            // Send realtime via WebSocket
+            // Send WebSocket AFTER transaction commits to avoid race condition
+            // where frontend queries DB before TX is visible.
             NotificationResponse response = mapToResponse(saved);
             String destination = "/topic/notifications/" + recipientId;
-            messagingTemplate.convertAndSend(destination, response);
-            log.debug("WebSocket notification sent to {}", destination);
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        messagingTemplate.convertAndSend(destination, response);
+                        log.debug("WebSocket notification sent after commit to {}", destination);
+                    }
+                });
+            } else {
+                messagingTemplate.convertAndSend(destination, response);
+                log.debug("WebSocket notification sent to {}", destination);
+            }
         } catch (Exception e) {
             log.error("Failed to send notification: type={}, recipient={}:{}, error={}",
                     type, recipientType, recipientId, e.getMessage());
