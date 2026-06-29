@@ -8,6 +8,8 @@ import com.smartrent.dto.request.DuplicateCheckRequest;
 import com.smartrent.dto.response.AiListingVerificationResponse;
 import com.smartrent.dto.response.DuplicateCheckResponse;
 import com.smartrent.enums.ModerationStatus;
+import com.smartrent.enums.NotificationType;
+import com.smartrent.enums.RecipientType;
 import com.smartrent.infra.connector.SmartRentAiConnector;
 import com.smartrent.infra.repository.ListingAiModerationRepository;
 import com.smartrent.infra.repository.ListingRepository;
@@ -17,6 +19,7 @@ import com.smartrent.infra.repository.entity.ListingAiModeration;
 import com.smartrent.infra.repository.entity.enums.VerificationStatus;
 import com.smartrent.service.ai.AiListingVerificationService;
 import com.smartrent.service.ai.AiModerationProcessorService;
+import com.smartrent.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -36,6 +39,7 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
     private final ListingRepository listingRepository;
     private final ListingAiModerationRepository listingAiModerationRepository;
     private final AiListingVerificationService aiVerificationService;
+    private final NotificationService notificationService;
     private final SmartRentAiConnector smartRentAiConnector;
     private final ObjectMapper objectMapper;
 
@@ -126,11 +130,40 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
             log.info("Finished processing listing ID: {}, verificationStatus: {}, moderationStatus: {}",
                     listing.getListingId(), moderation.getVerificationStatus(), listing.getModerationStatus());
 
+            sendOwnerNotification(listing, suggestedStatus);
+
         } catch (Exception e) {
             log.error("Failed to verify listing ID: {}", listing.getListingId(), e);
             moderation.setRetryCount(moderation.getRetryCount() + 1);
             moderation.setVerificationStatus(VerificationStatus.PENDING); // revert for retry
             listingAiModerationRepository.save(moderation);
+        }
+    }
+
+    private void sendOwnerNotification(Listing listing, String suggestedStatus) {
+        if (listing.getUserId() == null) return;
+
+        NotificationType notifType;
+        String notifMessage;
+
+        if ("APPROVED".equals(suggestedStatus)) {
+            notifType = NotificationType.LISTING_APPROVED;
+            notifMessage = "Tin đăng \"" + listing.getTitle() + "\" của bạn đã được hệ thống duyệt tự động và hiện đã hiển thị.";
+        } else if ("REJECTED".equals(suggestedStatus)) {
+            notifType = NotificationType.LISTING_REJECTED;
+            notifMessage = "Tin đăng \"" + listing.getTitle() + "\" của bạn đã bị từ chối bởi hệ thống kiểm duyệt tự động.";
+        } else {
+            // NEEDS_REVIEW: listing vào hàng đợi kiểm duyệt thủ công, admin sẽ thông báo kết quả cuối
+            return;
+        }
+
+        try {
+            notificationService.sendNotification(
+                    listing.getUserId(), RecipientType.USER,
+                    notifType, "Cập nhật kiểm duyệt tin đăng", notifMessage,
+                    listing.getListingId(), "LISTING");
+        } catch (Exception e) {
+            log.warn("Failed to send AI moderation notification for listing {}: {}", listing.getListingId(), e.getMessage());
         }
     }
 
