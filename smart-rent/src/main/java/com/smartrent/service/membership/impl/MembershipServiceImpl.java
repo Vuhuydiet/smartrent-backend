@@ -1145,6 +1145,21 @@ public class MembershipServiceImpl implements MembershipService {
         return mapToUserMembershipResponse(renewed);
     }
 
+    @Override
+    @Transactional
+    public void adminClearUserMembership(String userId) {
+        log.info("Admin clearing all active memberships for user: {}", userId);
+        List<UserMembership> active = userMembershipRepository
+                .findByUserIdAndStatus(userId, MembershipStatus.ACTIVE);
+        if (active.isEmpty()) {
+            log.info("No active memberships found for user: {}", userId);
+            return;
+        }
+        active.forEach(um -> um.setStatus(MembershipStatus.EXPIRED));
+        userMembershipRepository.saveAll(active);
+        log.info("Expired {} active membership(s) for user: {}", active.size(), userId);
+    }
+
     // =====================================================
     // UPGRADE HELPER METHODS
     // =====================================================
