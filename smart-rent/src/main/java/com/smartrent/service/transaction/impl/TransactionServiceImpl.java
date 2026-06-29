@@ -58,32 +58,6 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     @Transactional
-    public String createMembershipRenewalTransaction(String userId, Long membershipId, Long previousUserMembershipId,
-                                                      BigDecimal amount, String paymentProvider) {
-        log.info("Creating membership renewal transaction for user: {}, package: {}, previous userMembershipId: {}",
-                userId, membershipId, previousUserMembershipId);
-
-        Transaction transaction = Transaction.builder()
-                .transactionId(UUID.randomUUID().toString())
-                .userId(userId)
-                .transactionType(TransactionType.MEMBERSHIP_RENEWAL)
-                .amount(amount)
-                .referenceType(ReferenceType.MEMBERSHIP)
-                .referenceId(membershipId.toString())
-                .previousMembershipId(previousUserMembershipId)
-                .status(TransactionStatus.PENDING)
-                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "SEPAY"))
-                .additionalInfo("Membership renewal for package " + membershipId)
-                .build();
-
-        transaction = transactionRepository.save(transaction);
-        log.info("Created membership renewal transaction: {}", transaction.getTransactionId());
-
-        return transaction.getTransactionId();
-    }
-
-    @Override
-    @Transactional
     public String createMembershipUpgradeTransaction(String userId, Long targetMembershipId, Long previousMembershipId,
                                                       BigDecimal amount, BigDecimal discountAmount, String paymentProvider) {
         log.info("Creating membership upgrade transaction for user: {}, from membership: {} to: {}",
@@ -106,6 +80,33 @@ public class TransactionServiceImpl implements TransactionService {
 
         transaction = transactionRepository.save(transaction);
         log.info("Created membership upgrade transaction: {}", transaction.getTransactionId());
+
+        return transaction.getTransactionId();
+    }
+
+    @Override
+    @Transactional
+    public String createMembershipRenewalTransaction(String userId, Long membershipId, Long currentUserMembershipId,
+                                                      BigDecimal amount, String paymentProvider) {
+        log.info("Creating membership renewal transaction for user: {}, package: {}, current membership: {}",
+                userId, membershipId, currentUserMembershipId);
+
+        Transaction transaction = Transaction.builder()
+                .transactionId(UUID.randomUUID().toString())
+                .userId(userId)
+                .transactionType(TransactionType.MEMBERSHIP_RENEWAL)
+                .amount(amount)
+                .referenceType(ReferenceType.MEMBERSHIP)
+                .referenceId(membershipId.toString())
+                .previousMembershipId(currentUserMembershipId)
+                .status(TransactionStatus.PENDING)
+                .paymentProvider(PaymentProvider.valueOf(paymentProvider != null ? paymentProvider : "SEPAY"))
+                .additionalInfo("Membership renewal for package " + membershipId
+                        + " (extends membership " + currentUserMembershipId + ")")
+                .build();
+
+        transaction = transactionRepository.save(transaction);
+        log.info("Created membership renewal transaction: {}", transaction.getTransactionId());
 
         return transaction.getTransactionId();
     }

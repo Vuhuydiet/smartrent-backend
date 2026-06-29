@@ -25,19 +25,6 @@ public interface TransactionService {
     String createMembershipTransaction(String userId, Long membershipId, BigDecimal amount, String paymentProvider);
 
     /**
-     * Create a membership renewal transaction (same package, same tier)
-     *
-     * @param userId User ID
-     * @param membershipId Membership package ID being renewed
-     * @param previousUserMembershipId The current/recently-expired user membership ID
-     * @param amount Payment amount
-     * @param paymentProvider Payment provider (SEPAY, etc.)
-     * @return Transaction ID
-     */
-    String createMembershipRenewalTransaction(String userId, Long membershipId, Long previousUserMembershipId,
-                                               BigDecimal amount, String paymentProvider);
-
-    /**
      * Create a membership upgrade transaction
      *
      * @param userId User ID
@@ -50,6 +37,19 @@ public interface TransactionService {
      */
     String createMembershipUpgradeTransaction(String userId, Long targetMembershipId, Long previousMembershipId,
                                                BigDecimal amount, BigDecimal discountAmount, String paymentProvider);
+
+    /**
+     * Create a membership renewal transaction (same package, extended period).
+     *
+     * @param userId User ID
+     * @param membershipId The package being renewed
+     * @param currentUserMembershipId The existing UserMembership being renewed (stored as previousMembershipId)
+     * @param amount Payment amount (full package price)
+     * @param paymentProvider Payment provider
+     * @return Transaction ID
+     */
+    String createMembershipRenewalTransaction(String userId, Long membershipId, Long currentUserMembershipId,
+                                              BigDecimal amount, String paymentProvider);
 
     /**
      * Create a post fee transaction (pay-per-post)

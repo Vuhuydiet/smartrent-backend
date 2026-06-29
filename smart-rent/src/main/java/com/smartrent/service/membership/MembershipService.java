@@ -3,6 +3,7 @@ package com.smartrent.service.membership;
 import com.smartrent.dto.request.MembershipPackageCreateRequest;
 import com.smartrent.dto.request.MembershipPackageUpdateRequest;
 import com.smartrent.dto.request.MembershipPurchaseRequest;
+import com.smartrent.dto.request.MembershipRenewalRequest;
 import com.smartrent.dto.request.MembershipUpgradeRequest;
 import com.smartrent.dto.response.MembershipPackageResponse;
 import com.smartrent.dto.response.MembershipUpgradePreviewResponse;
@@ -128,26 +129,25 @@ public interface MembershipService {
      */
     List<MembershipUpgradePreviewResponse> getAvailableUpgrades(String userId);
 
-    // =====================================================
-    // MEMBERSHIP RENEWAL METHODS
-    // =====================================================
-
     /**
-     * Initiate membership renewal for the same package.
-     * Allowed when: membership is ACTIVE with <=7 days remaining,
-     * OR membership EXPIRED within the last 7 days.
-     * @param userId The requesting user
-     * @param paymentProvider Payment provider (default SEPAY)
-     * @return PaymentResponse with payment URL
+     * Initiate renewal of the user's current membership package for another period.
+     * The user must have an active or recently expired membership (within 7 days).
+     * On success, returns a payment URL to collect the renewal fee.
+     *
+     * @param userId The user requesting renewal
+     * @param request Renewal request containing payment provider preference
+     * @return Payment response with URL and transaction reference
      */
-    PaymentResponse initiateRenewal(String userId, String paymentProvider);
+    PaymentResponse initiateMembershipRenewal(String userId, MembershipRenewalRequest request);
 
     /**
      * Complete membership renewal after successful payment.
-     * Creates a new membership starting from the old endDate (if not yet expired)
-     * or from now (if already expired). Called from payment callback handler.
+     * Creates a new UserMembership chained to the end of the current one (or starting from now
+     * if the previous membership has already expired), then grants fresh benefits.
+     * Called from the payment callback handler.
+     *
      * @param transactionId The completed transaction ID
-     * @return The new user membership
+     * @return The newly created UserMembership
      */
     UserMembershipResponse completeMembershipRenewal(String transactionId);
 }

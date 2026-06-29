@@ -2,6 +2,7 @@ package com.smartrent.controller;
 
 import com.smartrent.dto.request.MembershipPackageCreateRequest;
 import com.smartrent.dto.request.MembershipPurchaseRequest;
+import com.smartrent.dto.request.MembershipRenewalRequest;
 import com.smartrent.dto.request.MembershipUpgradeRequest;
 import com.smartrent.dto.response.*;
 import com.smartrent.enums.BenefitType;
@@ -609,24 +610,29 @@ public class MembershipController {
     @PostMapping("/initiate-renewal")
     @Operation(
         summary = "Initiate membership renewal",
-        description = "Renew the current membership package (same tier, +1 month). " +
-            "Allowed when: membership is ACTIVE with ≤7 days remaining, " +
-            "OR membership EXPIRED within the last 7 days. " +
-            "Returns a SePay payment URL. Backend webhook completes the renewal automatically.",
+        description = "Renew the user's current membership package for another full period. "
+            + "Eligible when the user has an active membership or one that expired within the last 7 days. "
+            + "The renewed period is chained from the current end date (if not yet expired) or starts from now. "
+            + "Returns a payment URL; after successful payment the renewal is activated automatically.",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = false,
             content = @Content(
                 mediaType = "application/json",
+                schema = @Schema(implementation = MembershipRenewalRequest.class),
                 examples = @ExampleObject(
                     name = "Renewal Request",
-                    value = "{\"paymentProvider\": \"SEPAY\"}"
+                    value = """
+                        {
+                          "paymentProvider": "SEPAY"
+                        }
+                        """
                 )
             )
         ),
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Payment URL generated successfully",
+                description = "Renewal payment URL generated successfully",
                 content = @Content(
                     mediaType = "application/json",
                     schema = @Schema(implementation = PaymentResponse.class)
@@ -634,25 +640,21 @@ public class MembershipController {
             ),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "400",
-                description = "Not eligible for renewal (code 14008)",
-                content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                        value = "{\"code\": \"14008\", \"message\": \"Membership renewal is not allowed...\"}"
-                    )
-                )
+                description = "No active or recently expired membership to renew"
             )
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<PaymentResponse> initiateRenewal(
-            @RequestBody(required = false) java.util.Map<String, String> body) {
+    public ApiResponse<PaymentResponse> initiateMembershipRenewal(
+            @RequestBody(required = false) MembershipRenewalRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userId = authentication.getName();
 
-        String paymentProvider = body != null ? body.get("paymentProvider") : null;
-        log.info("User {} initiating membership renewal, provider: {}", userId, paymentProvider);
-        PaymentResponse response = membershipService.initiateRenewal(userId, paymentProvider);
+        if (request == null) {
+            request = new MembershipRenewalRequest();
+        }
+        log.info("User {} initiating membership renewal", userId);
+        PaymentResponse response = membershipService.initiateMembershipRenewal(userId, request);
         return ApiResponse.<PaymentResponse>builder()
                 .data(response)
                 .build();

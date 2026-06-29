@@ -29,6 +29,12 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
     @Query("UPDATE user_memberships um SET um.status = 'EXPIRED' WHERE um.status = 'ACTIVE' AND um.endDate <= :now")
     int expireOldMemberships(@Param("now") LocalDateTime now);
 
+    @Query("SELECT um FROM user_memberships um JOIN FETCH um.membershipPackage WHERE um.status = 'ACTIVE' AND um.endDate BETWEEN :start AND :end")
+    List<UserMembership> findExpiringBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT um FROM user_memberships um JOIN FETCH um.membershipPackage WHERE um.userId = :userId ORDER BY um.endDate DESC")
+    List<UserMembership> findByUserIdOrderByEndDateDesc(@Param("userId") String userId);
+
     boolean existsByUserIdAndStatus(String userId, MembershipStatus status);
 
     @Query("SELECT COUNT(um) > 0 FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.endDate > :now")
