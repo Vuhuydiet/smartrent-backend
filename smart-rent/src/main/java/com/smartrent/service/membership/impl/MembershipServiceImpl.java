@@ -629,6 +629,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .daysRemaining(userMembership.getDaysRemaining())
                 .status(userMembership.getStatus().name())
                 .totalPaid(userMembership.getTotalPaid())
+                .packageSalePrice(userMembership.getMembershipPackage().getSalePrice())
                 .benefits(benefits)
                 .createdAt(userMembership.getCreatedAt())
                 .updatedAt(userMembership.getUpdatedAt())
@@ -1128,6 +1129,13 @@ public class MembershipServiceImpl implements MembershipService {
                 .build();
 
         renewed = userMembershipRepository.save(renewed);
+
+        // Expire the previous membership so only one ACTIVE record exists per user.
+        // Without this, findActiveUserMembership throws NonUniqueResultException.
+        if (previous != null && previous.getStatus() == MembershipStatus.ACTIVE) {
+            previous.setStatus(MembershipStatus.EXPIRED);
+            userMembershipRepository.save(previous);
+        }
 
         List<UserMembershipBenefit> benefits = grantBenefits(renewed, pkg);
         userBenefitRepository.saveAll(benefits);
