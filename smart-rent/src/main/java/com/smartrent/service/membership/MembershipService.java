@@ -150,5 +150,13 @@ public interface MembershipService {
      * @return The newly created UserMembership
      */
     UserMembershipResponse completeMembershipRenewal(String transactionId);
+
+    /**
+     * Admin: expire all ACTIVE memberships for a user.
+     * Used to fix duplicate-active-membership issues caused by prior bugs.
+     *
+     * @param userId The user whose active memberships should be cleared
+     */
+    void adminClearUserMembership(String userId);
 }
 
