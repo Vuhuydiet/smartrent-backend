@@ -3,6 +3,7 @@ package com.smartrent.service.membership;
 import com.smartrent.dto.request.MembershipPackageCreateRequest;
 import com.smartrent.dto.request.MembershipPackageUpdateRequest;
 import com.smartrent.dto.request.MembershipPurchaseRequest;
+import com.smartrent.dto.request.MembershipRenewalRequest;
 import com.smartrent.dto.request.MembershipUpgradeRequest;
 import com.smartrent.dto.response.MembershipPackageResponse;
 import com.smartrent.dto.response.MembershipUpgradePreviewResponse;
@@ -127,5 +128,27 @@ public interface MembershipService {
      * @return List of packages available for upgrade with preview info
      */
     List<MembershipUpgradePreviewResponse> getAvailableUpgrades(String userId);
+
+    /**
+     * Initiate renewal of the user's current membership package for another period.
+     * The user must have an active or recently expired membership (within 7 days).
+     * On success, returns a payment URL to collect the renewal fee.
+     *
+     * @param userId The user requesting renewal
+     * @param request Renewal request containing payment provider preference
+     * @return Payment response with URL and transaction reference
+     */
+    PaymentResponse initiateMembershipRenewal(String userId, MembershipRenewalRequest request);
+
+    /**
+     * Complete membership renewal after successful payment.
+     * Creates a new UserMembership chained to the end of the current one (or starting from now
+     * if the previous membership has already expired), then grants fresh benefits.
+     * Called from the payment callback handler.
+     *
+     * @param transactionId The completed transaction ID
+     * @return The newly created UserMembership
+     */
+    UserMembershipResponse completeMembershipRenewal(String transactionId);
 }
 

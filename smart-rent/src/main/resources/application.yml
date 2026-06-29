@@ -271,6 +271,10 @@ application:
       # application.client-url (CLIENT_URL in .env, mirrors FE NEXT_PUBLIC_SITE_URL)
       # to produce the CTA link inside the email body.
       manage-path: "/seller/listings?page=1&size=10"
+    expiring-membership:
+      # Same whitelist env var as listing expiry — both gates are controlled together.
+      whitelist-emails: "${WHITE_LIST_EMAIL_NOTIFICATION:lqm550@gmail.com,fatuforwork@gmail.com,smartrent.tools@gmail.com,huyntranty@gmail.com}"
+      manage-path: "/buyer/memberships"
   otp:
     length: 6
     duration: 60 #s

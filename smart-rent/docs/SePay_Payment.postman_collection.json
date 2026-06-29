@@ -1,0 +1,375 @@
+{
+  "info": {
+    "name": "SmartRent - SePay Payment Gateway",
+    "description": "End-to-end test collection for the SePay Payment Gateway (Cổng thanh toán) integration.\n\n## Flow\n1. **Auth → Login** — gets a Bearer token (saved to `accessToken`).\n2. **Initiate** a payment (membership purchase/upgrade, push, post, VIP, repost) with `\"paymentProvider\": \"SEPAY\"`. The response's `transactionRef` and `amount` are auto-saved. `providerData.checkoutUrl` + `providerData.fields` are the signed checkout form the frontend POSTs to SePay.\n3. The user pays on SePay's hosted checkout. SePay then confirms via the **IPN** (`POST /v1/payments/webhook/sepay`, `X-Secret-Key` header). Either:\n   - complete a real test payment on the sandbox checkout, OR\n   - **Simulate the IPN** with *SePay IPN (simulate)* — sends `X-Secret-Key: {{sepaySecretKey}}` and a nested ORDER_PAID payload whose `order.order_invoice_number` = the saved `transactionRef`.\n4. **Poll** `GET /transactions/{txnRef}` until `status` = `COMPLETED`.\n\n## Setup\nSet collection variables: `baseUrl`, `email`, `password`, and `sepaySecretKey` (must equal the backend's `SEPAY_SECRET_KEY`).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "email", "value": "john.doe@example.com", "type": "string" },
+    { "key": "password", "value": "SecurePass123!", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "sepaySecretKey", "value": "YOUR_SEPAY_PG_SECRET_KEY", "type": "string" },
+    { "key": "transactionRef", "value": "", "type": "string" },
+    { "key": "amount", "value": "1400000", "type": "string" },
+    { "key": "membershipId", "value": "2", "type": "string" },
+    { "key": "targetMembershipId", "value": "2", "type": "string" },
+    { "key": "listingId", "value": "123", "type": "string" },
+    { "key": "userId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (get token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (res.data && res.data.accessToken) {",
+                  "    pm.collectionVariables.set('accessToken', res.data.accessToken);",
+                  "    console.log('accessToken saved');",
+                  "}",
+                  "pm.test('Got access token', () => pm.expect(res.data.accessToken).to.be.a('string'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/auth",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "auth"]
+            },
+            "description": "Authenticate and store the access token in {{accessToken}} for the rest of the collection."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Initiate (SEPAY)",
+      "description": "Each initiate endpoint returns a PaymentResponse. The test script saves transactionRef and amount so the IPN + polling requests work without manual copy-paste. providerData.checkoutUrl + providerData.fields are the signed checkout form to POST to SePay.",
+      "item": [
+        {
+          "name": "Membership - Initiate Purchase",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const d = res.data || {};",
+                  "if (d.transactionRef) pm.collectionVariables.set('transactionRef', d.transactionRef);",
+                  "if (d.amount) pm.collectionVariables.set('amount', String(d.amount));",
+                  "pm.test('provider is SEPAY', () => pm.expect(d.provider).to.eql('SEPAY'));",
+                  "pm.test('has transactionRef', () => pm.expect(d.transactionRef).to.be.a('string'));",
+                  "pm.test('has signed checkout fields', () => pm.expect(d.providerData.fields.signature).to.be.a('string'));",
+                  "console.log('transactionRef:', d.transactionRef, '| checkoutUrl:', d.providerData && d.providerData.checkoutUrl, '| amount:', d.amount);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"membershipId\": {{membershipId}},\n  \"paymentProvider\": \"SEPAY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/memberships/initiate-purchase",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "memberships", "initiate-purchase"]
+            },
+            "description": "POST providerData.fields (in order) to providerData.checkoutUrl to send the user to SePay's hosted checkout."
+          }
+        },
+        {
+          "name": "Membership - Initiate Upgrade",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const d = res.data || {};",
+                  "if (d.transactionRef) pm.collectionVariables.set('transactionRef', d.transactionRef);",
+                  "if (d.finalAmount != null) pm.collectionVariables.set('amount', String(d.finalAmount));",
+                  "console.log('status:', d.status, '| paymentUrl:', d.paymentUrl, '| finalAmount:', d.finalAmount);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetMembershipId\": {{targetMembershipId}},\n  \"paymentProvider\": \"SEPAY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/memberships/initiate-upgrade",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "memberships", "initiate-upgrade"]
+            },
+            "description": "If the discount covers the full price the response status is COMPLETED with no checkout (no IPN needed)."
+          }
+        },
+        {
+          "name": "Push - Pay per push",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const d = res.data || {};",
+                  "const payment = d.payment || d;",
+                  "if (payment.transactionRef) pm.collectionVariables.set('transactionRef', payment.transactionRef);",
+                  "if (payment.amount) pm.collectionVariables.set('amount', String(payment.amount));",
+                  "console.log('push response:', JSON.stringify(d));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"listingId\": {{listingId}},\n  \"useMembershipQuota\": false,\n  \"paymentProvider\": \"SEPAY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/pushes/push",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "pushes", "push"]
+            },
+            "description": "Pay-per-post, VIP listing and repost follow the same pattern — send paymentProvider=SEPAY when not using membership quota."
+          }
+        }
+      ]
+    },
+    {
+      "name": "SePay IPN (simulate)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const res = pm.response.json();",
+              "pm.test('Status 200 (SePay ack)', () => pm.response.to.have.status(200));",
+              "pm.test('success = true', () => pm.expect(res.success).to.eql(true));",
+              "console.log('IPN acked. Now poll GET /transactions/{{transactionRef}} for COMPLETED.');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Secret-Key", "value": "{{sepaySecretKey}}", "description": "SePay sends our Secret Key here. Backend returns 401 if it doesn't match SEPAY_SECRET_KEY." }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"timestamp\": 1759134682,\n  \"notification_type\": \"ORDER_PAID\",\n  \"order\": {\n    \"order_invoice_number\": \"{{transactionRef}}\",\n    \"order_status\": \"CAPTURED\",\n    \"order_amount\": \"{{amount}}.00\"\n  },\n  \"transaction\": {\n    \"transaction_id\": \"68ba94ac80123\",\n    \"transaction_status\": \"APPROVED\",\n    \"transaction_amount\": \"{{amount}}\",\n    \"payment_method\": \"BANK_TRANSFER\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/payments/webhook/sepay",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "payments", "webhook", "sepay"]
+        },
+        "description": "Simulates the SePay Payment Gateway IPN. The backend matches `order.order_invoice_number` to the pending transaction, requires notification_type=ORDER_PAID + transaction_status=APPROVED and transaction_amount >= order amount, marks it COMPLETED and triggers business logic.\n\nRun an *Initiate* request first so {{transactionRef}} and {{amount}} are populated."
+      }
+    },
+    {
+      "name": "SePay IPN - Bad secret key (expect 401)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status 401', () => pm.response.to.have.status(401));",
+              "const res = pm.response.json();",
+              "pm.test('success = false', () => pm.expect(res.success).to.eql(false));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Secret-Key", "value": "wrong-key-123" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"notification_type\": \"ORDER_PAID\",\n  \"order\": { \"order_invoice_number\": \"{{transactionRef}}\", \"order_status\": \"CAPTURED\", \"order_amount\": \"{{amount}}.00\" },\n  \"transaction\": { \"transaction_status\": \"APPROVED\", \"transaction_amount\": \"{{amount}}\" }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/payments/webhook/sepay",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "payments", "webhook", "sepay"]
+        },
+        "description": "Negative test: a wrong/missing X-Secret-Key header must be rejected with HTTP 401."
+      }
+    },
+    {
+      "name": "Query / Poll",
+      "item": [
+        {
+          "name": "Query Transaction (poll until COMPLETED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const status = res.data && res.data.status;",
+                  "console.log('Transaction status:', status);",
+                  "pm.test('status present', () => pm.expect(status).to.be.oneOf(['PENDING','COMPLETED','FAILED','CANCELLED','REFUNDED']));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/transactions/{{transactionRef}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "payments", "transactions", "{{transactionRef}}"]
+            },
+            "description": "Frontend polls this every ~3s. After the IPN fires, status flips to COMPLETED."
+          }
+        },
+        {
+          "name": "Check Transaction Exists",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/exists/{{transactionRef}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "payments", "exists", "{{transactionRef}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Available Providers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/providers",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "payments", "providers"]
+            },
+            "description": "Should return [\"SEPAY\"]."
+          }
+        },
+        {
+          "name": "Payment History",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/history?userId={{userId}}&page=1&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "payments", "history"],
+              "query": [
+                { "key": "userId", "value": "{{userId}}" },
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Payment History by Status",
+          "request": {
+            "method": "GET",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/history/status/COMPLETED?userId={{userId}}&page=1&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "payments", "history", "status", "COMPLETED"],
+              "query": [
+                { "key": "userId", "value": "{{userId}}" },
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "status path segment: PENDING | COMPLETED | FAILED | CANCELLED | REFUNDED"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Manage",
+      "item": [
+        {
+          "name": "Cancel Payment",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/cancel/{{transactionRef}}?reason=User%20closed",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "payments", "cancel", "{{transactionRef}}"],
+              "query": [ { "key": "reason", "value": "User%20closed" } ]
+            },
+            "description": "Cancels a PENDING transaction (best-effort SePay order/cancel + local CANCELLED)."
+          }
+        },
+        {
+          "name": "Refund / Void Payment",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Authorization", "value": "Bearer {{accessToken}}" } ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/payments/refund/{{transactionRef}}?amount={{amount}}&reason=Customer%20request",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "payments", "refund", "{{transactionRef}}"],
+              "query": [
+                { "key": "amount", "value": "{{amount}}" },
+                { "key": "reason", "value": "Customer%20request" }
+              ]
+            },
+            "description": "Voids a card transaction via SePay order/voidTransaction. Bank transfers are not auto-refundable."
+          }
+        }
+      ]
+    }
+  ]
+}

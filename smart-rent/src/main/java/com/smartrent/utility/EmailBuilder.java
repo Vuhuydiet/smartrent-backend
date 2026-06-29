@@ -3,6 +3,9 @@ package com.smartrent.utility;
 import com.smartrent.config.Constants;
 import com.smartrent.service.authentication.domain.OtpData;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 import java.time.Year;
 
 public class EmailBuilder {
@@ -207,6 +210,64 @@ public class EmailBuilder {
     htmlContent.append("</div>"); // End content
 
     // Footer
+    htmlContent.append("<div class=\"footer\">");
+    htmlContent.append("Email này được gửi tự động &mdash; bạn không cần phản hồi.<br>");
+    htmlContent.append("&copy; %d %s. Bản quyền được bảo lưu.".formatted(currentYear(), senderName));
+    htmlContent.append("</div>");
+
+    htmlContent.append("</div>"); // End container
+    htmlContent.append("</body></html>");
+
+    return htmlContent.toString();
+  }
+
+  public static String buildExpiringMembershipHtmlContent(String senderName, String firstName,
+                                                           String lastName, String packageName,
+                                                           long daysRemaining, LocalDateTime endDate,
+                                                           String manageUrl) {
+    StringBuilder htmlContent = buildHtmlHeader(Constants.EMAIL_EXPIRING_MEMBERSHIP_HEADER);
+
+    htmlContent.append("<div class=\"container\">");
+
+    htmlContent.append("<div class=\"header\">");
+    htmlContent.append("<h1>Gói thành viên sắp hết hạn</h1>");
+    htmlContent.append("</div>");
+
+    htmlContent.append("<div class=\"content\">");
+    htmlContent.append("<div class=\"greeting\">Xin chào %s,</div>"
+        .formatted(Utils.buildName(firstName, lastName)));
+
+    htmlContent.append("<div class=\"message\">");
+    htmlContent.append("Gói thành viên <strong>%s</strong> của bạn trên %s sắp hết hạn."
+        .formatted(packageName, senderName));
+    htmlContent.append("</div>");
+
+    boolean urgent = daysRemaining <= 0;
+    String urgencyClass = urgent ? "card card-danger" : "card card-warning";
+    String urgencyTitle = urgent ? "Khẩn" : "Thời hạn còn lại";
+    String formattedEnd = endDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+    String urgencyBody = urgent
+        ? "Gói của bạn sẽ hết hạn trong vòng <strong>24 giờ tới</strong> (vào lúc %s).".formatted(formattedEnd)
+        : "Gói của bạn sẽ hết hạn sau <strong>%d ngày</strong> (vào lúc %s).".formatted(daysRemaining, formattedEnd);
+
+    htmlContent.append("<div class=\"%s\">".formatted(urgencyClass));
+    htmlContent.append("<div class=\"card-title\">%s</div>".formatted(urgencyTitle));
+    htmlContent.append("<div class=\"card-body\">%s</div>".formatted(urgencyBody));
+    htmlContent.append("</div>");
+
+    htmlContent.append("<div class=\"card card-info\">");
+    htmlContent.append("<div class=\"card-title\">Lưu ý</div>");
+    htmlContent.append("<div class=\"card-body\">Sau khi hết hạn, các quyền lợi của gói thành viên sẽ không còn hiệu lực. "
+        + "Hãy gia hạn sớm để không bị gián đoạn dịch vụ.</div>");
+    htmlContent.append("</div>");
+
+    htmlContent.append("<div class=\"cta-container\">");
+    htmlContent.append("<a href=\"%s\" class=\"cta-button\">Gia hạn gói thành viên</a>"
+        .formatted(manageUrl));
+    htmlContent.append("</div>");
+
+    htmlContent.append("</div>"); // End content
+
     htmlContent.append("<div class=\"footer\">");
     htmlContent.append("Email này được gửi tự động &mdash; bạn không cần phản hồi.<br>");
     htmlContent.append("&copy; %d %s. Bản quyền được bảo lưu.".formatted(currentYear(), senderName));

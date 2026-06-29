@@ -219,5 +219,9 @@ public class Transaction {
     public boolean isMembershipUpgrade() {
         return transactionType == TransactionType.MEMBERSHIP_UPGRADE;
     }
+
+    public boolean isMembershipRenewal() {
+        return transactionType == TransactionType.MEMBERSHIP_RENEWAL;
+    }
 }
 
