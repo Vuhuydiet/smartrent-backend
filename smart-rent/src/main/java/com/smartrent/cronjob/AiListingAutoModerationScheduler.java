@@ -6,7 +6,6 @@ import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.ListingAiModeration;
 import com.smartrent.infra.repository.entity.enums.VerificationStatus;
 import com.smartrent.service.ai.AiModerationProcessorService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.Page;
@@ -19,9 +18,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.IntStream;
+import org.springframework.beans.factory.annotation.Value;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 @ConditionalOnProperty(
     name = "smartrent.ai.verification.scheduler.enabled",
@@ -41,10 +40,21 @@ public class AiListingAutoModerationScheduler {
 
     /**
      * Runtime toggle — controlled via the admin API.
-     * Defaults to {@code true} so the scheduler runs on startup.
-     * Can be toggled at runtime without a server restart.
+     * Initialized from config so AI_SCHEDULER_ENABLED=false at startup
+     * truly disables it without a restart later.
      */
-    private final AtomicBoolean aiAutoModerationEnabled = new AtomicBoolean(true);
+    private final AtomicBoolean aiAutoModerationEnabled;
+
+    public AiListingAutoModerationScheduler(
+            ListingRepository listingRepository,
+            ListingAiModerationRepository listingAiModerationRepository,
+            AiModerationProcessorService aiModerationProcessorService,
+            @Value("${smartrent.ai.verification.scheduler.enabled:true}") boolean initiallyEnabled) {
+        this.listingRepository = listingRepository;
+        this.listingAiModerationRepository = listingAiModerationRepository;
+        this.aiModerationProcessorService = aiModerationProcessorService;
+        this.aiAutoModerationEnabled = new AtomicBoolean(initiallyEnabled);
+    }
 
     /** Called by the admin API to enable AI auto-moderation. */
     public void enable() {

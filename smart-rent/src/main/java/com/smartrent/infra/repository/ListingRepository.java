@@ -54,10 +54,20 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     /**
      * Find listings that need AI verification.
      *
-     * <p>Exclusion rules:
+     * <p>Inclusion rules — a listing is picked up when it passes the gatekeeping
+     * filters AND its AI processing state allows a (re)try:
      * <ul>
      *   <li>{@code lam IS NULL} → new listing, never processed → include</li>
      *   <li>{@code lam.verificationStatus = PENDING} AND retryCount < 3 → needs processing → include</li>
+     *   <li>{@code l.moderationStatus = RESUBMITTED} AND retryCount < 3 → owner resubmitted after
+     *       revision → re-verify even if the previous {@code lam} ended in REJECTED/VERIFIED</li>
+     * </ul>
+     *
+     * <p>Exclusion rules:
+     * <ul>
+     *   <li>{@code lam.verificationStatus = IN_PROGRESS} → currently being processed → exclude (avoids double-dispatch)</li>
+     *   <li>{@code lam.verificationStatus IN (VERIFIED, REJECTED, UNDER_REVIEW)} AND not RESUBMITTED → resolved/awaiting human → exclude</li>
+     *   <li>{@code retryCount >= 3} → gave up → exclude</li>
      *   <li>{@code l.moderationStatus IN (APPROVED, REJECTED, SUSPENDED, REVISION_REQUIRED)} → already resolved → exclude</li>
      *   <li>{@code l.verified = true} → already approved → exclude</li>
      *   <li>{@code lam.manualOverride = true} → human took over → exclude</li>
@@ -66,8 +76,18 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     @Query("""
         SELECT l FROM listings l
         LEFT JOIN listing_ai_moderation lam ON lam.listingId = l.listingId
-        WHERE (lam IS NULL OR (lam.verificationStatus = 'PENDING' AND lam.retryCount < 3))
-        AND (lam IS NULL OR lam.manualOverride = false)
+        WHERE (
+                lam IS NULL
+                OR (
+                    lam.manualOverride = false
+                    AND lam.retryCount < 3
+                    AND lam.verificationStatus <> 'IN_PROGRESS'
+                    AND (
+                        lam.verificationStatus = 'PENDING'
+                        OR l.moderationStatus = com.smartrent.enums.ModerationStatus.RESUBMITTED
+                    )
+                )
+            )
         AND l.isDraft = false
         AND l.isShadow = false
         AND l.postDate IS NOT NULL

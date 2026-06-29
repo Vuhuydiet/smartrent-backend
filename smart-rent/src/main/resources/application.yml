@@ -59,6 +59,16 @@ logging:
     org.springframework.web: WARN
     org.springframework.security: WARN
     org.springframework.boot.actuate: WARN
+  # Emit logs as ECS JSON to stdout so the platform (Dokploy) aggregates
+  # machine-parseable, searchable logs. Spring Boot 3.4 native structured
+  # logging — no extra dependency. The console pattern below is the fallback
+  # used when structured format is disabled (e.g. LOGGING_STRUCTURED_FORMAT_CONSOLE=).
+  structured:
+    format:
+      console: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:ecs}
+    ecs:
+      service:
+        name: smartrent-backend
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
@@ -215,7 +225,6 @@ application:
         - "/v1/auth/**"
         - "/v1/payments/webhook/**"
         - "/v1/users"
-        - "/v1/admins"
         - "/v1/verification/**"
         - "/otp/**"
         - "/v1/listings/*/reports"
@@ -283,6 +292,19 @@ application:
 google:
   maps:
     api-key: ${GOOGLE_API_KEY}
+
+# AI service (FastAPI) — used by the WebClient that relays chat SSE.
+ai:
+  base-url: "${AI_SERVICE_BASE_URL:http://localhost:8000}"
+  internal-api-key: "${INTERNAL_AI_API_KEY:}"
+
+# Per-user rate limit for the chat SSE endpoint (each call costs LLM tokens).
+# Caddy already caps /v1/* at 120/min/IP; this is a tighter per-identity cap.
+chat:
+  rate-limit:
+    max-per-window: ${CHAT_RATE_LIMIT_MAX:20}
+    window-seconds: ${CHAT_RATE_LIMIT_WINDOW_SECONDS:60}
+
 feign:
   client:
     config:
@@ -475,10 +497,13 @@ otp:
       account-sid: ${TWILIO_ACCOUNT_SID:}
 
 # AI Service Configuration
-smarrent:
+smartrent:
   ai:
     verification:
       enabled: ${AI_VERIFICATION_ENABLED:true}
+      scheduler:
+        enabled: ${AI_SCHEDULER_ENABLED:true}
+        delay: ${AI_SCHEDULER_DELAY_MS:300000}
       url: ${AI_VERIFICATION_URL:http://localhost:8000/ai/verify-listing}
       timeout-seconds: ${AI_VERIFICATION_TIMEOUT:90}
       max-retry-attempts: ${AI_VERIFICATION_MAX_RETRY:3}

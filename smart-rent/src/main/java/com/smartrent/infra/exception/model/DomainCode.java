@@ -22,6 +22,8 @@ public enum DomainCode {
   PASSWORD_SAME("2008", HttpStatus.BAD_REQUEST, "The same password"),
   INVALID_PAGE("2009", HttpStatus.BAD_REQUEST, "Invalid page"),
   INVALID_PAGE_SIZE("2010", HttpStatus.BAD_REQUEST, "Invalid page size"),
+  INVALID_DISTRICT_CODE("2011", HttpStatus.BAD_REQUEST, "Unknown district code '%s'. Provide a valid GSO district code."),
+  INVALID_PROVINCE_CODE("2012", HttpStatus.BAD_REQUEST, "Unknown province code '%s'. Provide a valid province code."),
   //    Existing Error 3xxx
   EMAIL_EXISTING("3001", HttpStatus.CONFLICT, "Email already exists"),
   PHONE_EXISTING("3002", HttpStatus.CONFLICT, "Phone already exists"),

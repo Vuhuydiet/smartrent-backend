@@ -3,7 +3,9 @@ package com.smartrent.controller;
 import com.smartrent.dto.request.ChatRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.ChatResponse;
+import com.smartrent.service.ai.ChatRateLimitService;
 import com.smartrent.service.ai.ChatService;
+import com.smartrent.service.ai.ChatStreamService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -12,12 +14,17 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Flux;
 
 @RestController
 @RequestMapping("/v1/ai/chat")
@@ -26,6 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChatController {
 
   private final ChatService chatService;
+  private final ChatStreamService chatStreamService;
+  private final ChatRateLimitService chatRateLimitService;
 
   @PostMapping
   @Operation(
@@ -139,5 +148,33 @@ public class ChatController {
     }
     ChatResponse response = chatService.processChat(request);
     return ApiResponse.<ChatResponse>builder().data(response).build();
+  }
+
+  @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+  @Operation(
+      summary = "Chat streaming (SSE) — biến thể streaming của /v1/ai/chat",
+      description = "Relay Server-Sent Events từ AI service. Yêu cầu đăng nhập; "
+          + "user_id + JWT được inject từ phiên xác thực, có rate limit theo người dùng.")
+  public Flux<ServerSentEvent<String>> chatStream(
+      @Valid @RequestBody ChatRequest request,
+      HttpServletRequest httpRequest) {
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    String identity = (auth != null && auth.isAuthenticated()
+        && !"anonymousUser".equals(auth.getName()))
+        ? auth.getName()
+        : httpRequest.getRemoteAddr();
+
+    if (!chatRateLimitService.tryConsume(identity)) {
+      throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Chat rate limit exceeded");
+    }
+
+    if (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName())) {
+      request.setUser_id(auth.getName());
+      String authHeader = httpRequest.getHeader("Authorization");
+      if (authHeader != null && authHeader.startsWith("Bearer ")) {
+        request.setAuth_token(authHeader.substring(7));
+      }
+    }
+    return chatStreamService.streamChat(request);
   }
 }

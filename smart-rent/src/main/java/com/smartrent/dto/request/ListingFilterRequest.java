@@ -2,6 +2,8 @@ package com.smartrent.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -87,8 +89,16 @@ public class ListingFilterRequest {
     @Schema(hidden = true)
     List<String> resolvedNewProvinceCodes; // Populated by service layer when legacy provinceId is sent — NOT from API
 
-    @Schema(description = "District ID (OLD structure)", example = "5")
+    @Schema(description = "District ID (OLD structure) — the legacy_districts surrogate PK, "
+            + "NOT the GSO administrative code. Emitted by the FE district dropdown.", example = "5")
     Integer districtId;
+
+    @Schema(description = """
+            District GSO administrative code (e.g. '760' = Quận 1, '765' = Bình Thạnh).
+            Use this when you only know the official district code, not the internal
+            legacy_districts PK. The service resolves it to districtId before filtering.
+            """, example = "760")
+    String districtCode;
 
     @JsonIgnore
     @Schema(hidden = true)
@@ -292,10 +302,13 @@ public class ListingFilterRequest {
 
     // ============ PAGINATION & SORTING ============
     @Schema(description = "Page number (one-based)", example = "1", defaultValue = "1")
+    @Min(value = 1, message = "page must be >= 1")
     @Builder.Default
     Integer page = 1;
 
     @Schema(description = "Page size (max 100)", example = "20", defaultValue = "20")
+    @Min(value = 1, message = "size must be >= 1")
+    @Max(value = 100, message = "size must be <= 100")
     @Builder.Default
     Integer size = 20;
 

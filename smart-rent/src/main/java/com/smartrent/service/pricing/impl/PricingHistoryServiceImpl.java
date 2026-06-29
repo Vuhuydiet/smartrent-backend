@@ -3,6 +3,8 @@ package com.smartrent.service.pricing.impl;
 import com.smartrent.dto.request.PriceUpdateRequest;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PricingHistoryResponse;
+import com.smartrent.infra.exception.AppException;
+import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.PricingHistoryRepository;
 import com.smartrent.infra.repository.entity.Listing;
@@ -133,6 +135,13 @@ public class PricingHistoryServiceImpl implements PricingHistoryService {
 
         Listing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> new RuntimeException("Listing not found with id: " + listingId));
+
+        // Ownership guard: only the listing owner may change its price. The AI
+        // update_listing_price tool relies on the backend enforcing this (it
+        // maps a 403 to "Bạn không có quyền sửa tin này").
+        if (!listing.getUserId().equals(changedBy)) {
+            throw new AppException(DomainCode.UNAUTHORIZED);
+        }
 
         // Get current price
         PricingHistory currentPricing = pricingHistoryRepository.findByListingListingIdAndIsCurrentTrue(listingId)
