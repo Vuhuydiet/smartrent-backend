@@ -606,6 +606,58 @@ public class MembershipController {
                 .build();
     }
 
+    @PostMapping("/initiate-renewal")
+    @Operation(
+        summary = "Initiate membership renewal",
+        description = "Renew the current membership package (same tier, +1 month). " +
+            "Allowed when: membership is ACTIVE with ≤7 days remaining, " +
+            "OR membership EXPIRED within the last 7 days. " +
+            "Returns a SePay payment URL. Backend webhook completes the renewal automatically.",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = false,
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    name = "Renewal Request",
+                    value = "{\"paymentProvider\": \"SEPAY\"}"
+                )
+            )
+        ),
+        responses = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "200",
+                description = "Payment URL generated successfully",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = PaymentResponse.class)
+                )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                responseCode = "400",
+                description = "Not eligible for renewal (code 14008)",
+                content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                        value = "{\"code\": \"14008\", \"message\": \"Membership renewal is not allowed...\"}"
+                    )
+                )
+            )
+        }
+    )
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+    public ApiResponse<PaymentResponse> initiateRenewal(
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
+        String paymentProvider = body != null ? body.get("paymentProvider") : null;
+        log.info("User {} initiating membership renewal, provider: {}", userId, paymentProvider);
+        PaymentResponse response = membershipService.initiateRenewal(userId, paymentProvider);
+        return ApiResponse.<PaymentResponse>builder()
+                .data(response)
+                .build();
+    }
+
     @PostMapping("/initiate-upgrade")
     @Operation(
         summary = "Initiate membership upgrade",

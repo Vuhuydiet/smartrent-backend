@@ -1094,6 +1094,132 @@ public class MembershipServiceImpl implements MembershipService {
      * Calculate the monetary value of a benefit based on type and quantity
      * Uses standard pricing from PricingConstants
      */
+    // =====================================================
+    // MEMBERSHIP RENEWAL METHODS
+    // =====================================================
+
+    @Override
+    @Transactional
+    public PaymentResponse initiateRenewal(String userId, String paymentProvider) {
+        log.info("Initiating membership renewal for user: {}", userId);
+
+        userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime sevenDaysAgo = now.minusDays(7);
+
+        // Find active membership (within 7 days remaining) OR recently expired (within 7 days)
+        Optional<UserMembership> activeMembershipOpt = userMembershipRepository
+                .findActiveUserMembership(userId, now);
+
+        UserMembership membershipToRenew;
+
+        if (activeMembershipOpt.isPresent()) {
+            UserMembership active = activeMembershipOpt.get();
+            if (active.getDaysRemaining() > 7) {
+                log.warn("User {} tried to renew but still has {} days remaining", userId, active.getDaysRemaining());
+                throw new AppException(DomainCode.CANNOT_RENEW_MEMBERSHIP);
+            }
+            membershipToRenew = active;
+        } else {
+            // Try to find a membership that expired within the last 7 days
+            membershipToRenew = userMembershipRepository
+                    .findMostRecentExpiredMembership(userId, sevenDaysAgo)
+                    .orElseThrow(() -> new AppException(DomainCode.CANNOT_RENEW_MEMBERSHIP));
+        }
+
+        MembershipPackage pkg = membershipToRenew.getMembershipPackage();
+        if (!pkg.getIsActive()) {
+            throw new RuntimeException("Membership package is no longer active. Please contact support.");
+        }
+
+        String provider = paymentProvider != null ? paymentProvider : "SEPAY";
+        String transactionId = transactionService.createMembershipRenewalTransaction(
+                userId,
+                pkg.getMembershipId(),
+                membershipToRenew.getUserMembershipId(),
+                pkg.getSalePrice(),
+                provider
+        );
+
+        PaymentRequest paymentRequest = PaymentRequest.builder()
+                .transactionId(transactionId)
+                .provider(PaymentProvider.valueOf(provider))
+                .amount(pkg.getSalePrice())
+                .currency(PricingConstants.DEFAULT_CURRENCY)
+                .orderInfo("SmartRent Membership Renewal " + pkg.getPackageName())
+                .build();
+
+        PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
+        log.info("Renewal payment URL generated for transaction: {}", transactionId);
+        return paymentResponse;
+    }
+
+    @Override
+    @Transactional
+    public UserMembershipResponse completeMembershipRenewal(String transactionId) {
+        log.info("Completing membership renewal for transaction: {}", transactionId);
+
+        Transaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new RuntimeException("Transaction not found: " + transactionId));
+
+        if (!transaction.isCompleted()) {
+            throw new RuntimeException("Transaction is not completed: " + transactionId);
+        }
+
+        if (!transaction.isMembershipRenewal()) {
+            throw new RuntimeException("Transaction is not a membership renewal: " + transactionId);
+        }
+
+        Long membershipPackageId;
+        try {
+            membershipPackageId = Long.parseLong(transaction.getReferenceId());
+        } catch (NumberFormatException e) {
+            throw new RuntimeException("Invalid membership ID in transaction: " + transaction.getReferenceId(), e);
+        }
+
+        MembershipPackage pkg = membershipPackageRepository.findById(membershipPackageId)
+                .orElseThrow(MembershipPackageNotFoundException::new);
+
+        // Determine new startDate: continue from old endDate if not yet expired, else start from now
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime newStartDate = now;
+
+        Long previousUserMembershipId = transaction.getPreviousMembershipId();
+        if (previousUserMembershipId != null) {
+            Optional<UserMembership> previousMembershipOpt = userMembershipRepository.findById(previousUserMembershipId);
+            if (previousMembershipOpt.isPresent()) {
+                UserMembership previousMembership = previousMembershipOpt.get();
+                // If previous membership hasn't expired yet, start renewal from its endDate (no gap)
+                if (previousMembership.getEndDate().isAfter(now)) {
+                    newStartDate = previousMembership.getEndDate();
+                }
+            }
+        }
+
+        LocalDateTime newEndDate = newStartDate.plusMonths(pkg.getDurationMonths());
+        int durationDays = pkg.getDurationMonths() * 30;
+
+        UserMembership renewedMembership = UserMembership.builder()
+                .userId(transaction.getUserId())
+                .membershipPackage(pkg)
+                .startDate(newStartDate)
+                .endDate(newEndDate)
+                .durationDays(durationDays)
+                .status(MembershipStatus.ACTIVE)
+                .totalPaid(transaction.getAmount())
+                .build();
+
+        renewedMembership = userMembershipRepository.save(renewedMembership);
+
+        List<UserMembershipBenefit> benefits = grantBenefits(renewedMembership, pkg);
+        userBenefitRepository.saveAll(benefits);
+
+        log.info("Membership renewed for user: {}, new membership: {}", transaction.getUserId(), renewedMembership.getUserMembershipId());
+        return mapToUserMembershipResponse(renewedMembership);
+    }
+
     private BigDecimal calculateBenefitValue(BenefitType benefitType, int quantity) {
         if (quantity <= 0) {
             return BigDecimal.ZERO;

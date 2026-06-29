@@ -34,6 +34,13 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
     @Query("SELECT COUNT(um) > 0 FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.endDate > :now")
     boolean hasActiveMembership(@Param("userId") String userId, @Param("now") LocalDateTime now);
 
+    /**
+     * Find the most recently expired membership for renewal eligibility check.
+     * Returns a membership that expired after the given cutoff (now - 7 days).
+     */
+    @Query("SELECT um FROM user_memberships um WHERE um.userId = :userId AND um.status = 'EXPIRED' AND um.endDate > :cutoff ORDER BY um.endDate DESC")
+    Optional<UserMembership> findMostRecentExpiredMembership(@Param("userId") String userId, @Param("cutoff") LocalDateTime cutoff);
+
     // ─── Admin Dashboard: Membership Distribution ───
 
     @Query(value = "SELECT mp.package_level, mp.package_name, COUNT(um.user_membership_id) AS member_count " +

@@ -127,5 +127,28 @@ public interface MembershipService {
      * @return List of packages available for upgrade with preview info
      */
     List<MembershipUpgradePreviewResponse> getAvailableUpgrades(String userId);
+
+    // =====================================================
+    // MEMBERSHIP RENEWAL METHODS
+    // =====================================================
+
+    /**
+     * Initiate membership renewal for the same package.
+     * Allowed when: membership is ACTIVE with <=7 days remaining,
+     * OR membership EXPIRED within the last 7 days.
+     * @param userId The requesting user
+     * @param paymentProvider Payment provider (default SEPAY)
+     * @return PaymentResponse with payment URL
+     */
+    PaymentResponse initiateRenewal(String userId, String paymentProvider);
+
+    /**
+     * Complete membership renewal after successful payment.
+     * Creates a new membership starting from the old endDate (if not yet expired)
+     * or from now (if already expired). Called from payment callback handler.
+     * @param transactionId The completed transaction ID
+     * @return The new user membership
+     */
+    UserMembershipResponse completeMembershipRenewal(String transactionId);
 }
 
