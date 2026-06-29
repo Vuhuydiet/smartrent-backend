@@ -152,7 +152,7 @@ public class ListingSearchController {
         }
     )
     public ApiResponse<ListingCardListResponse> searchListings(
-            @RequestBody(required = false) ListingFilterRequest filter,
+            @Valid @RequestBody(required = false) ListingFilterRequest filter,
             Authentication authentication) {
 
         if (filter == null) {

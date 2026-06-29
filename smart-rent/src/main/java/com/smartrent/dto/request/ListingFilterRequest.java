@@ -2,6 +2,8 @@ package com.smartrent.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -300,10 +302,13 @@ public class ListingFilterRequest {
 
     // ============ PAGINATION & SORTING ============
     @Schema(description = "Page number (one-based)", example = "1", defaultValue = "1")
+    @Min(value = 1, message = "page must be >= 1")
     @Builder.Default
     Integer page = 1;
 
     @Schema(description = "Page size (max 100)", example = "20", defaultValue = "20")
+    @Min(value = 1, message = "size must be >= 1")
+    @Max(value = 100, message = "size must be <= 100")
     @Builder.Default
     Integer size = 20;
 
