@@ -18,6 +18,7 @@ import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.ListingAiModeration;
 import com.smartrent.infra.repository.entity.enums.VerificationStatus;
 import com.smartrent.service.ai.AiListingVerificationService;
+import com.smartrent.service.ai.AiModerationExecutor;
 import com.smartrent.service.ai.AiModerationProcessorService;
 import com.smartrent.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +44,7 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
     private final NotificationService notificationService;
     private final SmartRentAiConnector smartRentAiConnector;
     private final ObjectMapper objectMapper;
+    private final AiModerationExecutor aiModerationExecutor;
 
     /**
      * Processes a single listing in its own independent transaction.
@@ -71,7 +74,19 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
 
             AiListingVerificationRequest request =
                     aiVerificationService.buildVerificationRequest(listing.getListingId());
-            AiListingVerificationResponse response = aiVerificationService.verifyListing(request);
+
+            // Verify and duplicate-check are independent — run them concurrently.
+            CompletableFuture<AiListingVerificationResponse> verifyFuture =
+                    CompletableFuture.supplyAsync(
+                            () -> aiVerificationService.verifyListing(request),
+                            aiModerationExecutor.taskPool());
+            CompletableFuture<DuplicateCheckResponse> duplicateFuture =
+                    CompletableFuture.supplyAsync(
+                            () -> runDuplicateCheck(listing, request),
+                            aiModerationExecutor.taskPool());
+
+            AiListingVerificationResponse response = verifyFuture.join();
+            DuplicateCheckResponse duplicateResult = duplicateFuture.join();
 
             moderation.setAiScore(response.getScore());
 
@@ -95,10 +110,6 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
                 // Keep isVerify=true so owner can see it as IN_REVIEW
                 listing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
             }
-
-            // Duplicate detection — flag-for-admin, never hard-block. Best-effort:
-            // any failure or AI downtime leaves the verification decision untouched.
-            DuplicateCheckResponse duplicateResult = runDuplicateCheck(listing, request);
             if (duplicateResult != null
                     && ("DUPLICATE".equals(duplicateResult.getDecision())
                         || "SUSPICIOUS".equals(duplicateResult.getDecision()))) {
