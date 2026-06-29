@@ -1049,15 +1049,22 @@ public class MembershipServiceImpl implements MembershipService {
         userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
-        // Accept active memberships OR memberships that expired within the last 7 days
-        LocalDateTime renewalCutoff = LocalDateTime.now().minusDays(7);
+        // Prefer the current ACTIVE membership; only fall back to recently expired (≤7 days)
+        // when no active membership exists. This prevents charging for a wrong/old package
+        // when the user has an expired membership with a far-future endDate alongside a new
+        // active one with a closer endDate.
+        LocalDateTime now = LocalDateTime.now();
         UserMembership currentMembership = userMembershipRepository
-                .findByUserIdOrderByEndDateDesc(userId)
-                .stream()
-                .filter(um -> um.isActive()
-                        || (um.isExpired() && um.getEndDate().isAfter(renewalCutoff)))
-                .findFirst()
-                .orElseThrow(() -> new AppException(DomainCode.NO_RENEWABLE_MEMBERSHIP));
+                .findActiveUserMembership(userId, now)
+                .orElseGet(() -> {
+                    LocalDateTime renewalCutoff = now.minusDays(7);
+                    return userMembershipRepository
+                            .findByUserIdOrderByEndDateDesc(userId)
+                            .stream()
+                            .filter(um -> um.isExpired() && um.getEndDate().isAfter(renewalCutoff))
+                            .findFirst()
+                            .orElseThrow(() -> new AppException(DomainCode.NO_RENEWABLE_MEMBERSHIP));
+                });
 
         MembershipPackage pkg = currentMembership.getMembershipPackage();
         if (!pkg.getIsActive()) {
