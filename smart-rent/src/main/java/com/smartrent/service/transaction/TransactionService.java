@@ -39,6 +39,19 @@ public interface TransactionService {
                                                BigDecimal amount, BigDecimal discountAmount, String paymentProvider);
 
     /**
+     * Create a membership renewal transaction (same package, extended period).
+     *
+     * @param userId User ID
+     * @param membershipId The package being renewed
+     * @param currentUserMembershipId The existing UserMembership being renewed (stored as previousMembershipId)
+     * @param amount Payment amount (full package price)
+     * @param paymentProvider Payment provider
+     * @return Transaction ID
+     */
+    String createMembershipRenewalTransaction(String userId, Long membershipId, Long currentUserMembershipId,
+                                              BigDecimal amount, String paymentProvider);
+
+    /**
      * Create a post fee transaction (pay-per-post)
      *
      * @param userId User ID

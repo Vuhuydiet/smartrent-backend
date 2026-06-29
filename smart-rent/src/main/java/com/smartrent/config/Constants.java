@@ -94,4 +94,6 @@ public class Constants {
   public static final String EMAIL_VERIFICATION_HEADER = "Xác minh Email";
 
   public static final String EMAIL_EXPIRING_LISTING_HEADER = "Tin đăng sắp hết hạn";
+
+  public static final String EMAIL_EXPIRING_MEMBERSHIP_HEADER = "Gói thành viên sắp hết hạn";
 }

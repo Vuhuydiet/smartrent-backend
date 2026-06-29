@@ -4,6 +4,7 @@ import com.smartrent.constants.PricingConstants;
 import com.smartrent.dto.request.MembershipPackageCreateRequest;
 import com.smartrent.dto.request.MembershipPackageUpdateRequest;
 import com.smartrent.dto.request.MembershipPurchaseRequest;
+import com.smartrent.dto.request.MembershipRenewalRequest;
 import com.smartrent.dto.request.MembershipUpgradeRequest;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.response.*;
@@ -1033,6 +1034,107 @@ public class MembershipServiceImpl implements MembershipService {
 
         log.info("Found {} available upgrades for user {}", upgrades.size(), userId);
         return upgrades;
+    }
+
+    // =====================================================
+    // MEMBERSHIP RENEWAL METHODS
+    // =====================================================
+
+    @Override
+    @Transactional
+    public PaymentResponse initiateMembershipRenewal(String userId, MembershipRenewalRequest request) {
+        log.info("Initiating membership renewal for user: {}", userId);
+
+        userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        // Accept active memberships OR memberships that expired within the last 7 days
+        LocalDateTime renewalCutoff = LocalDateTime.now().minusDays(7);
+        UserMembership currentMembership = userMembershipRepository
+                .findByUserIdOrderByEndDateDesc(userId)
+                .stream()
+                .filter(um -> um.isActive()
+                        || (um.isExpired() && um.getEndDate().isAfter(renewalCutoff)))
+                .findFirst()
+                .orElseThrow(() -> new AppException(DomainCode.NO_RENEWABLE_MEMBERSHIP));
+
+        MembershipPackage pkg = currentMembership.getMembershipPackage();
+        if (!pkg.getIsActive()) {
+            throw new RuntimeException("Membership package is no longer active: " + pkg.getPackageName());
+        }
+
+        String provider = request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY";
+        String transactionId = transactionService.createMembershipRenewalTransaction(
+                userId,
+                pkg.getMembershipId(),
+                currentMembership.getUserMembershipId(),
+                pkg.getSalePrice(),
+                provider);
+
+        PaymentRequest paymentRequest = PaymentRequest.builder()
+                .transactionId(transactionId)
+                .provider(PaymentProvider.valueOf(provider))
+                .amount(pkg.getSalePrice())
+                .currency(PricingConstants.DEFAULT_CURRENCY)
+                .orderInfo("SmartRent Membership Renewal " + pkg.getPackageName())
+                .build();
+
+        PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
+        log.info("Renewal payment URL generated for transaction: {}", transactionId);
+        return paymentResponse;
+    }
+
+    @Override
+    @Transactional
+    public UserMembershipResponse completeMembershipRenewal(String transactionId) {
+        log.info("Completing membership renewal for transaction: {}", transactionId);
+
+        Transaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new RuntimeException("Transaction not found: " + transactionId));
+
+        if (!transaction.isCompleted()) {
+            throw new RuntimeException("Transaction is not completed: " + transactionId);
+        }
+
+        if (!transaction.isMembershipRenewal()) {
+            throw new RuntimeException("Transaction is not a membership renewal: " + transactionId);
+        }
+
+        Long membershipId = Long.parseLong(transaction.getReferenceId());
+        MembershipPackage pkg = membershipPackageRepository.findById(membershipId)
+                .orElseThrow(MembershipPackageNotFoundException::new);
+
+        Long previousMembershipId = transaction.getPreviousMembershipId();
+        UserMembership previous = previousMembershipId != null
+                ? userMembershipRepository.findById(previousMembershipId).orElse(null)
+                : null;
+
+        // Chain from previous endDate if it hasn't expired yet; otherwise start from now
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startDate = (previous != null && previous.getEndDate().isAfter(now))
+                ? previous.getEndDate()
+                : now;
+        LocalDateTime endDate = startDate.plusMonths(pkg.getDurationMonths());
+        int durationDays = pkg.getDurationMonths() * 30;
+
+        UserMembership renewed = UserMembership.builder()
+                .userId(transaction.getUserId())
+                .membershipPackage(pkg)
+                .startDate(startDate)
+                .endDate(endDate)
+                .durationDays(durationDays)
+                .status(MembershipStatus.ACTIVE)
+                .totalPaid(transaction.getAmount())
+                .build();
+
+        renewed = userMembershipRepository.save(renewed);
+
+        List<UserMembershipBenefit> benefits = grantBenefits(renewed, pkg);
+        userBenefitRepository.saveAll(benefits);
+
+        log.info("Membership renewal completed for user: {}, new membership: {} (start={}, end={})",
+                transaction.getUserId(), renewed.getUserMembershipId(), startDate, endDate);
+        return mapToUserMembershipResponse(renewed);
     }
 
     // =====================================================

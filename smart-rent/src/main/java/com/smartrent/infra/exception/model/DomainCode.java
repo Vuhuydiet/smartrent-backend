@@ -114,6 +114,7 @@ public enum DomainCode {
   MEMBERSHIP_UPGRADE_FAILED("14005", HttpStatus.INTERNAL_SERVER_ERROR, "Membership upgrade failed: %s"),
   INVALID_UPGRADE_TARGET("14006", HttpStatus.BAD_REQUEST, "Invalid upgrade target: %s"),
   ALREADY_HAS_ACTIVE_MEMBERSHIP("14007", HttpStatus.BAD_REQUEST, "You already have an active membership. Please use the upgrade feature to switch to a higher tier package."),
+  NO_RENEWABLE_MEMBERSHIP("14008", HttpStatus.BAD_REQUEST, "No active or recently expired membership found. Please purchase a membership first."),
   //    News Error 15xxx
   NEWS_NOT_FOUND("15001", HttpStatus.NOT_FOUND, "News not found"),
   NEWS_SLUG_ALREADY_EXISTS("15002", HttpStatus.CONFLICT, "News slug already exists"),

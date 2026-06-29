@@ -816,6 +816,10 @@ public class PaymentController {
                     log.info("Completing membership upgrade for transaction: {}", transactionRef);
                     membershipService.completeMembershipUpgrade(transactionRef);
                 }
+                case MEMBERSHIP_RENEWAL -> {
+                    log.info("Completing membership renewal for transaction: {}", transactionRef);
+                    membershipService.completeMembershipRenewal(transactionRef);
+                }
                 case POST_FEE -> {
                     log.info("Completing listing creation (NORMAL or VIP) for transaction: {}", transactionRef);
                     listingService.completeListingCreationAfterPayment(transactionRef);
