@@ -42,6 +42,10 @@ public class MembershipUpgradePreviewResponse {
     List<ForfeitedBenefitInfo> forfeitedBenefits;
     List<MembershipPackageBenefitResponse> newBenefits;
 
+    // "CURRENT" = upgrading the active slot immediately (Case B)
+    // "QUEUED"  = upgrading the queued slot, active slot unchanged (Case A)
+    String upgradeContext;
+
     // Upgrade eligibility
     Boolean eligible;
     String ineligibilityReason;

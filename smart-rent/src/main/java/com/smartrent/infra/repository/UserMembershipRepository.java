@@ -19,17 +19,19 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
 
     List<UserMembership> findByUserIdAndStatus(String userId, MembershipStatus status);
 
-    @Query("SELECT um FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.endDate > :now ORDER BY um.endDate DESC")
+    // Returns the membership the user is actively using right now (startDate in the past, not yet expired).
+    @Query("SELECT um FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.startDate <= :now AND um.endDate > :now ORDER BY um.endDate DESC")
     Optional<UserMembership> findActiveUserMembership(@Param("userId") String userId, @Param("now") LocalDateTime now);
 
-    @Query("SELECT um FROM user_memberships um WHERE um.status = 'ACTIVE' AND um.endDate <= :now")
-    List<UserMembership> findExpiredMemberships(@Param("now") LocalDateTime now);
+    // Returns the next queued membership (startDate in the future, still ACTIVE status).
+    @Query("SELECT um FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.startDate > :now ORDER BY um.startDate ASC")
+    Optional<UserMembership> findQueuedMembership(@Param("userId") String userId, @Param("now") LocalDateTime now);
 
-    @Modifying
-    @Query("UPDATE user_memberships um SET um.status = 'EXPIRED' WHERE um.status = 'ACTIVE' AND um.endDate <= :now")
-    int expireOldMemberships(@Param("now") LocalDateTime now);
+    // Returns current (non-queued) ACTIVE memberships whose endDate has passed — used by the lifecycle job.
+    @Query("SELECT um FROM user_memberships um JOIN FETCH um.membershipPackage WHERE um.status = 'ACTIVE' AND um.startDate <= :now AND um.endDate <= :now ORDER BY um.endDate ASC")
+    List<UserMembership> findExpiredActiveMemberships(@Param("now") LocalDateTime now);
 
-    @Query("SELECT um FROM user_memberships um JOIN FETCH um.membershipPackage WHERE um.status = 'ACTIVE' AND um.endDate BETWEEN :start AND :end")
+    @Query("SELECT um FROM user_memberships um JOIN FETCH um.membershipPackage WHERE um.status = 'ACTIVE' AND um.startDate <= :start AND um.endDate BETWEEN :start AND :end")
     List<UserMembership> findExpiringBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("SELECT um FROM user_memberships um JOIN FETCH um.membershipPackage WHERE um.userId = :userId ORDER BY um.endDate DESC")
@@ -37,6 +39,8 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
 
     boolean existsByUserIdAndStatus(String userId, MembershipStatus status);
 
+    // Returns true when the user has ANY non-expired ACTIVE slot (current or queued).
+    // Used as purchase guard — prevents buying a new membership when one already exists.
     @Query("SELECT COUNT(um) > 0 FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.endDate > :now")
     boolean hasActiveMembership(@Param("userId") String userId, @Param("now") LocalDateTime now);
 
@@ -45,7 +49,7 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
     @Query(value = "SELECT mp.package_level, mp.package_name, COUNT(um.user_membership_id) AS member_count " +
             "FROM user_memberships um " +
             "JOIN membership_packages mp ON um.membership_id = mp.membership_id " +
-            "WHERE um.status = 'ACTIVE' AND um.end_date > :now " +
+            "WHERE um.status = 'ACTIVE' AND um.start_date <= :now AND um.end_date > :now " +
             "GROUP BY mp.package_level, mp.package_name " +
             "ORDER BY member_count DESC", nativeQuery = true)
     List<Object[]> countActiveGroupedByPackageLevel(@Param("now") LocalDateTime now);

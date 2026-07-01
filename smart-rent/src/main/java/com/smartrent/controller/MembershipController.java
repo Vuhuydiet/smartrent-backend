@@ -331,32 +331,27 @@ public class MembershipController {
 
     @GetMapping("/my-membership")
     @Operation(
-        summary = "Get current active membership",
-        description = "Returns the user's current active membership with all benefits and quotas",
+        summary = "Get current and queued memberships",
+        description = "Returns the user's current (active, usable now) and queued (starts when current expires) memberships. Either field may be null.",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                 responseCode = "200",
-                description = "Successfully retrieved membership",
+                description = "Successfully retrieved memberships",
                 content = @Content(
                     mediaType = "application/json",
-                    schema = @Schema(implementation = UserMembershipResponse.class)
+                    schema = @Schema(implementation = MyMembershipResponse.class)
                 )
-            ),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(
-                responseCode = "404",
-                description = "No active membership found"
             )
         }
     )
     @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
-    public ApiResponse<UserMembershipResponse> getMyMembership() {
-        // Extract user ID from JWT token
+    public ApiResponse<MyMembershipResponse> getMyMembership() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userId = authentication.getName();
 
-        log.info("Getting active membership for user: {}", userId);
-        UserMembershipResponse response = membershipService.getActiveMembership(userId);
-        return ApiResponse.<UserMembershipResponse>builder()
+        log.info("Getting membership slots for user: {}", userId);
+        MyMembershipResponse response = membershipService.getMyMembership(userId);
+        return ApiResponse.<MyMembershipResponse>builder()
                 .data(response)
                 .build();
     }

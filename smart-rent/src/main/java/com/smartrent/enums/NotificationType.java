@@ -26,5 +26,6 @@ public enum NotificationType {
     NEW_LISTING_FROM_FOLLOWED_USER, // follower is notified when a followed user publishes a new listing
 
     // Membership lifecycle
-    MEMBERSHIP_EXPIRING             // member is notified at D-7 / D-3 before membership expiry
+    MEMBERSHIP_EXPIRING,            // member is notified at D-7 / D-3 before membership expiry
+    MEMBERSHIP_ACTIVATED            // member is notified when their queued membership activates
 }
