@@ -106,6 +106,16 @@ public class AdminMembershipController {
                                 .build();
         }
 
+        @DeleteMapping("/users/{userId}")
+        @ResponseStatus(HttpStatus.NO_CONTENT)
+        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+        @Operation(summary = "Clear user active memberships (Admin)", description = "Expires all ACTIVE membership records for a user. Use this to fix duplicate-active-membership issues.")
+        public void clearUserMembership(
+                        @Parameter(description = "User ID", required = true) @PathVariable String userId) {
+                log.info("Admin clearing memberships for user: {}", userId);
+                membershipService.adminClearUserMembership(userId);
+        }
+
         @DeleteMapping("/packages/{membershipId}")
         @ResponseStatus(HttpStatus.NO_CONTENT)
         @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")

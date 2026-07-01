@@ -13,6 +13,8 @@ public enum NotificationType {
     LISTING_REVISION_REQUIRED,
     LISTING_SUSPENDED,
     LISTING_RESUBMITTED,
+    LISTING_PENDING_REVIEW,          // owner notified when listing is routed to manual review (e.g. duplicate detected)
+    LISTING_DUPLICATE_DETECTED,      // admins notified when AI flags a listing as duplicate/suspicious
 
     // Broker-related
     BROKER_REGISTRATION_RECEIVED,   // admins are notified when a user submits registration

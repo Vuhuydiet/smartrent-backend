@@ -26,6 +26,7 @@ public class UserMembershipResponse {
     Long daysRemaining;
     String status;
     BigDecimal totalPaid;
+    BigDecimal packageSalePrice;
     List<UserMembershipBenefitResponse> benefits;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;

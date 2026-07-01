@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -21,5 +22,6 @@ public class NotificationResponse {
     Long referenceId;
     String referenceType;
     Boolean isRead;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'", timezone = "UTC")
     LocalDateTime createdAt;
 }
