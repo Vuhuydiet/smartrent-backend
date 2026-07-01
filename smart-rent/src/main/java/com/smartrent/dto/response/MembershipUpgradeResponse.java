@@ -19,6 +19,13 @@ import java.util.Map;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class MembershipUpgradeResponse {
 
+    // "CURRENT" = immediate upgrade of active slot (Case B)
+    // "QUEUED"  = upgrade of queued slot, active slot unchanged (Case A)
+    String upgradeContext;
+
+    // When the upgraded tier will activate — non-null only for QUEUED context
+    LocalDateTime activationDate;
+
     // Transaction info
     String transactionRef;
     String paymentUrl;

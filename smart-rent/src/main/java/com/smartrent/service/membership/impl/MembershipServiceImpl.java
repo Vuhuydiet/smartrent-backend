@@ -8,6 +8,7 @@ import com.smartrent.dto.request.MembershipRenewalRequest;
 import com.smartrent.dto.request.MembershipUpgradeRequest;
 import com.smartrent.dto.request.PaymentRequest;
 import com.smartrent.dto.response.*;
+import com.smartrent.dto.response.MyMembershipResponse;
 import com.smartrent.enums.*;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.MembershipPackageExistingException;
@@ -425,6 +426,19 @@ public class MembershipServiceImpl implements MembershipService {
 
     @Override
     @Transactional(readOnly = true)
+    public MyMembershipResponse getMyMembership(String userId) {
+        log.info("Getting membership slots for user: {}", userId);
+        LocalDateTime now = LocalDateTime.now();
+        UserMembership current = userMembershipRepository.findActiveUserMembership(userId, now).orElse(null);
+        UserMembership queued  = userMembershipRepository.findQueuedMembership(userId, now).orElse(null);
+        return MyMembershipResponse.builder()
+                .current(current != null ? mapToUserMembershipResponse(current) : null)
+                .queued(queued  != null ? mapToUserMembershipResponse(queued)  : null)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public UserMembershipResponse getActiveMembership(String userId) {
         log.info("Getting active membership for user: {}", userId);
         UserMembership userMembership = userMembershipRepository
@@ -471,11 +485,40 @@ public class MembershipServiceImpl implements MembershipService {
     @Override
     @Transactional
     public int expireOldMemberships() {
-        log.info("Expiring old memberships");
-        int expiredCount = userMembershipRepository.expireOldMemberships(LocalDateTime.now());
-        int expiredBenefitsCount = userBenefitRepository.expireOldBenefits(LocalDateTime.now());
-        log.info("Expired {} memberships and {} benefits", expiredCount, expiredBenefitsCount);
-        return expiredCount;
+        LocalDateTime now = LocalDateTime.now();
+        log.info("Running membership lifecycle job at {}", now);
+
+        List<UserMembership> toExpire = userMembershipRepository.findExpiredActiveMemberships(now);
+        for (UserMembership membership : toExpire) {
+            membership.setStatus(MembershipStatus.EXPIRED);
+            userMembershipRepository.save(membership);
+
+            List<UserMembershipBenefit> benefits = userBenefitRepository
+                    .findByUserMembershipUserMembershipId(membership.getUserMembershipId());
+            benefits.forEach(UserMembershipBenefit::expire);
+            userBenefitRepository.saveAll(benefits);
+
+            // After expiring the old slot, the queued slot (if any) is now the current one.
+            // findActiveUserMembership uses startDate <= now, so the queued slot (whose
+            // startDate == expired slot's endDate == now) is returned here.
+            userMembershipRepository.findActiveUserMembership(membership.getUserId(), now)
+                    .ifPresent(nowCurrent -> {
+                        boolean alreadyGranted = !userBenefitRepository
+                                .findByUserMembershipUserMembershipId(nowCurrent.getUserMembershipId())
+                                .isEmpty();
+                        if (!alreadyGranted) {
+                            List<UserMembershipBenefit> newBenefits =
+                                    grantBenefits(nowCurrent, nowCurrent.getMembershipPackage());
+                            userBenefitRepository.saveAll(newBenefits);
+                            log.info("Granted benefits to newly-current membership {} for user {}",
+                                    nowCurrent.getUserMembershipId(), nowCurrent.getUserId());
+                        }
+                    });
+        }
+
+        userBenefitRepository.expireOldBenefits(now);
+        log.info("Lifecycle job done: expired {} memberships", toExpire.size());
+        return toExpire.size();
     }
 
     @Override
@@ -629,7 +672,6 @@ public class MembershipServiceImpl implements MembershipService {
                 .daysRemaining(userMembership.getDaysRemaining())
                 .status(userMembership.getStatus().name())
                 .totalPaid(userMembership.getTotalPaid())
-                .packageSalePrice(userMembership.getMembershipPackage().getSalePrice())
                 .benefits(benefits)
                 .createdAt(userMembership.getCreatedAt())
                 .updatedAt(userMembership.getUpdatedAt())
@@ -668,41 +710,45 @@ public class MembershipServiceImpl implements MembershipService {
     public MembershipUpgradePreviewResponse getUpgradePreview(String userId, Long targetMembershipId) {
         log.info("Getting upgrade preview for user: {}, target membership: {}", userId, targetMembershipId);
 
-        // Get user's active membership
-        Optional<UserMembership> activeMembershipOpt = userMembershipRepository
-                .findActiveUserMembership(userId, LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        Optional<UserMembership> currentOpt = userMembershipRepository.findActiveUserMembership(userId, now);
+        Optional<UserMembership> queuedOpt  = userMembershipRepository.findQueuedMembership(userId, now);
 
-        if (activeMembershipOpt.isEmpty()) {
+        if (currentOpt.isEmpty()) {
             return MembershipUpgradePreviewResponse.builder()
                     .eligible(false)
                     .ineligibilityReason("No active membership found. Please purchase a membership first.")
                     .build();
         }
 
-        UserMembership currentMembership = activeMembershipOpt.get();
-        MembershipPackage currentPackage = currentMembership.getMembershipPackage();
+        // Case A: queued slot exists → upgrade targets the queued slot
+        // Case B: no queued slot  → upgrade targets the current (active) slot
+        boolean isQueuedUpgrade = queuedOpt.isPresent();
+        UserMembership upgradingMembership = isQueuedUpgrade ? queuedOpt.get() : currentOpt.get();
+        MembershipPackage upgradingPackage = upgradingMembership.getMembershipPackage();
+        String upgradeContext = isQueuedUpgrade ? "QUEUED" : "CURRENT";
 
-        // Get target membership package
         MembershipPackage targetPackage = membershipPackageRepository.findById(targetMembershipId)
                 .orElseThrow(MembershipPackageNotFoundException::new);
 
         if (!targetPackage.getIsActive()) {
             return MembershipUpgradePreviewResponse.builder()
+                    .upgradeContext(upgradeContext)
                     .eligible(false)
                     .ineligibilityReason("Target membership package is not active.")
                     .build();
         }
 
-        // Check if upgrade is valid (target must be higher level)
-        if (!isValidUpgrade(currentPackage.getPackageLevel(), targetPackage.getPackageLevel())) {
-            String reason = currentPackage.getPackageLevel() == targetPackage.getPackageLevel()
-                    ? "Target package is the same level as your current membership."
-                    : "Cannot downgrade membership. Target package must be higher tier than current package.";
+        if (!isValidUpgrade(upgradingPackage.getPackageLevel(), targetPackage.getPackageLevel())) {
+            String reason = upgradingPackage.getPackageLevel() == targetPackage.getPackageLevel()
+                    ? "Target package is the same level as your " + (isQueuedUpgrade ? "queued" : "current") + " membership."
+                    : "Cannot downgrade membership.";
             return MembershipUpgradePreviewResponse.builder()
-                    .currentMembershipId(currentMembership.getUserMembershipId())
-                    .currentPackageName(currentPackage.getPackageName())
-                    .currentPackageLevel(currentPackage.getPackageLevel().name())
-                    .daysRemaining(currentMembership.getDaysRemaining())
+                    .upgradeContext(upgradeContext)
+                    .currentMembershipId(upgradingMembership.getUserMembershipId())
+                    .currentPackageName(upgradingPackage.getPackageName())
+                    .currentPackageLevel(upgradingPackage.getPackageLevel().name())
+                    .daysRemaining(isQueuedUpgrade ? null : upgradingMembership.getDaysRemaining())
                     .targetMembershipId(targetPackage.getMembershipId())
                     .targetPackageName(targetPackage.getPackageName())
                     .targetPackageLevel(targetPackage.getPackageLevel().name())
@@ -711,32 +757,40 @@ public class MembershipServiceImpl implements MembershipService {
                     .build();
         }
 
-        // Calculate discount based on remaining time
-        List<UserMembershipBenefit> currentBenefits = userBenefitRepository
-                .findByUserMembershipUserMembershipId(currentMembership.getUserMembershipId());
-
-        BigDecimal currentPrice = currentPackage.getSalePrice();
         BigDecimal targetPrice = targetPackage.getSalePrice();
-        BigDecimal discountAmount = calculateUpgradeDiscount(currentMembership, currentBenefits, currentPrice, targetPrice);
-        BigDecimal finalPrice = targetPrice.subtract(discountAmount).max(BigDecimal.ZERO);
+        BigDecimal discountAmount;
+        BigDecimal finalPrice;
+        List<MembershipUpgradePreviewResponse.ForfeitedBenefitInfo> forfeitedBenefits;
+
+        if (isQueuedUpgrade) {
+            // Case A: credit = what the user already paid for the queued slot
+            discountAmount = upgradingMembership.getTotalPaid();
+            finalPrice = targetPrice.subtract(discountAmount).max(BigDecimal.ZERO);
+            forfeitedBenefits = List.of(); // queued slot has no granted benefits
+        } else {
+            // Case B: pro-rata discount on the active slot
+            List<UserMembershipBenefit> currentBenefits = userBenefitRepository
+                    .findByUserMembershipUserMembershipId(upgradingMembership.getUserMembershipId());
+            discountAmount = calculateUpgradeDiscount(
+                    upgradingMembership, currentBenefits, upgradingPackage.getSalePrice(), targetPrice);
+            finalPrice = targetPrice.subtract(discountAmount).max(BigDecimal.ZERO);
+            forfeitedBenefits = currentBenefits.stream()
+                    .filter(b -> b.getQuantityRemaining() > 0)
+                    .map(b -> MembershipUpgradePreviewResponse.ForfeitedBenefitInfo.builder()
+                            .benefitType(b.getBenefitType().name())
+                            .benefitName(b.getPackageBenefit().getBenefitNameDisplay())
+                            .totalQuantity(b.getTotalQuantity())
+                            .usedQuantity(b.getQuantityUsed())
+                            .remainingQuantity(b.getQuantityRemaining())
+                            .estimatedValue(calculateBenefitValue(b.getBenefitType(), b.getQuantityRemaining()))
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
         BigDecimal discountPercentage = targetPrice.compareTo(BigDecimal.ZERO) > 0
                 ? discountAmount.divide(targetPrice, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"))
                 : BigDecimal.ZERO;
 
-        // Build forfeited benefits list
-        List<MembershipUpgradePreviewResponse.ForfeitedBenefitInfo> forfeitedBenefits = currentBenefits.stream()
-                .filter(b -> b.getQuantityRemaining() > 0)
-                .map(b -> MembershipUpgradePreviewResponse.ForfeitedBenefitInfo.builder()
-                        .benefitType(b.getBenefitType().name())
-                        .benefitName(b.getPackageBenefit().getBenefitNameDisplay())
-                        .totalQuantity(b.getTotalQuantity())
-                        .usedQuantity(b.getQuantityUsed())
-                        .remainingQuantity(b.getQuantityRemaining())
-                        .estimatedValue(calculateBenefitValue(b.getBenefitType(), b.getQuantityRemaining()))
-                        .build())
-                .collect(Collectors.toList());
-
-        // Get new benefits from target package
         List<MembershipPackageBenefitResponse> newBenefits = packageBenefitRepository
                 .findByMembershipPackageMembershipId(targetMembershipId)
                 .stream()
@@ -744,10 +798,11 @@ public class MembershipServiceImpl implements MembershipService {
                 .collect(Collectors.toList());
 
         return MembershipUpgradePreviewResponse.builder()
-                .currentMembershipId(currentMembership.getUserMembershipId())
-                .currentPackageName(currentPackage.getPackageName())
-                .currentPackageLevel(currentPackage.getPackageLevel().name())
-                .daysRemaining(currentMembership.getDaysRemaining())
+                .upgradeContext(upgradeContext)
+                .currentMembershipId(upgradingMembership.getUserMembershipId())
+                .currentPackageName(upgradingPackage.getPackageName())
+                .currentPackageLevel(upgradingPackage.getPackageLevel().name())
+                .daysRemaining(isQueuedUpgrade ? null : upgradingMembership.getDaysRemaining())
                 .targetMembershipId(targetPackage.getMembershipId())
                 .targetPackageName(targetPackage.getPackageName())
                 .targetPackageLevel(targetPackage.getPackageLevel().name())
@@ -768,18 +823,24 @@ public class MembershipServiceImpl implements MembershipService {
     public MembershipUpgradeResponse initiateMembershipUpgrade(String userId, MembershipUpgradeRequest request) {
         log.info("Initiating membership upgrade for user: {}, target: {}", userId, request.getTargetMembershipId());
 
-        // Validate user exists
         userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
-        // Get user's active membership
+        LocalDateTime now = LocalDateTime.now();
+
+        // Must have a current (active) slot to initiate any upgrade.
         UserMembership currentMembership = userMembershipRepository
-                .findActiveUserMembership(userId, LocalDateTime.now())
+                .findActiveUserMembership(userId, now)
                 .orElseThrow(() -> new AppException(DomainCode.NO_ACTIVE_MEMBERSHIP));
 
-        MembershipPackage currentPackage = currentMembership.getMembershipPackage();
+        // Case A: user has a queued slot → upgrade targets the queued slot (price diff, no pro-rata).
+        // Case B: no queued slot         → upgrade targets the current slot (existing pro-rata logic).
+        Optional<UserMembership> queuedOpt = userMembershipRepository.findQueuedMembership(userId, now);
+        boolean isQueuedUpgrade = queuedOpt.isPresent();
+        UserMembership upgradingMembership = isQueuedUpgrade ? queuedOpt.get() : currentMembership;
+        MembershipPackage upgradingPackage = upgradingMembership.getMembershipPackage();
+        String upgradeContext = isQueuedUpgrade ? "QUEUED" : "CURRENT";
 
-        // Get target membership package
         MembershipPackage targetPackage = membershipPackageRepository.findById(request.getTargetMembershipId())
                 .orElseThrow(MembershipPackageNotFoundException::new);
 
@@ -787,66 +848,67 @@ public class MembershipServiceImpl implements MembershipService {
             throw new AppException(DomainCode.INVALID_UPGRADE_TARGET, "Target package is not active");
         }
 
-        // Validate upgrade direction
-        if (!isValidUpgrade(currentPackage.getPackageLevel(), targetPackage.getPackageLevel())) {
-            if (currentPackage.getPackageLevel() == targetPackage.getPackageLevel()) {
+        if (!isValidUpgrade(upgradingPackage.getPackageLevel(), targetPackage.getPackageLevel())) {
+            if (upgradingPackage.getPackageLevel() == targetPackage.getPackageLevel()) {
                 throw new AppException(DomainCode.SAME_MEMBERSHIP_LEVEL);
             }
             throw new AppException(DomainCode.CANNOT_DOWNGRADE_MEMBERSHIP);
         }
 
-        // Calculate discount
-        List<UserMembershipBenefit> currentBenefits = userBenefitRepository
-                .findByUserMembershipUserMembershipId(currentMembership.getUserMembershipId());
-        BigDecimal currentPrice = currentPackage.getSalePrice();
         BigDecimal targetPrice = targetPackage.getSalePrice();
-        BigDecimal discountAmount = calculateUpgradeDiscount(currentMembership, currentBenefits, currentPrice, targetPrice);
+        BigDecimal discountAmount;
+        if (isQueuedUpgrade) {
+            // Case A: credit = what the user already paid for the queued slot
+            discountAmount = upgradingMembership.getTotalPaid();
+        } else {
+            // Case B: pro-rata credit on remaining value of the current slot
+            List<UserMembershipBenefit> currentBenefits = userBenefitRepository
+                    .findByUserMembershipUserMembershipId(upgradingMembership.getUserMembershipId());
+            discountAmount = calculateUpgradeDiscount(
+                    upgradingMembership, currentBenefits, upgradingPackage.getSalePrice(), targetPrice);
+        }
         BigDecimal finalAmount = targetPrice.subtract(discountAmount).max(BigDecimal.ZERO);
 
-        // Create upgrade transaction with metadata
+        String provider = request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY";
         String transactionId = transactionService.createMembershipUpgradeTransaction(
                 userId,
                 request.getTargetMembershipId(),
-                currentMembership.getUserMembershipId(),
+                upgradingMembership.getUserMembershipId(),
                 finalAmount,
                 discountAmount,
-                request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"
+                provider
         );
 
-        // If final amount is 0 or less, complete upgrade immediately without payment
+        // If full discount covers the cost, complete the upgrade immediately.
         if (finalAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            log.info("Upgrade is free due to discount, completing immediately");
-            // Mark transaction as completed
+            log.info("Upgrade is free due to discount ({}), completing immediately", upgradeContext);
             Transaction transaction = transactionRepository.findById(transactionId)
                     .orElseThrow(() -> new RuntimeException("Transaction not found"));
             transaction.complete();
             transactionRepository.save(transaction);
-
-            // Complete the upgrade
             completeMembershipUpgrade(transactionId);
 
             return MembershipUpgradeResponse.builder()
+                    .upgradeContext(upgradeContext)
+                    .activationDate(isQueuedUpgrade ? upgradingMembership.getStartDate() : null)
                     .transactionRef(transactionId)
-                    .paymentUrl(null)
-                    .paymentProvider(request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY")
-                    .previousMembershipId(currentMembership.getUserMembershipId())
+                    .paymentProvider(provider)
+                    .previousMembershipId(upgradingMembership.getUserMembershipId())
                     .newMembershipPackageId(targetPackage.getMembershipId())
                     .newPackageName(targetPackage.getPackageName())
                     .newPackageLevel(targetPackage.getPackageLevel().name())
-                    .originalPrice(targetPackage.getSalePrice())
+                    .originalPrice(targetPrice)
                     .discountAmount(discountAmount)
                     .finalAmount(BigDecimal.ZERO)
                     .status("COMPLETED")
-                    .message("Upgrade completed successfully. No payment required due to discount.")
+                    .message("Upgrade completed successfully. No payment required.")
                     .createdAt(LocalDateTime.now())
                     .build();
         }
 
-        // Generate payment URL
         PaymentRequest paymentRequest = PaymentRequest.builder()
                 .transactionId(transactionId)
-                .provider(PaymentProvider.valueOf(
-                        request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY"))
+                .provider(PaymentProvider.valueOf(provider))
                 .amount(finalAmount)
                 .currency(PricingConstants.DEFAULT_CURRENCY)
                 .orderInfo("SmartRent Membership Upgrade to " + targetPackage.getPackageName())
@@ -855,17 +917,18 @@ public class MembershipServiceImpl implements MembershipService {
         PaymentResponse paymentResponse = paymentService.createPayment(paymentRequest, null);
 
         return MembershipUpgradeResponse.builder()
+                .upgradeContext(upgradeContext)
+                .activationDate(isQueuedUpgrade ? upgradingMembership.getStartDate() : null)
                 .transactionRef(transactionId)
                 .paymentUrl(paymentResponse.getPaymentUrl())
-                // Carry the SePay hosted-checkout form fields so the frontend can POST them.
-                // Without this the frontend only has paymentUrl and GETs the checkout URL -> 404.
+                // SePay requires a POST form submit; carry providerData so the frontend can do that.
                 .providerData(paymentResponse.getProviderData())
-                .paymentProvider(request.getPaymentProvider() != null ? request.getPaymentProvider() : "SEPAY")
-                .previousMembershipId(currentMembership.getUserMembershipId())
+                .paymentProvider(provider)
+                .previousMembershipId(upgradingMembership.getUserMembershipId())
                 .newMembershipPackageId(targetPackage.getMembershipId())
                 .newPackageName(targetPackage.getPackageName())
                 .newPackageLevel(targetPackage.getPackageLevel().name())
-                .originalPrice(targetPackage.getSalePrice())
+                .originalPrice(targetPrice)
                 .discountAmount(discountAmount)
                 .finalAmount(finalAmount)
                 .status("PENDING_PAYMENT")
@@ -905,33 +968,44 @@ public class MembershipServiceImpl implements MembershipService {
             throw new RuntimeException("Previous membership ID not found in transaction");
         }
 
-        // Cancel the old membership
         UserMembership oldMembership = userMembershipRepository.findById(previousMembershipId)
                 .orElseThrow(() -> new RuntimeException("Previous membership not found: " + previousMembershipId));
+
+        MembershipPackage targetPackage = membershipPackageRepository.findById(targetMembershipId)
+                .orElseThrow(MembershipPackageNotFoundException::new);
+
+        LocalDateTime now = LocalDateTime.now();
+        // Case A: the slot being replaced starts in the future (it was a queued slot).
+        // Case B: the slot starts in the past (it's the currently active slot).
+        boolean isQueuedUpgrade = oldMembership.getStartDate().isAfter(now);
 
         oldMembership.setStatus(MembershipStatus.UPGRADED);
         userMembershipRepository.save(oldMembership);
 
-        // Expire old benefits
         List<UserMembershipBenefit> oldBenefits = userBenefitRepository
                 .findByUserMembershipUserMembershipId(previousMembershipId);
         oldBenefits.forEach(UserMembershipBenefit::expire);
         userBenefitRepository.saveAll(oldBenefits);
 
-        // Get target membership package
-        MembershipPackage targetPackage = membershipPackageRepository.findById(targetMembershipId)
-                .orElseThrow(MembershipPackageNotFoundException::new);
-
-        // Create new membership
-        LocalDateTime startDate = LocalDateTime.now();
-        LocalDateTime endDate = startDate.plusMonths(targetPackage.getDurationMonths());
+        LocalDateTime newStartDate;
+        LocalDateTime newEndDate;
         int durationDays = targetPackage.getDurationMonths() * 30;
+
+        if (isQueuedUpgrade) {
+            // Case A: preserve the original queue position; only the tier changes.
+            newStartDate = oldMembership.getStartDate();
+            newEndDate   = oldMembership.getEndDate();
+        } else {
+            // Case B: immediate — membership starts now.
+            newStartDate = now;
+            newEndDate   = now.plusMonths(targetPackage.getDurationMonths());
+        }
 
         UserMembership newMembership = UserMembership.builder()
                 .userId(transaction.getUserId())
                 .membershipPackage(targetPackage)
-                .startDate(startDate)
-                .endDate(endDate)
+                .startDate(newStartDate)
+                .endDate(newEndDate)
                 .durationDays(durationDays)
                 .status(MembershipStatus.ACTIVE)
                 .totalPaid(transaction.getAmount())
@@ -940,12 +1014,15 @@ public class MembershipServiceImpl implements MembershipService {
 
         newMembership = userMembershipRepository.save(newMembership);
 
-        // Grant new benefits
-        List<UserMembershipBenefit> newBenefits = grantBenefits(newMembership, targetPackage);
-        userBenefitRepository.saveAll(newBenefits);
+        if (!isQueuedUpgrade) {
+            // Case B: grant benefits now (active slot).
+            // Case A: defer to the lifecycle cron job (queued slot — no benefits yet).
+            List<UserMembershipBenefit> newBenefits = grantBenefits(newMembership, targetPackage);
+            userBenefitRepository.saveAll(newBenefits);
+        }
 
-        log.info("Membership upgrade completed for user: {}, from membership {} to {}",
-                transaction.getUserId(), previousMembershipId, newMembership.getUserMembershipId());
+        log.info("Membership upgrade completed for user: {}, {} → {} (queued={})",
+                transaction.getUserId(), previousMembershipId, newMembership.getUserMembershipId(), isQueuedUpgrade);
 
         return mapToUserMembershipResponse(newMembership);
     }
@@ -955,57 +1032,63 @@ public class MembershipServiceImpl implements MembershipService {
     public List<MembershipUpgradePreviewResponse> getAvailableUpgrades(String userId) {
         log.info("Getting available upgrades for user: {}", userId);
 
-        // Get user's active membership
-        Optional<UserMembership> activeMembershipOpt = userMembershipRepository
-                .findActiveUserMembership(userId, LocalDateTime.now());
-
-        if (activeMembershipOpt.isEmpty()) {
+        LocalDateTime now = LocalDateTime.now();
+        Optional<UserMembership> currentOpt = userMembershipRepository.findActiveUserMembership(userId, now);
+        if (currentOpt.isEmpty()) {
             log.info("User {} has no active membership, returning empty upgrade list", userId);
             return List.of();
         }
 
-        UserMembership currentMembership = activeMembershipOpt.get();
-        MembershipPackage currentPackage = currentMembership.getMembershipPackage();
-        PackageLevel currentLevel = currentPackage.getPackageLevel();
+        // Case A: queued slot exists → upgrade targets the queued slot.
+        // Case B: no queued slot     → upgrade targets the current slot.
+        Optional<UserMembership> queuedOpt = userMembershipRepository.findQueuedMembership(userId, now);
+        boolean isQueuedUpgrade = queuedOpt.isPresent();
+        UserMembership upgradingMembership = isQueuedUpgrade ? queuedOpt.get() : currentOpt.get();
+        MembershipPackage upgradingPackage = upgradingMembership.getMembershipPackage();
+        String upgradeContext = isQueuedUpgrade ? "QUEUED" : "CURRENT";
 
-        // Get current benefits for discount calculation
-        List<UserMembershipBenefit> currentBenefits = userBenefitRepository
-                .findByUserMembershipUserMembershipId(currentMembership.getUserMembershipId());
+        List<UserMembershipBenefit> upgradingBenefits = isQueuedUpgrade
+                ? List.of()
+                : userBenefitRepository.findByUserMembershipUserMembershipId(upgradingMembership.getUserMembershipId());
 
-        // Get all active packages with higher tier
         List<MembershipPackage> allPackages = membershipPackageRepository.findByIsActiveTrueOrderByPackageLevelAsc();
 
         List<MembershipUpgradePreviewResponse> upgrades = allPackages.stream()
-                .filter(pkg -> pkg.getPackageLevel().ordinal() > currentLevel.ordinal())
+                .filter(pkg -> pkg.getPackageLevel().ordinal() > upgradingPackage.getPackageLevel().ordinal())
                 .sorted((a, b) -> {
-                    // Sort by level first, then by price
                     int levelCompare = Integer.compare(a.getPackageLevel().ordinal(), b.getPackageLevel().ordinal());
                     if (levelCompare != 0) return levelCompare;
                     return a.getSalePrice().compareTo(b.getSalePrice());
                 })
                 .map(targetPackage -> {
-                    BigDecimal currentPrice = currentPackage.getSalePrice();
                     BigDecimal targetPrice = targetPackage.getSalePrice();
-                    BigDecimal discountAmount = calculateUpgradeDiscount(currentMembership, currentBenefits, currentPrice, targetPrice);
+                    BigDecimal discountAmount;
+                    List<MembershipUpgradePreviewResponse.ForfeitedBenefitInfo> forfeitedBenefits;
+
+                    if (isQueuedUpgrade) {
+                        discountAmount = upgradingMembership.getTotalPaid();
+                        forfeitedBenefits = List.of();
+                    } else {
+                        discountAmount = calculateUpgradeDiscount(
+                                upgradingMembership, upgradingBenefits, upgradingPackage.getSalePrice(), targetPrice);
+                        forfeitedBenefits = upgradingBenefits.stream()
+                                .filter(b -> b.getQuantityRemaining() > 0)
+                                .map(b -> MembershipUpgradePreviewResponse.ForfeitedBenefitInfo.builder()
+                                        .benefitType(b.getBenefitType().name())
+                                        .benefitName(b.getPackageBenefit().getBenefitNameDisplay())
+                                        .totalQuantity(b.getTotalQuantity())
+                                        .usedQuantity(b.getQuantityUsed())
+                                        .remainingQuantity(b.getQuantityRemaining())
+                                        .estimatedValue(calculateBenefitValue(b.getBenefitType(), b.getQuantityRemaining()))
+                                        .build())
+                                .collect(Collectors.toList());
+                    }
+
                     BigDecimal finalPrice = targetPrice.subtract(discountAmount).max(BigDecimal.ZERO);
                     BigDecimal discountPercentage = targetPrice.compareTo(BigDecimal.ZERO) > 0
                             ? discountAmount.divide(targetPrice, 4, RoundingMode.HALF_UP).multiply(new BigDecimal("100"))
                             : BigDecimal.ZERO;
 
-                    // Build forfeited benefits list
-                    List<MembershipUpgradePreviewResponse.ForfeitedBenefitInfo> forfeitedBenefits = currentBenefits.stream()
-                            .filter(b -> b.getQuantityRemaining() > 0)
-                            .map(b -> MembershipUpgradePreviewResponse.ForfeitedBenefitInfo.builder()
-                                    .benefitType(b.getBenefitType().name())
-                                    .benefitName(b.getPackageBenefit().getBenefitNameDisplay())
-                                    .totalQuantity(b.getTotalQuantity())
-                                    .usedQuantity(b.getQuantityUsed())
-                                    .remainingQuantity(b.getQuantityRemaining())
-                                    .estimatedValue(calculateBenefitValue(b.getBenefitType(), b.getQuantityRemaining()))
-                                    .build())
-                            .collect(Collectors.toList());
-
-                    // Get new benefits from target package
                     List<MembershipPackageBenefitResponse> newBenefits = packageBenefitRepository
                             .findByMembershipPackageMembershipId(targetPackage.getMembershipId())
                             .stream()
@@ -1013,10 +1096,11 @@ public class MembershipServiceImpl implements MembershipService {
                             .collect(Collectors.toList());
 
                     return MembershipUpgradePreviewResponse.builder()
-                            .currentMembershipId(currentMembership.getUserMembershipId())
-                            .currentPackageName(currentPackage.getPackageName())
-                            .currentPackageLevel(currentPackage.getPackageLevel().name())
-                            .daysRemaining(currentMembership.getDaysRemaining())
+                            .upgradeContext(upgradeContext)
+                            .currentMembershipId(upgradingMembership.getUserMembershipId())
+                            .currentPackageName(upgradingPackage.getPackageName())
+                            .currentPackageLevel(upgradingPackage.getPackageLevel().name())
+                            .daysRemaining(isQueuedUpgrade ? null : upgradingMembership.getDaysRemaining())
                             .targetMembershipId(targetPackage.getMembershipId())
                             .targetPackageName(targetPackage.getPackageName())
                             .targetPackageLevel(targetPackage.getPackageLevel().name())
@@ -1033,7 +1117,7 @@ public class MembershipServiceImpl implements MembershipService {
                 })
                 .collect(Collectors.toList());
 
-        log.info("Found {} available upgrades for user {}", upgrades.size(), userId);
+        log.info("Found {} available upgrades for user {} (context={})", upgrades.size(), userId, upgradeContext);
         return upgrades;
     }
 
@@ -1049,22 +1133,22 @@ public class MembershipServiceImpl implements MembershipService {
         userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
-        // Prefer the current ACTIVE membership; only fall back to recently expired (≤7 days)
-        // when no active membership exists. This prevents charging for a wrong/old package
-        // when the user has an expired membership with a far-future endDate alongside a new
-        // active one with a closer endDate.
         LocalDateTime now = LocalDateTime.now();
+
+        // Reject if a queued slot already exists — only one queued slot is allowed.
+        if (userMembershipRepository.findQueuedMembership(userId, now).isPresent()) {
+            throw new AppException(DomainCode.QUEUED_MEMBERSHIP_EXISTS);
+        }
+
+        // Accept active memberships OR memberships that expired within the last 7 days
+        LocalDateTime renewalCutoff = now.minusDays(7);
         UserMembership currentMembership = userMembershipRepository
-                .findActiveUserMembership(userId, now)
-                .orElseGet(() -> {
-                    LocalDateTime renewalCutoff = now.minusDays(7);
-                    return userMembershipRepository
-                            .findByUserIdOrderByEndDateDesc(userId)
-                            .stream()
-                            .filter(um -> um.isExpired() && um.getEndDate().isAfter(renewalCutoff))
-                            .findFirst()
-                            .orElseThrow(() -> new AppException(DomainCode.NO_RENEWABLE_MEMBERSHIP));
-                });
+                .findByUserIdOrderByEndDateDesc(userId)
+                .stream()
+                .filter(um -> um.isActive()
+                        || (um.isExpired() && um.getEndDate().isAfter(renewalCutoff)))
+                .findFirst()
+                .orElseThrow(() -> new AppException(DomainCode.NO_RENEWABLE_MEMBERSHIP));
 
         MembershipPackage pkg = currentMembership.getMembershipPackage();
         if (!pkg.getIsActive()) {
@@ -1137,34 +1221,17 @@ public class MembershipServiceImpl implements MembershipService {
 
         renewed = userMembershipRepository.save(renewed);
 
-        // Expire the previous membership so only one ACTIVE record exists per user.
-        // Without this, findActiveUserMembership throws NonUniqueResultException.
-        if (previous != null && previous.getStatus() == MembershipStatus.ACTIVE) {
-            previous.setStatus(MembershipStatus.EXPIRED);
-            userMembershipRepository.save(previous);
+        // Grant benefits immediately only when the renewed slot starts right now
+        // (previously-expired renewal case). When startDate is in the future the slot
+        // is queued — benefits will be granted by the lifecycle cron job.
+        if (!startDate.isAfter(now)) {
+            List<UserMembershipBenefit> benefits = grantBenefits(renewed, pkg);
+            userBenefitRepository.saveAll(benefits);
         }
 
-        List<UserMembershipBenefit> benefits = grantBenefits(renewed, pkg);
-        userBenefitRepository.saveAll(benefits);
-
-        log.info("Membership renewal completed for user: {}, new membership: {} (start={}, end={})",
-                transaction.getUserId(), renewed.getUserMembershipId(), startDate, endDate);
+        log.info("Membership renewal completed for user: {}, new membership: {} (start={}, end={}, queued={})",
+                transaction.getUserId(), renewed.getUserMembershipId(), startDate, endDate, startDate.isAfter(now));
         return mapToUserMembershipResponse(renewed);
-    }
-
-    @Override
-    @Transactional
-    public void adminClearUserMembership(String userId) {
-        log.info("Admin clearing all active memberships for user: {}", userId);
-        List<UserMembership> active = userMembershipRepository
-                .findByUserIdAndStatus(userId, MembershipStatus.ACTIVE);
-        if (active.isEmpty()) {
-            log.info("No active memberships found for user: {}", userId);
-            return;
-        }
-        active.forEach(um -> um.setStatus(MembershipStatus.EXPIRED));
-        userMembershipRepository.saveAll(active);
-        log.info("Expired {} active membership(s) for user: {}", active.size(), userId);
     }
 
     // =====================================================

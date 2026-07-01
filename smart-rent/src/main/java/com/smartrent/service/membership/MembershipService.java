@@ -8,6 +8,7 @@ import com.smartrent.dto.request.MembershipUpgradeRequest;
 import com.smartrent.dto.response.MembershipPackageResponse;
 import com.smartrent.dto.response.MembershipUpgradePreviewResponse;
 import com.smartrent.dto.response.MembershipUpgradeResponse;
+import com.smartrent.dto.response.MyMembershipResponse;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.dto.response.QuotaStatusResponse;
@@ -72,7 +73,15 @@ public interface MembershipService {
     UserMembershipResponse purchaseMembership(String userId, MembershipPurchaseRequest request);
 
     /**
-     * Get user's active membership
+     * Get user's current and queued memberships.
+     * current = startDate <= now AND endDate > now (benefits usable)
+     * queued  = startDate > now (benefits not yet granted)
+     * Either field may be null.
+     */
+    MyMembershipResponse getMyMembership(String userId);
+
+    /**
+     * Get user's active membership (currently usable slot only).
      */
     UserMembershipResponse getActiveMembership(String userId);
 
