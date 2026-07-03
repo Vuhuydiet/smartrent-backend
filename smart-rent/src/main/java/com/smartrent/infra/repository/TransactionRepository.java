@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -83,5 +84,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
             "WHERE t.status = 'COMPLETED' AND t.created_at BETWEEN :startDate AND :endDate " +
             "GROUP BY DATE_FORMAT(t.created_at, '%Y-%m') ORDER BY revenue_month ASC", nativeQuery = true)
     List<Object[]> findMonthlyRevenue(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    @Modifying
+    @Query("UPDATE transactions t SET t.status = 'CANCELLED', t.updatedAt = CURRENT_TIMESTAMP " +
+            "WHERE t.status = 'PENDING' AND t.createdAt < :cutoff")
+    int cancelStalePendingTransactions(@Param("cutoff") LocalDateTime cutoff);
 }
 

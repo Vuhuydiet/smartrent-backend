@@ -394,6 +394,10 @@ zalopay:
   ipn-url: ${ZALOPAY_IPN_URL:https://dev.api.smartrent.io.vn/v1/payments/callback/ZALOPAY}
   timeout-minutes: ${ZALOPAY_TIMEOUT_MINUTES:15}
 
+# Auto-cancellation of stale PENDING transactions (abandoned checkouts / missed webhooks)
+transaction:
+  pending-timeout-minutes: ${TRANSACTION_PENDING_TIMEOUT_MINUTES:20}
+
 # Resilience4j Configuration for Circuit Breaker and Retry patterns
 resilience4j:
   circuitbreaker:

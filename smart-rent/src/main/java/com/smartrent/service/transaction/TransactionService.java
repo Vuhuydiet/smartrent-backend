@@ -144,5 +144,12 @@ public interface TransactionService {
      * @return Transaction response
      */
     TransactionResponse getTransactionByProviderTxId(String providerTransactionId);
+
+    /**
+     * Cancel every transaction still PENDING for longer than the configured timeout.
+     *
+     * @return Number of transactions cancelled
+     */
+    int cancelStalePendingTransactions();
 }
 

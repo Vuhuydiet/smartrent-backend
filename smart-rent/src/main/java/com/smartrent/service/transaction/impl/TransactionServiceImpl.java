@@ -11,13 +11,16 @@ import com.smartrent.service.transaction.TransactionService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,6 +35,10 @@ import java.util.stream.Collectors;
 public class TransactionServiceImpl implements TransactionService {
 
     TransactionRepository transactionRepository;
+
+    @NonFinal
+    @Value("${transaction.pending-timeout-minutes:20}")
+    long pendingTimeoutMinutes;
 
     @Override
     @Transactional
@@ -190,8 +197,8 @@ public class TransactionServiceImpl implements TransactionService {
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new RuntimeException("Transaction not found: " + transactionId));
 
-        if (transaction.isCompleted()) {
-            log.warn("Transaction already completed: {}", transactionId);
+        if (transaction.isTerminal()) {
+            log.warn("Transaction already in terminal state {}, ignoring completion: {}", transaction.getStatus(), transactionId);
             return mapToResponse(transaction);
         }
 
@@ -210,6 +217,11 @@ public class TransactionServiceImpl implements TransactionService {
 
         Transaction transaction = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new RuntimeException("Transaction not found: " + transactionId));
+
+        if (transaction.isTerminal()) {
+            log.warn("Transaction already in terminal state {}, ignoring failure: {}", transaction.getStatus(), transactionId);
+            return mapToResponse(transaction);
+        }
 
         transaction.fail();
         if (reason != null) {
@@ -267,6 +279,16 @@ public class TransactionServiceImpl implements TransactionService {
                 .orElseThrow(() -> new RuntimeException("Transaction not found for provider tx: " + providerTransactionId));
 
         return mapToResponse(transaction);
+    }
+
+    @Override
+    @Transactional
+    public int cancelStalePendingTransactions() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(pendingTimeoutMinutes);
+        int cancelled = transactionRepository.cancelStalePendingTransactions(cutoff);
+        log.info("Cancelled {} pending transaction(s) older than {} minute(s)", cancelled, pendingTimeoutMinutes);
+
+        return cancelled;
     }
 
     // Helper methods

@@ -179,6 +179,10 @@ public class Transaction {
         return status == TransactionStatus.REFUNDED;
     }
 
+    public boolean isTerminal() {
+        return isCompleted() || isCancelled() || isFailed() || isRefunded();
+    }
+
     public void complete() {
         this.status = TransactionStatus.COMPLETED;
         this.completedAt = LocalDateTime.now();
