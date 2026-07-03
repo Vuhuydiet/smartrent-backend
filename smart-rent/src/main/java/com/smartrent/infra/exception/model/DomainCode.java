@@ -148,7 +148,9 @@ public enum DomainCode {
   VIP_TIER_VIDEO_LIMIT_EXCEEDED("21002", HttpStatus.BAD_REQUEST,
       "Số lượng video vượt quá giới hạn của gói %s. Tối đa %d video, bạn đang muốn đăng %d video."),
   VIP_TIER_NOT_CONFIGURED("21003", HttpStatus.INTERNAL_SERVER_ERROR,
-      "Không tìm thấy cấu hình giới hạn cho gói VIP: %s")
+      "Không tìm thấy cấu hình giới hạn cho gói VIP: %s"),
+  //    Listing Report Error 22xxx
+  LISTING_REPORT_NOT_AVAILABLE("22001", HttpStatus.BAD_REQUEST, "Listing is no longer available and cannot be reported")
   ;
 
   private final String value;
