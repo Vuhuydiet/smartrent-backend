@@ -5,6 +5,7 @@ import com.smartrent.dto.request.ResolveReportRequest;
 import com.smartrent.dto.response.ListingReportResponse;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.ReportReasonResponse;
+import com.smartrent.enums.ListingStatus;
 import com.smartrent.enums.NotificationType;
 import com.smartrent.enums.RecipientType;
 import com.smartrent.enums.ReportCategory;
@@ -84,6 +85,16 @@ public class ListingReportServiceImpl implements ListingReportService {
         // Validate listing exists
         Listing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Listing not found with ID: " + listingId));
+
+        // Re-check the listing is currently published; reject reports on listings that are
+        // no longer publicly visible (expired, rejected, pending review/payment, etc.)
+        ListingStatus listingStatus = listing.computeListingStatus();
+        boolean isReportable = listingStatus == ListingStatus.DISPLAYING
+                || listingStatus == ListingStatus.EXPIRING_SOON
+                || listingStatus == ListingStatus.VERIFIED;
+        if (!isReportable) {
+            throw new DomainException(DomainCode.LISTING_REPORT_NOT_AVAILABLE);
+        }
 
         // Validate report category
         ReportCategory category;
