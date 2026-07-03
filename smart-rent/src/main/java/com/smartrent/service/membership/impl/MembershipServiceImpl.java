@@ -672,6 +672,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .daysRemaining(userMembership.getDaysRemaining())
                 .status(userMembership.getStatus().name())
                 .totalPaid(userMembership.getTotalPaid())
+                .packageSalePrice(userMembership.getMembershipPackage().getSalePrice())
                 .benefits(benefits)
                 .createdAt(userMembership.getCreatedAt())
                 .updatedAt(userMembership.getUpdatedAt())
@@ -1140,15 +1141,21 @@ public class MembershipServiceImpl implements MembershipService {
             throw new AppException(DomainCode.QUEUED_MEMBERSHIP_EXISTS);
         }
 
-        // Accept active memberships OR memberships that expired within the last 7 days
-        LocalDateTime renewalCutoff = now.minusDays(7);
+        // Prefer the true current membership (startDate <= now < endDate); only fall back to
+        // recently-expired (≤7 days) when there is no active one. Using isActive() alone here
+        // would also match a queued membership (status=ACTIVE, startDate in the future) since it
+        // doesn't check startDate, so findActiveUserMembership must be tried first.
         UserMembership currentMembership = userMembershipRepository
-                .findByUserIdOrderByEndDateDesc(userId)
-                .stream()
-                .filter(um -> um.isActive()
-                        || (um.isExpired() && um.getEndDate().isAfter(renewalCutoff)))
-                .findFirst()
-                .orElseThrow(() -> new AppException(DomainCode.NO_RENEWABLE_MEMBERSHIP));
+                .findActiveUserMembership(userId, now)
+                .orElseGet(() -> {
+                    LocalDateTime renewalCutoff = now.minusDays(7);
+                    return userMembershipRepository
+                            .findByUserIdOrderByEndDateDesc(userId)
+                            .stream()
+                            .filter(um -> um.isExpired() && um.getEndDate().isAfter(renewalCutoff))
+                            .findFirst()
+                            .orElseThrow(() -> new AppException(DomainCode.NO_RENEWABLE_MEMBERSHIP));
+                });
 
         MembershipPackage pkg = currentMembership.getMembershipPackage();
         if (!pkg.getIsActive()) {
