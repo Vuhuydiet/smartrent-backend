@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -305,9 +306,19 @@ public class TransactionServiceImpl implements TransactionService {
                 .paymentProvider(transaction.getPaymentProvider() != null ? transaction.getPaymentProvider().name() : null)
                 .providerTransactionId(transaction.getProviderTransactionId())
                 .additionalInfo(transaction.getAdditionalInfo())
-                .createdAt(transaction.getCreatedAt())
-                .updatedAt(transaction.getUpdatedAt())
+                .createdAt(toInstant(transaction.getCreatedAt()))
+                .updatedAt(toInstant(transaction.getUpdatedAt()))
                 .build();
+    }
+
+    /**
+     * The {@code createdAt}/{@code updatedAt} columns are persisted as naive {@link LocalDateTime}
+     * values but the DB/Hibernate session is pinned to UTC (see application.yml), so the stored
+     * value already represents a UTC instant. Convert explicitly when exposing it on the wire so
+     * Jackson serializes it with a proper {@code Z} suffix instead of a timezone-less string.
+     */
+    private static java.time.Instant toInstant(LocalDateTime localDateTime) {
+        return localDateTime == null ? null : localDateTime.atZone(ZoneOffset.UTC).toInstant();
     }
 }
 

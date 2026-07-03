@@ -5,7 +5,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @Getter
@@ -27,9 +27,9 @@ public class TransactionDetailResponse {
     String gatewayResponseCode;
     String status;
     String paymentType;
-    LocalDateTime createdAt;
-    LocalDateTime completedAt;
-    LocalDateTime expiredAt;
+    Instant createdAt;
+    Instant completedAt;
+    Instant expiredAt;
     TransactionInvoiceResponse invoice;
     TransactionRoomResponse room;
     TransactionPartyResponse customer;
