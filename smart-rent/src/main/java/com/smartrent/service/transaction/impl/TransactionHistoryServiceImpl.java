@@ -27,7 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -232,8 +234,8 @@ public class TransactionHistoryServiceImpl implements TransactionHistoryService 
                 .gatewayTransactionCode(transaction.getProviderTransactionId())
                 .status(toApiStatus(transaction.getStatus()))
                 .paymentType(transaction.getTransactionType() != null ? transaction.getTransactionType().name() : null)
-                .createdAt(transaction.getCreatedAt())
-                .completedAt(resolveCompletedAt(transaction))
+                .createdAt(toInstant(transaction.getCreatedAt()))
+                .completedAt(toInstant(resolveCompletedAt(transaction)))
                 .invoice(toInvoice(transaction))
                 .room(toRoom(transaction, listing))
                 .customer(includeCustomer ? toCustomer(transaction, customer) : null)
@@ -256,9 +258,9 @@ public class TransactionHistoryServiceImpl implements TransactionHistoryService 
                 .gatewayResponseCode(includeAdminFields ? transaction.getGatewayResponseCode() : null)
                 .status(toApiStatus(transaction.getStatus()))
                 .paymentType(transaction.getTransactionType() != null ? transaction.getTransactionType().name() : null)
-                .createdAt(transaction.getCreatedAt())
+                .createdAt(toInstant(transaction.getCreatedAt()))
                 .completedAt(item.getCompletedAt())
-                .expiredAt(transaction.getExpiredAt())
+                .expiredAt(toInstant(transaction.getExpiredAt()))
                 .invoice(item.getInvoice())
                 .room(item.getRoom())
                 .customer(item.getCustomer())
@@ -276,14 +278,17 @@ public class TransactionHistoryServiceImpl implements TransactionHistoryService 
             List<TransactionTimelineResponse> timeline = new ArrayList<>();
             timeline.add(TransactionTimelineResponse.builder()
                     .status("PENDING")
-                    .at(transaction.getCreatedAt())
+                    .at(toInstant(transaction.getCreatedAt()))
                     .actorType("SYSTEM")
                     .note("Payment created")
                     .build());
             if (transaction.getStatus() != TransactionStatus.PENDING) {
+                LocalDateTime completedOrUpdatedAt = resolveCompletedAt(transaction) != null
+                        ? resolveCompletedAt(transaction)
+                        : transaction.getUpdatedAt();
                 timeline.add(TransactionTimelineResponse.builder()
                         .status(toApiStatus(transaction.getStatus()))
-                        .at(resolveCompletedAt(transaction) != null ? resolveCompletedAt(transaction) : transaction.getUpdatedAt())
+                        .at(toInstant(completedOrUpdatedAt))
                         .actorType("GATEWAY")
                         .note(resolveFailureReason(transaction))
                         .build());
@@ -293,7 +298,7 @@ public class TransactionHistoryServiceImpl implements TransactionHistoryService 
         return audits.stream()
                 .map(audit -> TransactionTimelineResponse.builder()
                         .status(toApiStatus(audit.getNewStatus()))
-                        .at(audit.getCreatedAt())
+                        .at(toInstant(audit.getCreatedAt()))
                         .actorType(audit.getActorType())
                         .actorId(audit.getActorId())
                         .note(audit.getReason())
@@ -383,6 +388,17 @@ public class TransactionHistoryServiceImpl implements TransactionHistoryService 
             return transaction.getCompletedAt();
         }
         return transaction.getStatus() == TransactionStatus.COMPLETED ? transaction.getUpdatedAt() : null;
+    }
+
+    /**
+     * {@code Transaction}/{@code TransactionAudit} timestamp columns are persisted as naive
+     * {@link LocalDateTime} values, but the DB/Hibernate session is pinned to UTC (see
+     * application.yml), so the stored value already represents a UTC instant. Convert explicitly
+     * when exposing it on the wire so Jackson serializes it with a proper {@code Z} suffix instead
+     * of a timezone-less string that the frontend would misinterpret as browser-local time.
+     */
+    private static Instant toInstant(LocalDateTime localDateTime) {
+        return localDateTime == null ? null : localDateTime.atZone(ZoneOffset.UTC).toInstant();
     }
 
     private String resolveFailureReason(Transaction transaction) {

@@ -26,6 +26,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -170,9 +172,19 @@ public class PaymentServiceImpl implements PaymentService {
                 .status(updated.getStatus() != null ? updated.getStatus().name() : null)
                 .paymentProvider(updated.getPaymentProvider() != null ? updated.getPaymentProvider().name() : null)
                 .providerTransactionId(updated.getProviderTransactionId())
-                .createdAt(updated.getCreatedAt())
-                .updatedAt(updated.getUpdatedAt())
+                .createdAt(toInstant(updated.getCreatedAt()))
+                .updatedAt(toInstant(updated.getUpdatedAt()))
                 .build();
+    }
+
+    /**
+     * {@code Transaction.createdAt}/{@code updatedAt} are naive {@link LocalDateTime} values but
+     * the DB/Hibernate session is pinned to UTC (see application.yml), so the stored value already
+     * represents a UTC instant. Convert explicitly when exposing it on the wire so Jackson
+     * serializes it with a proper {@code Z} suffix instead of a timezone-less string.
+     */
+    private static java.time.Instant toInstant(LocalDateTime localDateTime) {
+        return localDateTime == null ? null : localDateTime.atZone(ZoneOffset.UTC).toInstant();
     }
 
     // Provider Management Methods
