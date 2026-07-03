@@ -1371,6 +1371,19 @@ public class ListingServiceImpl implements ListingService {
             ListingFilterRequest filter, String cursor, int size) {
         int safeSize = Math.min(Math.max(size, 1), 100);
 
+        // Same keyword guard as the offset search path: a non-blank keyword that
+        // normalizes away (e.g. "(((") must return no results, not an unfiltered query.
+        String normalizedKeyword = TextNormalizer.normalize(filter.getKeyword());
+        if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()
+                && (normalizedKeyword == null || normalizedKeyword.length() < 3)) {
+            return com.smartrent.dto.response.ListingCursorResponse.builder()
+                    .items(Collections.emptyList())
+                    .nextCursor(null)
+                    .hasNext(false)
+                    .size(safeSize)
+                    .build();
+        }
+
         // Same filter resolution + specification as the offset search path.
         resolveAddressMappings(filter);
         Specification<Listing> spec = listingQueryService.buildSpecification(filter);
