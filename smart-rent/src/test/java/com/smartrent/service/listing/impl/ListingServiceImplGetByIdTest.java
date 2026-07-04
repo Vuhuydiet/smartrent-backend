@@ -1,8 +1,10 @@
 package com.smartrent.service.listing.impl;
 
+import com.smartrent.enums.ModerationStatus;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.ListingRepository;
+import com.smartrent.infra.repository.entity.Listing;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -35,6 +37,19 @@ class ListingServiceImplGetByIdTest {
 
         DomainException ex = assertThrows(DomainException.class,
                 () -> service.getListingById(123L));
+        assertEquals(DomainCode.LISTING_NOT_FOUND, ex.getDomainCode());
+    }
+
+    @Test
+    void throwsListingNotFoundWhenNotPubliclyVisible() {
+        Listing pendingReview = Listing.builder()
+                .listingId(456L)
+                .moderationStatus(ModerationStatus.PENDING_REVIEW)
+                .build();
+        when(listingRepository.findByIdWithAmenities(456L)).thenReturn(Optional.of(pendingReview));
+
+        DomainException ex = assertThrows(DomainException.class,
+                () -> service.getListingById(456L));
         assertEquals(DomainCode.LISTING_NOT_FOUND, ex.getDomainCode());
     }
 }
