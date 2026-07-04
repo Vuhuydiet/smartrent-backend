@@ -615,8 +615,9 @@ public class ListingServiceImpl implements ListingService {
     @Override
     @Transactional
     @Caching(evict = {
-            @CacheEvict(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_DETAIL, key = "#id"),
-            @CacheEvict(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_BROWSE, allEntries = true)
+            @CacheEvict(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_DETAIL, key = "#id")
     })
     public ListingResponse updateListing(Long id, ListingRequest request, String userId) {
         Listing existing = listingRepository.findById(id)
