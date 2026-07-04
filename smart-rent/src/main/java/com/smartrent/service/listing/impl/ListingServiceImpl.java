@@ -553,9 +553,6 @@ public class ListingServiceImpl implements ListingService {
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_DETAIL,
-            key = "#id",
-            unless = "#result == null")
     public ListingResponse getListingById(Long id) {
         log.info("getListingById called for id={}", id);
 
