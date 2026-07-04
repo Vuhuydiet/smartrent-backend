@@ -138,7 +138,7 @@ public class Listing {
 
 
     // ── Moderation fields (nullable for backward compatibility) ──
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = com.smartrent.infra.repository.entity.converter.ModerationStatusConverter.class)
     @Column(name = "moderation_status", length = 30)
     ModerationStatus moderationStatus;
 
