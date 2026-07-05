@@ -1,6 +1,7 @@
 package com.smartrent.service.phoneclickdetail;
 
 import com.smartrent.dto.request.PhoneClickRequest;
+import com.smartrent.dto.response.OwnerPhoneClickStatsResponse;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PhoneClickResponse;
 import com.smartrent.dto.response.PhoneClickStatsResponse;
@@ -107,5 +108,14 @@ public interface PhoneClickDetailService {
      * @return Paginated user phone click detail responses
      */
     PageResponse<UserPhoneClickDetailResponse> searchUsersWhoClickedOnMyListings(String ownerId, String keyword, int page, int size);
+
+    /**
+     * Get aggregate phone click statistics across ALL listings owned by a user,
+     * independent of pagination (total clicks and total unique interested users).
+     *
+     * @param ownerId Owner/renter user ID
+     * @return Owner-wide phone click statistics
+     */
+    OwnerPhoneClickStatsResponse getOwnerPhoneClickStats(String ownerId);
 }
 

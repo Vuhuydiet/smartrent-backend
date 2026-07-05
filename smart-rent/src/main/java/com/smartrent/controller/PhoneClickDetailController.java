@@ -2,6 +2,7 @@ package com.smartrent.controller;
 
 import com.smartrent.dto.request.PhoneClickRequest;
 import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.OwnerPhoneClickStatsResponse;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PhoneClickResponse;
 import com.smartrent.dto.response.PhoneClickStatsResponse;
@@ -659,6 +660,59 @@ public class PhoneClickDetailController {
         return ApiResponse.<PageResponse<PhoneClickResponse>>builder()
                 .code("999999")
                 .data(responses)
+                .build();
+    }
+
+    @GetMapping("/my-listings/stats")
+    @Operation(
+            summary = "Get aggregate phone click statistics for my listings",
+            description = """
+                    Get total phone clicks and unique interested users across ALL of the
+                    authenticated user's listings, independent of pagination.
+
+                    **Use Case:**
+                    - Customer management dashboard summary cards
+                    """,
+            security = @SecurityRequirement(name = "Bearer Authentication")
+    )
+    @ApiResponses(value = {
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "200",
+                    description = "Successfully retrieved owner-wide statistics",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiResponse.class),
+                            examples = @ExampleObject(
+                                    name = "Success Response",
+                                    value = """
+                                            {
+                                              "code": "999999",
+                                              "message": "Success",
+                                              "data": {
+                                                "totalClicks": 137,
+                                                "uniqueUsers": 42
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized - User not authenticated"
+            )
+    })
+    public ApiResponse<OwnerPhoneClickStatsResponse> getOwnerPhoneClickStats() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String userId = authentication.getName();
+
+        log.info("Getting owner-wide phone click stats for user {}", userId);
+
+        OwnerPhoneClickStatsResponse response = phoneClickDetailService.getOwnerPhoneClickStats(userId);
+
+        return ApiResponse.<OwnerPhoneClickStatsResponse>builder()
+                .code("999999")
+                .data(response)
                 .build();
     }
 

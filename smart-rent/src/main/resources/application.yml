@@ -235,6 +235,7 @@ application:
         - "/v1/listings/stats/categories"
         - "/v1/listings/map-bounds"
         - "/v1/listings/search-suggestions/click"
+        - "/v1/views"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"
