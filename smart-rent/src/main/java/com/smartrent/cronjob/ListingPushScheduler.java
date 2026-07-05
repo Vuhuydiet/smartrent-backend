@@ -1,11 +1,14 @@
 package com.smartrent.cronjob;
 
+import com.smartrent.config.Constants;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.service.push.PushService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -56,6 +59,12 @@ public class ListingPushScheduler {
      * Mark listings whose expiryDate has passed as expired.
      * Runs every hour, aligned with the push scheduler.
      */
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_RECOMMENDATION_PERSONALIZED, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_RECOMMENDATION_SIMILAR, allEntries = true)
+    })
     @Scheduled(cron = "0 0 * * * *")
     public void expireListings() {
         int count = listingRepository.markExpiredListings(LocalDateTime.now());
