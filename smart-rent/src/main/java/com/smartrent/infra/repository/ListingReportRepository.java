@@ -85,4 +85,20 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
             "FROM listing_reports r WHERE r.created_at BETWEEN :start AND :end " +
             "GROUP BY DATE_FORMAT(r.created_at, '%Y-%m') ORDER BY label ASC", nativeQuery = true)
     List<Object[]> countReportsByMonth(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT r.category AS label, COUNT(*) AS cnt FROM listing_reports r " +
+            "WHERE r.created_at BETWEEN :start AND :end " +
+            "GROUP BY r.category ORDER BY cnt DESC", nativeQuery = true)
+    List<Object[]> countReportsByCategory(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT r.status AS label, COUNT(*) AS cnt FROM listing_reports r " +
+            "WHERE r.created_at BETWEEN :start AND :end " +
+            "GROUP BY r.status ORDER BY cnt DESC", nativeQuery = true)
+    List<Object[]> countReportsByStatus(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT AVG(TIMESTAMPDIFF(MINUTE, r.created_at, r.resolved_at)) FROM listing_reports r " +
+            "WHERE r.created_at BETWEEN :start AND :end AND r.resolved_at IS NOT NULL", nativeQuery = true)
+    Double avgResolutionMinutes(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    long countByCreatedAtBefore(LocalDateTime dateTime);
 }
