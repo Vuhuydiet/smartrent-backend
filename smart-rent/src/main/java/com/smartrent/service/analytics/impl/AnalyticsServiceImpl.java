@@ -53,22 +53,27 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         }
 
         long totalClicks;
-        long totalViews = viewRepository.countByListing_ListingId(listingId);
+        long totalViews;
         List<DailyClickCount> clicksOverTime;
         Map<String, Long> clicksByDayOfWeek;
 
         if (since != null) {
+            LocalDateTime now = LocalDateTime.now();
             totalClicks = phoneClickDetailRepository.countByListing_ListingIdAndClickedAtBetween(
-                    listingId, since, LocalDateTime.now());
+                    listingId, since, now);
+            totalViews = viewRepository.countByListing_ListingIdAndViewedAtBetween(listingId, since, now);
             clicksOverTime = buildClicksOverTimeSince(listingId, since);
             clicksByDayOfWeek = buildClicksByDayOfWeekSince(listingId, since);
         } else {
             totalClicks = phoneClickDetailRepository.countByListing_ListingId(listingId);
+            totalViews = viewRepository.countByListing_ListingId(listingId);
             clicksOverTime = buildClicksOverTime(listingId);
             clicksByDayOfWeek = buildClicksByDayOfWeek(listingId);
         }
 
-        double conversionRate = totalViews > 0 ? (double) totalClicks / totalViews : 0.0;
+        // Views can undercount relative to clicks (ad blockers, JS errors dropping the
+        // tracking beacon), so cap the displayed rate at 100% instead of showing e.g. 340%.
+        double conversionRate = totalViews > 0 ? Math.min(1.0, (double) totalClicks / totalViews) : 0.0;
 
         return ListingAnalyticsResponse.builder()
                 .listingId(listingId)
@@ -160,7 +165,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         } else {
             page = savedListingRepository.countSavesPerListingForOwnerPaged(ownerId, pageable);
         }
-        long totalSavesAcrossAll = 0;
+
+        // Computed independently of the page size so it reflects saves across
+        // ALL of the owner's listings, not just the current page.
+        long totalSavesAcrossAll = savedListingRepository.countTotalSavesForOwner(ownerId);
 
         List<ListingSaveSummary> summaries = page.getContent().stream()
                 .map(row -> {
@@ -176,10 +184,6 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                             .build();
                 })
                 .collect(Collectors.toList());
-
-        for (ListingSaveSummary s : summaries) {
-            totalSavesAcrossAll += s.getTotalSaves();
-        }
 
         return OwnerSavedListingsAnalyticsResponse.builder()
                 .listings(summaries)

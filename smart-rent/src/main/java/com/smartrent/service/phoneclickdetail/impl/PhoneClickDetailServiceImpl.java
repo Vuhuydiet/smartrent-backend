@@ -2,6 +2,7 @@ package com.smartrent.service.phoneclickdetail.impl;
 
 import com.smartrent.dto.request.PhoneClickRequest;
 import com.smartrent.dto.response.ListingClickInfo;
+import com.smartrent.dto.response.OwnerPhoneClickStatsResponse;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PhoneClickResponse;
 import com.smartrent.dto.response.PhoneClickStatsResponse;
@@ -459,6 +460,20 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
                 .totalPages(userIdsPage.getTotalPages())
                 .totalElements(userIdsPage.getTotalElements())
                 .data(responses)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OwnerPhoneClickStatsResponse getOwnerPhoneClickStats(String ownerId) {
+        log.info("Getting owner-wide phone click stats for user {}", ownerId);
+
+        long totalClicks = phoneClickDetailRepository.countByListingOwnerId(ownerId);
+        long uniqueUsers = phoneClickDetailRepository.countDistinctUsersByListingOwnerId(ownerId);
+
+        return OwnerPhoneClickStatsResponse.builder()
+                .totalClicks(totalClicks)
+                .uniqueUsers(uniqueUsers)
                 .build();
     }
 

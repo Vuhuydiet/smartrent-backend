@@ -234,6 +234,19 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
     Page<Object[]> countClicksPerListingForOwnerPagedWithSearch(
             @Param("ownerId") String ownerId, @Param("keyword") String keyword, Pageable pageable);
 
+    /**
+     * Count total phone clicks across ALL listings owned by a user (not paginated).
+     * Used for owner-wide dashboard/customer stats, independent of page size.
+     */
+    @Query("SELECT COUNT(pc) FROM phone_clicks pc WHERE pc.listing.userId = :ownerId")
+    long countByListingOwnerId(@Param("ownerId") String ownerId);
+
+    /**
+     * Count distinct users who clicked on any listing owned by a user (not paginated).
+     */
+    @Query("SELECT COUNT(DISTINCT pc.user.userId) FROM phone_clicks pc WHERE pc.listing.userId = :ownerId")
+    long countDistinctUsersByListingOwnerId(@Param("ownerId") String ownerId);
+
     // ─── Recommendation Signal Queries ───
 
     /**
