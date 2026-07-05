@@ -5,6 +5,7 @@ import com.smartrent.infra.repository.entity.ListingReport;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -13,7 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
-public interface ListingReportRepository extends JpaRepository<ListingReport, Long> {
+public interface ListingReportRepository extends JpaRepository<ListingReport, Long>, JpaSpecificationExecutor<ListingReport> {
 
     /**
      * Find all reports for a specific listing
@@ -45,16 +46,6 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
      */
     @Query("SELECT COUNT(r) > 0 FROM listing_reports r WHERE r.listingId = :listingId AND (r.reporterEmail = :email OR r.reporterPhone = :phone)")
     boolean existsByListingIdAndReporter(@Param("listingId") Long listingId, @Param("email") String email, @Param("phone") String phone);
-
-    /**
-     * Find all reports with pagination (for admin)
-     */
-    Page<ListingReport> findAllByOrderByCreatedAtDesc(Pageable pageable);
-
-    /**
-     * Find reports by status with pagination
-     */
-    Page<ListingReport> findByStatusOrderByCreatedAtDesc(ReportStatus status, Pageable pageable);
 
     /**
      * Find reports by status

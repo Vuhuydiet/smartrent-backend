@@ -2,6 +2,8 @@ package com.smartrent.infra.repository;
 
 import com.smartrent.enums.PackageLevel;
 import com.smartrent.infra.repository.entity.MembershipPackage;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -13,6 +15,8 @@ import java.util.Optional;
 public interface MembershipPackageRepository extends JpaRepository<MembershipPackage, Long> {
 
     Optional<MembershipPackage> findByPackageCode(String packageCode);
+
+    Page<MembershipPackage> findByPackageNameContainingIgnoreCase(String packageName, Pageable pageable);
 
     List<MembershipPackage> findByIsActiveTrueOrderByPackageLevelAsc();
 

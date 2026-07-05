@@ -6,6 +6,7 @@ import com.smartrent.infra.repository.entity.News;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface NewsRepository extends JpaRepository<News, Long> {
+public interface NewsRepository extends JpaRepository<News, Long>, JpaSpecificationExecutor<News> {
 
         /**
          * Find news by slug (for detail page)
@@ -43,64 +44,6 @@ public interface NewsRepository extends JpaRepository<News, Long> {
          * Find published news ordered by published date
          */
         Page<News> findByStatusOrderByPublishedAtDesc(NewsStatus status, Pageable pageable);
-
-        /**
-         * Full-text search in title and summary for admin (optional status)
-         */
-        @Query("SELECT n FROM news n WHERE (:status IS NULL OR n.status = :status) " +
-                        "AND (LOWER(n.title) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-                        "OR LOWER(n.summary) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
-                        "ORDER BY n.createdAt DESC")
-        Page<News> searchAdminNews(
-                        @Param("keyword") String keyword,
-                        @Param("status") NewsStatus status,
-                        Pageable pageable);
-
-        /**
-         * Search by category and keyword for admin (optional status)
-         */
-        @Query("SELECT n FROM news n WHERE (:status IS NULL OR n.status = :status) " +
-                        "AND n.category = :category " +
-                        "AND (LOWER(n.title) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-                        "OR LOWER(n.summary) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
-                        "ORDER BY n.createdAt DESC")
-        Page<News> searchAdminNewsByCategory(
-                        @Param("keyword") String keyword,
-                        @Param("category") NewsCategory category,
-                        @Param("status") NewsStatus status,
-                        Pageable pageable);
-
-        /**
-         * Search by tag for admin (optional status)
-         */
-        @Query("SELECT n FROM news n WHERE (:status IS NULL OR n.status = :status) " +
-                        "AND LOWER(n.tags) LIKE LOWER(CONCAT('%', :tag, '%')) " +
-                        "ORDER BY n.createdAt DESC")
-        Page<News> findByTagAndStatusOptional(
-                        @Param("tag") String tag,
-                        @Param("status") NewsStatus status,
-                        Pageable pageable);
-
-        /**
-         * Find by category for admin (optional status)
-         */
-        @Query("SELECT n FROM news n WHERE (:status IS NULL OR n.status = :status) " +
-                        "AND n.category = :category " +
-                        "ORDER BY n.createdAt DESC")
-        Page<News> findByCategoryAndStatusOptional(
-                        @Param("category") NewsCategory category,
-                        @Param("status") NewsStatus status,
-                        Pageable pageable);
-
-        /**
-         * Find all news (admin view) with pagination
-         */
-        Page<News> findAllByOrderByCreatedAtDesc(Pageable pageable);
-
-        /**
-         * Find news by status (admin view)
-         */
-        Page<News> findByStatusOrderByCreatedAtDesc(NewsStatus status, Pageable pageable);
 
         /**
          * Full-text search in title and summary for published news

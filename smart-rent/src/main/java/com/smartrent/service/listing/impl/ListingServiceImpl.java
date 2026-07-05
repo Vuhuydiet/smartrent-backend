@@ -87,6 +87,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -741,14 +742,15 @@ public class ListingServiceImpl implements ListingService {
                     .orElse(null);
         }
 
-        // Determine verification status based on listing state
+        // Determine verification status based on listing state (mirrors the admin
+        // list view's derivation in getAllListingsForAdmin — keep both in sync)
         String verificationStatus;
         if (listing.getVerified()) {
             verificationStatus = "APPROVED";
         } else if (listing.getIsVerify()) {
             verificationStatus = "PENDING";
         } else {
-            verificationStatus = "PENDING";
+            verificationStatus = "NOT_SUBMITTED";
         }
 
         // For now, verification notes can be null - in the future, this could be stored in a separate table
@@ -2049,8 +2051,21 @@ public class ListingServiceImpl implements ListingService {
                             LinkedHashMap::new,
                             Collectors.mapping(Media::getUrl, Collectors.toList())));
 
+            // ---- Batch-load legacy district names for the page — 1 query ----
+            // (Listing.address is already eager-fetched by ListingSpecification, so
+            // this only needs one extra findAllById for legacy-structure addresses.)
+            Set<Integer> legacyDistrictIds = content.stream()
+                    .map(Listing::getAddress)
+                    .filter(Objects::nonNull)
+                    .map(Address::getLegacyDistrictId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            Map<Integer, String> districtNameById = legacyDistrictIds.isEmpty()
+                    ? Collections.emptyMap()
+                    : legacyDistrictRepository.findAllById(legacyDistrictIds).stream()
+                            .collect(Collectors.toMap(District::getId, District::getName));
+
             // ---- Map to slim AdminListingSummary DTOs ----
-            // (No amenity/address fetch — list view does not need them.)
             listings = content.stream()
                     .map(listing -> {
                         String verificationStatus;
@@ -2063,7 +2078,16 @@ public class ListingServiceImpl implements ListingService {
                         }
                         com.smartrent.infra.repository.entity.User owner = userMap.get(listing.getUserId());
                         List<String> images = imagesByListingId.getOrDefault(listing.getListingId(), Collections.emptyList());
-                        return listingMapper.toAdminSummary(listing, owner, verificationStatus, images);
+                        com.smartrent.dto.response.AdminListingSummary summary =
+                                listingMapper.toAdminSummary(listing, owner, verificationStatus, images);
+                        Address address = listing.getAddress();
+                        if (address != null) {
+                            summary.setFullAddress(address.getDisplayAddress());
+                            if (address.getLegacyDistrictId() != null) {
+                                summary.setDistrict(districtNameById.get(address.getLegacyDistrictId()));
+                            }
+                        }
+                        return summary;
                     })
                     .collect(Collectors.toList());
         } else {

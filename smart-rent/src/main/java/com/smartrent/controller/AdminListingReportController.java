@@ -113,9 +113,18 @@ public class AdminListingReportController {
             @Parameter(description = "Page number (1-indexed)", example = "1")
             @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Number of items per page", example = "20")
-            @RequestParam(defaultValue = "20") int size) {
-        
-        PageResponse<ListingReportResponse> reports = listingReportService.getAllReports(status, page, size);
+            @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Free-text match against reporter name, email, or phone")
+            @RequestParam(required = false) String search,
+            @Parameter(description = "Filter by the reported listing's ID")
+            @RequestParam(required = false) Long listingId,
+            @Parameter(description = "Single date or range, e.g. 2026-02-09..2026-03-10")
+            @RequestParam(required = false) String createdAt,
+            @Parameter(description = "field,direction — e.g. status,asc. Supported fields: createdAt, status, category (default createdAt,desc)")
+            @RequestParam(required = false) String sort) {
+
+        PageResponse<ListingReportResponse> reports =
+                listingReportService.getAllReports(status, page, size, search, listingId, createdAt, sort);
         return ApiResponse.<PageResponse<ListingReportResponse>>builder()
                 .data(reports)
                 .build();

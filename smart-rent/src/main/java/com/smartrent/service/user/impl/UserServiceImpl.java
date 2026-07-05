@@ -32,8 +32,12 @@ import com.smartrent.service.user.UserService;
 import com.smartrent.utility.MaskingUtil;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.AccessLevel;
@@ -45,6 +49,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -126,13 +131,57 @@ public class UserServiceImpl implements UserService {
     return userMapper.mapFromUserEntityToGetUserResponse(user);
   }
 
+  private static final Set<String> USER_SORTABLE_FIELDS = Set.of("firstName", "lastName", "createdAt");
+
+  private Sort buildSort(AdminFilterRequest filter, Set<String> allowedFields, String defaultField) {
+    String field = filter.getSortBy();
+    if (field == null || !allowedFields.contains(field)) {
+      field = defaultField;
+    }
+    Sort.Direction direction = "ASC".equalsIgnoreCase(filter.getSortDirection())
+        ? Sort.Direction.ASC
+        : Sort.Direction.DESC;
+    return Sort.by(direction, field);
+  }
+
+  /**
+   * Parses a single date ("2026-02-09") or a "from..to" range. Either side of a
+   * range may be omitted for an open-ended bound. Returns {@code null} when the
+   * input is blank.
+   */
+  private DateRange parseDateOrRange(String raw) {
+    if (raw == null) {
+      return null;
+    }
+    String s = raw.trim();
+    if (s.isEmpty()) {
+      return null;
+    }
+    int idx = s.indexOf("..");
+    if (idx < 0) {
+      LocalDate date = LocalDate.parse(s);
+      return new DateRange(date.atStartOfDay(), date.atTime(LocalTime.MAX));
+    }
+    String fromStr = s.substring(0, idx).trim();
+    String toStr = s.substring(idx + 2).trim();
+    LocalDateTime from = fromStr.isEmpty() ? null : LocalDate.parse(fromStr).atStartOfDay();
+    LocalDateTime to = toStr.isEmpty() ? null : LocalDate.parse(toStr).atTime(LocalTime.MAX);
+    if (from == null && to == null) {
+      return null;
+    }
+    return new DateRange(from, to);
+  }
+
+  private record DateRange(LocalDateTime from, LocalDateTime to) {}
+
   @Override
   public PageResponse<GetUserResponse> getUsers(AdminFilterRequest filter) {
     // Validate and set defaults
     int page = Math.max(filter.getPage() != null ? filter.getPage() : 1, 1);
     int size = Math.max(filter.getSize() != null ? filter.getSize() : 20, 1);
 
-    Pageable pageable = PageRequest.of(page - 1, size);
+    Sort sort = buildSort(filter, USER_SORTABLE_FIELDS, "createdAt");
+    Pageable pageable = PageRequest.of(page - 1, size, sort);
 
     // Build dynamic specification from filter request
     Specification<User> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
@@ -190,6 +239,24 @@ public class UserServiceImpl implements UserService {
       Boolean isBroker = filter.getBooleanFilter("isBroker");
       if (isBroker != null) {
         spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("isBroker"), isBroker));
+      }
+    }
+
+    // createdAt filter - single date ("2026-02-09") or range ("2026-02-09..2026-03-10")
+    if (filter.hasFilter("createdAt")) {
+      DateRange range = parseDateOrRange(filter.getStringFilter("createdAt"));
+      if (range != null) {
+        DateRange finalRange = range;
+        spec = spec.and((root, query, criteriaBuilder) -> {
+          List<Predicate> predicates = new ArrayList<>();
+          if (finalRange.from() != null) {
+            predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), finalRange.from()));
+          }
+          if (finalRange.to() != null) {
+            predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), finalRange.to()));
+          }
+          return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        });
       }
     }
 

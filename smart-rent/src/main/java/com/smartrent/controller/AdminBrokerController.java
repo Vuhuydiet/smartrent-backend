@@ -118,9 +118,17 @@ public class AdminBrokerController {
             @Parameter(description = "Page number (1-indexed)", example = "1")
             @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Number of items per page (max 100)", example = "20")
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Free-text match against first name, last name, or email")
+            @RequestParam(required = false) String search,
+            @Parameter(description = "Single date or range on brokerRegisteredAt, e.g. 2026-02-09..2026-03-10")
+            @RequestParam(required = false) String registeredAt,
+            @Parameter(description = "field,direction — e.g. firstName,asc. Supported fields: brokerRegisteredAt, firstName, lastName (default brokerRegisteredAt,asc)")
+            @RequestParam(required = false) String sort) {
 
-        PageResponse<AdminBrokerUserResponse> result = brokerService.getPendingBrokers(page, size);
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
+        PageResponse<AdminBrokerUserResponse> result =
+                brokerService.getPendingBrokers(page, normalizedSize, search, registeredAt, sort);
         return ApiResponse.<PageResponse<AdminBrokerUserResponse>>builder().data(result).build();
     }
 

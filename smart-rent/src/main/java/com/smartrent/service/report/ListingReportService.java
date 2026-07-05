@@ -33,9 +33,15 @@ public interface ListingReportService {
     // ============ ADMIN METHODS ============
 
     /**
-     * Get all reports with pagination and optional status filter (Admin only)
+     * Get all reports with pagination and optional filters (Admin only)
+     *
+     * @param search free-text match against reporter name, email, or phone (nullable)
+     * @param listingId exact match on the reported listing's ID (nullable)
+     * @param createdAt single date or "from..to" range filter on createdAt (nullable)
+     * @param sort "field,direction" — supported fields: createdAt, status, category (nullable, defaults to createdAt,desc)
      */
-    PageResponse<ListingReportResponse> getAllReports(String status, int page, int size);
+    PageResponse<ListingReportResponse> getAllReports(
+            String status, int page, int size, String search, Long listingId, String createdAt, String sort);
 
     /**
      * Get a specific report by ID (Admin only)

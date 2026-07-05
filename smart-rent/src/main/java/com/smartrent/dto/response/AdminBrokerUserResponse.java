@@ -44,10 +44,7 @@ public class AdminBrokerUserResponse {
         @Schema(description = "URL of the user's profile picture")
         String avatarUrl;
 
-        @Schema(description = "Whether this user is an approved broker", example = "false")
-        Boolean isBroker;
-
-        @Schema(description = "Current broker verification status", example = "PENDING", allowableValues = { "NONE",
+        @Schema(description = "Current broker verification status — always PENDING for this endpoint, kept for consistency with other broker views", example = "PENDING", allowableValues = { "NONE",
                         "PENDING", "APPROVED", "REJECTED" })
         String brokerVerificationStatus;
 
@@ -55,14 +52,7 @@ public class AdminBrokerUserResponse {
         @Schema(description = "When the broker registration was submitted", example = "2024-01-15T10:30:00")
         LocalDateTime brokerRegisteredAt;
 
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-        @Schema(description = "When the admin made the decision", example = "2024-01-16T09:00:00")
-        LocalDateTime brokerVerifiedAt;
-
-        @Schema(description = "Admin ID who made the decision", example = "admin-uuid-abc")
-        String brokerVerifiedByAdminId;
-
-        @Schema(description = "Rejection reason (only present when REJECTED)", example = "License not found")
+        @Schema(description = "Rejection reason from a previous review, if this is a re-submission (only present when REJECTED)", example = "License not found")
         String brokerRejectionReason;
 
         // ============ DOCUMENT VIEWING URLS (presigned, short-lived) ============

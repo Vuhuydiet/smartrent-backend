@@ -70,9 +70,11 @@ public class AdminMembershipController {
                         })
         public ApiResponse<PageResponse<MembershipPackageResponse>> getAllPackages(
                         @Parameter(description = "Page number (1-indexed)", example = "1") @RequestParam(defaultValue = "1") int page,
-                        @Parameter(description = "Number of items per page", example = "10") @RequestParam(defaultValue = "10") int size) {
-                log.info("Admin listing all membership packages - page: {}, size: {}", page, size);
-                PageResponse<MembershipPackageResponse> packages = membershipService.getAllPackages(page, size);
+                        @Parameter(description = "Number of items per page", example = "10") @RequestParam(defaultValue = "10") int size,
+                        @Parameter(description = "Contains-match on package name") @RequestParam(required = false) String search,
+                        @Parameter(description = "field,direction — e.g. originalPrice,asc. Supported fields: packageName, packageLevel, originalPrice, salePrice, createdAt (default createdAt,desc)") @RequestParam(required = false) String sort) {
+                log.info("Admin listing all membership packages - page: {}, size: {}, search: {}, sort: {}", page, size, search, sort);
+                PageResponse<MembershipPackageResponse> packages = membershipService.getAllPackages(page, size, search, sort);
                 return ApiResponse.<PageResponse<MembershipPackageResponse>>builder()
                                 .data(packages)
                                 .build();

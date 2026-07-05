@@ -16,11 +16,13 @@ import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingReportRepository;
 import com.smartrent.infra.repository.ListingRepository;
+import com.smartrent.infra.repository.MediaRepository;
 import com.smartrent.infra.repository.ReportReasonRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.ListingReport;
+import com.smartrent.infra.repository.entity.Media;
 import com.smartrent.infra.repository.entity.ReportReason;
 import com.smartrent.mapper.ListingReportMapper;
 import com.smartrent.infra.connector.model.EmailInfo;
@@ -30,6 +32,7 @@ import com.smartrent.service.moderation.ListingModerationService;
 import com.smartrent.service.notification.NotificationService;
 import com.smartrent.utility.ModerationEmailBuilder;
 import com.smartrent.service.report.ListingReportService;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
@@ -37,11 +40,17 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -53,6 +62,7 @@ public class ListingReportServiceImpl implements ListingReportService {
     private final ReportReasonRepository reportReasonRepository;
     private final ListingReportRepository listingReportRepository;
     private final ListingRepository listingRepository;
+    private final MediaRepository mediaRepository;
     private final ListingReportMapper listingReportMapper;
     private final AdminRepository adminRepository;
     private final ListingModerationService listingModerationService;
@@ -184,27 +194,70 @@ public class ListingReportServiceImpl implements ListingReportService {
 
     // ============ ADMIN METHODS ============
 
+    private static final Set<String> REPORT_SORTABLE_FIELDS = Set.of("createdAt", "status", "category");
+
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<ListingReportResponse> getAllReports(String status, int page, int size) {
-        log.info("Admin fetching all reports - status: {}, page: {}, size: {}", status, page, size);
+    public PageResponse<ListingReportResponse> getAllReports(
+            String status, int page, int size, String search, Long listingId, String createdAt, String sort) {
+        log.info("Admin fetching all reports - status: {}, page: {}, size: {}, search: {}, listingId: {}, createdAt: {}, sort: {}",
+                status, page, size, search, listingId, createdAt, sort);
 
         // Convert 1-based page to 0-based for Spring Data
         int safePage = Math.max(page - 1, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
-        Pageable pageable = PageRequest.of(safePage, safeSize);
 
-        Page<ListingReport> reportPage;
+        String sortField = "createdAt";
+        Sort.Direction direction = Sort.Direction.DESC;
+        if (sort != null && !sort.isBlank()) {
+            String[] parts = sort.split(",", 2);
+            if (REPORT_SORTABLE_FIELDS.contains(parts[0].trim())) {
+                sortField = parts[0].trim();
+            }
+            if (parts.length > 1) {
+                direction = "ASC".equalsIgnoreCase(parts[1].trim()) ? Sort.Direction.ASC : Sort.Direction.DESC;
+            }
+        }
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(direction, sortField));
+
+        Specification<ListingReport> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
+
         if (status != null && !status.isEmpty()) {
+            ReportStatus reportStatus;
             try {
-                ReportStatus reportStatus = ReportStatus.valueOf(status.toUpperCase());
-                reportPage = listingReportRepository.findByStatusOrderByCreatedAtDesc(reportStatus, pageable);
+                reportStatus = ReportStatus.valueOf(status.toUpperCase());
             } catch (IllegalArgumentException e) {
                 throw new DomainException(DomainCode.BAD_REQUEST_ERROR, "Invalid status: " + status);
             }
-        } else {
-            reportPage = listingReportRepository.findAllByOrderByCreatedAtDesc(pageable);
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("status"), reportStatus));
         }
+        if (listingId != null) {
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("listingId"), listingId));
+        }
+        if (search != null && !search.isBlank()) {
+            String keyword = "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.or(
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("reporterName")), keyword),
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("reporterEmail")), keyword),
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("reporterPhone")), keyword)
+            ));
+        }
+        DateRange range = parseDateOrRange(createdAt);
+        if (range != null) {
+            DateRange finalRange = range;
+            spec = spec.and((root, query, criteriaBuilder) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                if (finalRange.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), finalRange.from()));
+                }
+                if (finalRange.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), finalRange.to()));
+                }
+                return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+            });
+        }
+
+        Page<ListingReport> reportPage = listingReportRepository.findAll(spec, pageable);
 
         List<ListingReportResponse> reports = reportPage.getContent().stream()
                 .map(this::mapToResponseWithAdminInfo)
@@ -220,6 +273,36 @@ public class ListingReportServiceImpl implements ListingReportService {
                 .data(reports)
                 .build();
     }
+
+    /**
+     * Parses a single date ("2026-02-09") or a "from..to" range. Either side of a
+     * range may be omitted for an open-ended bound. Returns {@code null} when the
+     * input is blank.
+     */
+    private DateRange parseDateOrRange(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String s = raw.trim();
+        if (s.isEmpty()) {
+            return null;
+        }
+        int idx = s.indexOf("..");
+        if (idx < 0) {
+            LocalDate date = LocalDate.parse(s);
+            return new DateRange(date.atStartOfDay(), date.atTime(LocalTime.MAX));
+        }
+        String fromStr = s.substring(0, idx).trim();
+        String toStr = s.substring(idx + 2).trim();
+        LocalDateTime from = fromStr.isEmpty() ? null : LocalDate.parse(fromStr).atStartOfDay();
+        LocalDateTime to = toStr.isEmpty() ? null : LocalDate.parse(toStr).atTime(LocalTime.MAX);
+        if (from == null && to == null) {
+            return null;
+        }
+        return new DateRange(from, to);
+    }
+
+    private record DateRange(LocalDateTime from, LocalDateTime to) {}
 
     @Override
     @Transactional(readOnly = true)
@@ -421,7 +504,25 @@ public class ListingReportServiceImpl implements ListingReportService {
             });
         }
 
+        // Add reported-listing title/thumbnail so the admin UI doesn't need a
+        // separate listing-detail request just to render the report row/modal.
+        listingRepository.findById(report.getListingId()).ifPresent(listing -> {
+            response.setListingTitle(listing.getTitle());
+            response.setListingThumbnailUrl(resolveListingThumbnailUrl(report.getListingId()));
+        });
+
         return response;
+    }
+
+    private String resolveListingThumbnailUrl(Long listingId) {
+        return mediaRepository.findActiveMediaByListingIds(List.of(listingId)).stream()
+                .filter(media -> media.getMediaType() == Media.MediaType.IMAGE)
+                .filter(media -> media.getUrl() != null && !media.getUrl().isBlank())
+                .min(java.util.Comparator
+                        .comparing((Media media) -> !Boolean.TRUE.equals(media.getIsPrimary()))
+                        .thenComparing(media -> media.getSortOrder() != null ? media.getSortOrder() : 0))
+                .map(Media::getUrl)
+                .orElse(null);
     }
 }
 

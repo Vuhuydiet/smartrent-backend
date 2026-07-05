@@ -15,19 +15,25 @@ import com.smartrent.infra.repository.NewsRepository;
 import com.smartrent.infra.repository.entity.News;
 import com.smartrent.mapper.NewsMapper;
 import com.smartrent.service.news.NewsService;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -276,6 +282,8 @@ public class NewsServiceImpl implements NewsService {
         log.info("News deleted successfully: {}", newsId);
     }
 
+    private static final Set<String> NEWS_SORTABLE_FIELDS = Set.of("createdAt", "publishedAt", "title", "viewCount");
+
     @Override
     @Transactional(readOnly = true)
     public NewsListResponse getAllNews(AdminFilterRequest filter) {
@@ -286,8 +294,14 @@ public class NewsServiceImpl implements NewsService {
         log.info("Getting all news (admin) - page: {}, size: {}, filters: {}",
                 page, size, filter.getFilters());
 
-        int pageNumber = page - 1;
-        Pageable pageable = PageRequest.of(pageNumber, size);
+        String field = filter.getSortBy();
+        if (field == null || !NEWS_SORTABLE_FIELDS.contains(field)) {
+            field = "createdAt";
+        }
+        Sort.Direction direction = "ASC".equalsIgnoreCase(filter.getSortDirection())
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(direction, field));
 
         // Extract filters
         String title = filter.hasFilter("title") ? filter.getStringFilter("title") : null;
@@ -295,11 +309,9 @@ public class NewsServiceImpl implements NewsService {
         String categoryStr = filter.hasFilter("category") ? filter.getStringFilter("category") : null;
         String tag = filter.hasFilter("tag") ? filter.getStringFilter("tag") : null;
         String statusStr = filter.hasFilter("status") ? filter.getStringFilter("status") : null;
+        String createdAtRaw = filter.hasFilter("createdAt") ? filter.getStringFilter("createdAt") : null;
 
-        // Parse enums
         NewsCategory category = null;
-        NewsStatus status = null;
-
         if (categoryStr != null) {
             try {
                 category = NewsCategory.valueOf(categoryStr);
@@ -308,6 +320,7 @@ public class NewsServiceImpl implements NewsService {
             }
         }
 
+        NewsStatus status = null;
         if (statusStr != null) {
             try {
                 status = NewsStatus.valueOf(statusStr);
@@ -316,28 +329,46 @@ public class NewsServiceImpl implements NewsService {
             }
         }
 
-        Page<News> newsPage;
-        boolean hasKeyword = StringUtils.hasText(title) || StringUtils.hasText(summary);
-
         // Use title for keyword search (support both title and summary filters)
-        String keyword = title != null ? title : summary;
+        String keyword = StringUtils.hasText(title) ? title.trim() : (StringUtils.hasText(summary) ? summary.trim() : null);
 
-        if (hasKeyword) {
-            String trimmedKeyword = keyword.trim();
-            if (category != null) {
-                newsPage = newsRepository.searchAdminNewsByCategory(trimmedKeyword, category, status, pageable);
-            } else {
-                newsPage = newsRepository.searchAdminNews(trimmedKeyword, status, pageable);
-            }
-        } else if (StringUtils.hasText(tag)) {
-            newsPage = newsRepository.findByTagAndStatusOptional(tag.trim(), status, pageable);
-        } else if (category != null) {
-            newsPage = newsRepository.findByCategoryAndStatusOptional(category, status, pageable);
-        } else if (status != null) {
-            newsPage = newsRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
-        } else {
-            newsPage = newsRepository.findAllByOrderByCreatedAtDesc(pageable);
+        Specification<News> spec = (root, query, criteriaBuilder) -> criteriaBuilder.conjunction();
+
+        if (status != null) {
+            NewsStatus finalStatus = status;
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("status"), finalStatus));
         }
+        if (category != null) {
+            NewsCategory finalCategory = category;
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("category"), finalCategory));
+        }
+        if (keyword != null) {
+            String likeKeyword = "%" + keyword.toLowerCase() + "%";
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.or(
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("title")), likeKeyword),
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("summary")), likeKeyword)
+            ));
+        }
+        if (StringUtils.hasText(tag)) {
+            String likeTag = "%" + tag.trim().toLowerCase() + "%";
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.like(criteriaBuilder.lower(root.get("tags")), likeTag));
+        }
+        DateRange createdAtRange = parseDateOrRange(createdAtRaw);
+        if (createdAtRange != null) {
+            DateRange finalRange = createdAtRange;
+            spec = spec.and((root, query, criteriaBuilder) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                if (finalRange.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), finalRange.from()));
+                }
+                if (finalRange.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), finalRange.to()));
+                }
+                return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+            });
+        }
+
+        Page<News> newsPage = newsRepository.findAll(spec, pageable);
 
         List<NewsSummaryResponse> newsList = newsPage.getContent().stream()
                 .map(newsMapper::toSummaryResponse)
@@ -351,6 +382,36 @@ public class NewsServiceImpl implements NewsService {
                 .totalPages(newsPage.getTotalPages())
                 .build();
     }
+
+    /**
+     * Parses a single date ("2026-02-09") or a "from..to" range. Either side of a
+     * range may be omitted for an open-ended bound. Returns {@code null} when the
+     * input is blank.
+     */
+    private DateRange parseDateOrRange(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String s = raw.trim();
+        if (s.isEmpty()) {
+            return null;
+        }
+        int idx = s.indexOf("..");
+        if (idx < 0) {
+            LocalDate date = LocalDate.parse(s);
+            return new DateRange(date.atStartOfDay(), date.atTime(LocalTime.MAX));
+        }
+        String fromStr = s.substring(0, idx).trim();
+        String toStr = s.substring(idx + 2).trim();
+        LocalDateTime from = fromStr.isEmpty() ? null : LocalDate.parse(fromStr).atStartOfDay();
+        LocalDateTime to = toStr.isEmpty() ? null : LocalDate.parse(toStr).atTime(LocalTime.MAX);
+        if (from == null && to == null) {
+            return null;
+        }
+        return new DateRange(from, to);
+    }
+
+    private record DateRange(LocalDateTime from, LocalDateTime to) {}
 
     @Override
     @Transactional(readOnly = true)

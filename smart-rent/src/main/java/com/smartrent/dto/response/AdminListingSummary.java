@@ -45,9 +45,6 @@ public class AdminListingSummary {
     @Schema(description = "Listing type", example = "SHARE", allowableValues = { "RENT", "SALE", "SHARE" })
     String listingType;
 
-    @Schema(description = "Whether listing is verified")
-    Boolean verified;
-
     @Schema(description = "Whether listing is expired")
     Boolean expired;
 
@@ -56,9 +53,6 @@ public class AdminListingSummary {
 
     @Schema(description = "VIP tier", example = "DIAMOND", allowableValues = { "NORMAL", "SILVER", "GOLD", "DIAMOND" })
     String vipType;
-
-    @Schema(description = "Category ID", example = "2")
-    Long categoryId;
 
     @Schema(description = "Product type", example = "APARTMENT", allowableValues = { "ROOM", "APARTMENT", "HOUSE", "OFFICE", "STUDIO" })
     String productType;
@@ -72,22 +66,22 @@ public class AdminListingSummary {
     @Schema(description = "Area in m²", example = "34.1")
     Float area;
 
+    @Schema(description = "District name (legacy address structure only; null for new-structure addresses)", example = "Quận Tân Bình")
+    String district;
+
+    @Schema(description = "Full formatted address", example = "123 Nguyễn Trãi, Phường 5, Quận Tân Bình, TP. Hồ Chí Minh")
+    String fullAddress;
+
     @Schema(description = "Image URLs (primary first, then sorted by sortOrder)",
             example = "[\"https://cdn.example.com/img1.jpg\", \"https://cdn.example.com/img2.jpg\"]")
     List<String> images;
 
-    @Schema(description = "Admin verification summary (verifiedAt + verificationStatus only)")
+    @Schema(description = "Admin verification summary (verificationStatus only)")
     AdminVerificationSummary adminVerification;
 
     @Schema(description = "Canonical moderation status", example = "PENDING_REVIEW", allowableValues = {
             "PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED" })
     String moderationStatus;
-
-    @Schema(description = "Number of revisions", example = "0")
-    Integer revisionCount;
-
-    @Schema(description = "Structured reason code for last moderation action", example = "MISSING_INFO")
-    String lastModerationReasonCode;
 
     @Schema(description = "Human-readable reason for last moderation action")
     String lastModerationReasonText;
@@ -121,10 +115,6 @@ public class AdminListingSummary {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @Schema(description = "Admin verification summary for admin list view")
     public static class AdminVerificationSummary {
-
-        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
-        @Schema(description = "Verification timestamp", example = "2026-05-24T04:08:12")
-        LocalDateTime verifiedAt;
 
         @Schema(description = "Verification status", example = "PENDING", allowableValues = { "PENDING", "APPROVED", "REJECTED", "NOT_SUBMITTED" })
         String verificationStatus;

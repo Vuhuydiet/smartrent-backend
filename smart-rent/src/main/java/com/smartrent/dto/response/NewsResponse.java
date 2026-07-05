@@ -53,9 +53,6 @@ public class NewsResponse {
     @Schema(description = "Publication date and time")
     LocalDateTime publishedAt;
 
-    @Schema(description = "Author ID (admin)")
-    String authorId;
-
     @Schema(description = "Author display name")
     String authorName;
 
@@ -73,8 +70,5 @@ public class NewsResponse {
 
     @Schema(description = "Creation timestamp")
     LocalDateTime createdAt;
-
-    @Schema(description = "Last update timestamp")
-    LocalDateTime updatedAt;
 }
 

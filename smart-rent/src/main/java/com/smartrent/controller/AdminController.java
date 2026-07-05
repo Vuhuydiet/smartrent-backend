@@ -1,12 +1,10 @@
 package com.smartrent.controller;
 
 import com.smartrent.dto.request.AdminCreationRequest;
-import com.smartrent.dto.request.AdminFilterRequest;
 import com.smartrent.dto.request.AdminUpdateRequest;
 import com.smartrent.dto.response.AdminCreationResponse;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.GetAdminResponse;
-import com.smartrent.dto.response.PageResponse;
 import com.smartrent.service.admin.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -149,38 +147,6 @@ public class AdminController {
     GetAdminResponse getAdminResponse = adminService.getAdminById(id);
     return ApiResponse.<GetAdminResponse>builder()
         .data(getAdminResponse)
-        .build();
-  }
-
-  @GetMapping("/list")
-  @Operation(summary = "Get all admins with flexible filtering", description = "Retrieves a paginated list of all administrators. Supports flexible key:value filtering.\n\nFilters format: filter=key:value\n- Example: filter=firstName:John&filter=role:SA,UA", security = @SecurityRequirement(name = "Bearer Authentication"))
-  @ApiResponses(value = {
-      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Admins retrieved successfully")
-  })
-  public ApiResponse<PageResponse<GetAdminResponse>> getAllAdmins(
-      @Parameter(description = "Page number (1-based)", example = "1") @RequestParam(required = false, defaultValue = "1") Integer page,
-      @Parameter(description = "Page size", example = "20") @RequestParam(required = false, defaultValue = "20") Integer size,
-      @Parameter(description = "Flexible filters in format key:value (e.g., firstName:John, role:SA,UA)") @RequestParam(required = false) String[] filter) {
-
-    AdminFilterRequest filterRequest = AdminFilterRequest.builder()
-        .page(page != null ? page : 1)
-        .size(size != null ? size : 20)
-        .build();
-
-    if (filter != null && filter.length > 0) {
-      for (String f : filter) {
-        if (f != null && f.contains(":")) {
-          String[] parts = f.split(":", 2);
-          if (parts.length == 2) {
-            filterRequest.getFilters().put(parts[0].trim(), parts[1].trim());
-          }
-        }
-      }
-    }
-
-    PageResponse<GetAdminResponse> admins = adminService.getAllAdmins(filterRequest);
-    return ApiResponse.<PageResponse<GetAdminResponse>>builder()
-        .data(admins)
         .build();
   }
 

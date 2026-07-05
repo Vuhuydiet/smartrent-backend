@@ -1,5 +1,6 @@
 package com.smartrent.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -8,7 +9,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
-import software.amazon.awssdk.services.s3.endpoints.internal.Value;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,6 +20,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Listing details response with admin verification information")
 public class ListingResponseWithAdmin {
 
@@ -55,12 +56,6 @@ public class ListingResponseWithAdmin {
             "RESUBMITTED" })
     String listingStatus;
 
-    @Schema(description = "VIP tier: NORMAL, SILVER, GOLD, DIAMOND", example = "SILVER", allowableValues = { "NORMAL",
-            "SILVER", "GOLD", "DIAMOND" })
-    String vipType;
-
-    Long categoryId;
-
     @Schema(description = "Product type (loại bất động sản)", example = "APARTMENT", allowableValues = { "ROOM",
             "APARTMENT", "HOUSE", "OFFICE", "STUDIO" })
     String productType;
@@ -80,8 +75,6 @@ public class ListingResponseWithAdmin {
     String direction;
 
     String furnishing;
-
-    Integer roomCapacity;
 
     @Schema(description = "Water price information", example = "50000 VND/month")
     String waterPrice;
@@ -104,14 +97,11 @@ public class ListingResponseWithAdmin {
     @Schema(description = "Admin verification information")
     AdminVerificationInfo adminVerification;
 
-    LocalDateTime createdAt;
-
-    LocalDateTime updatedAt;
-
     @Schema(description = "ID of admin who last updated the listing")
     Long updatedBy;
 
-    // ── Moderation context ──
+    // ── Moderation context — populated on the moderate/verify action response
+    // (PUT /v1/admin/listings/{id}/status), not by the plain detail GET ──
     @Schema(description = "Canonical moderation status", example = "PENDING_REVIEW", allowableValues = {
             "PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED" })
     String moderationStatus;

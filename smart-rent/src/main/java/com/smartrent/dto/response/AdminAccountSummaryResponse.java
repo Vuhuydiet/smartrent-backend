@@ -10,6 +10,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 @Getter
 @Setter
 @Builder
@@ -17,13 +20,15 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@Schema(description = "Admin verification information for listing")
-public class AdminVerificationInfo {
+@Schema(description = "Admin account summary for admin account list view")
+public class AdminAccountSummaryResponse {
 
-    @Schema(description = "Verification status", example = "APPROVED", allowableValues = { "PENDING", "APPROVED",
-            "REJECTED", "NOT_SUBMITTED" })
-    String verificationStatus;
-
-    @Schema(description = "Admin's notes or comments on verification", example = "Verified property documents and ownership")
-    String verificationNotes;
+    String adminId;
+    String phoneCode;
+    String phoneNumber;
+    String email;
+    String firstName;
+    String lastName;
+    LocalDateTime createdAt;
+    List<String> roles;
 }

@@ -33,14 +33,12 @@ public class NewsMapperImpl implements NewsMapper {
                 .thumbnailUrl(news.getThumbnailUrl())
                 .status(news.getStatus())
                 .publishedAt(news.getPublishedAt())
-                .authorId(news.getAuthorId())
                 .authorName(news.getAuthorName())
                 .viewCount(news.getViewCount())
                 .metaTitle(news.getMetaTitle())
                 .metaDescription(news.getMetaDescription())
                 .metaKeywords(news.getMetaKeywords())
                 .createdAt(news.getCreatedAt())
-                .updatedAt(news.getUpdatedAt())
                 .build();
     }
 

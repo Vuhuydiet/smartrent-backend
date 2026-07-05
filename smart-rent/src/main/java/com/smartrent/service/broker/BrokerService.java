@@ -53,11 +53,14 @@ public interface BrokerService {
 
     /**
      * Admin: get paginated list of users with PENDING broker registration.
-     * Ordered oldest-first (FIFO). Each entry includes presigned document URLs.
+     * Ordered oldest-first (FIFO) by default. Each entry includes presigned document URLs.
      *
      * @param page 1-based page number
      * @param size page size
+     * @param search free-text match against first name, last name, or email (nullable)
+     * @param registeredAt single date or "from..to" range filter on brokerRegisteredAt (nullable)
+     * @param sort "field,direction" — supported fields: brokerRegisteredAt, firstName, lastName (nullable, defaults to brokerRegisteredAt,asc)
      * @return paginated list of pending broker users
      */
-    PageResponse<AdminBrokerUserResponse> getPendingBrokers(int page, int size);
+    PageResponse<AdminBrokerUserResponse> getPendingBrokers(int page, int size, String search, String registeredAt, String sort);
 }

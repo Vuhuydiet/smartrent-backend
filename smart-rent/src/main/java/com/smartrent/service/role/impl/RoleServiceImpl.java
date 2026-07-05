@@ -108,6 +108,15 @@ public class RoleServiceImpl implements RoleService {
             .collect(Collectors.toList());
       }
 
+      // Sort by roleName (default) or roleId
+      java.util.Comparator<Role> comparator = "roleId".equals(filter.getSortBy())
+          ? java.util.Comparator.comparing(Role::getRoleId, String.CASE_INSENSITIVE_ORDER)
+          : java.util.Comparator.comparing(Role::getRoleName, String.CASE_INSENSITIVE_ORDER);
+      if ("DESC".equalsIgnoreCase(filter.getSortDirection())) {
+        comparator = comparator.reversed();
+      }
+      roles = roles.stream().sorted(comparator).collect(Collectors.toList());
+
       // Apply pagination
       int fromIndex = (page - 1) * size;
       int toIndex = Math.min(fromIndex + size, roles.size());

@@ -34,7 +34,7 @@ public class RoleController {
     RoleService roleService;
 
     @GetMapping
-    @Operation(summary = "Get all available roles with flexible filtering", description = "Retrieves a paginated list of all available roles in the system with support for flexible key:value filtering.\n\nFilters format: filter=key:value\n- Example: filter=roleId:ADMIN&filter=roleName:Administrator", security = @SecurityRequirement(name = "Bearer Authentication"))
+    @Operation(summary = "Get all available roles with flexible filtering", description = "Retrieves a paginated list of all available roles in the system with support for flexible key:value filtering.\n\nFilters format: filter=key:value\n- Example: filter=roleId:ADMIN&filter=roleName:Administrator\n\n`sort` format: `field,direction` — e.g. `roleName,asc`. Supported fields: `roleId`, `roleName` (default `roleName,desc` when omitted).", security = @SecurityRequirement(name = "Bearer Authentication"))
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Roles retrieved successfully"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing authentication token"),
@@ -43,7 +43,8 @@ public class RoleController {
     public ApiResponse<PageResponse<GetRoleResponse>> getAllRoles(
             @Parameter(description = "Page number (1-indexed)", example = "1") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Number of items per page", example = "10") @RequestParam(defaultValue = "10") int size,
-            @Parameter(description = "Flexible filters in format key:value (e.g., roleId:ADMIN, roleName:Admin)") @RequestParam(required = false) String[] filter) {
+            @Parameter(description = "Flexible filters in format key:value (e.g., roleId:ADMIN, roleName:Admin)") @RequestParam(required = false) String[] filter,
+            @Parameter(description = "field,direction — e.g. roleName,asc", example = "roleName,asc") @RequestParam(required = false) String sort) {
 
         AdminFilterRequest filterRequest = AdminFilterRequest.builder()
                 .page(page)
@@ -59,6 +60,13 @@ public class RoleController {
                     }
                 }
             }
+        }
+        if (sort != null && sort.contains(",")) {
+            String[] parts = sort.split(",", 2);
+            filterRequest.setSortBy(parts[0].trim());
+            filterRequest.setSortDirection(parts[1].trim());
+        } else if (sort != null && !sort.isBlank()) {
+            filterRequest.setSortBy(sort.trim());
         }
 
         PageResponse<GetRoleResponse> roles = roleService.getAllRoles(filterRequest);

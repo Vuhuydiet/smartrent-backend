@@ -20,6 +20,7 @@ import com.smartrent.infra.repository.entity.User;
 import com.smartrent.infra.storage.R2StorageService;
 import com.smartrent.service.broker.BrokerService;
 import com.smartrent.service.notification.NotificationService;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -30,10 +31,17 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -240,12 +248,41 @@ public class BrokerServiceImpl implements BrokerService {
         return toStatusResponse(user);
     }
 
+    private static final Set<String> BROKER_PENDING_SORTABLE_FIELDS = Set.of("brokerRegisteredAt", "firstName", "lastName");
+
     @Override
-    public PageResponse<AdminBrokerUserResponse> getPendingBrokers(int page, int size) {
-        Pageable pageable = PageRequest.of(page - 1, size);
-        Page<User> pageResult = userRepository
-                .findAllByBrokerVerificationStatusOrderByBrokerRegisteredAtAsc(
-                        BrokerVerificationStatus.PENDING, pageable);
+    public PageResponse<AdminBrokerUserResponse> getPendingBrokers(int page, int size, String search, String registeredAt, String sort) {
+        Sort sortObj = buildSort(sort, BROKER_PENDING_SORTABLE_FIELDS, "brokerRegisteredAt", Sort.Direction.ASC);
+        Pageable pageable = PageRequest.of(page - 1, size, sortObj);
+
+        Specification<User> spec = (root, query, criteriaBuilder) ->
+                criteriaBuilder.equal(root.get("brokerVerificationStatus"), BrokerVerificationStatus.PENDING);
+
+        if (search != null && !search.isBlank()) {
+            String keyword = "%" + search.trim().toLowerCase(Locale.ROOT) + "%";
+            spec = spec.and((root, query, criteriaBuilder) -> criteriaBuilder.or(
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("firstName")), keyword),
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("lastName")), keyword),
+                    criteriaBuilder.like(criteriaBuilder.lower(root.get("email")), keyword)
+            ));
+        }
+
+        DateRange range = parseDateOrRange(registeredAt);
+        if (range != null) {
+            DateRange finalRange = range;
+            spec = spec.and((root, query, criteriaBuilder) -> {
+                List<Predicate> predicates = new ArrayList<>();
+                if (finalRange.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("brokerRegisteredAt"), finalRange.from()));
+                }
+                if (finalRange.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("brokerRegisteredAt"), finalRange.to()));
+                }
+                return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+            });
+        }
+
+        Page<User> pageResult = userRepository.findAll(spec, pageable);
 
         List<AdminBrokerUserResponse> items = pageResult.getContent().stream()
                 .map(this::toAdminBrokerResponse)
@@ -259,6 +296,51 @@ public class BrokerServiceImpl implements BrokerService {
                 .data(items)
                 .build();
     }
+
+    private Sort buildSort(String sortParam, Set<String> allowedFields, String defaultField, Sort.Direction defaultDirection) {
+        String field = defaultField;
+        Sort.Direction direction = defaultDirection;
+        if (sortParam != null && !sortParam.isBlank()) {
+            String[] parts = sortParam.split(",", 2);
+            if (allowedFields.contains(parts[0].trim())) {
+                field = parts[0].trim();
+            }
+            if (parts.length > 1) {
+                direction = "ASC".equalsIgnoreCase(parts[1].trim()) ? Sort.Direction.ASC : Sort.Direction.DESC;
+            }
+        }
+        return Sort.by(direction, field);
+    }
+
+    /**
+     * Parses a single date ("2026-02-09") or a "from..to" range. Either side of a
+     * range may be omitted for an open-ended bound. Returns {@code null} when the
+     * input is blank.
+     */
+    private DateRange parseDateOrRange(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String s = raw.trim();
+        if (s.isEmpty()) {
+            return null;
+        }
+        int idx = s.indexOf("..");
+        if (idx < 0) {
+            LocalDate date = LocalDate.parse(s);
+            return new DateRange(date.atStartOfDay(), date.atTime(LocalTime.MAX));
+        }
+        String fromStr = s.substring(0, idx).trim();
+        String toStr = s.substring(idx + 2).trim();
+        LocalDateTime from = fromStr.isEmpty() ? null : LocalDate.parse(fromStr).atStartOfDay();
+        LocalDateTime to = toStr.isEmpty() ? null : LocalDate.parse(toStr).atTime(LocalTime.MAX);
+        if (from == null && to == null) {
+            return null;
+        }
+        return new DateRange(from, to);
+    }
+
+    private record DateRange(LocalDateTime from, LocalDateTime to) {}
 
     // ──────────────────────────────────────────────────────────────────
     // Private helpers
@@ -336,14 +418,11 @@ public class BrokerServiceImpl implements BrokerService {
                 .phoneCode(user.getPhoneCode())
                 .phoneNumber(user.getPhoneNumber())
                 .avatarUrl(user.getAvatarUrl())
-                .isBroker(user.isBroker())
                 .brokerVerificationStatus(
                         user.getBrokerVerificationStatus() != null
                                 ? user.getBrokerVerificationStatus().name()
                                 : BrokerVerificationStatus.NONE.name())
                 .brokerRegisteredAt(user.getBrokerRegisteredAt())
-                .brokerVerifiedAt(user.getBrokerVerifiedAt())
-                .brokerVerifiedByAdminId(user.getBrokerVerifiedByAdminId())
                 .brokerRejectionReason(user.getBrokerRejectionReason())
                 // Document viewing URLs (presigned, generated on demand for admin)
                 .cccdFrontUrl(resolveDocumentUrl(user.getBrokerCccdFrontMediaId()))

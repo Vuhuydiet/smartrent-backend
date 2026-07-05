@@ -164,7 +164,9 @@ public class AdminNewsController {
         public ApiResponse<NewsListResponse> getAllNews(
                         @Parameter(description = "Page number (1-based)", example = "1") @RequestParam(required = false, defaultValue = "1") Integer page,
                         @Parameter(description = "Page size", example = "20") @RequestParam(required = false, defaultValue = "20") Integer size,
-                        @Parameter(description = "Flexible filters in format key:value (e.g., title:market, status:PUBLISHED, category:BLOG)") @RequestParam(required = false) String[] filter) {
+                        @Parameter(description = "Flexible filters in format key:value (e.g., title:market, status:PUBLISHED, category:BLOG)") @RequestParam(required = false) String[] filter,
+                        @Parameter(description = "Single date or range on createdAt, e.g. 2026-02-09..2026-03-10") @RequestParam(required = false) String createdAt,
+                        @Parameter(description = "field,direction — e.g. title,asc. Supported fields: createdAt, publishedAt, title, viewCount (default createdAt,desc)") @RequestParam(required = false) String sort) {
 
                 AdminFilterRequest filterRequest = AdminFilterRequest.builder()
                                 .page(page != null ? page : 1)
@@ -180,6 +182,16 @@ public class AdminNewsController {
                                         }
                                 }
                         }
+                }
+                if (createdAt != null && !createdAt.isBlank()) {
+                        filterRequest.getFilters().put("createdAt", createdAt);
+                }
+                if (sort != null && sort.contains(",")) {
+                        String[] parts = sort.split(",", 2);
+                        filterRequest.setSortBy(parts[0].trim());
+                        filterRequest.setSortDirection(parts[1].trim());
+                } else if (sort != null && !sort.isBlank()) {
+                        filterRequest.setSortBy(sort.trim());
                 }
 
                 log.info("GET /v1/admin/news - page: {}, size: {}, filters: {}",

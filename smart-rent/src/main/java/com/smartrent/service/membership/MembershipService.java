@@ -31,8 +31,12 @@ public interface MembershipService {
 
     /**
      * Get all membership packages (active and inactive) with pagination - admin use
+     *
+     * @param search contains-match on packageName (nullable)
+     * @param sort "field,direction" — supported fields: packageName, packageLevel, originalPrice,
+     *             salePrice, createdAt (nullable, defaults to createdAt,desc)
      */
-    PageResponse<MembershipPackageResponse> getAllPackages(int page, int size);
+    PageResponse<MembershipPackageResponse> getAllPackages(int page, int size, String search, String sort);
 
     /**
      * Get membership package by ID

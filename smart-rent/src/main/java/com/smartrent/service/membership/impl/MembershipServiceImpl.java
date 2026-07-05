@@ -27,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +38,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -91,13 +93,31 @@ public class MembershipServiceImpl implements MembershipService {
                 .build();
     }
 
+    private static final Set<String> MEMBERSHIP_PACKAGE_SORTABLE_FIELDS =
+            Set.of("packageName", "packageLevel", "originalPrice", "salePrice", "createdAt");
+
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<MembershipPackageResponse> getAllPackages(int page, int size) {
-        log.info("Getting all membership packages (admin) with pagination - page: {}, size: {}", page, size);
+    public PageResponse<MembershipPackageResponse> getAllPackages(int page, int size, String search, String sort) {
+        log.info("Getting all membership packages (admin) with pagination - page: {}, size: {}, search: {}, sort: {}",
+                page, size, search, sort);
 
-        Pageable pageable = PageRequest.of(page - 1, size);
-        Page<MembershipPackage> packagePage = membershipPackageRepository.findAll(pageable);
+        String field = "createdAt";
+        Sort.Direction direction = Sort.Direction.DESC;
+        if (sort != null && !sort.isBlank()) {
+            String[] parts = sort.split(",", 2);
+            if (MEMBERSHIP_PACKAGE_SORTABLE_FIELDS.contains(parts[0].trim())) {
+                field = parts[0].trim();
+            }
+            if (parts.length > 1) {
+                direction = "ASC".equalsIgnoreCase(parts[1].trim()) ? Sort.Direction.ASC : Sort.Direction.DESC;
+            }
+        }
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(direction, field));
+
+        Page<MembershipPackage> packagePage = (search != null && !search.isBlank())
+                ? membershipPackageRepository.findByPackageNameContainingIgnoreCase(search.trim(), pageable)
+                : membershipPackageRepository.findAll(pageable);
 
         List<MembershipPackageResponse> packageResponses = packagePage.getContent().stream()
                 .map(this::mapToPackageResponse)

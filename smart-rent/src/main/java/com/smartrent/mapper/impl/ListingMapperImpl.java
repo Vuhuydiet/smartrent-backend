@@ -267,28 +267,10 @@ public class ListingMapperImpl implements ListingMapper {
         // Always calculate verification status based on listing state
         String finalVerificationStatus = verificationStatus != null
                 ? verificationStatus
-                : (entity.getVerified() ? "APPROVED" : (entity.getIsVerify() ? "PENDING" : "REJECTED"));
+                : (entity.getVerified() ? "APPROVED" : (entity.getIsVerify() ? "PENDING" : "NOT_SUBMITTED"));
 
-        // Build admin verification info - always include verificationStatus for FE
-        // filtering
-        // Admin-specific fields (adminId, adminName, adminEmail) are nullable if no
-        // admin has verified yet
-        String adminName = null;
-        if (verifyingAdmin != null) {
-            adminName = (verifyingAdmin.getFirstName() != null ? verifyingAdmin.getFirstName() : "") +
-                    " " +
-                    (verifyingAdmin.getLastName() != null ? verifyingAdmin.getLastName() : "");
-            adminName = adminName.trim();
-            if (adminName.isEmpty()) {
-                adminName = null;
-            }
-        }
-
+        // Build admin verification info - always include verificationStatus for FE filtering
         AdminVerificationInfo adminVerificationInfo = AdminVerificationInfo.builder()
-                .adminId(verifyingAdmin != null ? verifyingAdmin.getAdminId() : null)
-                .adminName(adminName)
-                .adminEmail(verifyingAdmin != null ? verifyingAdmin.getEmail() : null)
-                .verifiedAt(entity.getUpdatedAt())
                 .verificationStatus(finalVerificationStatus)
                 .verificationNotes(verificationNotes)
                 .build();
@@ -321,8 +303,6 @@ public class ListingMapperImpl implements ListingMapper {
                 .verified(entity.getVerified())
                 .expired(entity.getExpired())
                 .listingStatus(entity.computeListingStatus().name())
-                .vipType(entity.getVipType() != null ? entity.getVipType().name() : null)
-                .categoryId(entity.getCategoryId())
                 .productType(entity.getProductType() != null ? entity.getProductType().name() : null)
                 .price(entity.getPrice())
                 .priceUnit(entity.getPriceUnit() != null ? entity.getPriceUnit().name() : null)
@@ -332,7 +312,6 @@ public class ListingMapperImpl implements ListingMapper {
                 .bathrooms(entity.getBathrooms())
                 .direction(entity.getDirection() != null ? entity.getDirection().name() : null)
                 .furnishing(entity.getFurnishing() != null ? entity.getFurnishing().name() : null)
-                .roomCapacity(entity.getRoomCapacity())
                 .waterPrice(entity.getWaterPrice())
                 .electricityPrice(entity.getElectricityPrice())
                 .internetPrice(entity.getInternetPrice())
@@ -340,14 +319,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .amenities(amenityResponses)
                 .media(mediaResponses)
                 .adminVerification(adminVerificationInfo)
-                .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
                 .updatedBy(entity.getUpdatedBy())
-                // Moderation context
-                .moderationStatus(entity.getModerationStatus() != null ? entity.getModerationStatus().name() : null)
-                .revisionCount(entity.getRevisionCount())
-                .lastModerationReasonCode(entity.getLastModerationReasonCode())
-                .lastModerationReasonText(entity.getLastModerationReasonText())
                 .propertyInfo(propertyInfo)
                 .build();
     }
@@ -362,7 +334,6 @@ public class ListingMapperImpl implements ListingMapper {
                         .build();
 
         AdminListingSummary.AdminVerificationSummary verification = AdminListingSummary.AdminVerificationSummary.builder()
-                .verifiedAt(entity.getUpdatedAt())
                 .verificationStatus(verificationStatus)
                 .build();
 
@@ -371,13 +342,10 @@ public class ListingMapperImpl implements ListingMapper {
                 .title(entity.getTitle())
                 .user(ownerSummary)
                 .postDate(entity.getPostDate())
-                .expiryDate(entity.getExpiryDate())
                 .listingType(entity.getListingType() != null ? entity.getListingType().name() : null)
-                .verified(entity.getVerified())
                 .expired(entity.getExpired())
                 .listingStatus(entity.computeListingStatus().name())
                 .vipType(entity.getVipType() != null ? entity.getVipType().name() : null)
-                .categoryId(entity.getCategoryId())
                 .productType(entity.getProductType() != null ? entity.getProductType().name() : null)
                 .price(entity.getPrice())
                 .priceUnit(entity.getPriceUnit() != null ? entity.getPriceUnit().name() : null)
@@ -385,8 +353,6 @@ public class ListingMapperImpl implements ListingMapper {
                 .images(images)
                 .adminVerification(verification)
                 .moderationStatus(entity.getModerationStatus() != null ? entity.getModerationStatus().name() : null)
-                .revisionCount(entity.getRevisionCount())
-                .lastModerationReasonCode(entity.getLastModerationReasonCode())
                 .lastModerationReasonText(entity.getLastModerationReasonText())
                 .build();
     }
