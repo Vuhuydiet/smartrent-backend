@@ -46,9 +46,8 @@ public class CustomerTransactionController {
         Pageable pageable = newestFirst(page, size);
         TransactionFilterRequest filter = TransactionFilterRequest.builder()
                 .status(parseStatus(status))
-                .type(type)
-                .fromDate(fromDate)
-                .toDate(toDate)
+                .paymentType(type)
+                .createdAt(toRangeParam(fromDate, toDate))
                 .q(q)
                 .build();
 
@@ -68,6 +67,13 @@ public class CustomerTransactionController {
                 .message("Transaction retrieved successfully")
                 .data(transactionHistoryService.getCustomerTransactionDetail(authentication.getName(), transactionId))
                 .build();
+    }
+
+    private String toRangeParam(LocalDate fromDate, LocalDate toDate) {
+        if (fromDate == null && toDate == null) {
+            return null;
+        }
+        return (fromDate != null ? fromDate : "") + ".." + (toDate != null ? toDate : "");
     }
 
     private Pageable newestFirst(int page, int size) {

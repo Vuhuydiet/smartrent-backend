@@ -28,7 +28,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -180,20 +182,34 @@ public class TransactionHistoryServiceImpl implements TransactionHistoryService 
             if (filter.getLandlordId() != null && !filter.getLandlordId().isBlank()) {
                 predicates.add(criteriaBuilder.equal(root.get("landlordId"), filter.getLandlordId()));
             }
+            if (filter.getTransactionId() != null && !filter.getTransactionId().isBlank()) {
+                predicates.add(criteriaBuilder.like(criteriaBuilder.lower(root.get("transactionId")),
+                        "%" + filter.getTransactionId().trim().toLowerCase(Locale.ROOT) + "%"));
+            }
+            if (filter.getCustomer() != null && !filter.getCustomer().isBlank()) {
+                String keyword = "%" + filter.getCustomer().trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(criteriaBuilder.or(
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("customerNameSnapshot")), keyword),
+                        criteriaBuilder.like(criteriaBuilder.lower(root.get("customerPhoneSnapshot")), keyword)
+                ));
+            }
             if (filter.getStatus() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("status"), filter.getStatus()));
             }
-            if (filter.getType() != null) {
-                predicates.add(criteriaBuilder.equal(root.get("transactionType"), filter.getType()));
+            if (filter.getPaymentType() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("transactionType"), filter.getPaymentType()));
             }
-            if (filter.getGateway() != null) {
-                predicates.add(criteriaBuilder.equal(root.get("paymentProvider"), filter.getGateway()));
+            if (filter.getPaymentGateway() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("paymentProvider"), filter.getPaymentGateway()));
             }
-            if (filter.getFromDate() != null) {
-                predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), filter.getFromDate().atStartOfDay()));
-            }
-            if (filter.getToDate() != null) {
-                predicates.add(criteriaBuilder.lessThan(root.get("createdAt"), filter.getToDate().plusDays(1).atStartOfDay()));
+            DateRange createdAtRange = parseDateOrRange(filter.getCreatedAt());
+            if (createdAtRange != null) {
+                if (createdAtRange.from() != null) {
+                    predicates.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createdAt"), createdAtRange.from()));
+                }
+                if (createdAtRange.to() != null) {
+                    predicates.add(criteriaBuilder.lessThanOrEqualTo(root.get("createdAt"), createdAtRange.to()));
+                }
             }
             if (filter.getQ() != null && !filter.getQ().isBlank()) {
                 String keyword = "%" + filter.getQ().trim().toLowerCase(Locale.ROOT) + "%";
@@ -208,6 +224,36 @@ public class TransactionHistoryServiceImpl implements TransactionHistoryService 
             return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
         };
     }
+
+    /**
+     * Parses a single date ("2026-02-09") or a "from..to" range ("2026-02-09..2026-03-10").
+     * Either side of a range may be omitted for an open-ended bound. Returns {@code null} when
+     * the input is blank. Malformed dates throw {@link java.time.format.DateTimeParseException}.
+     */
+    private DateRange parseDateOrRange(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String s = raw.trim();
+        if (s.isEmpty()) {
+            return null;
+        }
+        int idx = s.indexOf("..");
+        if (idx < 0) {
+            LocalDate date = LocalDate.parse(s);
+            return new DateRange(date.atStartOfDay(), date.atTime(LocalTime.MAX));
+        }
+        String fromStr = s.substring(0, idx).trim();
+        String toStr = s.substring(idx + 2).trim();
+        LocalDateTime from = fromStr.isEmpty() ? null : LocalDate.parse(fromStr).atStartOfDay();
+        LocalDateTime to = toStr.isEmpty() ? null : LocalDate.parse(toStr).atTime(LocalTime.MAX);
+        if (from == null && to == null) {
+            return null;
+        }
+        return new DateRange(from, to);
+    }
+
+    private record DateRange(LocalDateTime from, LocalDateTime to) {}
 
     private PageResponse<TransactionHistoryItemResponse> toPageResponse(Page<TransactionHistoryItemResponse> page) {
         return PageResponse.<TransactionHistoryItemResponse>builder()
