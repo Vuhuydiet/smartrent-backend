@@ -11,7 +11,7 @@ The design is intentionally practical for a graduation project: one Spring Boot 
 Admins should be able to:
 
 * View transactions from all customers.
-* Filter by customer, landlord, status, gateway, date range, and payment type.
+* Filter by transaction ID, customer (by ID, or by name/phone free-text), landlord, status, payment gateway, payment type, and created-at date/range.
 * Search by transaction code, VNPay transaction code, or invoice code.
 * View full transaction detail.
 * Export filtered transactions as CSV.
@@ -46,7 +46,7 @@ Why: customer APIs use the authenticated user automatically. Admin APIs intentio
 ## Admin List API
 
 ```http
-GET /v1/admin/transactions?page=1&size=20&status=SUCCESS&gateway=VNPAY&type=MONTHLY_INVOICE&customerId=...&landlordId=...&fromDate=2026-05-01&toDate=2026-05-31&q=INV-202605
+GET /v1/admin/transactions?page=1&size=20&status=SUCCESS&paymentGateway=VNPAY&paymentType=MONTHLY_INVOICE&transactionId=6f5d6e8a&customer=Tran+Thi+B&customerId=...&landlordId=...&createdAt=2026-05-01..2026-05-31&q=INV-202605
 Authorization: Bearer <admin_access_token>
 ```
 
@@ -57,14 +57,17 @@ Query parameters:
 | `page` | number | 1-based, default `1`. |
 | `size` | number | Default `20`, max `100`. |
 | `status` | string | `PENDING`, `SUCCESS`, `FAILED`, `CANCELLED`, `REFUNDED`. |
-| `gateway` | string | `VNPAY`, later `ZALOPAY`, `MOMO`, etc. |
-| `type` | string | Payment type. |
-| `customerId` | string | UUID. |
-| `landlordId` | string | UUID. |
-| `fromDate` | date | Inclusive. |
-| `toDate` | date | Inclusive. |
+| `paymentGateway` | string | `VNPAY`, `MOMO`, `ZALOPAY`, `SEPAY`, `PAYPAL`. |
+| `paymentType` | string | Payment type, e.g. `MONTHLY_INVOICE`, `MEMBERSHIP_PURCHASE`, `POST_FEE`, ... (see `TransactionType` enum). |
+| `transactionId` | string | Partial, case-insensitive match against the transaction ID. |
+| `customer` | string | Free-text match against customer name **or** phone (matches either field, case-insensitive, partial). Based on the name/phone snapshot captured at transaction time, not the customer's current profile. |
+| `customerId` | string | Exact customer UUID. |
+| `landlordId` | string | Exact landlord UUID. |
+| `createdAt` | string | A single date (`2026-05-01`) or a range `from..to` (`2026-05-01..2026-05-31`). Either side of a range may be omitted for an open-ended bound (`2026-05-01..` or `..2026-05-31`). Both bounds are inclusive. Replaces the old separate `fromDate`/`toDate` params. |
 | `q` | string | Transaction code, gateway transaction code, invoice code. |
 | `sort` | string | Default `createdAt,desc`. |
+
+`paymentGateway`/`paymentType` were previously named `gateway`/`type` — renamed to match the field names already used in the response payload (`paymentGateway`, `paymentType`). `fromDate`/`toDate` were replaced by the single `createdAt` param described above. (The customer-facing `GET /v1/me/transactions` endpoint is unaffected and still accepts `fromDate`/`toDate`.)
 
 Response:
 
@@ -195,7 +198,7 @@ Include raw provider fields only for admins:
 ### Summary
 
 ```http
-GET /v1/admin/transactions/statistics?fromDate=2026-05-01&toDate=2026-05-31
+GET /v1/admin/transactions/statistics?createdAt=2026-05-01..2026-05-31
 ```
 
 ```json
@@ -219,7 +222,7 @@ GET /v1/admin/transactions/statistics?fromDate=2026-05-01&toDate=2026-05-31
 ### Revenue Series
 
 ```http
-GET /v1/admin/transactions/revenue-series?groupBy=DAY&fromDate=2026-05-01&toDate=2026-05-31
+GET /v1/admin/transactions/revenue-series?groupBy=DAY&createdAt=2026-05-01..2026-05-31
 ```
 
 ```json
@@ -246,7 +249,7 @@ Supported `groupBy`: `DAY`, `MONTH`.
 ### Export
 
 ```http
-GET /v1/admin/transactions/export?status=SUCCESS&fromDate=2026-05-01&toDate=2026-05-31
+GET /v1/admin/transactions/export?status=SUCCESS&createdAt=2026-05-01..2026-05-31
 Accept: text/csv
 ```
 
@@ -287,10 +290,10 @@ Main table columns:
 
 Filter UX:
 
-* Search input with debounce.
-* Selects for status, gateway, and payment type.
-* Customer and landlord async search boxes.
-* Date range picker with quick presets: today, last 7 days, this month.
+* Search input with debounce (`q`, general keyword; separate `transactionId` input if a dedicated ID lookup box is wanted).
+* Selects for status, payment gateway, and payment type.
+* Customer name/phone free-text box (`customer`) plus exact customer/landlord ID inputs for async-selected users.
+* Date range picker with quick presets (today, last 7 days, this month) that serializes to the single `createdAt=from..to` param (see `toCreatedAtParam` above). A single-date picker can send `createdAt=2026-05-01` directly.
 * Export button uses the current filters.
 * Reset filters button.
 
@@ -689,12 +692,20 @@ export interface AdminTransactionFilters {
   size: number;
   q?: string;
   status?: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'REFUNDED';
-  gateway?: 'VNPAY' | string;
-  type?: string;
+  paymentGateway?: 'VNPAY' | 'MOMO' | 'ZALOPAY' | 'SEPAY' | 'PAYPAL' | string;
+  paymentType?: string;
+  transactionId?: string;
+  /** Free-text match against customer name or phone. */
+  customer?: string;
   customerId?: string;
   landlordId?: string;
-  fromDate?: string;
-  toDate?: string;
+  /** Single date "YYYY-MM-DD" or range "YYYY-MM-DD..YYYY-MM-DD"; either side of a range is optional. */
+  createdAt?: string;
+}
+
+function toCreatedAtParam(from?: string, to?: string): string | undefined {
+  if (!from && !to) return undefined;
+  return `${from ?? ''}..${to ?? ''}`;
 }
 ```
 

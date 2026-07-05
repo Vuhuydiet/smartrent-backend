@@ -6,8 +6,6 @@ import com.smartrent.enums.TransactionType;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-import java.time.LocalDate;
-
 @Getter
 @Setter
 @Builder
@@ -17,10 +15,13 @@ import java.time.LocalDate;
 public class TransactionFilterRequest {
     String customerId;
     String landlordId;
+    String transactionId;
+    /** Free-text match against customer name or phone (snapshot columns on Transaction). */
+    String customer;
     TransactionStatus status;
-    TransactionType type;
-    PaymentProvider gateway;
-    LocalDate fromDate;
-    LocalDate toDate;
+    TransactionType paymentType;
+    PaymentProvider paymentGateway;
+    /** Single date ("2026-02-09") or a range ("2026-02-09..2026-03-10"); either side of a range may be omitted. */
+    String createdAt;
     String q;
 }

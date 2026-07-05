@@ -14,14 +14,12 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -39,11 +37,12 @@ public class AdminTransactionController {
     public ApiResponse<PageResponse<TransactionHistoryItemResponse>> getTransactions(
             @RequestParam(required = false) String customerId,
             @RequestParam(required = false) String landlordId,
+            @RequestParam(required = false) String transactionId,
+            @RequestParam(required = false) String customer,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) PaymentProvider gateway,
-            @RequestParam(required = false) TransactionType type,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) PaymentProvider paymentGateway,
+            @RequestParam(required = false) TransactionType paymentType,
+            @RequestParam(required = false) String createdAt,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -52,7 +51,7 @@ public class AdminTransactionController {
                 .code("200000")
                 .message("Transactions retrieved successfully")
                 .data(transactionHistoryService.getAdminTransactions(
-                        filter(customerId, landlordId, status, gateway, type, fromDate, toDate, q),
+                        filter(customerId, landlordId, transactionId, customer, status, paymentGateway, paymentType, createdAt, q),
                         newestFirst(page, size)))
                 .build();
     }
@@ -70,16 +69,18 @@ public class AdminTransactionController {
     public ApiResponse<TransactionStatisticsResponse> getStatistics(
             @RequestParam(required = false) String customerId,
             @RequestParam(required = false) String landlordId,
+            @RequestParam(required = false) String transactionId,
+            @RequestParam(required = false) String customer,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) PaymentProvider gateway,
-            @RequestParam(required = false) TransactionType type,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) PaymentProvider paymentGateway,
+            @RequestParam(required = false) TransactionType paymentType,
+            @RequestParam(required = false) String createdAt,
             @RequestParam(required = false) String q) {
         return ApiResponse.<TransactionStatisticsResponse>builder()
                 .code("200000")
                 .message("Transaction statistics retrieved successfully")
-                .data(transactionHistoryService.getStatistics(filter(customerId, landlordId, status, gateway, type, fromDate, toDate, q)))
+                .data(transactionHistoryService.getStatistics(
+                        filter(customerId, landlordId, transactionId, customer, status, paymentGateway, paymentType, createdAt, q)))
                 .build();
     }
 
@@ -88,31 +89,34 @@ public class AdminTransactionController {
             @RequestParam(defaultValue = "DAY") String groupBy,
             @RequestParam(required = false) String customerId,
             @RequestParam(required = false) String landlordId,
+            @RequestParam(required = false) String transactionId,
+            @RequestParam(required = false) String customer,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) PaymentProvider gateway,
-            @RequestParam(required = false) TransactionType type,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) PaymentProvider paymentGateway,
+            @RequestParam(required = false) TransactionType paymentType,
+            @RequestParam(required = false) String createdAt,
             @RequestParam(required = false) String q) {
         return ApiResponse.<List<RevenueSeriesResponse>>builder()
                 .code("200000")
                 .message("Revenue series retrieved successfully")
                 .data(transactionHistoryService.getRevenueSeries(
-                        filter(customerId, landlordId, status, gateway, type, fromDate, toDate, q), groupBy))
+                        filter(customerId, landlordId, transactionId, customer, status, paymentGateway, paymentType, createdAt, q), groupBy))
                 .build();
     }
 
-    @GetMapping(value = "/export", produces = "text/csv")
+    @GetMapping("/export")
     public ResponseEntity<byte[]> exportTransactions(
             @RequestParam(required = false) String customerId,
             @RequestParam(required = false) String landlordId,
+            @RequestParam(required = false) String transactionId,
+            @RequestParam(required = false) String customer,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) PaymentProvider gateway,
-            @RequestParam(required = false) TransactionType type,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) PaymentProvider paymentGateway,
+            @RequestParam(required = false) TransactionType paymentType,
+            @RequestParam(required = false) String createdAt,
             @RequestParam(required = false) String q) {
-        byte[] csv = transactionHistoryService.exportCsv(filter(customerId, landlordId, status, gateway, type, fromDate, toDate, q));
+        byte[] csv = transactionHistoryService.exportCsv(
+                filter(customerId, landlordId, transactionId, customer, status, paymentGateway, paymentType, createdAt, q));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"transactions.csv\"")
                 .contentType(new MediaType("text", "csv"))
@@ -122,20 +126,22 @@ public class AdminTransactionController {
     private TransactionFilterRequest filter(
             String customerId,
             String landlordId,
+            String transactionId,
+            String customer,
             String status,
-            PaymentProvider gateway,
-            TransactionType type,
-            LocalDate fromDate,
-            LocalDate toDate,
+            PaymentProvider paymentGateway,
+            TransactionType paymentType,
+            String createdAt,
             String q) {
         return TransactionFilterRequest.builder()
                 .customerId(customerId)
                 .landlordId(landlordId)
+                .transactionId(transactionId)
+                .customer(customer)
                 .status(parseStatus(status))
-                .gateway(gateway)
-                .type(type)
-                .fromDate(fromDate)
-                .toDate(toDate)
+                .paymentGateway(paymentGateway)
+                .paymentType(paymentType)
+                .createdAt(createdAt)
                 .q(q)
                 .build();
     }
