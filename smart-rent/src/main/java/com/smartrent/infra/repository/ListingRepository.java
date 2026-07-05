@@ -138,6 +138,13 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      */
     @Query("SELECT l FROM listings l LEFT JOIN FETCH l.address " +
            "WHERE l.vipType = :vipType AND l.verified = true " +
+           // Defense-in-depth: verified is the leading equality idx_listings_public_vip_tier
+           // (vip_type, verified, is_draft, is_shadow, updated_at) seeks on — keep it so the
+           // index scan + backward-order LIMIT still avoids a filesort on the huge NORMAL tier.
+           // moderationStatus is the canonical visibility gate (see ListingSpecification);
+           // added on top so this query can't drift from it even if verified/moderationStatus
+           // ever fall out of sync on a row.
+           "AND l.moderationStatus = com.smartrent.enums.ModerationStatus.APPROVED " +
            "AND l.isDraft = false AND l.isShadow = false " +
            "AND l.expired = false " +
            "AND (l.expiryDate IS NULL OR l.expiryDate > CURRENT_TIMESTAMP) " +
