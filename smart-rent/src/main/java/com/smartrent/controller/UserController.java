@@ -388,10 +388,9 @@ public class UserController {
 
         @DeleteMapping("/{userId}")
         @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
-        @ResponseStatus(HttpStatus.NO_CONTENT)
         @Operation(summary = "Delete user (Admin operation)", description = "Deletes a user from the system. This is an admin operation.", security = @SecurityRequirement(name = "Bearer Authentication"))
         @ApiResponses(value = {
-                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "User deleted successfully"),
+                        @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "User deleted successfully"),
                         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "User not found", content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "Not Found Error", value = """
                                         {
                                           "code": "4001",
@@ -400,8 +399,9 @@ public class UserController {
                                         }
                                         """)))
         })
-        void deleteUser(
+        ApiResponse<Void> deleteUser(
                         @Parameter(description = "User ID", required = true) @PathVariable String userId) {
                 userService.deleteUser(userId);
+                return ApiResponse.<Void>builder().build();
         }
 }

@@ -335,6 +335,7 @@ public class BrokerServiceImpl implements BrokerService {
                 .email(user.getEmail())
                 .phoneCode(user.getPhoneCode())
                 .phoneNumber(user.getPhoneNumber())
+                .avatarUrl(user.getAvatarUrl())
                 .isBroker(user.isBroker())
                 .brokerVerificationStatus(
                         user.getBrokerVerificationStatus() != null

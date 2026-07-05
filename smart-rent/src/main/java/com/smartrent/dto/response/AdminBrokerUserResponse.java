@@ -41,6 +41,9 @@ public class AdminBrokerUserResponse {
         @Schema(description = "Phone number", example = "0912345678")
         String phoneNumber;
 
+        @Schema(description = "URL of the user's profile picture")
+        String avatarUrl;
+
         @Schema(description = "Whether this user is an approved broker", example = "false")
         Boolean isBroker;
 
