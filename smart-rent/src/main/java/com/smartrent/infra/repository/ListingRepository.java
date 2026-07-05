@@ -646,6 +646,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.price BETWEEN :minPrice AND :maxPrice
         AND l.listingId NOT IN :excludedIds
         AND l.isDraft = false AND l.isShadow = false AND l.verified = true AND l.expired = false
+        AND (l.expiryDate IS NULL OR l.expiryDate > CURRENT_TIMESTAMP)
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
     List<Listing> findPersonalizedPriceCandidates(
@@ -668,6 +669,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isShadow = false
         AND l.verified = true
         AND l.expired = false
+        AND (l.expiryDate IS NULL OR l.expiryDate > CURRENT_TIMESTAMP)
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
     List<Listing> findCandidatesForPersonalizedByLegacyProvince(
@@ -687,6 +689,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isShadow = false
         AND l.verified = true
         AND l.expired = false
+        AND (l.expiryDate IS NULL OR l.expiryDate > CURRENT_TIMESTAMP)
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
     List<Listing> findCandidatesForPersonalizedByNewProvince(
@@ -706,6 +709,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isShadow = false
         AND l.verified = true
         AND l.expired = false
+        AND (l.expiryDate IS NULL OR l.expiryDate > CURRENT_TIMESTAMP)
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
     List<Listing> findCandidatesByLegacyWard(
@@ -725,6 +729,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isShadow = false
         AND l.verified = true
         AND l.expired = false
+        AND (l.expiryDate IS NULL OR l.expiryDate > CURRENT_TIMESTAMP)
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
     List<Listing> findCandidatesByNewWard(
@@ -744,6 +749,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isShadow = false
         AND l.verified = true
         AND l.expired = false
+        AND (l.expiryDate IS NULL OR l.expiryDate > CURRENT_TIMESTAMP)
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
     List<Listing> findCandidatesByDistrict(
@@ -763,6 +769,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         AND l.isShadow = false
         AND l.verified = true
         AND l.expired = false
+        AND (l.expiryDate IS NULL OR l.expiryDate > CURRENT_TIMESTAMP)
         ORDER BY l.pushedAt DESC NULLS LAST, l.postDate DESC
     """)
     List<Listing> findCandidatesForPersonalizedGlobal(
