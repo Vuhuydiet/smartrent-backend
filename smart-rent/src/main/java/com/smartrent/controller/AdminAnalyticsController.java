@@ -1,10 +1,12 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.response.AdminListingAnalyticsResponse;
+import com.smartrent.dto.response.AdminReportAnalyticsResponse;
+import com.smartrent.dto.response.AdminUserAnalyticsResponse;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.MembershipDistributionResponse;
 import com.smartrent.dto.response.RevenueOverTimeResponse;
-import com.smartrent.dto.response.TimeSeriesResponse;
-import com.smartrent.service.dashboard.AdminDashboardService;
+import com.smartrent.service.admin.analytics.AdminAnalyticsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -21,16 +23,18 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.function.BiFunction;
+import java.util.function.IntFunction;
 
 @RestController
-@RequestMapping("/v1/admin/dashboard")
+@RequestMapping("/v1/admin/analytics")
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Slf4j
-@Tag(name = "Admin Dashboard", description = "Admin dashboard chart data APIs")
-public class AdminDashboardController {
+@Tag(name = "Admin Analytics", description = "Admin analytics chart data APIs")
+public class AdminAnalyticsController {
 
-    AdminDashboardService adminDashboardService;
+    AdminAnalyticsService adminAnalyticsService;
 
     @GetMapping("/revenue")
     @Operation(
@@ -85,12 +89,12 @@ public class AdminDashboardController {
 
         if (days != null) {
             log.info("Admin requesting revenue data for last {} days", days);
-            response = adminDashboardService.getRevenueOverTime(days);
+            response = adminAnalyticsService.getRevenueOverTime(days);
         } else {
             LocalDate endDate = (to != null) ? to : LocalDate.now();
             LocalDate startDate = (from != null) ? from : endDate.minusDays(30);
             log.info("Admin requesting revenue data from {} to {}", startDate, endDate);
-            response = adminDashboardService.getRevenueOverTime(startDate, endDate);
+            response = adminAnalyticsService.getRevenueOverTime(startDate, endDate);
         }
 
         return ApiResponse.<RevenueOverTimeResponse>builder()
@@ -133,7 +137,7 @@ public class AdminDashboardController {
     public ApiResponse<MembershipDistributionResponse> getMembershipDistribution() {
         log.info("Admin requesting membership distribution");
 
-        MembershipDistributionResponse response = adminDashboardService.getMembershipDistribution();
+        MembershipDistributionResponse response = adminAnalyticsService.getMembershipDistribution();
 
         return ApiResponse.<MembershipDistributionResponse>builder()
                 .code("999999")
@@ -141,13 +145,14 @@ public class AdminDashboardController {
                 .build();
     }
 
-    // ─── New Analytics Charts ───
+    // ─── Analytics Charts ───
 
-    @GetMapping("/users/growth")
+    @GetMapping("/users")
     @Operation(
-            summary = "Get user growth over time",
+            summary = "Get user growth analytics",
             description = """
-                    Returns count of new user registrations.
+                    Returns new-registration time series, a cumulative user-growth curve, and breakdowns
+                    by role (regular vs broker) and by broker verification status.
                     Use `days` for preset ranges (7, 30, 360) with automatic granularity (day for 7/30, month for 360),
                     or `from`/`to` for custom date ranges (always daily granularity).
                     When `days` is provided, `from`/`to` are ignored. If no parameter is given, defaults to last 7 days.""",
@@ -156,7 +161,7 @@ public class AdminDashboardController {
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
-                    description = "User growth data retrieved successfully",
+                    description = "User analytics retrieved successfully",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ApiResponse.class),
@@ -170,7 +175,21 @@ public class AdminDashboardController {
                                           {"label": "2026-03-25", "count": 8}
                                         ],
                                         "total": 25,
-                                        "granularity": "DAY"
+                                        "granularity": "DAY",
+                                        "cumulativeDataPoints": [
+                                          {"label": "2026-03-23", "count": 1005},
+                                          {"label": "2026-03-24", "count": 1017},
+                                          {"label": "2026-03-25", "count": 1025}
+                                        ],
+                                        "totalUsersAsOfRangeEnd": 1025,
+                                        "roleBreakdown": [
+                                          {"category": "REGULAR", "count": 20, "percentage": 80.0},
+                                          {"category": "BROKER", "count": 5, "percentage": 20.0}
+                                        ],
+                                        "brokerVerificationBreakdown": [
+                                          {"category": "PENDING", "count": 3, "percentage": 60.0},
+                                          {"category": "APPROVED", "count": 2, "percentage": 40.0}
+                                        ]
                                       }
                                     }
                                     """)
@@ -179,7 +198,7 @@ public class AdminDashboardController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden — admin role required")
     })
-    public ApiResponse<TimeSeriesResponse> getUserGrowth(
+    public ApiResponse<AdminUserAnalyticsResponse> getUserAnalytics(
             @Parameter(description = "Preset range in days (7, 30, or 360). Takes priority over from/to.", example = "7")
             @RequestParam(required = false) Integer days,
 
@@ -189,20 +208,22 @@ public class AdminDashboardController {
             @Parameter(description = "End date (inclusive), defaults to today", example = "2026-03-29")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        return ApiResponse.<TimeSeriesResponse>builder()
+        return ApiResponse.<AdminUserAnalyticsResponse>builder()
                 .code("999999")
-                .data(resolveTimeSeries(days, from, to,
-                        adminDashboardService::getUserGrowth,
-                        adminDashboardService::getUserGrowth,
-                        "user growth"))
+                .data(resolveAnalytics(days, from, to,
+                        adminAnalyticsService::getUserAnalytics,
+                        adminAnalyticsService::getUserAnalytics,
+                        "user analytics"))
                 .build();
     }
 
-    @GetMapping("/reports/count")
+    @GetMapping("/reports")
     @Operation(
-            summary = "Get report count over time",
+            summary = "Get listing report analytics",
             description = """
-                    Returns count of listing reports created.
+                    Returns report-count time series, a cumulative report curve, breakdowns by category
+                    (LISTING/MAP) and status (PENDING/RESOLVED/REJECTED), plus resolution rate and average
+                    resolution time.
                     Use `days` for preset ranges (7, 30, 360) with automatic granularity (day for 7/30, month for 360),
                     or `from`/`to` for custom date ranges (always daily granularity).
                     When `days` is provided, `from`/`to` are ignored. If no parameter is given, defaults to last 7 days.""",
@@ -211,7 +232,7 @@ public class AdminDashboardController {
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
-                    description = "Report count data retrieved successfully",
+                    description = "Report analytics retrieved successfully",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ApiResponse.class),
@@ -225,7 +246,23 @@ public class AdminDashboardController {
                                           {"label": "2026-03-25", "count": 5}
                                         ],
                                         "total": 7,
-                                        "granularity": "DAY"
+                                        "granularity": "DAY",
+                                        "cumulativeDataPoints": [
+                                          {"label": "2026-03-23", "count": 102},
+                                          {"label": "2026-03-24", "count": 102},
+                                          {"label": "2026-03-25", "count": 107}
+                                        ],
+                                        "categoryBreakdown": [
+                                          {"category": "LISTING", "count": 5, "percentage": 71.43},
+                                          {"category": "MAP", "count": 2, "percentage": 28.57}
+                                        ],
+                                        "statusBreakdown": [
+                                          {"category": "PENDING", "count": 4, "percentage": 57.14},
+                                          {"category": "RESOLVED", "count": 2, "percentage": 28.57},
+                                          {"category": "REJECTED", "count": 1, "percentage": 14.29}
+                                        ],
+                                        "resolutionRatePercent": 42.86,
+                                        "avgResolutionHours": 5.75
                                       }
                                     }
                                     """)
@@ -234,7 +271,7 @@ public class AdminDashboardController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden — admin role required")
     })
-    public ApiResponse<TimeSeriesResponse> getReportCount(
+    public ApiResponse<AdminReportAnalyticsResponse> getReportAnalytics(
             @Parameter(description = "Preset range in days (7, 30, or 360). Takes priority over from/to.", example = "7")
             @RequestParam(required = false) Integer days,
 
@@ -244,20 +281,22 @@ public class AdminDashboardController {
             @Parameter(description = "End date (inclusive), defaults to today", example = "2026-03-29")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        return ApiResponse.<TimeSeriesResponse>builder()
+        return ApiResponse.<AdminReportAnalyticsResponse>builder()
                 .code("999999")
-                .data(resolveTimeSeries(days, from, to,
-                        adminDashboardService::getReportCount,
-                        adminDashboardService::getReportCount,
-                        "report count"))
+                .data(resolveAnalytics(days, from, to,
+                        adminAnalyticsService::getReportAnalytics,
+                        adminAnalyticsService::getReportAnalytics,
+                        "report analytics"))
                 .build();
     }
 
-    @GetMapping("/listings/creation")
+    @GetMapping("/listings")
     @Operation(
-            summary = "Get listing creation over time",
+            summary = "Get listing creation analytics",
             description = """
-                    Returns count of new listings created (excluding drafts and shadows).
+                    Returns listing-creation time series (excluding drafts and shadows), a cumulative
+                    listings curve, and breakdowns by listing type (RENT/SALE/SHARE), product type
+                    (ROOM/APARTMENT/HOUSE/OFFICE/STUDIO/STORE), and verification status.
                     Use `days` for preset ranges (7, 30, 360) with automatic granularity (day for 7/30, month for 360),
                     or `from`/`to` for custom date ranges (always daily granularity).
                     When `days` is provided, `from`/`to` are ignored. If no parameter is given, defaults to last 7 days.""",
@@ -266,7 +305,7 @@ public class AdminDashboardController {
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(
                     responseCode = "200",
-                    description = "Listing creation data retrieved successfully",
+                    description = "Listing analytics retrieved successfully",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ApiResponse.class),
@@ -280,7 +319,27 @@ public class AdminDashboardController {
                                           {"label": "2026-03-25", "count": 7}
                                         ],
                                         "total": 32,
-                                        "granularity": "DAY"
+                                        "granularity": "DAY",
+                                        "cumulativeDataPoints": [
+                                          {"label": "2026-03-23", "count": 4210},
+                                          {"label": "2026-03-24", "count": 4225},
+                                          {"label": "2026-03-25", "count": 4232}
+                                        ],
+                                        "totalListingsAsOfRangeEnd": 4232,
+                                        "listingTypeBreakdown": [
+                                          {"category": "RENT", "count": 24, "percentage": 75.0},
+                                          {"category": "SALE", "count": 6, "percentage": 18.75},
+                                          {"category": "SHARE", "count": 2, "percentage": 6.25}
+                                        ],
+                                        "productTypeBreakdown": [
+                                          {"category": "ROOM", "count": 18, "percentage": 56.25},
+                                          {"category": "APARTMENT", "count": 10, "percentage": 31.25},
+                                          {"category": "HOUSE", "count": 4, "percentage": 12.5}
+                                        ],
+                                        "verificationBreakdown": [
+                                          {"category": "VERIFIED", "count": 20, "percentage": 62.5},
+                                          {"category": "UNVERIFIED", "count": 12, "percentage": 37.5}
+                                        ]
                                       }
                                     }
                                     """)
@@ -289,7 +348,7 @@ public class AdminDashboardController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden — admin role required")
     })
-    public ApiResponse<TimeSeriesResponse> getListingCreation(
+    public ApiResponse<AdminListingAnalyticsResponse> getListingAnalytics(
             @Parameter(description = "Preset range in days (7, 30, or 360). Takes priority over from/to.", example = "7")
             @RequestParam(required = false) Integer days,
 
@@ -299,21 +358,21 @@ public class AdminDashboardController {
             @Parameter(description = "End date (inclusive), defaults to today", example = "2026-03-29")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        return ApiResponse.<TimeSeriesResponse>builder()
+        return ApiResponse.<AdminListingAnalyticsResponse>builder()
                 .code("999999")
-                .data(resolveTimeSeries(days, from, to,
-                        adminDashboardService::getListingCreation,
-                        adminDashboardService::getListingCreation,
-                        "listing creation"))
+                .data(resolveAnalytics(days, from, to,
+                        adminAnalyticsService::getListingAnalytics,
+                        adminAnalyticsService::getListingAnalytics,
+                        "listing analytics"))
                 .build();
     }
 
-    private TimeSeriesResponse resolveTimeSeries(
+    private <T> T resolveAnalytics(
             Integer days,
             LocalDate from,
             LocalDate to,
-            java.util.function.IntFunction<TimeSeriesResponse> byDays,
-            java.util.function.BiFunction<LocalDate, LocalDate, TimeSeriesResponse> byRange,
+            IntFunction<T> byDays,
+            BiFunction<LocalDate, LocalDate, T> byRange,
             String label
     ) {
         if (days != null) {

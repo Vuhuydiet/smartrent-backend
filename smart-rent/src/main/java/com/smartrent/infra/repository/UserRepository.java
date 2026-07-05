@@ -36,6 +36,18 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
                         "GROUP BY DATE_FORMAT(u.created_at, '%Y-%m') ORDER BY label ASC", nativeQuery = true)
         List<Object[]> countNewUsersByMonth(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+        long countByCreatedAtBefore(LocalDateTime dateTime);
+
+        @Query(value = "SELECT CASE WHEN u.is_broker = true THEN 'BROKER' ELSE 'REGULAR' END AS label, COUNT(*) AS cnt " +
+                        "FROM users u WHERE u.created_at BETWEEN :start AND :end " +
+                        "GROUP BY u.is_broker", nativeQuery = true)
+        List<Object[]> countNewUsersByRole(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+        @Query(value = "SELECT u.broker_verification_status AS label, COUNT(*) AS cnt " +
+                        "FROM users u WHERE u.created_at BETWEEN :start AND :end AND u.is_broker = true " +
+                        "GROUP BY u.broker_verification_status", nativeQuery = true)
+        List<Object[]> countNewBrokersByVerificationStatus(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
         Page<User> findAllByBrokerVerificationStatusOrderByBrokerRegisteredAtAsc(
                         BrokerVerificationStatus status,
                         Pageable pageable);

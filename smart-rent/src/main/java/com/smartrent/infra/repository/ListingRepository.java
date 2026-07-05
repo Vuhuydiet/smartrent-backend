@@ -516,6 +516,23 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
             "GROUP BY DATE_FORMAT(l.created_at, '%Y-%m') ORDER BY label ASC", nativeQuery = true)
     List<Object[]> countNewListingsByMonth(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+    long countByCreatedAtBeforeAndIsDraftFalseAndIsShadowFalse(LocalDateTime dateTime);
+
+    @Query(value = "SELECT l.listing_type AS label, COUNT(*) AS cnt FROM listings l " +
+            "WHERE l.created_at BETWEEN :start AND :end AND l.is_draft = false AND l.is_shadow = false " +
+            "GROUP BY l.listing_type ORDER BY cnt DESC", nativeQuery = true)
+    List<Object[]> countNewListingsByType(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT l.product_type AS label, COUNT(*) AS cnt FROM listings l " +
+            "WHERE l.created_at BETWEEN :start AND :end AND l.is_draft = false AND l.is_shadow = false " +
+            "GROUP BY l.product_type ORDER BY cnt DESC", nativeQuery = true)
+    List<Object[]> countNewListingsByProductType(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query(value = "SELECT CASE WHEN l.verified = true THEN 'VERIFIED' ELSE 'UNVERIFIED' END AS label, COUNT(*) AS cnt " +
+            "FROM listings l WHERE l.created_at BETWEEN :start AND :end AND l.is_draft = false AND l.is_shadow = false " +
+            "GROUP BY l.verified", nativeQuery = true)
+    List<Object[]> countNewListingsByVerification(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
     // ─── Recommendation Queries ───
 
     /**
