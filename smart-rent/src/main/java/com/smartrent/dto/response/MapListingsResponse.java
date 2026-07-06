@@ -25,10 +25,10 @@ import java.util.List;
 public class MapListingsResponse {
 
     @Schema(
-        description = "Danh sách bài đăng trong vùng bản đồ. Đã được sắp xếp theo VIP type (DIAMOND > GOLD > SILVER > NORMAL) và updatedAt (mới nhất trước).",
+        description = "Danh sách bài đăng trong vùng bản đồ (dạng card, không kèm amenities). Đã được sắp xếp theo VIP type (DIAMOND > GOLD > SILVER > NORMAL) và updatedAt (mới nhất trước).",
         example = "[...]"
     )
-    List<ListingResponse> listings;
+    List<ListingCardResponse> listings;
 
     @Schema(
         description = "Tổng số lượng bài đăng trong vùng (có thể nhiều hơn số lượng trả về do limit)",
