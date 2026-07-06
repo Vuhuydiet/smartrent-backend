@@ -162,6 +162,20 @@ public class PaymentController {
 
         log.info("Processing payment callback for provider: {} with params: {}", provider, params.keySet());
 
+        // SePay is webhook-only (bank-transfer QR — no browser redirect). Its sole
+        // authentic entry point is POST /webhook/sepay, which verifies X-Secret-Key.
+        // Reject SEPAY on this PUBLIC browser-callback path: otherwise a forged
+        // GET /v1/payments/callback/SEPAY?...&transaction_status=APPROVED reaches the
+        // same processIPN and can mark a PENDING transaction COMPLETED — granting paid
+        // listings/memberships without the secret key. (Audit: SePay callback bypass.)
+        if (provider == PaymentProvider.SEPAY) {
+            log.warn("Rejected SePay on the browser-callback path; SePay must use the authenticated /webhook/sepay endpoint");
+            return ApiResponse.<PaymentCallbackResponse>builder()
+                    .code("400002")
+                    .message("SePay is not supported on the callback path")
+                    .build();
+        }
+
         try {
             PaymentCallbackRequest callbackRequest = PaymentCallbackRequest.builder()
                     .provider(provider)
