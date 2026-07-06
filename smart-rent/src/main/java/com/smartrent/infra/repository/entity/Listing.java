@@ -47,7 +47,18 @@ import java.util.List;
                 // Directions (updated_at/listing_id DESC) need MySQL 8; the real index is built by V94.
                 @Index(name = "idx_listings_public_cursor_default", columnList = "moderation_status, is_draft, is_shadow, vip_type_sort_order, updated_at, listing_id"),
                 // Category-filtered cursor feed (?categoryId=…) — leads with category_id. See V94.
-                @Index(name = "idx_listings_public_cursor_category", columnList = "category_id, moderation_status, is_draft, is_shadow, vip_type_sort_order, updated_at, listing_id")
+                @Index(name = "idx_listings_public_cursor_category", columnList = "category_id, moderation_status, is_draft, is_shadow, vip_type_sort_order, updated_at, listing_id"),
+                // Recommendation candidate retrieval (getPersonalizedFeed / getSimilarListings) — see V97.
+                // Location keys are denormalized from addresses (fixed reference data) so filter AND sort
+                // live on listings ⇒ each candidate query is a single-table index-ordered range scan, no
+                // filesort. Equality prefix (location + visibility) + ordered suffix (pushed_at, post_date),
+                // mirroring idx_listings_public_default_sort. product_type/listing_type/price/expiry are residual.
+                @Index(name = "idx_listings_reco_new_prov", columnList = "new_province_code, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
+                @Index(name = "idx_listings_reco_new_ward", columnList = "new_ward_code, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
+                @Index(name = "idx_listings_reco_legacy_dist", columnList = "legacy_district_id, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
+                @Index(name = "idx_listings_reco_legacy_ward", columnList = "legacy_ward_id, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
+                @Index(name = "idx_listings_reco_legacy_prov", columnList = "legacy_province_id, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
+                @Index(name = "idx_listings_reco_fresh", columnList = "is_draft, is_shadow, verified, expired, pushed_at, post_date")
         })
 @Getter
 @Setter
@@ -178,6 +189,27 @@ public class Listing {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "address_id", nullable = false)
     Address address;
+
+    // Denormalized location keys copied from the referenced Address (fixed
+    // reference data). Populated by updateSearchFields() on persist/update and
+    // backfilled in V97. These exist ONLY so the recommendation candidate
+    // queries can filter AND sort on listings alone (see idx_listings_reco_*),
+    // turning a cross-table filter+sort filesort into an index-ordered scan.
+    // Read the Address entity for canonical values; never write these directly.
+    @Column(name = "new_province_code", length = 10)
+    String newProvinceCode;
+
+    @Column(name = "new_ward_code", length = 10)
+    String newWardCode;
+
+    @Column(name = "legacy_province_id")
+    Integer legacyProvinceId;
+
+    @Column(name = "legacy_district_id")
+    Integer legacyDistrictId;
+
+    @Column(name = "legacy_ward_id")
+    Integer legacyWardId;
 
     // Property Specifications
     @Column(name = "area")
@@ -363,6 +395,18 @@ public class Listing {
     @PrePersist
     @PreUpdate
     private void updateSearchFields() {
+        // Keep the denormalized location keys in sync with the referenced address
+        // (see the field comment + idx_listings_reco_*). Address is fixed reference
+        // data, so in practice this only ever fires meaningfully on create; the
+        // address proxy is already initialized below via getDisplayAddress().
+        if (address != null) {
+            newProvinceCode = address.getNewProvinceCode();
+            newWardCode = address.getNewWardCode();
+            legacyProvinceId = address.getLegacyProvinceId();
+            legacyDistrictId = address.getLegacyDistrictId();
+            legacyWardId = address.getLegacyWardId();
+        }
+
         String addressText = address != null ? address.getDisplayAddress() : null;
         String descSnippet = description;
         if (descSnippet != null && descSnippet.length() > 200) {
