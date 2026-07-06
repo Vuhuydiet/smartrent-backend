@@ -54,18 +54,24 @@ public class NotificationServiceImpl implements NotificationService {
             // Send WebSocket AFTER transaction commits to avoid race condition
             // where frontend queries DB before TX is visible.
             NotificationResponse response = mapToResponse(saved);
-            String destination = "/topic/notifications/" + recipientId;
+            // Route to the recipient's PRIVATE user-destination. The STOMP session's
+            // authenticated Principal (set by WebSocketAuthChannelInterceptor) equals
+            // recipientId, and the FE subscribes to /user/queue/notifications, so only
+            // that user receives it. Replaces the old guessable public
+            // /topic/notifications/{recipientId} broadcast that any anonymous client
+            // could subscribe to (notification IDOR).
+            String userDestination = "/queue/notifications";
             if (TransactionSynchronizationManager.isActualTransactionActive()) {
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        messagingTemplate.convertAndSend(destination, response);
-                        log.debug("WebSocket notification sent after commit to {}", destination);
+                        messagingTemplate.convertAndSendToUser(recipientId, userDestination, response);
+                        log.debug("WebSocket notification sent after commit to user {}", recipientId);
                     }
                 });
             } else {
-                messagingTemplate.convertAndSend(destination, response);
-                log.debug("WebSocket notification sent to {}", destination);
+                messagingTemplate.convertAndSendToUser(recipientId, userDestination, response);
+                log.debug("WebSocket notification sent to user {}", recipientId);
             }
         } catch (Exception e) {
             log.error("Failed to send notification: type={}, recipient={}:{}, error={}",
