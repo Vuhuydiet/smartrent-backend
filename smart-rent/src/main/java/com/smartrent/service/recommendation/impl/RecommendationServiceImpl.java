@@ -61,6 +61,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             return emptyResponse("similar");
         }
 
+        long tStart = System.nanoTime();
         com.smartrent.infra.repository.entity.Address targetAddr = target.getAddress();
         Integer provinceId = (targetAddr != null) ? targetAddr.getLegacyProvinceId() : null;
         String provinceCode = (targetAddr != null) ? targetAddr.getNewProvinceCode() : null;
@@ -71,7 +72,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                     if (districtId != null) {
                         return listingRepository.findSimilarProximityCandidates(
                                 provinceCode, provinceId, districtId, target.getProductType(), target.getListingType(),
-                                listingId, PageRequest.of(0, 250));
+                                listingId, PageRequest.of(0, 150));
                     }
                     return java.util.Collections.emptyList();
                 });
@@ -85,7 +86,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                         return listingRepository.findSimilarPriceCandidates(
                                 provinceCode, provinceId, minPrice, maxPrice, target.getProductType(),
                                 target.getListingType(),
-                                listingId, PageRequest.of(0, 200));
+                                listingId, PageRequest.of(0, 120));
                     }
                     return java.util.Collections.emptyList();
                 });
@@ -116,10 +117,13 @@ public class RecommendationServiceImpl implements RecommendationService {
             candidateSet.addAll(priceFuture.get());
             candidateSet.addAll(freshFuture.get());
 
-            // Stage-2 Fallback Top-up if candidate pool is less than 150 (prevent candidate
-            // starvation)
-            if (candidateSet.size() < 150) {
-                int needed = 300 - candidateSet.size();
+            // Stage-2 Fallback Top-up if candidate pool is less than 120 (prevent candidate
+            // starvation). Pool trimmed 300→200 for cold-start latency: on the 32MB
+            // buffer pool, hydrating fewer candidates cuts the cold disk reads; 200 is
+            // ample to rank a top-N feed. (Similar has no discovery-shift pinning, so
+            // unlike the personalized feed it does not need a large fixed pool.)
+            if (candidateSet.size() < 120) {
+                int needed = 200 - candidateSet.size();
                 List<Listing> topUp;
                 if (provinceCode != null && !provinceCode.isEmpty() && !provinceCode.equals("UNKNOWN")) {
                     topUp = listingRepository.findCandidatesForSimilarByNewProvince(
@@ -138,12 +142,14 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
 
             candidates = candidateSet.stream()
-                    .limit(300)
+                    .limit(200)
                     .collect(Collectors.toList());
         } catch (Exception e) {
             log.error("Error executing parallel multi-channel retrieval for similar listings", e);
             candidates = freshFuture.join();
         }
+
+        long tAfterCandidates = System.nanoTime();
 
         if (candidates.isEmpty()) {
             return emptyResponse("similar");
@@ -187,8 +193,16 @@ public class RecommendationServiceImpl implements RecommendationService {
                 .interactionFeatures(interactionFeatures)
                 .build();
 
+        long tBeforeAi = System.nanoTime();
         try {
             List<RecommendationItemDto> result = aiConnector.getSimilarListings(aiRequest);
+            long tAfterAi = System.nanoTime();
+            log.info("[PerfTrace] similar listingId={} candidatePool={} | candidateRetrieval={}ms interactions+features={}ms feignAi={}ms total(soFar)={}ms",
+                    listingId, candidates.size(),
+                    (tAfterCandidates - tStart) / 1_000_000,
+                    (tBeforeAi - tAfterCandidates) / 1_000_000,
+                    (tAfterAi - tBeforeAi) / 1_000_000,
+                    (tAfterAi - tStart) / 1_000_000);
             return buildResponse(result, userId != null ? "similar_personalized" : "similar", false, false);
         } catch (Exception e) {
             log.error("AI service error for similar listings (listingId={})", listingId, e);

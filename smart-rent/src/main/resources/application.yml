@@ -179,7 +179,12 @@ spring:
         # Asia/Ho_Chi_Minh by HomepageStatsCacheScheduler.
         "[listing.stats.categories]": 0s
         "[listing.stats.provinces]": 0s
-        "[listing.recommendation.similar]": 5m
+        # Similar-listings cache is keyed by listingId (NOT per-user) so it is
+        # shared across everyone viewing a listing and is never evicted on view.
+        # A longer TTL keeps the cold ~5s recompute rare (once per listing per
+        # window) — a big win while the DB buffer pool is only 32MB. See PR reco
+        # cold-start work.
+        "[listing.recommendation.similar]": 30m
         "[listing.recommendation.personalized]": 2m
 
 application:
