@@ -3179,8 +3179,13 @@ public class ListingServiceImpl implements ListingService {
                 request.getVipType()
         );
 
-        // Batch-load all relationships and map to DTOs (avoids N+1)
-        List<ListingResponse> listings = batchMapListings(page.getContent());
+        // Card DTO: the map only ever renders pins/cards (title, price, area,
+        // first-image thumbnail) — never amenities. batchMapListings() joins
+        // listing_amenities (a @ManyToMany), which multiplies the result set by
+        // amenity count per listing and was pure overhead here. batchMapCardListings()
+        // skips that join entirely, which is the dominant cost at high zoom-out
+        // levels where the query returns close to the 500-listing cap.
+        List<ListingCardResponse> listings = batchMapCardListings(page.getContent());
 
         // Build bounds info
         com.smartrent.dto.response.MapListingsResponse.MapBoundsInfo boundsInfo =
