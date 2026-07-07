@@ -35,6 +35,7 @@ import com.smartrent.infra.repository.AddressRepository;
 // AddressMetadataRepository removed — queries now use addresses table directly
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.AmenityRepository;
+import com.smartrent.infra.repository.CategoryListingCount;
 import com.smartrent.infra.repository.CategoryRepository;
 import com.smartrent.infra.repository.LegacyProvinceRepository;
 import com.smartrent.infra.repository.LegacyDistrictRepository;
@@ -1913,10 +1914,23 @@ public class ListingServiceImpl implements ListingService {
         Map<Long, Category> categoryMap = categoryRepository.findAllById(request.getCategoryIds())
                 .stream().collect(Collectors.toMap(Category::getCategoryId, Function.identity()));
 
-        // SINGLE SOURCE OF TRUTH: count each category with the EXACT same
-        // ListingSpecification the public /properties listing page uses, with
-        // the same param the FE card navigates with (categoryId). Guarantees
-        // the homepage number equals the listing-page total for that card.
+        // SINGLE SOURCE OF TRUTH: count every requested category in ONE grouped
+        // query whose WHERE mirrors the public /properties card filter
+        // (categoryId + excludeExpired). This replaced a per-category
+        // count(ListingSpecification) loop — N sequential COUNTs, ~20s for 5
+        // categories on a cold cache. Categories with no listing are absent from
+        // the map and default to 0 below. Keep the query's WHERE in sync with
+        // ListingSpecification.fromFilterRequest so the homepage number equals
+        // the listing-page total for that card.
+        Map<Long, Long> countByCategory = listingRepository
+                .countPublicListingsByCategory(
+                        request.getCategoryIds(),
+                        ModerationStatus.APPROVED,
+                        java.time.LocalDateTime.now())
+                .stream()
+                .collect(Collectors.toMap(
+                        CategoryListingCount::categoryId, CategoryListingCount::total));
+
         boolean verifiedOnly = Boolean.TRUE.equals(request.getVerifiedOnly());
         for (Long categoryId : request.getCategoryIds()) {
             Category category = categoryMap.get(categoryId);
@@ -1925,11 +1939,7 @@ public class ListingServiceImpl implements ListingService {
                 continue;
             }
 
-            ListingFilterRequest cardFilter = ListingFilterRequest.builder()
-                    .categoryId(categoryId)
-                    .excludeExpired(true)
-                    .build();
-            long count = countPublicListings(cardFilter);
+            long count = countByCategory.getOrDefault(categoryId, 0L);
 
             if (verifiedOnly && count == 0) {
                 continue;

@@ -36,6 +36,36 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     """)
     List<Listing> findDisplayingByListingIdIn(@Param("listingIds") Collection<Long> listingIds);
 
+    /**
+     * Homepage "by category" counts in ONE grouped query. Replaces the previous
+     * per-category {@code count(ListingSpecification)} loop (one COUNT per
+     * category → N sequential round-trips; ~20s for 5 categories on a cold
+     * cache). The WHERE clause MUST mirror the public-visibility predicates that
+     * {@link com.smartrent.infra.repository.specification.ListingSpecification#fromFilterRequest}
+     * applies for a category card filter (categoryId + excludeExpired, no auth):
+     * isDraft=false, isShadow=false, moderationStatus=APPROVED, and not-expired
+     * (expired=false AND (expiryDate IS NULL OR expiryDate &gt; now)) — so the
+     * homepage number equals the /properties total for that card. Categories
+     * with no matching listing are absent from the result (caller defaults them
+     * to 0). Served by idx_listings_public_cursor_category (leads with
+     * category_id).
+     */
+    @Query("""
+        SELECT new com.smartrent.infra.repository.CategoryListingCount(l.categoryId, COUNT(l))
+        FROM listings l
+        WHERE l.categoryId IN :categoryIds
+          AND l.isDraft = false
+          AND l.isShadow = false
+          AND l.moderationStatus = :approved
+          AND l.expired = false
+          AND (l.expiryDate IS NULL OR l.expiryDate > :now)
+        GROUP BY l.categoryId
+    """)
+    List<CategoryListingCount> countPublicListingsByCategory(
+            @Param("categoryIds") Collection<Long> categoryIds,
+            @Param("approved") com.smartrent.enums.ModerationStatus approved,
+            @Param("now") LocalDateTime now);
+
     List<Listing> findByUserId(String userId);
 
     Optional<Listing> findByParentListingId(Long parentListingId);
