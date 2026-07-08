@@ -59,12 +59,14 @@ import java.util.List;
                 @Index(name = "idx_listings_reco_legacy_ward", columnList = "legacy_ward_id, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
                 @Index(name = "idx_listings_reco_legacy_prov", columnList = "legacy_province_id, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
                 @Index(name = "idx_listings_reco_fresh", columnList = "is_draft, is_shadow, verified, expired, pushed_at, post_date"),
-                // Public /map-bounds bounding-box query — see V98. lat/lng are denormalized
-                // from addresses so the visibility filter, the bbox and the vip/updated_at
-                // sort all live on listings ⇒ a single-table range scan replaces the
-                // addresses join. Equality prefix (is_draft, verified, expired) + latitude
-                // range + covering suffix (longitude, expiry_date + sort keys).
-                @Index(name = "idx_listings_map_bounds", columnList = "is_draft, verified, expired, latitude, longitude, expiry_date, vip_type_sort_order, updated_at, listing_id")
+                // Public /map-bounds bounding-box query — see V98/V99. lat/lng are
+                // denormalized from addresses so the visibility filter, the bbox and the
+                // vip/updated_at sort all live on listings ⇒ a single-table range scan
+                // replaces the addresses join. Equality prefix (is_draft, is_shadow,
+                // verified, moderation_status, expired) + latitude range + covering
+                // suffix (longitude, expiry_date + sort keys). moderation_status/is_shadow
+                // added in V99 to match withinMapBounds()'s admin-approval + shadow-ban gate.
+                @Index(name = "idx_listings_map_bounds", columnList = "is_draft, is_shadow, verified, moderation_status, expired, latitude, longitude, expiry_date, vip_type_sort_order, updated_at, listing_id")
         })
 @Getter
 @Setter

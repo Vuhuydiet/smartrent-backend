@@ -992,6 +992,11 @@ public class ListingSpecification {
             // Exclude drafts - only show published listings on map
             predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
 
+            // Exclude shadow-banned listings. Every other public-visibility path
+            // (fromFilterRequest, findHomepageTier) applies this unconditionally;
+            // withinMapBounds had drifted from that and was missing it.
+            predicates.add(criteriaBuilder.equal(root.get("isShadow"), false));
+
             // Verified filter
             if (Boolean.TRUE.equals(verifiedOnly)) {
                 predicates.add(criteriaBuilder.equal(root.get("verified"), true));
@@ -999,6 +1004,20 @@ public class ListingSpecification {
                 // By default, only show verified listings on public map
                 predicates.add(criteriaBuilder.equal(root.get("verified"), true));
             }
+
+            // Admin-approval gate. `verified` alone is not authoritative -- it's a
+            // badge flag that can drift from the actual moderation outcome (see
+            // ListingModerationServiceImpl, which sets both together on approve but
+            // can flip verified back to false on revision/resubmission while
+            // moderationStatus moves independently). moderationStatus=APPROVED is
+            // what admin approval actually gates on, and is required by the same
+            // "Đang hiển thị" (DISPLAYING) rule /seller/listings uses -- see
+            // ListingSpecification.buildStatusPredicate(DISPLAYING) plus the
+            // moderationStatus=APPROVED predicate the seller page always sends
+            // alongside it.
+            predicates.add(criteriaBuilder.equal(
+                root.get("moderationStatus"),
+                com.smartrent.enums.ModerationStatus.APPROVED));
 
             // Exclude expired listings (flag AND date check)
             LocalDateTime mapNow = LocalDateTime.now();
