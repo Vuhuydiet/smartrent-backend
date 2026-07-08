@@ -53,6 +53,8 @@ public class ListingCardResponse {
     public static class AddressCard {
         String fullNewAddress;
         String fullAddress;
+        BigDecimal latitude;
+        BigDecimal longitude;
     }
 
     @Getter
