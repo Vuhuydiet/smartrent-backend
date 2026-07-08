@@ -985,8 +985,12 @@ public class ListingServiceImpl implements ListingService {
                 : userRepository.findAllById(userIds).stream()
                         .collect(Collectors.toMap(User::getUserId, Function.identity()));
 
-        // 1 query: batch-load media (no amenities needed for cards)
-        listingRepository.findByIdsWithMedia(listingIds);
+        // 1 query: batch-load media AND address (no amenities needed for cards).
+        // Address must be hydrated here: the map-bounds query joins addresses only
+        // for its WHERE/sort, so listing.getAddress() below would otherwise
+        // lazy-load once per listing -- an N+1 of up to 200 queries that dominated
+        // the map-bounds response time (1-23s in production traces).
+        listingRepository.findByIdsWithMediaAndAddress(listingIds);
 
         return listings.stream()
                 .map(listing -> {
@@ -3196,6 +3200,12 @@ public class ListingServiceImpl implements ListingService {
         // skips that join entirely, which is the dominant cost at high zoom-out
         // levels where the query returns close to the 500-listing cap.
         List<ListingCardResponse> listings = batchMapCardListings(page.getContent());
+
+        // The map renders pins and compact cards only — it never shows the
+        // description body. Drop it on this path (up to 500 listings per call)
+        // so full descriptions don't inflate the payload; the other
+        // batchMapCardListings callers keep theirs untouched.
+        listings.forEach(card -> card.setDescription(null));
 
         // Build bounds info
         com.smartrent.dto.response.MapListingsResponse.MapBoundsInfo boundsInfo =

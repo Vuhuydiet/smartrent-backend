@@ -143,6 +143,17 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     List<Listing> findByIdsWithMedia(@Param("ids") Collection<Long> ids);
 
     /**
+     * Map-card hydration: media AND address in a single query, without the
+     * amenities join (cards never render amenities). The map-bounds query joins
+     * addresses only for its WHERE/sort, so the address association is left lazy
+     * on the returned entities — mapping each card would then lazy-load address
+     * one listing at a time (an N+1 of up to 200 queries that dominated the
+     * map-bounds latency). Fetching it here collapses that into one query.
+     */
+    @Query("SELECT DISTINCT l FROM listings l LEFT JOIN FETCH l.media LEFT JOIN FETCH l.address WHERE l.listingId IN :ids")
+    List<Listing> findByIdsWithMediaAndAddress(@Param("ids") Collection<Long> ids);
+
+    /**
      * Homepage VIP-tier carousel: the latest {@code N} verified, non-draft,
      * non-shadow listings of one tier. Returns a plain {@code List} (not a
      * {@code Page}) so Spring Data does NOT run a COUNT(*) — the carousel only
