@@ -34,6 +34,12 @@ import static org.mockito.Mockito.when;
  * result set by amenity count per listing for data the map never displays.
  * Locks in the fix: the endpoint must use the card path and must never
  * touch the amenities batch-load.
+ *
+ * Also locks in the N+1 fix: the card path must hydrate media AND address in a
+ * single query (findByIdsWithMediaAndAddress). The map-bounds query joins
+ * addresses only for its WHERE/sort, so without this the per-card
+ * getAddress() would lazy-load one row at a time -- an N+1 of up to 200
+ * queries. The media-only findByIdsWithMedia must no longer be used here.
  */
 @ExtendWith(MockitoExtension.class)
 class ListingServiceImplMapBoundsTest {
@@ -62,7 +68,7 @@ class ListingServiceImplMapBoundsTest {
         when(listingQueryService.queryByMapBounds(
                 any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(listing), Pageable.unpaged(), 1));
-        when(listingRepository.findByIdsWithMedia(anyCollection()))
+        when(listingRepository.findByIdsWithMediaAndAddress(anyCollection()))
                 .thenReturn(List.of(listing));
         when(listingMapper.toCardResponse(any(), any(), any()))
                 .thenReturn(ListingCardResponse.builder().listingId(1L).build());
@@ -81,5 +87,9 @@ class ListingServiceImplMapBoundsTest {
         assertEquals(1, response.getListings().size());
         assertEquals(1L, response.getListings().get(0).getListingId());
         verify(listingRepository, never()).findByIdsWithAmenities(anyCollection());
+        // Media + address hydrated together; the media-only path (which left
+        // address lazy and caused the N+1) must not be used on the map path.
+        verify(listingRepository).findByIdsWithMediaAndAddress(anyCollection());
+        verify(listingRepository, never()).findByIdsWithMedia(anyCollection());
     }
 }
