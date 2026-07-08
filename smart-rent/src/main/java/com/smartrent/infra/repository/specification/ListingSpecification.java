@@ -970,20 +970,21 @@ public class ListingSpecification {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            // Join with Address table to access latitude and longitude
-            Join<Listing, Address> addressJoin = root.join("address", JoinType.INNER);
-
-            // Bounding box filter: latitude and longitude must be within bounds
-            // Latitude: swLat <= latitude <= neLat
-            // Longitude: swLng <= longitude <= neLng
+            // Bounding-box filter on the coordinates denormalized onto listings
+            // (V98). Filtering here instead of joining addresses keeps the query
+            // single-table, so the visibility filter, the bbox and the
+            // vip_type_sort_order/updated_at sort are all served by
+            // idx_listings_map_bounds -- no nested-loop join to addresses, which
+            // was the ~20s cost at wide zoom on the small-buffer-pool prod DB.
+            // Latitude: swLat <= latitude <= neLat; Longitude: swLng <= longitude <= neLng
             predicates.add(criteriaBuilder.between(
-                addressJoin.get("latitude"),
+                root.get("latitude"),
                 swLat.doubleValue(),
                 neLat.doubleValue()
             ));
 
             predicates.add(criteriaBuilder.between(
-                addressJoin.get("longitude"),
+                root.get("longitude"),
                 swLng.doubleValue(),
                 neLng.doubleValue()
             ));
