@@ -58,7 +58,13 @@ import java.util.List;
                 @Index(name = "idx_listings_reco_legacy_dist", columnList = "legacy_district_id, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
                 @Index(name = "idx_listings_reco_legacy_ward", columnList = "legacy_ward_id, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
                 @Index(name = "idx_listings_reco_legacy_prov", columnList = "legacy_province_id, is_draft, is_shadow, verified, expired, pushed_at, post_date"),
-                @Index(name = "idx_listings_reco_fresh", columnList = "is_draft, is_shadow, verified, expired, pushed_at, post_date")
+                @Index(name = "idx_listings_reco_fresh", columnList = "is_draft, is_shadow, verified, expired, pushed_at, post_date"),
+                // Public /map-bounds bounding-box query — see V98. lat/lng are denormalized
+                // from addresses so the visibility filter, the bbox and the vip/updated_at
+                // sort all live on listings ⇒ a single-table range scan replaces the
+                // addresses join. Equality prefix (is_draft, verified, expired) + latitude
+                // range + covering suffix (longitude, expiry_date + sort keys).
+                @Index(name = "idx_listings_map_bounds", columnList = "is_draft, verified, expired, latitude, longitude, expiry_date, vip_type_sort_order, updated_at, listing_id")
         })
 @Getter
 @Setter
@@ -210,6 +216,19 @@ public class Listing {
 
     @Column(name = "legacy_ward_id")
     Integer legacyWardId;
+
+    // Denormalized coordinates copied from the referenced Address, same rationale
+    // as the location keys above: /map-bounds filters by a lat/lng bounding box
+    // AND sorts by vip_type_sort_order/updated_at. Keeping lat/lng on listings
+    // turns that cross-table filter+sort (a ~20s nested-loop join on the
+    // small-buffer-pool prod DB) into a single-table index range scan
+    // (idx_listings_map_bounds). Populated by updateSearchFields() and backfilled
+    // in V98. Read the Address entity for canonical values; never write directly.
+    @Column(name = "latitude", precision = 10, scale = 8)
+    BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 11, scale = 8)
+    BigDecimal longitude;
 
     // Property Specifications
     @Column(name = "area")
@@ -405,6 +424,8 @@ public class Listing {
             legacyProvinceId = address.getLegacyProvinceId();
             legacyDistrictId = address.getLegacyDistrictId();
             legacyWardId = address.getLegacyWardId();
+            latitude = address.getLatitude();
+            longitude = address.getLongitude();
         }
 
         String addressText = address != null ? address.getDisplayAddress() : null;
