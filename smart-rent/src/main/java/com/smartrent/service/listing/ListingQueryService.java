@@ -4,11 +4,18 @@ import com.smartrent.dto.request.ListingFilterRequest;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.specification.ListingSpecification;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -165,30 +172,43 @@ public class ListingQueryService {
         log.debug("Querying listings by map bounds - NE: ({}, {}), SW: ({}, {}), limit: {}",
                 neLat, neLng, swLat, swLng, limit);
 
-        // Build specification for map bounds query
-        Specification<Listing> spec = ListingSpecification.withinMapBounds(
-                neLat, neLng, swLat, swLng, verifiedOnly, categoryId, vipType);
-
         // Deterministic ordering is REQUIRED for the map: the query is capped by
         // `limit`, so without a stable ORDER BY the database is free to return a
-        // different subset (and different order) for the same bounding box on each
-        // call — which is exactly the "points flicker / disappear in the same area"
-        // bug. Sort by VIP tier (DIAMOND first) so the most relevant pins always
-        // win the cap, then newest first, then listingId as a final tie-breaker so
-        // the result set is fully reproducible.
-        Sort sort = Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
-                .and(Sort.by(Sort.Direction.DESC, "updatedAt"))
-                .and(Sort.by(Sort.Direction.ASC, "listingId"));
-
-        // Create pageable with limit and the deterministic sort
+        // different subset for the same bounding box on each call — the "points
+        // flicker / disappear in the same area" bug. VIP tier first (DIAMOND wins
+        // the cap), then newest, then listingId as a final tie-breaker. That order
+        // is baked into findMapBoundsListingIds' native ORDER BY.
         int safeLimit = Math.min(Math.max(limit, 1), 500); // Max 500 for map queries
-        Pageable pageable = PageRequest.of(0, safeLimit, sort);
 
-        // Execute query
-        Page<Listing> results = listingRepository.findAll(spec, pageable);
+        // Force idx_listings_map_bounds. This bbox + ORDER BY + LIMIT shape makes
+        // the optimizer prefer idx_listings_sort_order and filter row-by-row
+        // (~1.5s at city zoom, worse when zoomed into a sparse area); the forced
+        // geo index is a covering range scan (~70ms, consistent). The native query
+        // reproduces ListingSpecification.withinMapBounds' filter exactly — the map
+        // is always verified-only, so verifiedOnly/vipType aren't applied separately
+        // (matching the previous behaviour, where vipType was disabled and
+        // verifiedOnly resolved to verified=true either way).
+        List<Long> ids = listingRepository.findMapBoundsListingIds(
+                swLat, neLat, swLng, neLng, categoryId, safeLimit);
+        long total = listingRepository.countMapBoundsListings(
+                swLat, neLat, swLng, neLng, categoryId);
 
-        log.debug("Map bounds query returned {} results", results.getNumberOfElements());
+        // Hydrate the managed entities and restore the native order (IN loses it).
+        // Left lazy on media/address here on purpose: the caller's
+        // batchMapCardListings batch-fetches those in a single query.
+        List<Listing> ordered;
+        if (ids.isEmpty()) {
+            ordered = Collections.emptyList();
+        } else {
+            Map<Long, Listing> byId = listingRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(Listing::getListingId, Function.identity(), (a, b) -> a));
+            ordered = ids.stream()
+                    .map(byId::get)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        }
 
-        return results;
+        log.debug("Map bounds query returned {} of {} listings", ordered.size(), total);
+        return new PageImpl<>(ordered, PageRequest.of(0, safeLimit), total);
     }
 }
