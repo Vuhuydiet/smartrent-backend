@@ -53,6 +53,11 @@ public class ListingCardResponse {
     public static class AddressCard {
         String fullNewAddress;
         String fullAddress;
+        // Coordinates the /map-bounds map view needs to place each pin. The FE
+        // reads listing.address.latitude/longitude and filters out any listing
+        // without them, so omitting these renders an empty map even on a 200.
+        BigDecimal latitude;
+        BigDecimal longitude;
     }
 
     @Getter

@@ -186,6 +186,8 @@ public class ListingMapperImpl implements ListingMapper {
             addressCard = ListingCardResponse.AddressCard.builder()
                     .fullNewAddress(address.getFullNewAddress())
                     .fullAddress(address.getFullAddress())
+                    .latitude(address.getLatitude())
+                    .longitude(address.getLongitude())
                     .build();
         }
 
