@@ -154,6 +154,65 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     List<Listing> findByIdsWithMediaAndAddress(@Param("ids") Collection<Long> ids);
 
     /**
+     * Map-bounds pin IDs — ordered (VIP-first, then newest, then id) and capped,
+     * with the geo index FORCED. The bbox + visibility filter mirrors
+     * {@link com.smartrent.infra.repository.specification.ListingSpecification#withinMapBounds}
+     * exactly (is_draft/is_shadow/verified/moderation_status/expired + bbox + expiry
+     * + optional category).
+     *
+     * <p>FORCE INDEX is load-bearing: with this ORDER BY + LIMIT shape the optimizer
+     * otherwise prefers idx_listings_sort_order and filters row-by-row (measured
+     * ~1.5s at city zoom on the small-buffer-pool prod DB, and far worse when zoomed
+     * into a sparse area where it scans most of the sort index before hitting the
+     * cap). idx_listings_map_bounds is a covering, geo-bounded range scan (~70ms,
+     * consistent). A histogram on latitude/longitude does NOT flip the planner — the
+     * ORDER BY+LIMIT bias wins — so the hint is required. Returns IDs only; the
+     * caller hydrates the managed entities (media+address) by id.
+     */
+    @Query(value = """
+            SELECT l.listing_id
+            FROM listings l FORCE INDEX (idx_listings_map_bounds)
+            WHERE l.is_draft = 0
+              AND l.is_shadow = 0
+              AND l.verified = 1
+              AND l.moderation_status = 'APPROVED'
+              AND l.expired = 0
+              AND l.latitude BETWEEN :swLat AND :neLat
+              AND l.longitude BETWEEN :swLng AND :neLng
+              AND (l.expiry_date IS NULL OR l.expiry_date > NOW())
+              AND (:categoryId IS NULL OR l.category_id = :categoryId)
+            ORDER BY l.vip_type_sort_order ASC, l.updated_at DESC, l.listing_id ASC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Long> findMapBoundsListingIds(
+            @Param("swLat") BigDecimal swLat, @Param("neLat") BigDecimal neLat,
+            @Param("swLng") BigDecimal swLng, @Param("neLng") BigDecimal neLng,
+            @Param("categoryId") Long categoryId, @Param("limit") int limit);
+
+    /**
+     * Total matching pins in the bounds (drives the FE "X tổng, phóng to" hint).
+     * Same filter + forced geo index as {@link #findMapBoundsListingIds}; no ORDER BY
+     * so it's a plain covering range-count.
+     */
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM listings l FORCE INDEX (idx_listings_map_bounds)
+            WHERE l.is_draft = 0
+              AND l.is_shadow = 0
+              AND l.verified = 1
+              AND l.moderation_status = 'APPROVED'
+              AND l.expired = 0
+              AND l.latitude BETWEEN :swLat AND :neLat
+              AND l.longitude BETWEEN :swLng AND :neLng
+              AND (l.expiry_date IS NULL OR l.expiry_date > NOW())
+              AND (:categoryId IS NULL OR l.category_id = :categoryId)
+            """, nativeQuery = true)
+    long countMapBoundsListings(
+            @Param("swLat") BigDecimal swLat, @Param("neLat") BigDecimal neLat,
+            @Param("swLng") BigDecimal swLng, @Param("neLng") BigDecimal neLng,
+            @Param("categoryId") Long categoryId);
+
+    /**
      * Homepage VIP-tier carousel: the latest {@code N} verified, non-draft,
      * non-shadow listings of one tier. Returns a plain {@code List} (not a
      * {@code Page}) so Spring Data does NOT run a COUNT(*) — the carousel only
