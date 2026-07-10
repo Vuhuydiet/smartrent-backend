@@ -73,7 +73,18 @@ import java.util.List;
                 // index leads with moderation_status/category_id/user_id/vip_type, none of
                 // which are bound here, so the planner fell back to a filesort over the
                 // whole table. This is a dedicated prefix for that gap.
-                @Index(name = "idx_listings_admin_default_sort", columnList = "is_shadow, vip_type_sort_order, updated_at")
+                @Index(name = "idx_listings_admin_default_sort", columnList = "is_shadow, vip_type_sort_order, updated_at"),
+                // Admin "pending review" queue (moderationStatus=PENDING_REVIEW +
+                // listingStatus=IN_REVIEW, the FE's default admin-list tab) — see V101.
+                // Resolves to: is_shadow=false, is_verify=true, verified IN (false, NULL),
+                // moderation_status IN ('PENDING_REVIEW', NULL), expired IN (false, NULL).
+                // The two equality columns (is_shadow, is_verify) narrow the range scan;
+                // the trailing OR/nullable columns still get evaluated via index condition
+                // pushdown, so only genuinely-matching rows need a row fetch — avoids the
+                // full-table scan the planner otherwise falls back to (no existing index
+                // has this equality prefix; every sort-oriented index leads with
+                // moderation_status/category_id/user_id/vip_type instead of is_verify).
+                @Index(name = "idx_listings_admin_review_queue", columnList = "is_shadow, is_verify, verified, moderation_status, expired")
         })
 @Getter
 @Setter
