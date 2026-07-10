@@ -29,6 +29,13 @@ public interface ListingModerationService {
     void handleReportResolutionOwnerAction(Long reportId, Long listingId, ResolveReportRequest request, String adminId);
 
     /**
+     * Confirmed violation severe enough to permanently remove the listing (report resolution).
+     * Sets moderationStatus=SUSPENDED and marks the listing as permanently removed so the
+     * owner cannot resubmit it, unlike an ordinary admin SUSPEND.
+     */
+    void handleReportResolutionRemoval(Long reportId, Long listingId, ResolveReportRequest request, String adminId);
+
+    /**
      * Owner resubmits their listing for review after making required changes.
      */
     void resubmitForReview(Long listingId, String userId, ResubmitListingRequest request);

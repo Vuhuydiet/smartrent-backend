@@ -350,6 +350,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .revisionCount(entity.getRevisionCount())
                 .lastModerationReasonCode(entity.getLastModerationReasonCode())
                 .lastModerationReasonText(entity.getLastModerationReasonText())
+                .permanentlyRemoved(entity.getPermanentlyRemoved())
                 .propertyInfo(propertyInfo)
                 .build();
     }
@@ -390,6 +391,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .revisionCount(entity.getRevisionCount())
                 .lastModerationReasonCode(entity.getLastModerationReasonCode())
                 .lastModerationReasonText(entity.getLastModerationReasonText())
+                .permanentlyRemoved(entity.getPermanentlyRemoved())
                 .build();
     }
 
@@ -472,6 +474,7 @@ public class ListingMapperImpl implements ListingMapper {
                 // Moderation context (pendingOwnerAction & moderationTimeline populated by
                 // service layer)
                 .moderationStatus(entity.getModerationStatus() != null ? entity.getModerationStatus().name() : null)
+                .permanentlyRemoved(entity.getPermanentlyRemoved())
                 .build();
     }
 }

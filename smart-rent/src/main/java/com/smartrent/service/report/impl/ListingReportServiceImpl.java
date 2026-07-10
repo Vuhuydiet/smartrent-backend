@@ -263,6 +263,11 @@ public class ListingReportServiceImpl implements ListingReportService {
             throw new DomainException(DomainCode.BAD_REQUEST_ERROR, "Invalid status: " + request.getStatus());
         }
 
+        if (Boolean.TRUE.equals(request.getOwnerActionRequired()) && Boolean.TRUE.equals(request.getRemoveListing())) {
+            throw new DomainException(DomainCode.BAD_REQUEST_ERROR,
+                    "Cannot request owner action and remove the listing at the same time");
+        }
+
         // Update report
         report.setStatus(newStatus);
         report.setResolvedBy(adminId);
@@ -307,6 +312,10 @@ public class ListingReportServiceImpl implements ListingReportService {
             listingModerationService.handleReportResolutionOwnerAction(
                     reportId, report.getListingId(), request, adminId);
             log.info("Owner action created for report {} on listing {}", reportId, report.getListingId());
+        } else if (newStatus == ReportStatus.RESOLVED && Boolean.TRUE.equals(request.getRemoveListing())) {
+            listingModerationService.handleReportResolutionRemoval(
+                    reportId, report.getListingId(), request, adminId);
+            log.info("Listing removed for report {} on listing {}", reportId, report.getListingId());
         }
 
         return mapToResponseWithAdminInfo(savedReport);

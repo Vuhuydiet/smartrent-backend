@@ -18,6 +18,7 @@ New listing ──→ PENDING_REVIEW ──→ admin approves ──→ APPROVED
                                 ──→ admin rejects  ──→ REJECTED ──→ owner resubmits ──→ PENDING_REVIEW (loop)
 
 Report filed ──→ admin resolves w/ ownerActionRequired ──→ REVISION_REQUIRED ──→ owner resubmits ──→ PENDING_REVIEW
+             ──→ admin resolves w/ removeListing        ──→ SUSPENDED (permanently removed, no resubmit)
 ```
 
 ---
@@ -175,11 +176,13 @@ X-Admin-Id: <admin_uuid>
   "ownerActionRequired": true,
   "adminNotes": "Thông tin giá và diện tích không chính xác. Vui lòng cập nhật.",
   "ownerActionType": "UPDATE_LISTING",
-  "ownerActionDeadlineAt": "2026-03-07T23:59:59",
-  "listingVisibilityAction": "HIDE_UNTIL_REVIEW"
+  "ownerActionDeadlineAt": "2026-03-07T23:59:59"
 }
 ```
-→ Listing → `REVISION_REQUIRED`, owner gets email, listing hidden until fixed
+→ Listing → `REVISION_REQUIRED`. Reporter **and** owner each get an email + realtime in-app notification with `adminNotes` as the reason.
+
+> [!WARNING]
+> `listingVisibilityAction` (`KEEP_VISIBLE` / `HIDE_UNTIL_REVIEW`) is accepted by the DTO but **not implemented** — no service code reads it. Sending it has no effect; do not rely on it to hide the listing. Drop it from requests until the backend implements it.
 
 ### Resolve report (no owner action needed)
 
@@ -190,7 +193,25 @@ X-Admin-Id: <admin_uuid>
   "adminNotes": "Đã ghi nhận, không cần thay đổi"
 }
 ```
-→ Listing NOT changed
+→ Listing NOT changed. Reporter **and** owner still each get an email + realtime notification (with `adminNotes` as the reason) — resolving a report always notifies both sides, even with no owner action.
+
+### Resolve report — confirmed violation, remove listing (NEW)
+
+```json
+{
+  "status": "RESOLVED",
+  "removeListing": true,
+  "adminNotes": "Tin đăng lừa đảo, không có căn hộ thật tại địa chỉ này."
+}
+```
+→ Listing → `moderationStatus: SUSPENDED` **and permanently removed** — excluded from all public/search results immediately, exactly like an ordinary suspend, but the owner **can no longer resubmit it** (any resubmit call now fails with `RESUBMIT_NOT_ALLOWED`, error code `16003`). Owner gets a dedicated "listing removed" email + realtime notification (`REPORT_LISTING_REMOVED`) with `adminNotes` as the reason; reporter gets the normal resolved notification.
+>
+> The listing responses (`AdminListingSummary`, `ListingResponseWithAdmin`, `ListingResponseForOwner`) all now include `permanentlyRemoved: boolean` so the admin UI can show a distinct "Đã gỡ (vĩnh viễn)" badge/tab instead of the generic "Tạm ngưng" for `SUSPENDED` listings.
+
+> [!IMPORTANT]
+> `removeListing: true` and `ownerActionRequired: true` are **mutually exclusive** — sending both throws `400 BAD_REQUEST_ERROR`. Pick exactly one outcome per resolution: request an edit, remove the listing, or neither.
+
+This is the backend piece for the 3rd report-review button. If you rename it in the admin UI (e.g. **"Xác nhận vi phạm" / "Gỡ bài đăng"**), wire it to `removeListing: true` — do NOT set `ownerActionRequired: true` for that button anymore, since that maps to the separate "Yêu cầu chỉnh sửa" button.
 
 ### Reject report (invalid)
 
@@ -200,14 +221,17 @@ X-Admin-Id: <admin_uuid>
   "adminNotes": "Báo cáo không hợp lệ"
 }
 ```
-→ Listing NOT changed
+→ Listing NOT changed. Reporter **and** owner still each get an email + realtime notification announcing the report was rejected, with `adminNotes` as the reason. This is already implemented — no extra backend work needed to notify the reporter/owner on reject.
 
 > [!IMPORTANT]
 > **For the owner to be able to update & resubmit**, you MUST:
 > - Set `status: "RESOLVED"` (NOT `"REJECTED"`)
-> - Set `ownerActionRequired: true`
+> - Set `ownerActionRequired: true` (NOT `removeListing: true`)
 >
-> If you set `REJECTED`, the listing is untouched and the owner **cannot** resubmit.
+> If you set `REJECTED` or `removeListing: true`, the listing owner **cannot** resubmit.
+
+> [!NOTE]
+> Still **not implemented**: any account-level action (e.g. "cảnh cáo user" / warn or ban the reported user's account). `removeListing` only affects the listing, not the owner's account.
 
 ---
 
@@ -239,6 +263,8 @@ X-Admin-Id: <admin_uuid>
 | Đã từ chối | `POST /admin/list` with `"moderationStatus": "REJECTED"` |
 | Cần sửa | `POST /admin/list` with `"moderationStatus": "REVISION_REQUIRED"` |
 | Tạm ngưng | `POST /admin/list` with `"moderationStatus": "SUSPENDED"` |
+
+> `moderationStatus: SUSPENDED` covers **both** ordinary admin suspends and report-driven permanent removals — there is no separate server-side filter for it. If you want a distinct "Đã gỡ (vĩnh viễn)" tab, fetch `SUSPENDED` and split the results client-side on `permanentlyRemoved` (`true` = removed, no resubmit; `false`/`null` = ordinary suspend, resubmit allowed).
 
 ### Key UI Logic
 

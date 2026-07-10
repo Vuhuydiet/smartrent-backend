@@ -39,5 +39,11 @@ public class ResolveReportRequest {
     @Schema(description = "Whether to hide listing until owner fixes it", example = "KEEP_VISIBLE",
             allowableValues = {"KEEP_VISIBLE", "HIDE_UNTIL_REVIEW"})
     String listingVisibilityAction;
+
+    // ── Confirmed-violation removal ──
+    @Schema(description = "Confirmed violation severe enough to permanently remove the listing. " +
+            "Mutually exclusive with ownerActionRequired=true — the owner cannot resubmit a removed listing.",
+            example = "false")
+    Boolean removeListing;
 }
 

@@ -194,6 +194,13 @@ public class Listing {
     @Column(name = "last_moderation_reason_text", columnDefinition = "TEXT")
     String lastModerationReasonText;
 
+    // Set when a report is resolved as a confirmed severe violation and the
+    // listing is removed (moderationStatus=SUSPENDED). Distinguishes that case
+    // from an ordinary admin SUSPEND, which the owner CAN resubmit from.
+    @Builder.Default
+    @Column(name = "permanently_removed", nullable = false)
+    Boolean permanentlyRemoved = false;
+
     @Builder.Default
     @Column(name = "revision_count", nullable = false)
     Integer revisionCount = 0;
