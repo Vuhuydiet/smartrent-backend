@@ -241,6 +241,10 @@ application:
         - "/v1/listings/map-bounds"
         - "/v1/listings/search-suggestions/click"
         - "/v1/views"
+        # AI chat streaming is optional-auth (see OPTIONAL_AUTH_POST_PATTERNS):
+        # guests may use it (IP rate-limited in ChatController) while logged-in
+        # users still get their JWT processed for personalisation.
+        - "/v1/ai/chat/stream"
   authentication:
     jwt:
       access-signer-key: "${ACCESS_SIGNER_KEY}"

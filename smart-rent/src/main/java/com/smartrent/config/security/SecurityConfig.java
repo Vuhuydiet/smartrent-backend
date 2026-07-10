@@ -167,12 +167,27 @@ public class SecurityConfig {
       "/v1/users/*/following",
   };
 
+  // POST endpoints public to anonymous callers that must still process a Bearer
+  // token when one is supplied. AI chat streaming: guests may use it (the
+  // controller rate-limits them by IP), while logged-in users keep their
+  // user_id + per-user rate limiting instead of being treated as anonymous.
+  private static final String[] OPTIONAL_AUTH_POST_PATTERNS = {
+      "/v1/ai/chat/stream",
+  };
+
   private boolean isOptionalAuthPath(String method, String path) {
-    if (!"GET".equalsIgnoreCase(method)) return false;
-    for (String pattern : OPTIONAL_AUTH_GET_PATTERNS) {
+    String[] patterns = optionalAuthPatternsForMethod(method);
+    if (patterns == null) return false;
+    for (String pattern : patterns) {
       if (pathMatches(path, pattern)) return true;
     }
     return false;
+  }
+
+  private String[] optionalAuthPatternsForMethod(String method) {
+    if ("GET".equalsIgnoreCase(method)) return OPTIONAL_AUTH_GET_PATTERNS;
+    if ("POST".equalsIgnoreCase(method)) return OPTIONAL_AUTH_POST_PATTERNS;
+    return null;
   }
 
   @Bean
