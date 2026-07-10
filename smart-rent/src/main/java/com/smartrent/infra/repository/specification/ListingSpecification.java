@@ -144,10 +144,10 @@ public class ListingSpecification {
                         // Exclude them even though getAllListingsForAdmin sets excludeExpired=false.
                         LocalDateTime reviewNow = LocalDateTime.now();
                         predicates.add(criteriaBuilder.and(
-                            criteriaBuilder.or(
-                                criteriaBuilder.isFalse(root.get("expired")),
-                                criteriaBuilder.isNull(root.get("expired"))
-                            ),
+                            // expired is BOOLEAN NOT NULL (see V7 listings DDL) — no OR-isNull
+                            // branch needed. That dead branch forced MySQL's ref_or_null access
+                            // method on every admin review-queue query for zero behavioral benefit.
+                            criteriaBuilder.isFalse(root.get("expired")),
                             criteriaBuilder.or(
                                 criteriaBuilder.isNull(root.get("expiryDate")),
                                 criteriaBuilder.greaterThan(root.get("expiryDate"), reviewNow)
@@ -160,10 +160,8 @@ public class ListingSpecification {
                         // belong in "Hết hạn", not the active review queue.
                         LocalDateTime resubmittedNow = LocalDateTime.now();
                         predicates.add(criteriaBuilder.and(
-                            criteriaBuilder.or(
-                                criteriaBuilder.isFalse(root.get("expired")),
-                                criteriaBuilder.isNull(root.get("expired"))
-                            ),
+                            // expired is BOOLEAN NOT NULL — see note on the PENDING_REVIEW branch above.
+                            criteriaBuilder.isFalse(root.get("expired")),
                             criteriaBuilder.or(
                                 criteriaBuilder.isNull(root.get("expiryDate")),
                                 criteriaBuilder.greaterThan(root.get("expiryDate"), resubmittedNow)
@@ -870,25 +868,24 @@ public class ListingSpecification {
                     criteriaBuilder.lessThan(root.get("expiryDate"), now)
                 );
 
+            // verified, expired, isVerify, isDraft are all BOOLEAN NOT NULL (see V7
+            // listings DDL, never altered since) — the OR-isNull branches these cases
+            // used to carry could never match. That dead branch forced MySQL's
+            // ref_or_null access method (and blocked ORDER BY index usage) on every
+            // query hitting these predicates for zero behavioral benefit.
             case EXPIRING_SOON ->
                 // verified = true AND expiryDate between now and 7 days from now
                 criteriaBuilder.and(
                     criteriaBuilder.isTrue(root.get("verified")),
                     criteriaBuilder.between(root.get("expiryDate"), now, sevenDaysFromNow),
-                    criteriaBuilder.or(
-                        criteriaBuilder.isFalse(root.get("expired")),
-                        criteriaBuilder.isNull(root.get("expired"))
-                    )
+                    criteriaBuilder.isFalse(root.get("expired"))
                 );
 
             case DISPLAYING ->
                 // verified = true AND NOT expired AND expiryDate > now
                 criteriaBuilder.and(
                     criteriaBuilder.isTrue(root.get("verified")),
-                    criteriaBuilder.or(
-                        criteriaBuilder.isFalse(root.get("expired")),
-                        criteriaBuilder.isNull(root.get("expired"))
-                    ),
+                    criteriaBuilder.isFalse(root.get("expired")),
                     criteriaBuilder.or(
                         criteriaBuilder.isNull(root.get("expiryDate")),
                         criteriaBuilder.greaterThan(root.get("expiryDate"), now)
@@ -901,41 +898,23 @@ public class ListingSpecification {
                 // Use moderationStatus filter for granular control
                 criteriaBuilder.and(
                     criteriaBuilder.isTrue(root.get("isVerify")),
-                    criteriaBuilder.or(
-                        criteriaBuilder.isFalse(root.get("verified")),
-                        criteriaBuilder.isNull(root.get("verified"))
-                    )
+                    criteriaBuilder.isFalse(root.get("verified"))
                 );
 
             case PENDING_PAYMENT ->
                 // transactionId is not null AND verified = false AND isVerify = false
                 criteriaBuilder.and(
                     criteriaBuilder.isNotNull(root.get("transactionId")),
-                    criteriaBuilder.or(
-                        criteriaBuilder.isFalse(root.get("verified")),
-                        criteriaBuilder.isNull(root.get("verified"))
-                    ),
-                    criteriaBuilder.or(
-                        criteriaBuilder.isFalse(root.get("isVerify")),
-                        criteriaBuilder.isNull(root.get("isVerify"))
-                    )
+                    criteriaBuilder.isFalse(root.get("verified")),
+                    criteriaBuilder.isFalse(root.get("isVerify"))
                 );
 
             case REJECTED ->
                 // verified = false AND isVerify = false AND isDraft = false AND postDate is not null
                 criteriaBuilder.and(
-                    criteriaBuilder.or(
-                        criteriaBuilder.isFalse(root.get("verified")),
-                        criteriaBuilder.isNull(root.get("verified"))
-                    ),
-                    criteriaBuilder.or(
-                        criteriaBuilder.isFalse(root.get("isVerify")),
-                        criteriaBuilder.isNull(root.get("isVerify"))
-                    ),
-                    criteriaBuilder.or(
-                        criteriaBuilder.isFalse(root.get("isDraft")),
-                        criteriaBuilder.isNull(root.get("isDraft"))
-                    ),
+                    criteriaBuilder.isFalse(root.get("verified")),
+                    criteriaBuilder.isFalse(root.get("isVerify")),
+                    criteriaBuilder.isFalse(root.get("isDraft")),
                     criteriaBuilder.isNotNull(root.get("postDate"))
                 );
 
