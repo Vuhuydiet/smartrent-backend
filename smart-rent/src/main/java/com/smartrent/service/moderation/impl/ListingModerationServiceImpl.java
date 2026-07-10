@@ -244,6 +244,58 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     }
 
     // ───────────────────────────────────────────────────────────────
+    // Report resolution with confirmed-violation removal
+    // ───────────────────────────────────────────────────────────────
+    @Override
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_SEARCH, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_BROWSE, allEntries = true),
+            @CacheEvict(cacheNames = Constants.CacheNames.LISTING_DETAIL, key = "#listingId"),
+    })
+    public void handleReportResolutionRemoval(Long reportId, Long listingId, ResolveReportRequest request, String adminId) {
+        if (!Boolean.TRUE.equals(request.getRemoveListing())) {
+            return;
+        }
+
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new DomainException(DomainCode.LISTING_NOT_FOUND));
+
+        ModerationStatus previousStatus = listing.getModerationStatus();
+
+        listing.setModerationStatus(ModerationStatus.SUSPENDED);
+        listing.setVerified(false);
+        listing.setIsVerify(false);
+        listing.setPermanentlyRemoved(true);
+        listing.setLastModeratedBy(adminId);
+        listing.setLastModeratedAt(LocalDateTime.now());
+        listing.setLastModerationReasonText(request.getAdminNotes());
+        listingRepository.save(listing);
+
+        // Audit event
+        createModerationEvent(listingId, ModerationSource.REPORT_RESOLUTION,
+                previousStatus, ModerationStatus.SUSPENDED,
+                ModerationAction.SUSPEND, adminId, null,
+                null, request.getAdminNotes(), reportId);
+
+        // Async email
+        sendListingRemovedEmailAsync(listing, request.getAdminNotes());
+
+        // Realtime notification: notify owner the listing was removed
+        if (listing.getUserId() != null) {
+            notificationService.sendNotification(
+                    listing.getUserId(), RecipientType.USER,
+                    NotificationType.REPORT_LISTING_REMOVED,
+                    "Tin đăng của bạn đã bị gỡ",
+                    "Tin đăng \"" + listing.getTitle() + "\" của bạn đã bị gỡ do vi phạm được xác nhận qua báo cáo. "
+                            + (request.getAdminNotes() != null ? request.getAdminNotes() : ""),
+                    listing.getListingId(), "LISTING");
+        }
+
+        log.info("Listing {} permanently removed via report {} by admin {}", listingId, reportId, adminId);
+    }
+
+    // ───────────────────────────────────────────────────────────────
     // Owner resubmit
     // ───────────────────────────────────────────────────────────────
     @Override
@@ -260,6 +312,11 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         // Validate ownership
         if (!listing.getUserId().equals(userId)) {
             throw new DomainException(DomainCode.NOT_LISTING_OWNER);
+        }
+
+        // A listing removed for a confirmed violation can never be resubmitted
+        if (Boolean.TRUE.equals(listing.getPermanentlyRemoved())) {
+            throw new DomainException(DomainCode.RESUBMIT_NOT_ALLOWED);
         }
 
         // Validate state: must be REJECTED, REVISION_REQUIRED, or have pending owner action
@@ -352,6 +409,11 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         // Validate ownership
         if (!listing.getUserId().equals(userId)) {
             throw new DomainException(DomainCode.NOT_LISTING_OWNER);
+        }
+
+        // A listing removed for a confirmed violation can never be resubmitted
+        if (Boolean.TRUE.equals(listing.getPermanentlyRemoved())) {
+            throw new DomainException(DomainCode.RESUBMIT_NOT_ALLOWED);
         }
 
         // Validate state: must be REJECTED, REVISION_REQUIRED, or legacy rejected
@@ -727,6 +789,23 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             emailService.sendEmail(emailRequest);
         } catch (Exception e) {
             log.warn("Failed to send report action email for listing {}: {}", listing.getListingId(), e.getMessage());
+        }
+    }
+
+    private void sendListingRemovedEmailAsync(Listing listing, String adminNotes) {
+        try {
+            var userEntity = userRepository.findById(listing.getUserId()).orElse(null);
+            if (userEntity == null || userEntity.getEmail() == null) return;
+
+            EmailRequest emailRequest = EmailRequest.builder()
+                    .sender(EmailInfo.builder().name(senderName).email(senderEmail).build())
+                    .to(List.of(EmailInfo.builder().name(userEntity.getFirstName()).email(userEntity.getEmail()).build()))
+                    .subject("Tin đăng của bạn đã bị gỡ - SmartRent")
+                    .htmlContent(ModerationEmailBuilder.buildListingRemovedForViolationEmail(listing.getTitle(), userEntity.getFirstName(), adminNotes))
+                    .build();
+            emailService.sendEmail(emailRequest);
+        } catch (Exception e) {
+            log.warn("Failed to send listing removed email for listing {}: {}", listing.getListingId(), e.getMessage());
         }
     }
 

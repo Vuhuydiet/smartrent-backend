@@ -11,7 +11,10 @@
 | 🟡 **Đang chờ duyệt** | Admin đang xem xét tin đăng | Chờ kết quả |
 | 🟢 **Đang hiển thị** | Tin đăng đã được duyệt, đang hiển thị | Không cần làm gì |
 | 🔴 **Bị từ chối** | Admin yêu cầu chỉnh sửa | **Sửa → Gửi lại** |
-| ⛔ **Tạm ngưng** | Tin đăng bị tạm ngưng | Liên hệ hỗ trợ |
+| ⛔ **Tạm ngưng** | Tin đăng bị tạm ngưng (admin tạm ngưng thủ công) | Sửa & gửi lại được |
+| ⛔ **Đã gỡ (vĩnh viễn)** | Admin xác nhận vi phạm nghiêm trọng qua báo cáo và gỡ tin | **Không thể sửa/gửi lại** — liên hệ hỗ trợ nếu cho rằng nhầm lẫn |
+
+> Cả "Tạm ngưng" và "Đã gỡ (vĩnh viễn)" đều hiển thị chung trạng thái `SUSPENDED` ở backend — điểm khác biệt duy nhất là gỡ vĩnh viễn không cho resubmit. FE phân biệt 2 trường hợp này bằng field **`permanentlyRemoved`** (boolean) có sẵn trên response của `GET /v1/listings/{id}` (owner-facing) và các API admin xem tin đăng — `true` nghĩa là đã gỡ vĩnh viễn, không có "Sửa & Gửi lại"; `false`/`null` nghĩa là chỉ tạm ngưng, vẫn resubmit được. Server cũng chặn ở tầng API: cố resubmit một tin `permanentlyRemoved=true` sẽ nhận lỗi `RESUBMIT_NOT_ALLOWED` (16003).
 
 ### Khi Tin Đăng Bị Từ Chối
 
@@ -74,17 +77,22 @@ Tin mới / Tin gửi lại
 
 Khi nhận 1 báo cáo từ người dùng:
 
-| Quyết định | Khi nào dùng | Ảnh hưởng đến tin đăng? |
-|-----------|-------------|------------------------|
-| ✅ **Chấp nhận + Yêu cầu chủ nhà sửa** | Báo cáo đúng, cần chủ nhà fix | ✅ Tin đăng → Từ chối, chủ nhà phải sửa |
-| ✅ **Chấp nhận + Không yêu cầu sửa** | Báo cáo đúng, nhưng admin tự xử lý | ❌ Không đổi |
-| ❌ **Từ chối báo cáo** | Báo cáo không hợp lệ | ❌ Không đổi |
+| Quyết định | Khi nào dùng | Ảnh hưởng đến tin đăng? | Thông báo gửi đi? |
+|-----------|-------------|------------------------|--------------------|
+| ✅ **Chấp nhận + Yêu cầu chủ nhà sửa** | Vi phạm nhẹ, có thể sửa được | ✅ Tin đăng → **Cần sửa** (`REVISION_REQUIRED`), chủ nhà phải sửa & gửi lại | 📧 Email + in-app cho **cả người báo cáo lẫn chủ nhà**, kèm lý do admin nhập |
+| ✅ **Chấp nhận + Gỡ bài đăng** | Vi phạm nghiêm trọng, phải gỡ hẳn | ✅ Tin đăng → **Đã gỡ vĩnh viễn** (`SUSPENDED` + không cho resubmit) | 📧 Email + in-app riêng cho chủ nhà báo tin đã bị gỡ + lý do; người báo cáo nhận thông báo kết quả như thường |
+| ✅ **Chấp nhận + Không yêu cầu sửa** | Báo cáo đúng, nhưng admin tự xử lý ngoài hệ thống (vd đã nhắc nhở qua kênh khác) | ❌ Không đổi | 📧 Email + in-app cho cả 2 bên, kèm lý do admin nhập |
+| ❌ **Từ chối báo cáo** | Báo cáo không hợp lệ | ❌ Không đổi | 📧 Email + in-app cho cả 2 bên, báo kết quả "Rejected" kèm lý do admin nhập |
+
+> ✅ **Đã xác nhận có sẵn trong code** (`ListingReportServiceImpl.resolveReport`): tất cả các nhánh trên đều tự động gửi thông báo (email + realtime in-app) cho **người báo cáo và chủ nhà**, kể cả khi báo cáo bị **Từ chối**. Lý do hiển thị trong thông báo luôn lấy từ ghi chú admin nhập (`adminNotes`).
 
 > ⚠️ **Quan trọng:** Nếu muốn chủ nhà sửa tin đăng, bạn PHẢI:
 > - Chọn **Chấp nhận** (không phải Từ chối)
-> - Bật **Yêu cầu chủ nhà hành động**
+> - Bật **Yêu cầu chủ nhà hành động** (KHÔNG bật cùng lúc với "Gỡ bài đăng" — 2 cờ này loại trừ nhau, API sẽ báo lỗi nếu cả hai đều `true`)
 >
 > Nếu bạn **Từ chối báo cáo**, tin đăng KHÔNG bị ảnh hưởng và chủ nhà KHÔNG thể gửi lại.
+
+> ✅ **Đã bổ sung "Gỡ bài đăng"** (trước đây là gap, nay đã implement): gửi `removeListing: true` trong request `resolve` khi vi phạm đủ nghiêm trọng để gỡ hẳn. Khác với "Yêu cầu chủ nhà sửa", tin đăng bị gỡ sẽ **không thể resubmit** — chủ nhà cố sửa & gửi lại sẽ nhận lỗi từ API. Chi tiết payload xem `ADMIN_LISTING_MODERATION_FRONTEND_GUIDE.md`. Vẫn CHƯA có "cảnh cáo user" (action ở cấp tài khoản) — chỉ mới có hành động ở cấp tin đăng.
 
 ### Duyệt Tin Gửi Lại
 

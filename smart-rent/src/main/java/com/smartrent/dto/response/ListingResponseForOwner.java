@@ -73,6 +73,10 @@ public class ListingResponseForOwner extends ListingResponse {
             allowableValues = {"PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED"})
     String moderationStatus;
 
+    @Schema(description = "True if this listing was permanently removed for a confirmed report violation — " +
+            "moderationStatus is SUSPENDED but, unlike an ordinary admin suspend, it can never be resubmitted")
+    Boolean permanentlyRemoved;
+
     @Schema(description = "Pending owner action (if any)")
     OwnerActionResponse pendingOwnerAction;
 

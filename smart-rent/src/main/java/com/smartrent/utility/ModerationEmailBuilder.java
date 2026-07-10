@@ -93,6 +93,32 @@ public class ModerationEmailBuilder {
         return html.toString();
     }
 
+    public static String buildListingRemovedForViolationEmail(String listingTitle, String ownerFirstName, String adminNotes) {
+        StringBuilder html = EmailBuilder.buildHtmlHeader("Tin đăng đã bị gỡ");
+        html.append("<div class=\"container\">");
+        html.append("<div class=\"header\"><h1>Tin đăng đã bị gỡ</h1></div>");
+        html.append("<div class=\"content\">");
+        html.append("<div class=\"greeting\">Xin chào %s,</div>".formatted(safe(ownerFirstName)));
+        html.append("<div class=\"message\">");
+        html.append("Sau khi xem xét một báo cáo, đội ngũ quản trị đã xác nhận tin đăng <strong>%s</strong> của bạn vi phạm quy định và đã gỡ tin đăng này khỏi nền tảng.".formatted(safe(listingTitle)));
+        html.append("</div>");
+        html.append("<div class=\"card card-danger\">");
+        html.append("<div class=\"card-title\">Trạng thái</div>");
+        html.append("<div class=\"card-body\">Đã gỡ &mdash; tin đăng không còn hiển thị và không thể chỉnh sửa/gửi lại.</div>");
+        html.append("</div>");
+        if (adminNotes != null && !adminNotes.isBlank()) {
+            html.append("<div class=\"card card-accent\">");
+            html.append("<div class=\"card-title\">Lý do</div>");
+            html.append("<div class=\"card-body\">%s</div>".formatted(safe(adminNotes)));
+            html.append("</div>");
+        }
+        html.append("<div class=\"message\">Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ đội ngũ hỗ trợ của SmartRent.</div>");
+        html.append("</div>");
+        html.append("<div class=\"footer\">&copy; %d SmartRent. Bản quyền được bảo lưu.</div>".formatted(EmailBuilder.currentYear()));
+        html.append("</div></body></html>");
+        return html.toString();
+    }
+
     public static String buildReportResolvedForReporterEmail(String listingTitle, String reporterName,
                                                                String resolution, String adminNotes) {
         boolean resolved = "RESOLVED".equalsIgnoreCase(resolution);

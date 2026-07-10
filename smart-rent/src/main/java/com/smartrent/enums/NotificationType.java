@@ -6,6 +6,7 @@ public enum NotificationType {
     REPORT_RESOLVED,
     REPORT_REJECTED,
     REPORT_ACTION_REQUIRED,
+    REPORT_LISTING_REMOVED,   // owner notified when a report is resolved as a confirmed violation and the listing is permanently removed
 
     // Moderation-related
     LISTING_APPROVED,

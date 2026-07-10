@@ -92,6 +92,11 @@ public class AdminListingSummary {
     @Schema(description = "Human-readable reason for last moderation action")
     String lastModerationReasonText;
 
+    @Schema(description = "True if this listing was permanently removed for a confirmed report violation " +
+            "(moderationStatus=SUSPENDED but the owner can never resubmit it) — distinguishes this from an " +
+            "ordinary admin suspend, which the owner can resubmit from")
+    Boolean permanentlyRemoved;
+
     @Getter
     @Setter
     @Builder
