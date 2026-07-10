@@ -160,6 +160,7 @@ spring:
       - "listing.map"
       - "listing.stats.categories"
       - "listing.stats.provinces"
+      - "listing.stats.admin"
       - "listing.recommendation.similar"
       - "listing.recommendation.personalized"
     type: "${CACHE_TYPE:redis}"
@@ -179,6 +180,11 @@ spring:
         # Asia/Ho_Chi_Minh by HomepageStatsCacheScheduler.
         "[listing.stats.categories]": 0s
         "[listing.stats.provinces]": 0s
+        # Admin dashboard stats (POST /v1/listings/admin/list): AdminListingStatsService
+        # runs an unfiltered full-table aggregate. A short TTL means repeated admin
+        # requests (paging, filtering) within the window reuse one computed result
+        # instead of re-scanning the whole listings table on every call.
+        "[listing.stats.admin]": 20s
         # Similar-listings cache is keyed by listingId (NOT per-user) so it is
         # shared across everyone viewing a listing and is never evicted on view.
         # A longer TTL keeps the cold ~5s recompute rare (once per listing per

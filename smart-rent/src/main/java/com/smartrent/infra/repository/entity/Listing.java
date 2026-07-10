@@ -66,7 +66,14 @@ import java.util.List;
                 // verified, moderation_status, expired) + latitude range + covering
                 // suffix (longitude, expiry_date + sort keys). moderation_status/is_shadow
                 // added in V99 to match withinMapBounds()'s admin-approval + shadow-ban gate.
-                @Index(name = "idx_listings_map_bounds", columnList = "is_draft, is_shadow, verified, moderation_status, expired, latitude, longitude, expiry_date, vip_type_sort_order, updated_at, listing_id")
+                @Index(name = "idx_listings_map_bounds", columnList = "is_draft, is_shadow, verified, moderation_status, expired, latitude, longitude, expiry_date, vip_type_sort_order, updated_at, listing_id"),
+                // Admin list, default/unfiltered browse (POST /v1/listings/admin/list with
+                // no moderationStatus/category/user filter) — see V100. getAllListingsForAdmin
+                // only constrains is_shadow=false in this case; every other sort-supporting
+                // index leads with moderation_status/category_id/user_id/vip_type, none of
+                // which are bound here, so the planner fell back to a filesort over the
+                // whole table. This is a dedicated prefix for that gap.
+                @Index(name = "idx_listings_admin_default_sort", columnList = "is_shadow, vip_type_sort_order, updated_at")
         })
 @Getter
 @Setter

@@ -130,6 +130,7 @@ public class ListingServiceImpl implements ListingService {
     AddressService addressService;
     ListingRequestCacheService listingRequestCacheService;
     ListingQueryService listingQueryService;
+    com.smartrent.service.listing.AdminListingStatsService adminListingStatsService;
     com.smartrent.service.moderation.ListingModerationService listingModerationService;
     com.smartrent.infra.repository.UserFollowRepository userFollowRepository;
 
@@ -2084,9 +2085,10 @@ public class ListingServiceImpl implements ListingService {
             listings = Collections.emptyList();
         }
 
-        // Calculate statistics — 1 query instead of 10
+        // Dashboard statistics — full-table aggregate, cached with a short TTL
+        // (see AdminListingStatsService) so it isn't recomputed on every request.
         com.smartrent.dto.response.AdminListingListResponse.AdminStatistics statistics =
-                calculateAdminStatistics();
+                adminListingStatsService.getStatistics();
 
         return com.smartrent.dto.response.AdminListingListResponse.builder()
                 .listings(listings)
@@ -2096,35 +2098,6 @@ public class ListingServiceImpl implements ListingService {
                 .totalPages(page.getTotalPages())
                 .filterCriteria(filter)
                 .statistics(statistics)
-                .build();
-    }
-
-    /**
-     * Calculate admin statistics in a single query instead of 11 separate COUNT queries
-     */
-    private com.smartrent.dto.response.AdminListingListResponse.AdminStatistics calculateAdminStatistics() {
-        List<Object[]> results = listingRepository.getAdminStatistics();
-        if (results == null || results.isEmpty()) {
-            return com.smartrent.dto.response.AdminListingListResponse.AdminStatistics.builder()
-                    .pendingVerification(0L).verified(0L).expired(0L).rejected(0L)
-                    .drafts(0L).shadows(0L)
-                    .normalListings(0L).silverListings(0L).goldListings(0L).diamondListings(0L)
-                    .totalListings(0L)
-                    .build();
-        }
-        Object[] row = results.get(0);
-        return com.smartrent.dto.response.AdminListingListResponse.AdminStatistics.builder()
-                .pendingVerification(toLong(row[0]))
-                .verified(toLong(row[1]))
-                .expired(toLong(row[2]))
-                .rejected(toLong(row[3]))
-                .drafts(toLong(row[4]))
-                .shadows(toLong(row[5]))
-                .normalListings(toLong(row[6]))
-                .silverListings(toLong(row[7]))
-                .goldListings(toLong(row[8]))
-                .diamondListings(toLong(row[9]))
-                .totalListings(toLong(row[10]))
                 .build();
     }
 
