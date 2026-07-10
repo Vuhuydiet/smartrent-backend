@@ -403,6 +403,54 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     List<Object[]> getAdminStatistics();
 
     /**
+     * Admin "pending review" queue fast path — POST /v1/listings/admin/list with
+     * {@code moderationStatus=PENDING_REVIEW, listingStatus=IN_REVIEW}, the FE's
+     * default admin-dashboard tab. Backed by idx_listings_admin_review_queue (V102).
+     *
+     * <p>FORCE INDEX is load-bearing, same technique as {@link #findMapBoundsListingIds}:
+     * with this WHERE + ORDER BY + LIMIT shape the cost-based optimizer instead picks
+     * idx_listings_public_cursor_default (built for a different query), which requires
+     * a full-row fetch of every is_shadow/moderation_status match (~15k rows measured)
+     * before it can even apply the is_verify/verified/expired filter — ~9s. The forced
+     * covering index evaluates every predicate except the final row assembly via index
+     * condition pushdown. Mirrors the WHERE in ListingSpecification's
+     * buildStatusPredicate(IN_REVIEW) + the moderationStatus=PENDING_REVIEW branch —
+     * keep both in sync; see {@link com.smartrent.service.listing.ListingQueryService}
+     * for the eligibility check that gates this fast path.
+     */
+    @Query(value = """
+            SELECT l.listing_id
+            FROM listings l FORCE INDEX (idx_listings_admin_review_queue)
+            WHERE l.is_shadow = 0
+              AND l.is_verify = 1
+              AND l.verified = 0
+              AND l.expired = 0
+              AND (l.moderation_status = 'PENDING_REVIEW' OR l.moderation_status IS NULL)
+              AND (l.expiry_date IS NULL OR l.expiry_date > NOW())
+            ORDER BY l.vip_type_sort_order ASC, l.updated_at DESC
+            LIMIT :limit OFFSET :offset
+            """, nativeQuery = true)
+    List<Long> findAdminPendingReviewQueueIds(@Param("limit") int limit, @Param("offset") int offset);
+
+    /**
+     * Total matching rows for {@link #findAdminPendingReviewQueueIds}. Already a
+     * covering index scan without forcing (MySQL picks idx_listings_admin_review_queue
+     * on its own for the plain COUNT — measured ~22ms) but FORCE INDEX is added anyway
+     * so this stays fast even if the optimizer's choice drifts as the table grows.
+     */
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM listings l FORCE INDEX (idx_listings_admin_review_queue)
+            WHERE l.is_shadow = 0
+              AND l.is_verify = 1
+              AND l.verified = 0
+              AND l.expired = 0
+              AND (l.moderation_status = 'PENDING_REVIEW' OR l.moderation_status IS NULL)
+              AND (l.expiry_date IS NULL OR l.expiry_date > NOW())
+            """, nativeQuery = true)
+    long countAdminPendingReviewQueue();
+
+    /**
      * Get listing statistics grouped by province (old structure)
      * Returns: provinceId, totalCount, verifiedCount, vipCount
      */

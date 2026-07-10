@@ -56,6 +56,10 @@ public class ListingQueryService {
                 filter.getCategoryId(), filter.getProvinceId(), filter.getProvinceCodes(),
                 filter.getPage(), filter.getSize());
 
+        if (isAdminPendingReviewQueueShape(filter)) {
+            return queryAdminPendingReviewQueue(filter);
+        }
+
         // Build JPA specification from filter request
         Specification<Listing> spec = buildSpecification(filter);
 
@@ -69,6 +73,78 @@ public class ListingQueryService {
                 results.getNumberOfElements(), results.getTotalElements());
 
         return results;
+    }
+
+    /**
+     * Fast path for the admin "pending review" queue — see
+     * {@link com.smartrent.infra.repository.ListingRepository#findAdminPendingReviewQueueIds}.
+     * Only takes over when the filter is EXACTLY this shape: any other field set (a
+     * category, a price range, a different sort, etc.) falls through to the generic
+     * specification path unchanged, since the forced index/hardcoded WHERE only covers
+     * this one combination.
+     */
+    private boolean isAdminPendingReviewQueueShape(ListingFilterRequest filter) {
+        if (!Boolean.TRUE.equals(filter.getIsAdminRequest())) return false;
+        if (!"PENDING_REVIEW".equals(filter.getModerationStatus())) return false;
+        if (!"IN_REVIEW".equals(filter.getListingStatus())) return false;
+        String sortBy = filter.getSortBy();
+        if (sortBy != null && !sortBy.isEmpty() && !"NEWEST".equals(sortBy) && !"DEFAULT".equals(sortBy)) return false;
+
+        return filter.getVerified() == null && filter.getIsVerify() == null
+                && filter.getIsDraft() == null && filter.getExpired() == null
+                && filter.getUserId() == null && filter.getCategoryId() == null
+                && filter.getProvinceId() == null && isEmpty(filter.getProvinceCodes())
+                && filter.getDistrictId() == null && filter.getWardId() == null
+                && filter.getNewWardCode() == null && filter.getStreetId() == null
+                && filter.getListingType() == null && filter.getVipType() == null
+                && filter.getProductType() == null
+                && filter.getPrice() == null && filter.getPriceUnit() == null
+                && filter.getHasPriceReduction() == null && filter.getHasPriceIncrease() == null
+                && filter.getPriceReductionPercent() == null && filter.getPriceChangedWithinDays() == null
+                && filter.getArea() == null && filter.getBedrooms() == null && filter.getBathrooms() == null
+                && filter.getBedroomsRange() == null && filter.getBathroomsRange() == null
+                && filter.getFurnishing() == null && filter.getDirection() == null
+                && filter.getRoomCapacity() == null
+                && filter.getWaterPrice() == null && filter.getElectricityPrice() == null
+                && filter.getInternetPrice() == null && filter.getServiceFee() == null
+                && isEmpty(filter.getAmenityIds()) && filter.getHasMedia() == null
+                && filter.getMinMediaCount() == null
+                && filter.getKeyword() == null && filter.getTitle() == null && filter.getOwnerSearch() == null
+                && filter.getOwnerPhoneVerified() == null && filter.getIsBroker() == null
+                && filter.getPostedWithinDays() == null && filter.getUpdatedWithinDays() == null
+                && filter.getPostDate() == null && filter.getExpiryDate() == null;
+    }
+
+    private static boolean isEmpty(java.util.Collection<?> c) {
+        return c == null || c.isEmpty();
+    }
+
+    /**
+     * Admin "pending review" queue via forced covering index — see
+     * {@link com.smartrent.infra.repository.ListingRepository#findAdminPendingReviewQueueIds}
+     * for why this bypasses the generic specification for this one filter shape.
+     */
+    private Page<Listing> queryAdminPendingReviewQueue(ListingFilterRequest filter) {
+        int page = Math.max(filter.getPage() - 1, 0);
+        int size = Math.min(Math.max(filter.getSize(), 1), 100);
+        int offset = page * size;
+
+        List<Long> ids = listingRepository.findAdminPendingReviewQueueIds(size, offset);
+        long total = listingRepository.countAdminPendingReviewQueue();
+
+        List<Listing> ordered;
+        if (ids.isEmpty()) {
+            ordered = Collections.emptyList();
+        } else {
+            Map<Long, Listing> byId = listingRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(Listing::getListingId, Function.identity(), (a, b) -> a));
+            ordered = ids.stream()
+                    .map(byId::get)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        }
+
+        return new PageImpl<>(ordered, PageRequest.of(page, size), total);
     }
 
     /**
