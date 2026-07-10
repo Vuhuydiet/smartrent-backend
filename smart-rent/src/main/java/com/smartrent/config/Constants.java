@@ -33,6 +33,13 @@ public class Constants {
      */
     public static final String LISTING_STATS_PROVINCES = LISTING + "stats.provinces";
     /**
+     * Admin dashboard statistics (POST /v1/listings/admin/list). Aggregates over
+     * the entire listings table with no WHERE clause, so it's cached with a short
+     * TTL (see application.yml) — every admin list request was paying that full
+     * scan on top of the paginated query otherwise, regardless of page/filters.
+     */
+    public static final String LISTING_STATS_ADMIN = LISTING + "stats.admin";
+    /**
      * Short-TTL cache for POST /v1/listings/map-bounds (interactive map pins).
      * Keyed by quantized bounding box + zoom + filters. Map browsing is bursty
      * (pan/zoom around the same city, many concurrent users on the same area),
