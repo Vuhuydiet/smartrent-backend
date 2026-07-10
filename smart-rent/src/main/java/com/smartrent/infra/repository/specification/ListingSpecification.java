@@ -43,9 +43,14 @@ public class ListingSpecification {
                     || filter.getDistrictId() != null || filter.getWardId() != null
                     || filter.getNewWardCode() != null || filter.getStreetId() != null;
 
-            // Eagerly fetch address to avoid N+1 lazy loads (skip for count queries)
-            // When location filters are used, the INNER JOIN below handles the fetch
-            if (query.getResultType() != Long.class && query.getResultType() != long.class && !hasLocationFilter) {
+            // Eagerly fetch address to avoid N+1 lazy loads (skip for count queries).
+            // When location filters are used, the INNER JOIN below handles the fetch.
+            // Skipped entirely for admin requests: AdminListingSummary (the DTO
+            // getAllListingsForAdmin maps to) never reads listing.address, so this
+            // join was pure overhead on every admin/list call — a JOIN + address-row
+            // lookup for every candidate row, for data the response never uses.
+            if (query.getResultType() != Long.class && query.getResultType() != long.class && !hasLocationFilter
+                    && !Boolean.TRUE.equals(filter.getIsAdminRequest())) {
                 root.fetch("address", JoinType.LEFT);
             }
 
