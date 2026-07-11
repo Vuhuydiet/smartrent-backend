@@ -170,7 +170,7 @@ public class ReportedAuthorServiceImpl implements ReportedAuthorService {
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .email(user.getEmail())
-                .phoneNumber(user.getPhoneNumber())
+                .phoneNumber(user.getContactPhoneNumber() != null ? user.getContactPhoneNumber() : user.getPhoneNumber())
                 .avatarUrl(user.getAvatarUrl())
                 .totalReports(total)
                 .resolvedReports(resolved)
