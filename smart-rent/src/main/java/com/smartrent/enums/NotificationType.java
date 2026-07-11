@@ -30,5 +30,8 @@ public enum NotificationType {
 
     // Membership lifecycle
     MEMBERSHIP_EXPIRING,            // member is notified at D-7 / D-3 before membership expiry
-    MEMBERSHIP_ACTIVATED            // member is notified when their queued membership activates
+    MEMBERSHIP_ACTIVATED,           // member is notified when their queued membership activates
+    // Posting block
+    POSTING_BLOCKED,                // user is notified when admin blocks them from posting listings
+    POSTING_UNBLOCKED               // user is notified when admin lifts the posting block
 }
