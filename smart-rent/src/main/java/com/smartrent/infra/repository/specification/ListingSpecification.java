@@ -61,18 +61,24 @@ public class ListingSpecification {
             }
 
             // Draft status filter
+            // Note: gate on isOwnerRequest, not "userId == null". A userId is also set for
+            // *public* browsing of one seller's profile (GET /sellers/{userId}/{tier} and any
+            // POST /search caller passing an arbitrary userId) — that caller is anonymous and
+            // must still be denied drafts/unapproved listings. Only the owner's own dashboard
+            // (userId resolved from the JWT — see ListingServiceImpl#getMyListings and
+            // ListingSearchController#searchListings) sets isOwnerRequest=true. The field is
+            // @JsonIgnore'd so a client cannot set it directly in the request body.
             if (filter.getIsDraft() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("isDraft"), filter.getIsDraft()));
-            } else if (filter.getUserId() == null && !Boolean.TRUE.equals(filter.getIsAdminRequest())) {
-                // For public search (userId null AND not admin), exclude drafts by default
-                // Admin requests can see drafts if they want to
+            } else if (!Boolean.TRUE.equals(filter.getIsOwnerRequest()) && !Boolean.TRUE.equals(filter.getIsAdminRequest())) {
+                // For public search (not the owner, not admin), exclude drafts by default
                 predicates.add(criteriaBuilder.equal(root.get("isDraft"), false));
             }
 
             // Verified filter
             if (filter.getVerified() != null) {
                 predicates.add(criteriaBuilder.equal(root.get("verified"), filter.getVerified()));
-            } else if (filter.getUserId() == null && !Boolean.TRUE.equals(filter.getIsAdminRequest())) {
+            } else if (!Boolean.TRUE.equals(filter.getIsOwnerRequest()) && !Boolean.TRUE.equals(filter.getIsAdminRequest())) {
                 // Public search gates on moderation outcome, not the admin "verified" badge.
                 // verified=true still surfaces a "Tin đã xác minh" badge on the FE, but pending
                 // listings that passed moderation (APPROVED) are visible too — matching how

@@ -52,7 +52,15 @@ public class ListingFilterRequest {
     String listingStatus;
 
     @Schema(description = "Internal flag to indicate this is an admin request (set by backend, not by frontend)", hidden = true)
+    @JsonIgnore
     Boolean isAdminRequest;
+
+    @Schema(description = "Internal flag: userId was set by the backend from an authenticated principal "
+            + "(owner's own dashboard), not supplied by an anonymous caller. Only requests with this flag "
+            + "skip the isDraft=false / moderationStatus=APPROVED public-visibility gate. Set by backend, "
+            + "not by frontend.", hidden = true)
+    @JsonIgnore
+    Boolean isOwnerRequest;
 
     @Schema(description = "Filter by moderation status (admin only)",
             example = "PENDING_REVIEW",
