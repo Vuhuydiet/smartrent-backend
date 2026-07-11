@@ -17,6 +17,7 @@ import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +31,7 @@ import java.util.Map;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Tag(name = "Admin - Listing Reports", description = "Admin APIs for managing and resolving listing reports")
 @SecurityRequirement(name = "Bearer Authentication")
+@PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM', 'ROLE_SPA')")
 public class AdminListingReportController {
 
     ListingReportService listingReportService;

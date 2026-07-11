@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -37,6 +38,7 @@ public class AdminAnalyticsController {
     AdminAnalyticsService adminAnalyticsService;
 
     @GetMapping("/revenue")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_FA', 'ROLE_MA')")
     @Operation(
             summary = "Get revenue over time",
             description = """
@@ -104,6 +106,7 @@ public class AdminAnalyticsController {
     }
 
     @GetMapping("/memberships/distribution")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_FA', 'ROLE_MA')")
     @Operation(
             summary = "Get active membership distribution by package level",
             description = "Returns the count and percentage of currently active memberships grouped by package level.",
@@ -148,6 +151,7 @@ public class AdminAnalyticsController {
     // ─── Analytics Charts ───
 
     @GetMapping("/users")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA', 'ROLE_MA')")
     @Operation(
             summary = "Get user growth analytics",
             description = """
@@ -218,6 +222,7 @@ public class AdminAnalyticsController {
     }
 
     @GetMapping("/reports")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_FA', 'ROLE_MA')")
     @Operation(
             summary = "Get listing report analytics",
             description = """
@@ -291,6 +296,7 @@ public class AdminAnalyticsController {
     }
 
     @GetMapping("/listings")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM', 'ROLE_MA')")
     @Operation(
             summary = "Get listing creation analytics",
             description = """

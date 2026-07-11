@@ -142,6 +142,7 @@ public class UserController {
         }
 
         @GetMapping("/list")
+        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
         @Operation(summary = "Get paginated list of users with flexible filtering", description = "Retrieves a paginated list of all users in the system. Supports flexible key:value filtering.\n\nFilters format: filter=key:value\n- Example: filter=firstName:John&filter=isBroker:true", security = @SecurityRequirement(name = "Bearer Authentication"))
         @ApiResponses(value = {
                         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Users retrieved successfully"),
@@ -340,7 +341,7 @@ public class UserController {
         }
 
         @PutMapping("/{userId}")
-        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA')")
         @Operation(summary = "Update user (Admin operation)", description = "Updates an existing user's information. This is an admin operation.", security = @SecurityRequirement(name = "Bearer Authentication"))
         @ApiResponses(value = {
                         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "User updated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class), examples = @ExampleObject(name = "Success Response", value = """
@@ -387,7 +388,7 @@ public class UserController {
         }
 
         @DeleteMapping("/{userId}")
-        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA')")
         @Operation(summary = "Delete user (Admin operation)", description = "Deletes a user from the system. This is an admin operation.", security = @SecurityRequirement(name = "Bearer Authentication"))
         @ApiResponses(value = {
                         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "User deleted successfully"),

@@ -41,7 +41,7 @@ public class AdminMembershipController {
         MembershipService membershipService;
 
         @GetMapping("/packages")
-        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_SPA', 'ROLE_FA', 'ROLE_MA')")
         @Operation(summary = "List all membership packages (Admin)", description = "Returns all membership packages including inactive ones, with pagination. "
                         +
                         "Use this endpoint in the admin console so administrators can see and re-enable packages that have been deactivated.", responses = {
@@ -79,7 +79,7 @@ public class AdminMembershipController {
         }
 
         @PutMapping("/packages/{membershipId}")
-        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_FA', 'ROLE_MA')")
         @Operation(summary = "Update membership package (Admin)", description = "Updates an existing membership package. "
                         + "Sale price is automatically computed by the server as "
                         + "salePrice = originalPrice * (1 - discountPercentage / 100). "
@@ -108,7 +108,9 @@ public class AdminMembershipController {
 
         @DeleteMapping("/users/{userId}")
         @ResponseStatus(HttpStatus.NO_CONTENT)
-        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+        // Triggered from the Users management page (SA, UA), not the membership
+        // package screen — so it follows user-management write access.
+        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA')")
         @Operation(summary = "Clear user active memberships (Admin)", description = "Expires all ACTIVE membership records for a user. Use this to fix duplicate-active-membership issues.")
         public void clearUserMembership(
                         @Parameter(description = "User ID", required = true) @PathVariable String userId) {
@@ -118,7 +120,7 @@ public class AdminMembershipController {
 
         @DeleteMapping("/packages/{membershipId}")
         @ResponseStatus(HttpStatus.NO_CONTENT)
-        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+        @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_FA', 'ROLE_MA')")
         @Operation(summary = "Delete membership package (Admin)", description = "Deletes a membership package.", responses = {
                         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "204", description = "Package deleted successfully"),
                         @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "Package not found", content = @Content(mediaType = "application/json", examples = @ExampleObject(name = "Not Found Error", value = """

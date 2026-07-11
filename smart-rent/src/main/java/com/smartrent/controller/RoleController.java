@@ -21,6 +21,7 @@ import java.util.List;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 
@@ -29,6 +30,9 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Tag(name = "Role Management", description = "APIs for managing system roles and permissions")
+// Viewing roles is available to Super Admin and User Admin (needed for the admin
+// creation form); creating/updating/deleting roles is Super Admin only.
+@PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA')")
 public class RoleController {
 
     RoleService roleService;
@@ -98,6 +102,7 @@ public class RoleController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('ROLE_SA')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Create new role", description = "Creates a new role in the system", security = @SecurityRequirement(name = "Bearer Authentication"))
     @ApiResponses(value = {
@@ -128,6 +133,7 @@ public class RoleController {
     }
 
     @PutMapping("/{roleId}")
+    @PreAuthorize("hasAuthority('ROLE_SA')")
     @Operation(summary = "Update role", description = "Updates an existing role's information", security = @SecurityRequirement(name = "Bearer Authentication"))
     @ApiResponses(value = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Role updated successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiResponse.class), examples = @ExampleObject(name = "Success Response", value = """
@@ -158,6 +164,7 @@ public class RoleController {
     }
 
     @DeleteMapping("/{roleId}")
+    @PreAuthorize("hasAuthority('ROLE_SA')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Delete role", description = "Deletes a role from the system", security = @SecurityRequirement(name = "Bearer Authentication"))
     @ApiResponses(value = {

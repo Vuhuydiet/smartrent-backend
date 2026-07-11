@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -44,6 +45,7 @@ import org.springframework.web.bind.annotation.*;
         """
 )
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM')")
 public class ListingAdminController {
 
     private final ListingService listingService;

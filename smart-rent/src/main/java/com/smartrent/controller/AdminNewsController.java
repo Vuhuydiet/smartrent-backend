@@ -24,6 +24,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Admin - News & Blog", description = "Admin APIs for managing news and blog posts")
 @SecurityRequirement(name = "Bearer Authentication")
 @Slf4j
+@PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM', 'ROLE_MA')")
 public class AdminNewsController {
 
         NewsService newsService;

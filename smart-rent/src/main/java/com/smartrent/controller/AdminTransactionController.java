@@ -27,7 +27,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @SecurityRequirement(name = "Bearer Authentication")
-@PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+@PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_SPA', 'ROLE_FA')")
 @Tag(name = "Admin Transaction Management", description = "Admin transaction search, detail, statistics, and export APIs")
 public class AdminTransactionController {
 
