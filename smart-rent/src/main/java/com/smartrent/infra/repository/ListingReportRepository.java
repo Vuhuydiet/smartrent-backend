@@ -103,16 +103,12 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
     long countByCreatedAtBefore(LocalDateTime dateTime);
 
     /**
-     * Aggregate reports per listing author (người đăng tin). Each row is one author who
-     * has at least one report on any of their listings, with total and admin-approved
-     * (RESOLVED) report counts. Ordered by most approved reports first.
-     */
-    /**
      * Reported authors with optional filters. Empty-string text filters and a
      * {@code blockEligibleFlag} of -1 mean "no filter" (sentinels avoid binding
      * nulls in a native query). {@code blockEligibleFlag}: -1 all, 1 eligible
-     * (resolved &gt; threshold), 0 not eligible. Text filters are prefix matches so
-     * they can use the users indexes.
+     * (total reports &gt; threshold), 0 not eligible. Eligibility is based on the
+     * TOTAL report count (any status), matching {@code ReportedAuthorServiceImpl}.
+     * Text filters are prefix matches so they can use the users indexes.
      */
     @Query(value = "SELECT l.user_id AS userId, " +
             "CAST(COUNT(*) AS SIGNED) AS totalReports, " +
@@ -125,8 +121,8 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
             "AND (:phone = '' OR u.phone_number LIKE CONCAT(:phone, '%')) " +
             "GROUP BY l.user_id " +
             "HAVING (:blockEligibleFlag = -1 " +
-            "  OR (:blockEligibleFlag = 1 AND SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) > :threshold) " +
-            "  OR (:blockEligibleFlag = 0 AND SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) <= :threshold)) " +
+            "  OR (:blockEligibleFlag = 1 AND COUNT(*) > :threshold) " +
+            "  OR (:blockEligibleFlag = 0 AND COUNT(*) <= :threshold)) " +
             "ORDER BY resolvedReports DESC, totalReports DESC",
             countQuery = "SELECT COUNT(*) FROM (" +
                     "SELECT l.user_id " +
@@ -138,8 +134,8 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
                     "AND (:phone = '' OR u.phone_number LIKE CONCAT(:phone, '%')) " +
                     "GROUP BY l.user_id " +
                     "HAVING (:blockEligibleFlag = -1 " +
-                    "  OR (:blockEligibleFlag = 1 AND SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) > :threshold) " +
-                    "  OR (:blockEligibleFlag = 0 AND SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) <= :threshold))" +
+                    "  OR (:blockEligibleFlag = 1 AND COUNT(*) > :threshold) " +
+                    "  OR (:blockEligibleFlag = 0 AND COUNT(*) <= :threshold))" +
                     ") x",
             nativeQuery = true)
     Page<ReportedAuthorProjection> findReportedAuthors(

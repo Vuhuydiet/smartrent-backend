@@ -13,7 +13,7 @@ import java.util.List;
  */
 public interface ReportedAuthorService {
 
-    /** Number of admin-approved (RESOLVED) reports beyond which an author becomes block-eligible. */
+    /** Total number of reports (any status) beyond which an author becomes block-eligible. */
     int BLOCK_ELIGIBLE_THRESHOLD = 3;
 
     /**
