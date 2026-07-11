@@ -45,14 +45,24 @@ public class AdminReportedAuthorController {
     @Operation(
             summary = "List reported listing authors (Admin)",
             description = "Paginated list of authors who have at least one report on their listings, " +
-                    "with total / approved report counts and current posting-block state.")
+                    "with total / approved report counts and current posting-block state. " +
+                    "Optional filters: email / name / phone (prefix) and blockEligible.")
     public ApiResponse<PageResponse<ReportedAuthorResponse>> getReportedAuthors(
+            @Parameter(description = "Filter by email (prefix)")
+            @RequestParam(required = false) String email,
+            @Parameter(description = "Filter by first/last name (prefix)")
+            @RequestParam(required = false) String name,
+            @Parameter(description = "Filter by phone number (prefix)")
+            @RequestParam(required = false) String phone,
+            @Parameter(description = "Filter by block eligibility: true = enough approved reports (> 3), false = not yet")
+            @RequestParam(required = false) Boolean blockEligible,
             @Parameter(description = "Page number (1-indexed)", example = "1")
             @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Items per page", example = "20")
             @RequestParam(defaultValue = "20") int size) {
 
-        PageResponse<ReportedAuthorResponse> result = reportedAuthorService.getReportedAuthors(page, size);
+        PageResponse<ReportedAuthorResponse> result =
+                reportedAuthorService.getReportedAuthors(email, name, phone, blockEligible, page, size);
         return ApiResponse.<PageResponse<ReportedAuthorResponse>>builder().data(result).build();
     }
 

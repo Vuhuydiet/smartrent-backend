@@ -14,4 +14,13 @@ public interface ReportedAuthorProjection {
 
     /** Number of reports admins have approved (RESOLVED) across this author's listings. */
     Long getResolvedReports();
+
+    /**
+     * Total / approved report counts for a single author (userId is not selected).
+     */
+    interface Counts {
+        Long getTotalReports();
+
+        Long getResolvedReports();
+    }
 }

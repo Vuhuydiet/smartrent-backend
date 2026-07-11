@@ -51,6 +51,7 @@ public class RepostServiceImpl implements RepostService {
     QuotaService quotaService;
     TransactionService transactionService;
     PaymentService paymentService;
+    com.smartrent.service.listing.PostingAccessGuard postingAccessGuard;
 
     @Override
     @Transactional
@@ -62,6 +63,9 @@ public class RepostServiceImpl implements RepostService {
     })
     public RepostResponse repostListing(String userId, RepostListingRequest request) {
         log.info("Reposting listing {} for user {}", request.getListingId(), userId);
+
+        // Reposting re-lists a listing (uses quota/payment) — block barred users
+        postingAccessGuard.ensureCanPost(userId);
 
         Listing listing = listingRepository.findById(request.getListingId())
                 .orElseThrow(() -> new RuntimeException("Listing not found: " + request.getListingId()));

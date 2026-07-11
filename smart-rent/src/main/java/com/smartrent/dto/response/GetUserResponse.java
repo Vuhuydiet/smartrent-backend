@@ -71,4 +71,12 @@ public class GetUserResponse implements Serializable {
     @Schema(description = "Current broker verification status: NONE | PENDING | APPROVED | REJECTED", example = "NONE", allowableValues = {
             "NONE", "PENDING", "APPROVED", "REJECTED" })
     String brokerVerificationStatus;
+
+    // ============ POSTING BLOCK FIELDS ============
+
+    @Schema(description = "Whether an admin has blocked this user from posting new listings", example = "false")
+    Boolean postingBlocked;
+
+    @Schema(description = "Reason for the posting block (present only when blocked)")
+    String postingBlockedReason;
 }

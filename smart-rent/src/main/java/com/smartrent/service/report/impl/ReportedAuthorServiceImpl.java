@@ -50,12 +50,20 @@ public class ReportedAuthorServiceImpl implements ReportedAuthorService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<ReportedAuthorResponse> getReportedAuthors(int page, int size) {
+    public PageResponse<ReportedAuthorResponse> getReportedAuthors(
+            String email, String name, String phone, Boolean blockEligible, int page, int size) {
         int safePage = Math.max(page, 1);
         int safeSize = size < 1 ? 20 : Math.min(size, 100);
         Pageable pageable = PageRequest.of(safePage - 1, safeSize);
 
-        Page<ReportedAuthorProjection> authorPage = listingReportRepository.findReportedAuthors(pageable);
+        // Sentinels avoid binding nulls in the native query
+        String emailFilter = email != null ? email.trim() : "";
+        String nameFilter = name != null ? name.trim() : "";
+        String phoneFilter = phone != null ? phone.trim() : "";
+        int blockEligibleFlag = blockEligible == null ? -1 : (blockEligible ? 1 : 0);
+
+        Page<ReportedAuthorProjection> authorPage = listingReportRepository.findReportedAuthors(
+                emailFilter, nameFilter, phoneFilter, blockEligibleFlag, BLOCK_ELIGIBLE_THRESHOLD, pageable);
 
         // Batch-load user details for the page
         List<String> userIds = authorPage.getContent().stream()
@@ -131,10 +139,10 @@ public class ReportedAuthorServiceImpl implements ReportedAuthorService {
             );
         }
 
-        long resolvedReports = listingReportRepository.countByAuthorIdAndStatus(userId, ReportStatus.RESOLVED);
-        long totalReports = listingReportRepository.countByAuthorIdAndStatus(userId, ReportStatus.PENDING)
-                + listingReportRepository.countByAuthorIdAndStatus(userId, ReportStatus.RESOLVED)
-                + listingReportRepository.countByAuthorIdAndStatus(userId, ReportStatus.REJECTED);
+        // Single combined query instead of one per status (faster toggle)
+        ReportedAuthorProjection.Counts counts = listingReportRepository.getReportCountsByAuthor(userId);
+        long totalReports = counts != null && counts.getTotalReports() != null ? counts.getTotalReports() : 0L;
+        long resolvedReports = counts != null && counts.getResolvedReports() != null ? counts.getResolvedReports() : 0L;
         return buildResponse(user, totalReports, resolvedReports);
     }
 

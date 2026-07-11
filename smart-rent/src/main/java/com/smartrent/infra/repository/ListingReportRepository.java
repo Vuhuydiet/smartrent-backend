@@ -107,16 +107,48 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
      * has at least one report on any of their listings, with total and admin-approved
      * (RESOLVED) report counts. Ordered by most approved reports first.
      */
+    /**
+     * Reported authors with optional filters. Empty-string text filters and a
+     * {@code blockEligibleFlag} of -1 mean "no filter" (sentinels avoid binding
+     * nulls in a native query). {@code blockEligibleFlag}: -1 all, 1 eligible
+     * (resolved &gt; threshold), 0 not eligible. Text filters are prefix matches so
+     * they can use the users indexes.
+     */
     @Query(value = "SELECT l.user_id AS userId, " +
             "CAST(COUNT(*) AS SIGNED) AS totalReports, " +
             "CAST(SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) AS SIGNED) AS resolvedReports " +
-            "FROM listing_reports r JOIN listings l ON r.listing_id = l.listing_id " +
+            "FROM listing_reports r " +
+            "JOIN listings l ON r.listing_id = l.listing_id " +
+            "JOIN users u ON u.user_id = l.user_id " +
+            "WHERE (:email = '' OR u.email LIKE CONCAT(:email, '%')) " +
+            "AND (:name = '' OR u.first_name LIKE CONCAT(:name, '%') OR u.last_name LIKE CONCAT(:name, '%')) " +
+            "AND (:phone = '' OR u.phone_number LIKE CONCAT(:phone, '%')) " +
             "GROUP BY l.user_id " +
+            "HAVING (:blockEligibleFlag = -1 " +
+            "  OR (:blockEligibleFlag = 1 AND SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) > :threshold) " +
+            "  OR (:blockEligibleFlag = 0 AND SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) <= :threshold)) " +
             "ORDER BY resolvedReports DESC, totalReports DESC",
-            countQuery = "SELECT COUNT(DISTINCT l.user_id) " +
-                    "FROM listing_reports r JOIN listings l ON r.listing_id = l.listing_id",
+            countQuery = "SELECT COUNT(*) FROM (" +
+                    "SELECT l.user_id " +
+                    "FROM listing_reports r " +
+                    "JOIN listings l ON r.listing_id = l.listing_id " +
+                    "JOIN users u ON u.user_id = l.user_id " +
+                    "WHERE (:email = '' OR u.email LIKE CONCAT(:email, '%')) " +
+                    "AND (:name = '' OR u.first_name LIKE CONCAT(:name, '%') OR u.last_name LIKE CONCAT(:name, '%')) " +
+                    "AND (:phone = '' OR u.phone_number LIKE CONCAT(:phone, '%')) " +
+                    "GROUP BY l.user_id " +
+                    "HAVING (:blockEligibleFlag = -1 " +
+                    "  OR (:blockEligibleFlag = 1 AND SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) > :threshold) " +
+                    "  OR (:blockEligibleFlag = 0 AND SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) <= :threshold))" +
+                    ") x",
             nativeQuery = true)
-    Page<ReportedAuthorProjection> findReportedAuthors(Pageable pageable);
+    Page<ReportedAuthorProjection> findReportedAuthors(
+            @Param("email") String email,
+            @Param("name") String name,
+            @Param("phone") String phone,
+            @Param("blockEligibleFlag") int blockEligibleFlag,
+            @Param("threshold") int threshold,
+            Pageable pageable);
 
     /**
      * Find all reports for a given author (owner of the reported listings) filtered by status,
@@ -132,4 +164,15 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
      */
     @Query("SELECT COUNT(r) FROM listing_reports r WHERE r.listing.userId = :userId AND r.status = :status")
     long countByAuthorIdAndStatus(@Param("userId") String userId, @Param("status") ReportStatus status);
+
+    /**
+     * Total and admin-approved (RESOLVED) report counts for a single author, in one query.
+     */
+    @Query(value = "SELECT " +
+            "CAST(COUNT(*) AS SIGNED) AS totalReports, " +
+            "CAST(SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) AS SIGNED) AS resolvedReports " +
+            "FROM listing_reports r JOIN listings l ON r.listing_id = l.listing_id " +
+            "WHERE l.user_id = :userId",
+            nativeQuery = true)
+    ReportedAuthorProjection.Counts getReportCountsByAuthor(@Param("userId") String userId);
 }
