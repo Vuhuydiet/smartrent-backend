@@ -165,6 +165,7 @@ public class ListingSearchController {
 
             if (filter.getIsDraft() != null || filter.getIsVerify() != null) {
                 filter.setUserId(authentication.getName());
+                filter.setIsOwnerRequest(true);
             }
         }
 

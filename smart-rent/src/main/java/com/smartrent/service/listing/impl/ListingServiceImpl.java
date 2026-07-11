@@ -2108,8 +2108,12 @@ public class ListingServiceImpl implements ListingService {
         log.info("Owner {} requesting listings - Page: {}, Size: {}, Filters: verified={}, expired={}, isDraft={}",
                 userId, filter.getPage(), filter.getSize(), filter.getVerified(), filter.getExpired(), filter.getIsDraft());
 
-        // Set userId in filter to get only owner's listings
+        // Set userId in filter to get only owner's listings. userId here comes from the
+        // authenticated JWT (see ListingOwnerController#getMyListings), so it's safe to also
+        // mark this as an owner request — that's what lets the query below skip the
+        // isDraft=false / moderationStatus=APPROVED public-visibility gate.
         filter.setUserId(userId);
+        filter.setIsOwnerRequest(true);
 
         // The seller dashboard must show ALL of the owner's listings — including
         // expired / taken-down ones — so the "All" and "Expired" tabs aren't
