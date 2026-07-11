@@ -34,7 +34,7 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @Tag(name = "Admin - Media", description = "Admin APIs for managing media uploads")
 @SecurityRequirement(name = "Bearer Authentication")
-@PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+@PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM', 'ROLE_MA')")
 @Slf4j
 public class AdminMediaController {
 

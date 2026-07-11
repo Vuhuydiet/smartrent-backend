@@ -41,7 +41,7 @@ public class AdminReportedAuthorController {
     ReportedAuthorService reportedAuthorService;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM', 'ROLE_SPA')")
     @Operation(
             summary = "List reported listing authors (Admin)",
             description = "Paginated list of authors who have at least one report on their listings, " +
@@ -67,7 +67,7 @@ public class AdminReportedAuthorController {
     }
 
     @GetMapping("/{userId}/reports")
-    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM', 'ROLE_SPA')")
     @Operation(
             summary = "Get an author's admin-approved reports (Admin)",
             description = "All reports across the author's listings that an admin has approved (RESOLVED).")
@@ -79,7 +79,7 @@ public class AdminReportedAuthorController {
     }
 
     @PatchMapping("/{userId}/posting-block")
-    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM', 'ROLE_SPA')")
     @Operation(
             summary = "Block or unblock an author from posting (Admin)",
             description = "Blocks the author from creating new listings (or lifts an existing block). " +

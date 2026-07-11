@@ -47,7 +47,7 @@ public class AdminBrokerController {
     // ──────────────────────────────────────────────────────────────────
 
     @GetMapping("/broker-pending")
-    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM', 'ROLE_SPA')")
     @Operation(
             summary = "List users with PENDING broker registration (Admin only)",
             description = """
@@ -129,7 +129,7 @@ public class AdminBrokerController {
     // ──────────────────────────────────────────────────────────────────
 
     @PatchMapping("/{userId}/broker-verification")
-    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM', 'ROLE_SPA')")
     @Operation(
             summary = "Approve or reject a user's broker registration (Admin only)",
             description = """
@@ -224,7 +224,9 @@ public class AdminBrokerController {
     }
 
     @DeleteMapping("/{userId}/broker")
-    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    // Triggered from the Users management page (SA, UA), not the broker-pending
+    // moderation list — so it follows user-management write access.
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA')")
     @Operation(
             summary = "Remove broker role from a user (Admin only)",
             description = """

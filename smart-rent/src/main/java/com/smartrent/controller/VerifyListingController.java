@@ -32,7 +32,7 @@ public class VerifyListingController {
     VerifyListingService verifyListingService;
 
     @PutMapping("/{listingId}/status")
-    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
+    @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_CM')")
     @Operation(
         summary = "Change listing verification status",
         description = """
