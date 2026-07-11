@@ -8,6 +8,8 @@ import com.smartrent.dto.response.NewsListResponse;
 import com.smartrent.dto.response.NewsResponse;
 import com.smartrent.enums.NewsCategory;
 import com.smartrent.enums.NewsStatus;
+import com.smartrent.infra.repository.AdminRepository;
+import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.service.news.NewsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -41,6 +43,8 @@ public class AdminNewsController {
 
         NewsService newsService;
 
+        AdminRepository adminRepository;
+
         @PostMapping
         @Operation(summary = "Create a new news/blog post (Admin)", description = "Creates a new news or blog post. The post is created in DRAFT status by default. "
                         +
@@ -60,10 +64,11 @@ public class AdminNewsController {
                 Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                 String adminId = authentication.getName();
 
-                // For admin name, we'll use the adminId as fallback
-                // In a real scenario, you might want to fetch the admin details from the
-                // database
-                String adminName = adminId; // TODO: Fetch actual admin name if needed
+                // Resolve the admin's display name from the database, falling back to the
+                // admin ID only if the record cannot be found
+                String adminName = adminRepository.findById(adminId)
+                                .map(AdminNewsController::buildAdminName)
+                                .orElse(adminId);
 
                 log.info("POST /v1/admin/news - Creating news by admin: {}", adminId);
 
@@ -208,5 +213,12 @@ public class AdminNewsController {
                 return ApiResponse.<NewsResponse>builder()
                                 .data(response)
                                 .build();
+        }
+
+        private static String buildAdminName(Admin admin) {
+                String firstName = admin.getFirstName() != null ? admin.getFirstName().trim() : "";
+                String lastName = admin.getLastName() != null ? admin.getLastName().trim() : "";
+                String fullName = (firstName + " " + lastName).trim();
+                return fullName.isEmpty() ? admin.getEmail() : fullName;
         }
 }
