@@ -69,7 +69,7 @@ public class AdminNewsController {
                 // Resolve the admin's display name from the database, falling back to the
                 // admin ID only if the record cannot be found
                 String adminName = adminRepository.findById(adminId)
-                                .map(AdminNewsController::buildAdminName)
+                                .map(Admin::getDisplayName)
                                 .orElse(adminId);
 
                 log.info("POST /v1/admin/news - Creating news by admin: {}", adminId);
@@ -217,10 +217,4 @@ public class AdminNewsController {
                                 .build();
         }
 
-        private static String buildAdminName(Admin admin) {
-                String firstName = admin.getFirstName() != null ? admin.getFirstName().trim() : "";
-                String lastName = admin.getLastName() != null ? admin.getLastName().trim() : "";
-                String fullName = (firstName + " " + lastName).trim();
-                return fullName.isEmpty() ? admin.getEmail() : fullName;
-        }
 }
