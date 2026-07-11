@@ -22,6 +22,11 @@ public interface MediaRepository extends JpaRepository<Media, Long> {
     Optional<Media> findByMediaIdAndUserId(Long mediaId, String userId);
 
     /**
+     * Find media by ID and admin (for admin-owned upload confirmation)
+     */
+    Optional<Media> findByMediaIdAndAdminId(Long mediaId, String adminId);
+
+    /**
      * Find all media for a listing
      */
     List<Media> findByListing_ListingIdAndStatusOrderBySortOrderAsc(

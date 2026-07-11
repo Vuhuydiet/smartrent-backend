@@ -811,8 +811,8 @@ public class ListingServiceImpl implements ListingService {
                     .orElseThrow(() -> new AppException(DomainCode.ADDRESS_NOT_FOUND,
                             "Media not found with ID: " + mediaId));
 
-            // Validate ownership
-            if (!media.getUserId().equals(userId)) {
+            // Validate ownership (null-safe: admin-owned media has no userId)
+            if (!media.isOwnedBy(userId)) {
                 throw new AppException(DomainCode.UNAUTHORIZED,
                         "Media " + mediaId + " does not belong to user " + userId);
             }

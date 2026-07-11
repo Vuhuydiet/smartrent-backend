@@ -1,6 +1,9 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.request.AdminGenerateUploadUrlRequest;
+import com.smartrent.dto.request.ConfirmUploadRequest;
 import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.GenerateUploadUrlResponse;
 import com.smartrent.dto.response.MediaResponse;
 import com.smartrent.service.media.MediaService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -138,6 +142,54 @@ public class AdminMediaController {
         return ResponseEntity.ok(ApiResponse.<MediaResponse>builder()
                 .data(response)
                 .message("Media uploaded successfully by admin.")
+                .build());
+    }
+
+    @PostMapping("/upload-url")
+    @Operation(
+            summary = "Generate pre-signed upload URL (Admin, step 1 of 2)",
+            description = """
+                    Generates a pre-signed URL for the admin to upload a file directly to R2.
+                    The admin's ID is stored as the media owner (admin_id column, not user_id).
+
+                    **Process:**
+                    1. Backend generates a secure upload URL and a PENDING media record
+                    2. Client uploads the file directly to R2 using the URL (PUT)
+                    3. Client calls /{mediaId}/confirm to finalize
+                    """
+    )
+    public ResponseEntity<ApiResponse<GenerateUploadUrlResponse>> generateUploadUrl(
+            @Valid @RequestBody AdminGenerateUploadUrlRequest request) {
+
+        String adminId = extractAdminId();
+        log.info("POST /v1/admin/media/upload-url - admin: {}, type: {}", adminId, request.getMediaType());
+
+        GenerateUploadUrlResponse response = mediaService.adminGenerateUploadUrl(request, adminId);
+
+        return ResponseEntity.ok(ApiResponse.<GenerateUploadUrlResponse>builder()
+                .data(response)
+                .message("Upload URL generated successfully. Please upload file within "
+                        + (response.getExpiresIn() / 60) + " minutes.")
+                .build());
+    }
+
+    @PostMapping("/{mediaId}/confirm")
+    @Operation(
+            summary = "Confirm upload completion (Admin, step 2 of 2)",
+            description = "Confirms that the admin-initiated file upload is complete and makes the media active."
+    )
+    public ResponseEntity<ApiResponse<MediaResponse>> confirmUpload(
+            @Parameter(description = "Media ID from upload URL response") @PathVariable Long mediaId,
+            @Valid @RequestBody ConfirmUploadRequest request) {
+
+        String adminId = extractAdminId();
+        log.info("POST /v1/admin/media/{}/confirm - admin: {}", mediaId, adminId);
+
+        MediaResponse response = mediaService.adminConfirmUpload(mediaId, request, adminId);
+
+        return ResponseEntity.ok(ApiResponse.<MediaResponse>builder()
+                .data(response)
+                .message("Upload confirmed successfully. Media is now active.")
                 .build());
     }
 
