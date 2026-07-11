@@ -89,6 +89,9 @@ public class UserMapperImpl implements UserMapper {
             user.getBrokerVerificationStatus() != null
                 ? user.getBrokerVerificationStatus().name()
                 : null)
+        // Posting block fields
+        .postingBlocked(user.isPostingBlocked())
+        .postingBlockedReason(user.getPostingBlockedReason())
         .build();
   }
 

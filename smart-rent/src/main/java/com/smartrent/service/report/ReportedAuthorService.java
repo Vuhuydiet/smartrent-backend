@@ -19,8 +19,15 @@ public interface ReportedAuthorService {
     /**
      * Paginated list of authors who have at least one report on their listings,
      * with total / approved report counts and current block state.
+     *
+     * @param email         optional email prefix filter (null/blank = no filter)
+     * @param name          optional first/last name prefix filter (null/blank = no filter)
+     * @param phone         optional phone-number prefix filter (null/blank = no filter)
+     * @param blockEligible optional filter: TRUE = only block-eligible authors,
+     *                      FALSE = only not-yet-eligible, null = all
      */
-    PageResponse<ReportedAuthorResponse> getReportedAuthors(int page, int size);
+    PageResponse<ReportedAuthorResponse> getReportedAuthors(
+            String email, String name, String phone, Boolean blockEligible, int page, int size);
 
     /**
      * All admin-approved (RESOLVED) reports across a given author's listings.
