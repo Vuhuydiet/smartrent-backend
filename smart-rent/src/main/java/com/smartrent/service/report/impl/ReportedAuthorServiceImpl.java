@@ -8,6 +8,7 @@ import com.smartrent.dto.response.ReportedAuthorResponse;
 import com.smartrent.enums.NotificationType;
 import com.smartrent.enums.RecipientType;
 import com.smartrent.enums.ReportStatus;
+import com.smartrent.infra.exception.UserNotBlockEligibleException;
 import com.smartrent.infra.exception.UserNotFoundException;
 import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.ListingReportRepository;
@@ -104,8 +105,16 @@ public class ReportedAuthorServiceImpl implements ReportedAuthorService {
     public ReportedAuthorResponse setPostingBlock(String userId, PostingBlockRequest request, String adminId) {
         User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
 
+        // Single combined query instead of one per status (faster toggle)
+        ReportedAuthorProjection.Counts counts = listingReportRepository.getReportCountsByAuthor(userId);
+        long totalReports = counts != null && counts.getTotalReports() != null ? counts.getTotalReports() : 0L;
+        long resolvedReports = counts != null && counts.getResolvedReports() != null ? counts.getResolvedReports() : 0L;
+
         boolean block = Boolean.TRUE.equals(request.getBlocked());
         if (block) {
+            if (resolvedReports <= BLOCK_ELIGIBLE_THRESHOLD) {
+                throw new UserNotBlockEligibleException(BLOCK_ELIGIBLE_THRESHOLD, resolvedReports);
+            }
             user.setPostingBlocked(true);
             user.setPostingBlockedReason(request.getReason());
             user.setPostingBlockedByAdminId(adminId);
@@ -139,10 +148,6 @@ public class ReportedAuthorServiceImpl implements ReportedAuthorService {
             );
         }
 
-        // Single combined query instead of one per status (faster toggle)
-        ReportedAuthorProjection.Counts counts = listingReportRepository.getReportCountsByAuthor(userId);
-        long totalReports = counts != null && counts.getTotalReports() != null ? counts.getTotalReports() : 0L;
-        long resolvedReports = counts != null && counts.getResolvedReports() != null ? counts.getResolvedReports() : 0L;
         return buildResponse(user, totalReports, resolvedReports);
     }
 
@@ -157,7 +162,7 @@ public class ReportedAuthorServiceImpl implements ReportedAuthorService {
                     .userId(projection.getUserId())
                     .totalReports(total)
                     .resolvedReports(resolved)
-                    .blockEligible(total > BLOCK_ELIGIBLE_THRESHOLD)
+                    .blockEligible(resolved > BLOCK_ELIGIBLE_THRESHOLD)
                     .postingBlocked(false)
                     .build();
         }
@@ -174,7 +179,7 @@ public class ReportedAuthorServiceImpl implements ReportedAuthorService {
                 .avatarUrl(user.getAvatarUrl())
                 .totalReports(total)
                 .resolvedReports(resolved)
-                .blockEligible(total > BLOCK_ELIGIBLE_THRESHOLD)
+                .blockEligible(resolved > BLOCK_ELIGIBLE_THRESHOLD)
                 .postingBlocked(user.isPostingBlocked())
                 .postingBlockedReason(user.getPostingBlockedReason())
                 .postingBlockedAt(user.getPostingBlockedAt())

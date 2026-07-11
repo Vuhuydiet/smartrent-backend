@@ -153,7 +153,9 @@ public enum DomainCode {
   LISTING_REPORT_NOT_AVAILABLE("22001", HttpStatus.BAD_REQUEST, "Listing is no longer available and cannot be reported"),
   //    User Posting Block Error 23xxx
   USER_POSTING_BLOCKED("23001", HttpStatus.FORBIDDEN,
-      "Tài khoản của bạn đã bị chặn đăng tin do có nhiều tin vi phạm bị báo cáo. Vui lòng liên hệ quản trị viên để được hỗ trợ.")
+      "Tài khoản của bạn đã bị chặn đăng tin do có nhiều tin vi phạm bị báo cáo. Vui lòng liên hệ quản trị viên để được hỗ trợ."),
+  USER_NOT_BLOCK_ELIGIBLE("23002", HttpStatus.BAD_REQUEST,
+      "Người dùng chưa đủ điều kiện bị chặn đăng tin. Cần trên %d report đã được admin duyệt, hiện tại chỉ có %d.")
   ;
 
   private final String value;
