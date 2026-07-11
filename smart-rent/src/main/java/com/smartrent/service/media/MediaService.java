@@ -1,5 +1,6 @@
 package com.smartrent.service.media;
 
+import com.smartrent.dto.request.AdminGenerateUploadUrlRequest;
 import com.smartrent.dto.request.ConfirmUploadRequest;
 import com.smartrent.dto.request.GenerateUploadUrlRequest;
 import com.smartrent.dto.request.SaveExternalMediaRequest;
@@ -110,4 +111,15 @@ public interface MediaService {
      * Admin: Get all media (paginated) for moderation
      */
     List<MediaResponse> adminGetAllMedia(String status, int page, int size);
+
+    /**
+     * Admin: Generate pre-signed upload URL (Step 1 of presign upload flow).
+     * Stores adminId as the media owner.
+     */
+    GenerateUploadUrlResponse adminGenerateUploadUrl(AdminGenerateUploadUrlRequest request, String adminId);
+
+    /**
+     * Admin: Confirm upload completion (Step 2 of presign upload flow)
+     */
+    MediaResponse adminConfirmUpload(Long mediaId, ConfirmUploadRequest request, String adminId);
 }

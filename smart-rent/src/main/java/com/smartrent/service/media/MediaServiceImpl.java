@@ -1,5 +1,6 @@
 package com.smartrent.service.media;
 
+import com.smartrent.dto.request.AdminGenerateUploadUrlRequest;
 import com.smartrent.dto.request.ConfirmUploadRequest;
 import com.smartrent.dto.request.GenerateUploadUrlRequest;
 import com.smartrent.dto.request.SaveExternalMediaRequest;
@@ -194,7 +195,7 @@ public class MediaServiceImpl implements MediaService {
             }
         }
 
-        return doUploadMedia(file, mediaType, listing, title, description, altText, isPrimary, sortOrder, userId);
+        return doUploadMedia(file, mediaType, listing, title, description, altText, isPrimary, sortOrder, userId, null);
     }
 
     @Override
@@ -206,6 +207,12 @@ public class MediaServiceImpl implements MediaService {
         Media media = mediaRepository.findByMediaIdAndUserId(mediaId, userId)
                 .orElseThrow(() -> new AppException(DomainCode.UNAUTHORIZED,
                         "Media not found or you don't have permission"));
+
+        return doConfirmUpload(media);
+    }
+
+    private MediaResponse doConfirmUpload(Media media) {
+        Long mediaId = media.getMediaId();
 
         // Validate status
         if (media.getStatus() != Media.MediaStatus.PENDING) {
@@ -589,7 +596,7 @@ public class MediaServiceImpl implements MediaService {
 
         // Validate admin exists
         adminRepository.findById(adminId)
-                .orElseThrow(() -> new AppException(DomainCode.USER_NOT_FOUND, "Admin not found"));
+                .orElseThrow(() -> new AppException(DomainCode.ADMIN_NOT_FOUND, "Admin not found"));
 
         // Validate listing if provided (no ownership check for admin)
         Listing listing = null;
@@ -598,7 +605,84 @@ public class MediaServiceImpl implements MediaService {
                     .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
         }
 
-        return doUploadMedia(file, mediaType, listing, title, description, altText, isPrimary, sortOrder, adminId);
+        return doUploadMedia(file, mediaType, listing, title, description, altText, isPrimary, sortOrder, null, adminId);
+    }
+
+    @Override
+    @Transactional
+    public GenerateUploadUrlResponse adminGenerateUploadUrl(AdminGenerateUploadUrlRequest request, String adminId) {
+        log.info("Admin generating upload URL - admin: {}, type: {}", adminId, request.getMediaType());
+
+        // Validate admin exists
+        adminRepository.findById(adminId)
+                .orElseThrow(() -> new AppException(DomainCode.ADMIN_NOT_FOUND, "Admin not found"));
+
+        boolean isImage = request.getMediaType() == AdminGenerateUploadUrlRequest.MediaType.IMAGE;
+        if (!storageService.isValidContentType(request.getContentType(), isImage)) {
+            throw new AppException(DomainCode.INVALID_FILE_TYPE,
+                    String.format("Invalid content type %s for %s", request.getContentType(), request.getMediaType()));
+        }
+        if (!storageService.isValidFileSize(request.getFileSize(), isImage)) {
+            throw new AppException(DomainCode.FILE_TOO_LARGE,
+                    String.format("File size exceeds maximum allowed for %s: %d MB",
+                            request.getMediaType(), storageService.getMaxSizeMB(isImage)));
+        }
+
+        // Validate listing if provided (no ownership check for admin)
+        Listing listing = null;
+        if (request.getListingId() != null) {
+            listing = listingRepository.findById(request.getListingId())
+                    .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND, "Listing not found"));
+        }
+
+        String storageKey = storageService.generateGenericStorageKey(
+                adminId, request.getFilename(), request.getContentType());
+
+        Media media = Media.builder()
+                .adminId(adminId)
+                .listing(listing)
+                .mediaType(isImage ? Media.MediaType.IMAGE : Media.MediaType.VIDEO)
+                .sourceType(Media.MediaSourceType.UPLOAD)
+                .status(Media.MediaStatus.PENDING)
+                .storageKey(storageKey)
+                .originalFilename(request.getFilename())
+                .mimeType(request.getContentType())
+                .fileSize(request.getFileSize())
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .altText(request.getAltText())
+                .isPrimary(request.getIsPrimary() != null && request.getIsPrimary())
+                .sortOrder(request.getSortOrder() != null ? request.getSortOrder() : 0)
+                .uploadConfirmed(false)
+                .build();
+
+        media = mediaRepository.save(media);
+
+        R2StorageService.PresignedUrlResponse presignedUrl =
+                storageService.generateUploadUrl(storageKey, request.getContentType(), request.getFileSize());
+
+        log.info("Admin upload URL generated successfully for media ID: {}", media.getMediaId());
+
+        return GenerateUploadUrlResponse.builder()
+                .mediaId(media.getMediaId())
+                .uploadUrl(presignedUrl.getUrl())
+                .expiresIn(presignedUrl.getExpiresIn())
+                .storageKey(storageKey)
+                .message("Upload URL generated. Please upload the file to the provided URL within "
+                        + (presignedUrl.getExpiresIn() / 60) + " minutes.")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public MediaResponse adminConfirmUpload(Long mediaId, ConfirmUploadRequest request, String adminId) {
+        log.info("Admin confirming upload for media ID: {}, admin: {}", mediaId, adminId);
+
+        Media media = mediaRepository.findByMediaIdAndAdminId(mediaId, adminId)
+                .orElseThrow(() -> new AppException(DomainCode.UNAUTHORIZED,
+                        "Media not found or you don't have permission"));
+
+        return doConfirmUpload(media);
     }
 
     @Override
@@ -655,7 +739,10 @@ public class MediaServiceImpl implements MediaService {
             String altText,
             Boolean isPrimary,
             Integer sortOrder,
-            String ownerId) {
+            String userId,
+            String adminId) {
+
+        String ownerId = userId != null ? userId : adminId;
 
         // Validate file is not empty
         if (file.isEmpty()) {
@@ -700,7 +787,8 @@ public class MediaServiceImpl implements MediaService {
             String publicUrl = storageService.getPublicUrl(storageKey);
 
             Media media = Media.builder()
-                    .userId(ownerId)
+                    .userId(userId)
+                    .adminId(adminId)
                     .listing(listing)
                     .mediaType(mediaTypeEnum)
                     .sourceType(Media.MediaSourceType.UPLOAD)

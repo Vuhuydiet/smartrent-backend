@@ -462,7 +462,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             if (!request.getMediaIds().isEmpty()) {
                 for (Long mediaId : request.getMediaIds()) {
                     Media media = mediaRepository.findById(mediaId).orElse(null);
-                    if (media != null && media.getUserId().equals(userId) && media.getStatus() == Media.MediaStatus.ACTIVE) {
+                    if (media != null && media.isOwnedBy(userId) && media.getStatus() == Media.MediaStatus.ACTIVE) {
                         media.setListing(listing);
                         mediaRepository.save(media);
                     }

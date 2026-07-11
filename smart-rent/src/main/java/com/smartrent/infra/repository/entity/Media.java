@@ -44,8 +44,11 @@ public class Media {
     @JoinColumn(name = "listing_id")
     Listing listing;
 
-    @Column(name = "user_id", nullable = false)
-    String userId; // Owner ID of the media
+    @Column(name = "user_id")
+    String userId; // Owner user ID of the media (mutually exclusive with adminId)
+
+    @Column(name = "admin_id")
+    String adminId; // Owner admin ID of the media (mutually exclusive with userId)
 
     @Enumerated(EnumType.STRING)
     @Column(name = "media_type", nullable = false, length = 20)
@@ -155,5 +158,9 @@ public class Media {
 
     public boolean isOwnedBy(String userId) {
         return this.userId != null && this.userId.equals(userId);
+    }
+
+    public boolean isOwnedByAdmin(String adminId) {
+        return this.adminId != null && this.adminId.equals(adminId);
     }
 }
