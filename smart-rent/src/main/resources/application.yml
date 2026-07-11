@@ -191,7 +191,12 @@ spring:
         # window) — a big win while the DB buffer pool is only 32MB. See PR reco
         # cold-start work.
         "[listing.recommendation.similar]": 30m
-        "[listing.recommendation.personalized]": 2m
+        # Personalized "for you" feed is the most expensive homepage query (pulls
+        # interaction history + calls the AI service), so it gets a longer TTL
+        # than the VIP-tier/newest carousels (listing.search, 5m) rather than a
+        # shorter one — freshness matters less here than avoiding repeat AI calls
+        # per user. ListingPushScheduler still force-evicts this bucket hourly.
+        "[listing.recommendation.personalized]": 30m
 
 application:
   client-url: "${CLIENT_URL:http://localhost:3000}"
