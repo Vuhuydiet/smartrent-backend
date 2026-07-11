@@ -140,6 +140,9 @@ public class ListingServiceImpl implements ListingService {
         log.info("Creating listing with address - User: {}, Title: {}, UseMembershipQuota: {}",
                 request.getUserId(), request.getTitle(), request.getUseMembershipQuota());
 
+        // Block users an admin has barred from posting (too many approved reports)
+        ensureUserCanPost(request.getUserId());
+
         // Validate required fields for non-draft listings
         validateNonDraftListing(request);
 
@@ -346,6 +349,9 @@ public class ListingServiceImpl implements ListingService {
     @Transactional
     public Object createVipListing(VipListingCreationRequest request) {
         log.info("Creating VIP listing for user: {}, vipType: {}", request.getUserId(), request.getVipType());
+
+        // Block users an admin has barred from posting (too many approved reports)
+        ensureUserCanPost(request.getUserId());
 
         // Fail fast on image/video limit before doing any quota/payment work so the
         // caller gets a 400 instead of consuming a benefit or being redirected to VNPay.
@@ -1156,6 +1162,22 @@ public class ListingServiceImpl implements ListingService {
             throw new AppException(DomainCode.UNKNOWN_ERROR,
                     "Failed to create VIP listing after payment: " + e.getMessage());
         }
+    }
+
+    /**
+     * Reject listing creation when an admin has blocked this user from posting.
+     * A blocked user (too many admin-approved reports) cannot create new listings.
+     */
+    private void ensureUserCanPost(String userId) {
+        if (userId == null) {
+            return;
+        }
+        userRepository.findById(userId).ifPresent(user -> {
+            if (user.isPostingBlocked()) {
+                log.warn("Blocked user {} attempted to create a listing", userId);
+                throw new DomainException(DomainCode.USER_POSTING_BLOCKED);
+            }
+        });
     }
 
     /**

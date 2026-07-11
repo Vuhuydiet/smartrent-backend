@@ -101,4 +101,35 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
     Double avgResolutionMinutes(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     long countByCreatedAtBefore(LocalDateTime dateTime);
+
+    /**
+     * Aggregate reports per listing author (người đăng tin). Each row is one author who
+     * has at least one report on any of their listings, with total and admin-approved
+     * (RESOLVED) report counts. Ordered by most approved reports first.
+     */
+    @Query(value = "SELECT l.user_id AS userId, " +
+            "CAST(COUNT(*) AS SIGNED) AS totalReports, " +
+            "CAST(SUM(CASE WHEN r.status = 'RESOLVED' THEN 1 ELSE 0 END) AS SIGNED) AS resolvedReports " +
+            "FROM listing_reports r JOIN listings l ON r.listing_id = l.listing_id " +
+            "GROUP BY l.user_id " +
+            "ORDER BY resolvedReports DESC, totalReports DESC",
+            countQuery = "SELECT COUNT(DISTINCT l.user_id) " +
+                    "FROM listing_reports r JOIN listings l ON r.listing_id = l.listing_id",
+            nativeQuery = true)
+    Page<ReportedAuthorProjection> findReportedAuthors(Pageable pageable);
+
+    /**
+     * Find all reports for a given author (owner of the reported listings) filtered by status,
+     * newest first. Used to show an author's admin-approved reports.
+     */
+    @Query("SELECT r FROM listing_reports r WHERE r.listing.userId = :userId AND r.status = :status " +
+            "ORDER BY r.resolvedAt DESC, r.createdAt DESC")
+    List<ListingReport> findByAuthorIdAndStatus(@Param("userId") String userId,
+                                                @Param("status") ReportStatus status);
+
+    /**
+     * Count reports of a given status across all of an author's listings.
+     */
+    @Query("SELECT COUNT(r) FROM listing_reports r WHERE r.listing.userId = :userId AND r.status = :status")
+    long countByAuthorIdAndStatus(@Param("userId") String userId, @Param("status") ReportStatus status);
 }

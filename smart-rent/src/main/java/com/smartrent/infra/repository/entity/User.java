@@ -65,6 +65,26 @@ public class User extends AbstractUser {
     @Column(name = "avatar_media_id")
     Long avatarMediaId;
 
+    // ============ POSTING BLOCK FIELDS ============
+
+    /** True when an admin has blocked this user from creating new listings. */
+    @Builder.Default
+    @Column(name = "posting_blocked", nullable = false)
+    boolean postingBlocked = false;
+
+    /** Admin-provided reason for the posting block. Null when not blocked. */
+    @Column(name = "posting_blocked_reason", length = 500)
+    String postingBlockedReason;
+
+    /** Admin ID who blocked the user from posting (VARCHAR(36) for UUID-style ids). */
+    @Column(name = "posting_blocked_by_admin_id", length = 36)
+    String postingBlockedByAdminId;
+
+    /** Timestamp when the posting block was applied. Null when not blocked. */
+    @Column(name = "posting_blocked_at")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+    LocalDateTime postingBlockedAt;
+
     // ============ BROKER FIELDS ============
 
     /** True when the user is an approved broker. */

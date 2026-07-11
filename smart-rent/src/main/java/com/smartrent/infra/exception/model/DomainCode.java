@@ -150,7 +150,10 @@ public enum DomainCode {
   VIP_TIER_NOT_CONFIGURED("21003", HttpStatus.INTERNAL_SERVER_ERROR,
       "Không tìm thấy cấu hình giới hạn cho gói VIP: %s"),
   //    Listing Report Error 22xxx
-  LISTING_REPORT_NOT_AVAILABLE("22001", HttpStatus.BAD_REQUEST, "Listing is no longer available and cannot be reported")
+  LISTING_REPORT_NOT_AVAILABLE("22001", HttpStatus.BAD_REQUEST, "Listing is no longer available and cannot be reported"),
+  //    User Posting Block Error 23xxx
+  USER_POSTING_BLOCKED("23001", HttpStatus.FORBIDDEN,
+      "Tài khoản của bạn đã bị chặn đăng tin do có nhiều tin vi phạm bị báo cáo. Vui lòng liên hệ quản trị viên để được hỗ trợ.")
   ;
 
   private final String value;
