@@ -54,7 +54,7 @@ public class AdminReportedAuthorController {
             @RequestParam(required = false) String name,
             @Parameter(description = "Filter by phone number (prefix)")
             @RequestParam(required = false) String phone,
-            @Parameter(description = "Filter by block eligibility: true = enough approved reports (> 3), false = not yet")
+            @Parameter(description = "Filter by block eligibility: true = enough total reports (> 3), false = not yet")
             @RequestParam(required = false) Boolean blockEligible,
             @Parameter(description = "Page number (1-indexed)", example = "1")
             @RequestParam(defaultValue = "1") int page,

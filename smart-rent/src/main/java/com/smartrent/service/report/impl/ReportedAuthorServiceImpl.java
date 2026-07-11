@@ -157,7 +157,7 @@ public class ReportedAuthorServiceImpl implements ReportedAuthorService {
                     .userId(projection.getUserId())
                     .totalReports(total)
                     .resolvedReports(resolved)
-                    .blockEligible(resolved > BLOCK_ELIGIBLE_THRESHOLD)
+                    .blockEligible(total > BLOCK_ELIGIBLE_THRESHOLD)
                     .postingBlocked(false)
                     .build();
         }
@@ -174,7 +174,7 @@ public class ReportedAuthorServiceImpl implements ReportedAuthorService {
                 .avatarUrl(user.getAvatarUrl())
                 .totalReports(total)
                 .resolvedReports(resolved)
-                .blockEligible(resolved > BLOCK_ELIGIBLE_THRESHOLD)
+                .blockEligible(total > BLOCK_ELIGIBLE_THRESHOLD)
                 .postingBlocked(user.isPostingBlocked())
                 .postingBlockedReason(user.getPostingBlockedReason())
                 .postingBlockedAt(user.getPostingBlockedAt())

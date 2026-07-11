@@ -64,6 +64,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     MediaRepository mediaRepository;
     AdminRepository adminRepository;
     UserRepository userRepository;
+    com.smartrent.service.listing.PostingAccessGuard postingAccessGuard;
     ListingMapper listingMapper;
     UserMapper userMapper;
     EmailService emailService;
@@ -314,6 +315,9 @@ public class ListingModerationServiceImpl implements ListingModerationService {
             throw new DomainException(DomainCode.NOT_LISTING_OWNER);
         }
 
+        // Resubmitting re-lists the listing for review — block barred users
+        postingAccessGuard.ensureCanPost(userId);
+
         // A listing removed for a confirmed violation can never be resubmitted
         if (Boolean.TRUE.equals(listing.getPermanentlyRemoved())) {
             throw new DomainException(DomainCode.RESUBMIT_NOT_ALLOWED);
@@ -410,6 +414,9 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         if (!listing.getUserId().equals(userId)) {
             throw new DomainException(DomainCode.NOT_LISTING_OWNER);
         }
+
+        // Resubmitting re-lists the listing for review — block barred users
+        postingAccessGuard.ensureCanPost(userId);
 
         // A listing removed for a confirmed violation can never be resubmitted
         if (Boolean.TRUE.equals(listing.getPermanentlyRemoved())) {
