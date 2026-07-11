@@ -11,7 +11,9 @@ import com.smartrent.enums.NewsCategory;
 import com.smartrent.enums.NewsStatus;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.model.DomainCode;
+import com.smartrent.infra.repository.AdminRepository;
 import com.smartrent.infra.repository.NewsRepository;
+import com.smartrent.infra.repository.entity.Admin;
 import com.smartrent.infra.repository.entity.News;
 import com.smartrent.mapper.NewsMapper;
 import com.smartrent.service.news.NewsService;
@@ -37,6 +39,7 @@ public class NewsServiceImpl implements NewsService {
 
     private final NewsRepository newsRepository;
     private final NewsMapper newsMapper;
+    private final AdminRepository adminRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -340,7 +343,11 @@ public class NewsServiceImpl implements NewsService {
         }
 
         List<NewsSummaryResponse> newsList = newsPage.getContent().stream()
-                .map(newsMapper::toSummaryResponse)
+                .map(news -> {
+                    NewsSummaryResponse response = newsMapper.toSummaryResponse(news);
+                    response.setAuthorName(resolveAuthorName(news.getAuthorId(), news.getAuthorName()));
+                    return response;
+                })
                 .collect(Collectors.toList());
 
         return NewsListResponse.builder()
@@ -360,10 +367,29 @@ public class NewsServiceImpl implements NewsService {
         News news = newsRepository.findById(newsId)
                 .orElseThrow(() -> new AppException(DomainCode.NEWS_NOT_FOUND));
 
-        return newsMapper.toResponse(news);
+        NewsResponse response = newsMapper.toResponse(news);
+        response.setAuthorName(resolveAuthorName(news.getAuthorId(), news.getAuthorName()));
+        return response;
     }
 
     // ========== Helper Methods ==========
+
+    /**
+     * Legacy news rows created before author names were resolved on write may have
+     * their author_name column stored as the raw admin ID. Repair that here so the
+     * admin UI always shows a display name instead of an ID.
+     */
+    private String resolveAuthorName(String authorId, String authorName) {
+        if (authorId == null) {
+            return authorName;
+        }
+        if (authorName == null || authorName.isBlank() || authorName.equals(authorId)) {
+            return adminRepository.findById(authorId)
+                    .map(Admin::getDisplayName)
+                    .orElse(authorName);
+        }
+        return authorName;
+    }
 
     /**
      * Generate URL-friendly slug from title

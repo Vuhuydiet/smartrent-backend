@@ -52,4 +52,15 @@ public class Admin extends AbstractUser {
   )
   List<Role> roles;
 
+  /**
+   * Human-readable display name, falling back to the admin's email when
+   * first/last name are unavailable.
+   */
+  public String getDisplayName() {
+    String firstName = getFirstName() != null ? getFirstName().trim() : "";
+    String lastName = getLastName() != null ? getLastName().trim() : "";
+    String fullName = (firstName + " " + lastName).trim();
+    return fullName.isEmpty() ? getEmail() : fullName;
+  }
+
 }
