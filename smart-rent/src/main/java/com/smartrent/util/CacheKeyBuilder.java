@@ -28,6 +28,7 @@ public final class CacheKeyBuilder {
         append(sb, "status", filter.getStatus());
         append(sb, "listingStatus", filter.getListingStatus());
         append(sb, "isAdminRequest", filter.getIsAdminRequest());
+        append(sb, "isOwnerRequest", filter.getIsOwnerRequest());
 
         append(sb, "provinceId", filter.getProvinceId());
         append(sb, "provinceCode", filter.getProvinceCode());
