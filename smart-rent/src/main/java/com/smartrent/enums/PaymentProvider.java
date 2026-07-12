@@ -19,7 +19,18 @@ public enum PaymentProvider {
      * SePay migration can still be read. No provider bean is registered for it,
      * so it must not be used to initiate new payments.
      */
-    VNPAY("vnpay", "VNPay Payment Gateway (legacy)");
+    VNPAY("vnpay", "VNPay Payment Gateway (legacy)"),
+
+    /**
+     * Legacy provider — PayOS was the default gateway before the SePay
+     * migration (see V88/V89). Kept only so historical transactions created
+     * during that window can still be read (@Enumerated(EnumType.STRING) on
+     * Transaction.paymentProvider throws IllegalArgumentException on any DB
+     * value with no matching constant, breaking GET /v1/me/transactions for
+     * any user with an old PayOS transaction). No provider bean is registered
+     * for it, so it must not be used to initiate new payments.
+     */
+    PAYOS("payos", "PayOS Payment Gateway (legacy)");
 
     String code;
     String displayName;
