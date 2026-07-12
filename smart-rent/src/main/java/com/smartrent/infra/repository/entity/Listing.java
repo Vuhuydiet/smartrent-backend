@@ -87,7 +87,24 @@ import java.util.List;
                 // ICP can filter them from index data alone (avoiding a full-row fetch for the
                 // ~half of candidates that turn out expired), then the sort columns trailing.
                 @Index(name = "idx_listings_admin_review_queue",
-                        columnList = "is_shadow, is_verify, verified, expired, moderation_status, expiry_date, vip_type_sort_order, updated_at")
+                        columnList = "is_shadow, is_verify, verified, expired, moderation_status, expiry_date, vip_type_sort_order, updated_at"),
+                // "From users I follow" feed (GET /v1/listings/my-following-feed ->
+                // findPublicListingsByUserIdIn) — always scoped to a single followed
+                // user in practice. Equality prefix (user_id + the four visibility
+                // booleans) + ordered suffix (post_date, created_at) so the feed is an
+                // index-ordered range scan instead of a filesort. Mirrors
+                // idx_listings_reco_* / idx_listings_map_bounds. Built by V108.
+                @Index(name = "idx_listings_follow_feed",
+                        columnList = "user_id, is_draft, is_shadow, verified, expired, post_date, created_at"),
+                // Admin list, moderation-status-filtered tabs (POST /v1/listings/admin/list
+                // with moderationStatus set — "Đã Duyệt"/"Từ Chối"/etc.). Equality prefix
+                // (is_shadow, moderation_status) + sort columns (vip_type_sort_order ASC,
+                // updated_at DESC — real directions built by V109) so each status tab is an
+                // ordered index range scan instead of the index_merge + 71k-row filesort
+                // (~9.3s measured) the APPROVED tab hit. Mirrors idx_listings_admin_default_sort
+                // (V100) with moderation_status inserted. Built by V109.
+                @Index(name = "idx_listings_admin_moderation_sort",
+                        columnList = "is_shadow, moderation_status, vip_type_sort_order, updated_at")
         })
 @Getter
 @Setter
