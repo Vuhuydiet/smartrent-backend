@@ -21,6 +21,15 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
     List<Listing> findByListingIdIn(Collection<Long> listingIds);
 
     /**
+     * Lightweight {@code [listingId, title]} projection for a batch of ids —
+     * used by owner analytics to resolve titles for a page of aggregate rows in
+     * ONE query instead of a {@code findById} per row (N+1). Avoids loading the
+     * full Listing entity (notably the longtext description).
+     */
+    @Query("SELECT l.listingId, l.title FROM listings l WHERE l.listingId IN :listingIds")
+    List<Object[]> findIdAndTitleByListingIdIn(@Param("listingIds") Collection<Long> listingIds);
+
+    /**
      * Fetch listings by id restricted to those currently publicly displayed
      * (same visibility filter as {@link #findPublicListings}). Used so that
      * features like "recently viewed" never surface listings that have since

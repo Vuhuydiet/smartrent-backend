@@ -96,16 +96,17 @@ public class AnalyticsServiceImpl implements AnalyticsService {
             page = phoneClickDetailRepository.countClicksPerListingForOwnerPaged(ownerId, pageable);
         }
 
-        List<ListingClickSummary> summaries = page.getContent().stream()
+        List<Object[]> rows = page.getContent();
+        // Batch-resolve titles for the page in ONE query (was findById per row → N+1).
+        Map<Long, String> titleById = resolveListingTitles(rows);
+
+        List<ListingClickSummary> summaries = rows.stream()
                 .map(row -> {
                     Long listingId = ((Number) row[0]).longValue();
                     Long count = ((Number) row[1]).longValue();
-                    String title = listingRepository.findById(listingId)
-                            .map(Listing::getTitle)
-                            .orElse("Unknown");
                     return ListingClickSummary.builder()
                             .listingId(listingId)
-                            .listingTitle(title)
+                            .listingTitle(titleById.getOrDefault(listingId, "Unknown"))
                             .totalClicks(count)
                             .build();
                 })
@@ -171,16 +172,16 @@ public class AnalyticsServiceImpl implements AnalyticsService {
         // ALL of the owner's listings, not just the current page.
         long totalSavesAcrossAll = savedListingRepository.countTotalSavesForOwner(ownerId);
 
-        List<ListingSaveSummary> summaries = page.getContent().stream()
+        List<Object[]> rows = page.getContent();
+        Map<Long, String> titleById = resolveListingTitles(rows);
+
+        List<ListingSaveSummary> summaries = rows.stream()
                 .map(row -> {
                     Long lid = ((Number) row[0]).longValue();
                     Long count = ((Number) row[1]).longValue();
-                    String title = listingRepository.findById(lid)
-                            .map(Listing::getTitle)
-                            .orElse("Unknown");
                     return ListingSaveSummary.builder()
                             .listingId(lid)
-                            .listingTitle(title)
+                            .listingTitle(titleById.getOrDefault(lid, "Unknown"))
                             .totalSaves(count)
                             .build();
                 })
@@ -197,6 +198,24 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     }
 
     // ─── Private helpers ───
+
+    /**
+     * Batch-resolve listing titles for a page of {@code [listingId, count]}
+     * aggregate rows in a single query, replacing a per-row
+     * {@code listingRepository.findById} (N+1). Ids missing from the result
+     * fall back to "Unknown" at the call site via {@code getOrDefault}.
+     */
+    private Map<Long, String> resolveListingTitles(List<Object[]> rows) {
+        List<Long> ids = rows.stream()
+                .map(r -> ((Number) r[0]).longValue())
+                .distinct()
+                .collect(Collectors.toList());
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return listingRepository.findIdAndTitleByListingIdIn(ids).stream()
+                .collect(Collectors.toMap(r -> ((Number) r[0]).longValue(), r -> (String) r[1]));
+    }
 
     private List<DailyClickCount> buildClicksOverTime(Long listingId) {
         List<Object[]> rawData = phoneClickDetailRepository.countClicksGroupedByDate(listingId);

@@ -19,8 +19,8 @@ import java.time.LocalDateTime;
 @Entity(name = "phone_clicks")
 @Table(name = "phone_clicks",
         indexes = {
-                @Index(name = "idx_listing_id", columnList = "listing_id"),
-                @Index(name = "idx_user_id", columnList = "user_id"),
+                // idx_listing_id (⊂ idx_listing_user) + idx_user_id
+                // (⊂ idx_phone_clicks_user_listing) dropped in V110.
                 @Index(name = "idx_listing_user", columnList = "listing_id, user_id"),
                 @Index(name = "idx_phone_clicks_user_listing", columnList = "user_id, listing_id"),
                 @Index(name = "idx_clicked_at", columnList = "clicked_at")
