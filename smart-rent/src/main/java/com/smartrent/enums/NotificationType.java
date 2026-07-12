@@ -49,5 +49,12 @@ public enum NotificationType {
      * type='VIEW_MILESTONE' still exist in the notifications table, same
      * failure mode as PHONE_CLICK above. Kept only so old rows load.
      */
-    VIEW_MILESTONE
+    VIEW_MILESTONE,
+
+    /**
+     * Legacy — no code path creates this anymore, but historical rows with
+     * type='NEW_FOLLOWER' still exist in the notifications table, same
+     * failure mode as PHONE_CLICK above. Kept only so old rows load.
+     */
+    NEW_FOLLOWER
 }
