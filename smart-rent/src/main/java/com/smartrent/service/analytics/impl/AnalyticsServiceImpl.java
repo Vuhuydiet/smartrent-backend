@@ -132,12 +132,13 @@ public class AnalyticsServiceImpl implements AnalyticsService {
             throw new RuntimeException("You are not the owner of this listing");
         }
 
-        long totalSaves = savedListingRepository.countByIdListingId(listingId);
-
+        long totalSaves;
         List<Object[]> rawData;
         if (since != null) {
+            totalSaves = savedListingRepository.countByIdListingIdAndCreatedAtGreaterThanEqual(listingId, since);
             rawData = savedListingRepository.countSavesGroupedByDateSince(listingId, since);
         } else {
+            totalSaves = savedListingRepository.countByIdListingId(listingId);
             rawData = savedListingRepository.countSavesGroupedByDate(listingId);
         }
 

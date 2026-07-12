@@ -71,6 +71,8 @@ public interface SavedListingRepository extends JpaRepository<SavedListing, Save
 
     long countByIdListingId(Long listingId);
 
+    long countByIdListingIdAndCreatedAtGreaterThanEqual(Long listingId, LocalDateTime since);
+
     @Query(value = "SELECT DATE(sl.created_at) AS save_date, COUNT(*) AS save_count " +
             "FROM saved_listings sl " +
             "WHERE sl.listing_id = :listingId AND sl.created_at >= :since " +
