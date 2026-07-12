@@ -76,10 +76,8 @@ public class AiListingMapperImpl implements AiListingMapper {
                 case HOUSE -> HousingPropertyType.HOUSE;
                 case ROOM -> HousingPropertyType.ROOM;
                 case STUDIO -> HousingPropertyType.STUDIO;
-                case OFFICE -> {
-                    log.debug("Mapping OFFICE product type to APARTMENT for AI verification");
-                    yield HousingPropertyType.APARTMENT;
-                }
+                case OFFICE -> HousingPropertyType.OFFICE;
+                case STORE -> HousingPropertyType.STORE;
                 default -> {
                     log.warn("Unknown product type: {}, defaulting to APARTMENT", productType);
                     yield HousingPropertyType.APARTMENT;

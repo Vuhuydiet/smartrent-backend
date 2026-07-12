@@ -8,5 +8,7 @@ public enum HousingPropertyType {
     APARTMENT,
     HOUSE, 
     ROOM,
-    STUDIO
+    STUDIO,
+    OFFICE,
+    STORE
 }
