@@ -33,5 +33,14 @@ public enum NotificationType {
     MEMBERSHIP_ACTIVATED,           // member is notified when their queued membership activates
     // Posting block
     POSTING_BLOCKED,                // user is notified when admin blocks them from posting listings
-    POSTING_UNBLOCKED               // user is notified when admin lifts the posting block
+    POSTING_UNBLOCKED,              // user is notified when admin lifts the posting block
+
+    /**
+     * Legacy — no code path creates this anymore, but historical rows with
+     * type='PHONE_CLICK' still exist in the notifications table (Notification.type
+     * is @Enumerated(EnumType.STRING), so a DB value with no matching constant
+     * throws IllegalArgumentException and breaks GET /v1/notifications for that
+     * user, not just the read of that one row). Kept only so old rows load.
+     */
+    PHONE_CLICK
 }
