@@ -580,7 +580,11 @@ public class PushServiceImpl implements PushService {
 
     private void validateListingCanBePushed(Listing listing) {
         ListingStatus listingStatus = listing.computeListingStatus();
-        if (listingStatus != ListingStatus.DISPLAYING) {
+        // EXPIRING_SOON listings are still publicly live (see
+        // ListingSpecification.buildStatusPredicate(DISPLAYING)) -- pushing them is
+        // if anything more useful, since the seller is trying to keep visibility
+        // right before expiry. Only genuinely non-live statuses are rejected.
+        if (listingStatus != ListingStatus.DISPLAYING && listingStatus != ListingStatus.EXPIRING_SOON) {
             throw new RuntimeException("Only displaying listings can be pushed. Current status: " + listingStatus);
         }
     }

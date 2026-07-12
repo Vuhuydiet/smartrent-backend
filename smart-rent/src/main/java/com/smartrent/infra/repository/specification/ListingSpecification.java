@@ -888,7 +888,15 @@ public class ListingSpecification {
                 );
 
             case DISPLAYING ->
-                // verified = true AND NOT expired AND expiryDate > now
+                // verified = true AND NOT expired AND expiryDate > now.
+                // Intentionally includes listings expiring within 7 days (EXPIRING_SOON
+                // per Listing.computeListingStatus()) -- they are still publicly live
+                // (public visibility only gates on moderationStatus=APPROVED + not
+                // expired), so the seller's "Đang hiển thị" tab must keep showing them.
+                // What must NOT happen is per-row actions (push, detail link) silently
+                // disagreeing with that -- see PushServiceImpl.validateListingCanBePushed
+                // and the listing-card DISPLAYING/EXPIRING_SOON checks, which both treat
+                // the two statuses as equally "displaying".
                 criteriaBuilder.and(
                     criteriaBuilder.isTrue(root.get("verified")),
                     criteriaBuilder.isFalse(root.get("expired")),
