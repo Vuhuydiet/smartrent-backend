@@ -42,5 +42,12 @@ public enum NotificationType {
      * throws IllegalArgumentException and breaks GET /v1/notifications for that
      * user, not just the read of that one row). Kept only so old rows load.
      */
-    PHONE_CLICK
+    PHONE_CLICK,
+
+    /**
+     * Legacy — no code path creates this anymore, but historical rows with
+     * type='VIEW_MILESTONE' still exist in the notifications table, same
+     * failure mode as PHONE_CLICK above. Kept only so old rows load.
+     */
+    VIEW_MILESTONE
 }
