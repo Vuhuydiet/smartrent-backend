@@ -2,7 +2,6 @@ package com.smartrent.service.recommendation.impl;
 
 import com.smartrent.dto.request.AIRecommendationRequest;
 import com.smartrent.dto.response.ListingResponse;
-import com.smartrent.dto.response.RecentlyViewedItemResponse;
 import com.smartrent.dto.response.RecommendationItemDto;
 import com.smartrent.dto.response.RecommendationResponse;
 import com.smartrent.infra.connector.SmartRentAiConnector;
@@ -169,8 +168,7 @@ public class RecommendationServiceImpl implements RecommendationService {
                 userInteractions.add(new AIRecommendationRequest.InteractionEntryDto(userId, lId, 2.5));
                 seenIds.add(lId);
             }
-            for (RecentlyViewedItemResponse rv : recentlyViewedService.getRecentlyViewed(userId)) {
-                Long lId = rv.getListing().getListingId();
+            for (Long lId : recentlyViewedService.getRecentlyViewedIds(userId)) {
                 if (!seenIds.contains(lId)) {
                     userInteractions.add(new AIRecommendationRequest.InteractionEntryDto(userId, lId, 1.0));
                     seenIds.add(lId);
@@ -223,9 +221,17 @@ public class RecommendationServiceImpl implements RecommendationService {
         long tStart = System.nanoTime();
         Map<Long, Double> interactionWeightMap = new LinkedHashMap<>();
         List<SavedListing> savedListings = savedListingRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        long tAfterSaved = System.nanoTime();
 
         List<Long> clickedListingIds = phoneClickDetailRepository.findListingIdsByUserId(userId);
-        List<RecentlyViewedItemResponse> viewedListings = recentlyViewedService.getRecentlyViewed(userId);
+        long tAfterClicks = System.nanoTime();
+
+        // IDs-only recency read (no full-DTO hydration): this path only needs the
+        // viewed listing IDs and their order below, so getRecentlyViewedIds skips
+        // the getDisplayingListingsByIds hydration of up to 20 listings that
+        // getRecentlyViewed() would run.
+        List<Long> viewedListingIds = recentlyViewedService.getRecentlyViewedIds(userId);
+        long tAfterViewed = System.nanoTime();
 
         for (SavedListing s : savedListings) {
             interactionWeightMap.merge(s.getId().getListingId(), 3.0, Math::max);
@@ -233,12 +239,12 @@ public class RecommendationServiceImpl implements RecommendationService {
         for (Long lId : clickedListingIds) {
             interactionWeightMap.merge(lId, 2.5, Math::max);
         }
-        for (RecentlyViewedItemResponse rv : viewedListings) {
-            interactionWeightMap.merge(rv.getListing().getListingId(), 1.0, Math::max);
+        for (Long lId : viewedListingIds) {
+            interactionWeightMap.merge(lId, 1.0, Math::max);
         }
 
         boolean hasEnoughInteractions = !savedListings.isEmpty() || !clickedListingIds.isEmpty()
-                || viewedListings.size() >= 3;
+                || viewedListingIds.size() >= 3;
         if (!hasEnoughInteractions) {
             return getColdStartFeed(topN);
         }
@@ -254,11 +260,8 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<Listing> interactedListings = listingRepository.findWithAddressByListingIds(interactedListingIds);
 
         // Sort interactedListings so that the most recently viewed items come FIRST.
-        // Reuse the viewedListings already fetched above — re-calling getRecentlyViewed
-        // re-hits Redis AND re-runs batchMapListings (~4 DB queries + full DTO build).
-        List<Long> recencyOrder = viewedListings.stream()
-                .map(rv -> rv.getListing().getListingId())
-                .collect(Collectors.toList());
+        // viewedListingIds is already in recency order (most recent first) from Redis.
+        List<Long> recencyOrder = viewedListingIds;
 
         interactedListings.sort((l1, l2) -> {
             int idx1 = recencyOrder.indexOf(l1.getListingId());
@@ -274,6 +277,12 @@ public class RecommendationServiceImpl implements RecommendationService {
         List<AIRecommendationRequest.ListingFeatureDto> interactionFeatures = interactedListings.stream()
                 .map(this::toFeatureDto).collect(Collectors.toList());
         long tAfterInteractions = System.nanoTime();
+        log.info("[PerfTrace] personalized interactions breakdown userId={} | saved={}ms clicks={}ms recentlyViewed={}ms featureExtract={}ms",
+                userId,
+                (tAfterSaved - tStart) / 1_000_000,
+                (tAfterClicks - tAfterSaved) / 1_000_000,
+                (tAfterViewed - tAfterClicks) / 1_000_000,
+                (tAfterInteractions - tAfterViewed) / 1_000_000);
 
         // 3. Location profiling
         // 3.1 Find most frequent (preferred) locations
@@ -313,9 +322,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             featureById.put(f.getListingId(), f);
         }
 
-        long diffLocViews = viewedListings.stream()
-                .map(rv -> rv.getListing() != null ? rv.getListing().getListingId() : null)
-                .filter(Objects::nonNull)
+        long diffLocViews = viewedListingIds.stream()
                 .distinct()
                 .filter(id -> isDifferentFromPreferred(featureById.get(id),
                         preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode))
@@ -345,9 +352,8 @@ public class RecommendationServiceImpl implements RecommendationService {
         // Fall back to the plain latest interaction when nothing differs (isShift
         // stays false in that case).
         Long latestListingId = null;
-        for (RecentlyViewedItemResponse rv : viewedListings) {
-            Long id = rv.getListing() != null ? rv.getListing().getListingId() : null;
-            if (id != null && isDifferentFromPreferred(featureById.get(id),
+        for (Long id : viewedListingIds) {
+            if (isDifferentFromPreferred(featureById.get(id),
                     preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode)) {
                 latestListingId = id;
                 break;
@@ -373,8 +379,8 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
         }
         if (latestListingId == null) {
-            if (!viewedListings.isEmpty()) {
-                latestListingId = viewedListings.get(0).getListing().getListingId();
+            if (!viewedListingIds.isEmpty()) {
+                latestListingId = viewedListingIds.get(0);
             } else if (!savedListings.isEmpty()) {
                 latestListingId = savedListings.get(0).getId().getListingId();
             } else if (!clickedListingIds.isEmpty()) {

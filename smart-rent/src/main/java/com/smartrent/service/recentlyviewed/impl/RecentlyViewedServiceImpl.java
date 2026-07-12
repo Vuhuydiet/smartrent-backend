@@ -165,6 +165,31 @@ public class RecentlyViewedServiceImpl implements RecentlyViewedService {
         return result;
     }
 
+    @Override
+    public List<Long> getRecentlyViewedIds(String userId) {
+        String redisKey = buildKey(userId);
+
+        // ZREVRANGE returns the top MAX_LISTINGS listing IDs by score (most recent
+        // first). Spring Data returns an insertion-ordered LinkedHashSet, so the
+        // recency order is preserved. No DB hydration: callers that only need the
+        // IDs skip getDisplayingListingsByIds (the full-DTO build for up to 20
+        // listings) entirely.
+        Set<String> ids = redisTemplate.opsForZSet().reverseRange(redisKey, 0, MAX_LISTINGS - 1);
+        if (ids == null || ids.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Long> result = new ArrayList<>(ids.size());
+        for (String id : ids) {
+            try {
+                result.add(Long.parseLong(id));
+            } catch (NumberFormatException e) {
+                log.warn("Skipping non-numeric recently-viewed entry '{}' for user {}", id, userId);
+            }
+        }
+        return result;
+    }
+
     /**
      * Validate timestamp to prevent invalid values
      * @param listing Listing to validate
