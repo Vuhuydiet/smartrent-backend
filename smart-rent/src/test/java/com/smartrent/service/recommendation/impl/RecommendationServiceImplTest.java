@@ -83,7 +83,7 @@ public class RecommendationServiceImplTest {
                 .thenReturn(Collections.emptyList());
         when(phoneClickDetailRepository.findListingIdsByUserId("user1"))
                 .thenReturn(Collections.emptyList());
-        when(recentlyViewedService.getRecentlyViewed("user1"))
+        when(recentlyViewedService.getRecentlyViewedIds("user1"))
                 .thenReturn(Collections.emptyList());
 
         // For cold start
