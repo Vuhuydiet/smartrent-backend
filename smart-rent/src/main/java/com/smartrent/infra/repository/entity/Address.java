@@ -15,14 +15,12 @@ import java.util.List;
  * Matches database schema from V7 migration
  */
 @Entity(name = "addresses")
-@Table(name = "addresses",
-        indexes = {
-                @Index(name = "idx_addresses_legacy_loc", columnList = "legacy_province_id, legacy_district_id, legacy_ward_id"),
-                @Index(name = "idx_addresses_new_loc", columnList = "new_province_code, new_ward_code"),
-                @Index(name = "idx_addresses_geo", columnList = "latitude, longitude"),
-                @Index(name = "idx_addresses_legacy_ward", columnList = "legacy_ward_id"),
-                @Index(name = "idx_addresses_legacy_district", columnList = "legacy_district_id")
-        })
+// Address indexes live in Flyway migrations (idx_legacy_location / idx_new_location /
+// idx_addresses_lat_lng / idx_legacy_ward / idx_legacy_district from V59/V81, etc.).
+// The duplicate @Index copies here were removed after V110 dropped them on prod —
+// each was an exact duplicate of a migration index. Keeping them would let
+// ddl-auto=update reintroduce the bloat.
+@Table(name = "addresses")
 @Getter
 @Setter
 @Builder

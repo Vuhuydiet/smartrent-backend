@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Entity(name = "views")
 @Table(name = "views",
         indexes = {
-                @Index(name = "idx_listing_id", columnList = "listing_id"),
+                // idx_listing_id dropped in V110 — prefix of idx_listing_time.
                 @Index(name = "idx_listing_time", columnList = "listing_id, viewed_at"),
                 @Index(name = "idx_user_id", columnList = "user_id"),
                 @Index(name = "idx_ip_time", columnList = "ip_address, viewed_at")

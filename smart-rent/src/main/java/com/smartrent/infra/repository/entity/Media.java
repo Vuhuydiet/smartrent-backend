@@ -20,13 +20,13 @@ import java.time.LocalDateTime;
 @Entity(name = "media")
 @Table(name = "media",
         indexes = {
-                @Index(name = "idx_listing_id", columnList = "listing_id"),
+                // idx_listing_id + idx_media_listing_status dropped in V110 —
+                // both are prefixes of idx_media_listing_status_sort (migration).
                 @Index(name = "idx_user_id", columnList = "user_id"),
                 @Index(name = "idx_media_type", columnList = "media_type"),
                 @Index(name = "idx_status", columnList = "status"),
                 @Index(name = "idx_listing_sort", columnList = "listing_id, sort_order"),
-                @Index(name = "idx_storage_key", columnList = "storage_key"),
-                @Index(name = "idx_media_listing_status", columnList = "listing_id, status")
+                @Index(name = "idx_storage_key", columnList = "storage_key")
         })
 @Getter
 @Setter
