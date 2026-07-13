@@ -62,20 +62,33 @@ public class NotificationServiceImpl implements NotificationService {
             // could subscribe to (notification IDOR).
             String userDestination = "/queue/notifications";
             if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                // afterCommit() runs later, on a callback Spring drives itself — it is
+                // NOT inside this method's try/catch, so a send failure here must be
+                // caught locally or it only surfaces in Spring's own transaction-sync
+                // logging, without recipientId/type context.
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                     @Override
                     public void afterCommit() {
-                        messagingTemplate.convertAndSendToUser(recipientId, userDestination, response);
-                        log.debug("WebSocket notification sent after commit to user {}", recipientId);
+                        sendWebSocketNotification(recipientId, userDestination, response, type);
                     }
                 });
             } else {
-                messagingTemplate.convertAndSendToUser(recipientId, userDestination, response);
-                log.debug("WebSocket notification sent to user {}", recipientId);
+                sendWebSocketNotification(recipientId, userDestination, response, type);
             }
         } catch (Exception e) {
             log.error("Failed to send notification: type={}, recipient={}:{}, error={}",
-                    type, recipientType, recipientId, e.getMessage());
+                    type, recipientType, recipientId, e.getMessage(), e);
+        }
+    }
+
+    private void sendWebSocketNotification(String recipientId, String destination,
+                                           NotificationResponse response, NotificationType type) {
+        try {
+            messagingTemplate.convertAndSendToUser(recipientId, destination, response);
+            log.debug("WebSocket notification sent to user {}", recipientId);
+        } catch (Exception e) {
+            log.error("Failed to deliver WebSocket notification: type={}, recipient={}, error={}",
+                    type, recipientId, e.getMessage(), e);
         }
     }
 
