@@ -87,7 +87,6 @@ public class ListingQueryService {
         if (!Boolean.TRUE.equals(filter.getIsAdminRequest())) return false;
         if (!"PENDING_REVIEW".equals(filter.getModerationStatus())) return false;
         if (!"IN_REVIEW".equals(filter.getListingStatus())) return false;
-        if (filter.getHasPendingOwnerAction() != null) return false;
         String sortBy = filter.getSortBy();
         if (sortBy != null && !sortBy.isEmpty() && !"NEWEST".equals(sortBy) && !"DEFAULT".equals(sortBy)) return false;
 

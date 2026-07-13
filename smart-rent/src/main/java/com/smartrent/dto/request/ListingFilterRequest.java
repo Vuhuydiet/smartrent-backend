@@ -64,15 +64,8 @@ public class ListingFilterRequest {
 
     @Schema(description = "Filter by moderation status (admin only)",
             example = "PENDING_REVIEW",
-            allowableValues = {"PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED"})
+            allowableValues = {"PENDING_REVIEW", "APPROVED", "REJECTED", "REVISION_REQUIRED", "RESUBMITTED", "SUSPENDED", "REMOVED"})
     String moderationStatus;
-
-    @Schema(description = "Admin only. Only meaningful alongside moderationStatus=SUSPENDED, which is shared by "
-            + "two unrelated admin actions: rejecting a listing in the review queue (always creates a pending "
-            + "owner action) and temporarily hiding a listing under report review (never does). true narrows to "
-            + "the reject case, false narrows to the hide case; omit to match both.",
-            example = "true")
-    Boolean hasPendingOwnerAction;
 
     // ============ LOCATION FILTERS ============
     @Schema(description = """

@@ -647,8 +647,13 @@ public class ListingServiceImpl implements ListingService {
             throw new DomainException(DomainCode.NOT_LISTING_OWNER);
         }
 
-        // Block updates on SUSPENDED listings
-        if (existing.getModerationStatus() == ModerationStatus.SUSPENDED) {
+        // Block generic edits on listings that are hidden, rejected, or removed.
+        // REVISION_REQUIRED is intentionally NOT blocked — that state exists precisely
+        // so the owner can fix and resubmit.
+        ModerationStatus modStatus = existing.getModerationStatus();
+        if (modStatus == ModerationStatus.SUSPENDED
+                || modStatus == ModerationStatus.REJECTED
+                || modStatus == ModerationStatus.REMOVED) {
             throw new DomainException(DomainCode.UPDATE_NOT_ALLOWED);
         }
         // Update fields from request (null-safe for partial update)
@@ -771,10 +776,7 @@ public class ListingServiceImpl implements ListingService {
                 ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity)
                 : null;
 
-        ListingResponseWithAdmin response =
-                listingMapper.toResponseWithAdmin(listing, user, verifyingAdmin, verificationStatus, verificationNotes);
-        response.setPendingOwnerAction(listingModerationService.getOwnerPendingAction(id));
-        return response;
+        return listingMapper.toResponseWithAdmin(listing, user, verifyingAdmin, verificationStatus, verificationNotes);
     }
 
     /**
@@ -2075,15 +2077,10 @@ public class ListingServiceImpl implements ListingService {
                             LinkedHashMap::new,
                             Collectors.mapping(Media::getUrl, Collectors.toList())));
 
-            // ---- Batch-load pending owner actions — 1 query ----
-            // Lets the admin FE tell "rejected in review queue" apart from
-            // "temporarily hidden via report review" even though both share
-            // moderationStatus=SUSPENDED (see AdminListingSummary#hasPendingOwnerAction).
-            Map<Long, com.smartrent.dto.response.OwnerActionResponse> pendingActionsByListingId =
-                    listingModerationService.getOwnerPendingActions(listingIds);
-
             // ---- Map to slim AdminListingSummary DTOs ----
             // (No amenity/address fetch — list view does not need them.)
+            // The moderationStatus itself (REJECTED / SUSPENDED / REMOVED) now carries
+            // the distinction the admin table needs — no owner-action lookup required.
             listings = content.stream()
                     .map(listing -> {
                         String verificationStatus;
@@ -2096,11 +2093,7 @@ public class ListingServiceImpl implements ListingService {
                         }
                         com.smartrent.infra.repository.entity.User owner = userMap.get(listing.getUserId());
                         List<String> images = imagesByListingId.getOrDefault(listing.getListingId(), Collections.emptyList());
-                        com.smartrent.dto.response.AdminListingSummary summary =
-                                listingMapper.toAdminSummary(listing, owner, verificationStatus, images);
-                        summary.setHasPendingOwnerAction(
-                                pendingActionsByListingId.containsKey(listing.getListingId()));
-                        return summary;
+                        return listingMapper.toAdminSummary(listing, owner, verificationStatus, images);
                     })
                     .collect(Collectors.toList());
         } else {

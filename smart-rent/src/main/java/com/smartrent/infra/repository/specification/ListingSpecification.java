@@ -183,27 +183,6 @@ public class ListingSpecification {
                 }
             }
 
-            // hasPendingOwnerAction — only meaningful alongside moderationStatus=SUSPENDED,
-            // which is shared by rejecting a listing in the review queue (creates a pending
-            // owner action) and temporarily hiding it under report review (doesn't). Lets the
-            // admin table filter "Đã từ chối" apart from "Bị tạm ngưng" instead of showing both
-            // under one SUSPENDED bucket (see AdminListingSummary#hasPendingOwnerAction).
-            if (filter.getHasPendingOwnerAction() != null) {
-                Subquery<Long> ownerActionSubquery = query.subquery(Long.class);
-                var ownerActionRoot = ownerActionSubquery.from(
-                        com.smartrent.infra.repository.entity.ListingOwnerAction.class);
-                ownerActionSubquery.select(ownerActionRoot.get("listingId"))
-                        .where(criteriaBuilder.and(
-                                criteriaBuilder.equal(ownerActionRoot.get("listingId"), root.get("listingId")),
-                                criteriaBuilder.equal(ownerActionRoot.get("status"),
-                                        com.smartrent.enums.OwnerActionStatus.PENDING_OWNER)
-                        ));
-
-                predicates.add(Boolean.TRUE.equals(filter.getHasPendingOwnerAction())
-                        ? criteriaBuilder.exists(ownerActionSubquery)
-                        : criteriaBuilder.not(criteriaBuilder.exists(ownerActionSubquery)));
-            }
-
             // ============ LOCATION FILTERS ============
             // Category filter
             if (filter.getCategoryId() != null) {

@@ -125,15 +125,9 @@ public class ListingResponseWithAdmin {
     @Schema(description = "Human-readable reason for last moderation action")
     String lastModerationReasonText;
 
-    @Schema(description = "True if this listing was permanently removed for a confirmed report violation " +
-            "(moderationStatus=SUSPENDED but the owner can never resubmit it) — distinguishes this from an " +
-            "ordinary admin suspend, which the owner can resubmit from")
+    @Schema(description = "True if this listing was permanently removed for a confirmed report violation. " +
+            "Redundant with moderationStatus=REMOVED now; kept for backward compatibility.")
     Boolean permanentlyRemoved;
-
-    @Schema(description = "Pending owner action (if any) — present when moderationStatus=SUSPENDED came from " +
-            "rejecting the listing in the review queue, absent when it came from temporarily hiding the listing " +
-            "during report review instead")
-    OwnerActionResponse pendingOwnerAction;
 
     @Schema(description = "Property information summary")
     PropertyInfo propertyInfo;
