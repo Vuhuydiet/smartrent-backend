@@ -1,5 +1,6 @@
 package com.smartrent.util;
 
+import com.smartrent.config.Constants;
 import com.smartrent.enums.RecipientType;
 import org.springframework.security.oauth2.jwt.Jwt;
 
@@ -31,7 +32,20 @@ public final class JwtRecipientResolver {
     }
 
     public static RecipientType resolveRecipientType(Jwt jwt) {
-        String adminId = jwt.getClaimAsString("admin_id");
-        return adminId != null ? RecipientType.ADMIN : RecipientType.USER;
+        if (jwt.getClaimAsString("admin_id") != null) {
+            return RecipientType.ADMIN;
+        }
+
+        // Fallback for admin access tokens minted before the admin_id claim was
+        // added: a user token carries scope exactly "ROLE_USER", while an admin
+        // token carries its admin role scopes (ROLE_SA / ROLE_UA / ROLE_SPA).
+        // Anything that isn't the plain user scope is an admin.
+        String scope = jwt.getClaimAsString("scope");
+        if (scope != null && !scope.isBlank()
+                && !Constants.ROLE_USER.equals(scope.trim())) {
+            return RecipientType.ADMIN;
+        }
+
+        return RecipientType.USER;
     }
 }

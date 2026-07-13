@@ -141,6 +141,11 @@ public class AdminAuthenticationServiceImpl extends AuthenticationServiceImpl {
           .expirationTime(new Date(Instant.now().plus(duration, ChronoUnit.SECONDS).toEpochMilli()))
           .claim("rfId", otherId)
           .claim("scope", buildScope(admin))
+          // Top-level admin_id lets JwtRecipientResolver classify this token as an
+          // ADMIN recipient. Without it, admin notifications (stored with
+          // recipientType=ADMIN) never matched the REST list/unread/mark-read
+          // queries, which resolved the type from this claim and fell back to USER.
+          .claim("admin_id", admin.getAdminId())
           .claim("user", adminMapper.mapFromAdminEntityToJwtAdminClaimsDto(admin))
           .build();
     } catch (Exception e) {
