@@ -100,7 +100,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         switch (decision) {
             case "APPROVE" -> handleApprove(listing, adminId);
-            case "REJECT" -> handleRejectOrRevision(listing, request, adminId, ModerationStatus.SUSPENDED, ModerationAction.REJECT);
+            case "REJECT" -> handleRejectOrRevision(listing, request, adminId, ModerationStatus.REJECTED, ModerationAction.REJECT);
             case "REQUEST_REVISION" -> handleRejectOrRevision(listing, request, adminId, ModerationStatus.REVISION_REQUIRED, ModerationAction.REQUEST_REVISION);
             case "SUSPEND" -> handleRejectOrRevision(listing, request, adminId, ModerationStatus.SUSPENDED, ModerationAction.SUSPEND);
             default -> throw new DomainException(DomainCode.MODERATION_INVALID_DECISION);
@@ -264,9 +264,11 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         ModerationStatus previousStatus = listing.getModerationStatus();
 
-        listing.setModerationStatus(ModerationStatus.SUSPENDED);
+        listing.setModerationStatus(ModerationStatus.REMOVED);
         listing.setVerified(false);
         listing.setIsVerify(false);
+        // Keep the permanentlyRemoved column set too: the REMOVED status now carries
+        // this meaning, but the resubmit guard and older reads still consult the flag.
         listing.setPermanentlyRemoved(true);
         listing.setLastModeratedBy(adminId);
         listing.setLastModeratedAt(LocalDateTime.now());
@@ -275,7 +277,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
 
         // Audit event
         createModerationEvent(listingId, ModerationSource.REPORT_RESOLUTION,
-                previousStatus, ModerationStatus.SUSPENDED,
+                previousStatus, ModerationStatus.REMOVED,
                 ModerationAction.SUSPEND, adminId, null,
                 null, request.getAdminNotes(), reportId);
 

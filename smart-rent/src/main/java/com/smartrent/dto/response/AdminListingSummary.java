@@ -92,15 +92,9 @@ public class AdminListingSummary {
     @Schema(description = "Human-readable reason for last moderation action")
     String lastModerationReasonText;
 
-    @Schema(description = "True if this listing was permanently removed for a confirmed report violation " +
-            "(moderationStatus=SUSPENDED but the owner can never resubmit it) — distinguishes this from an " +
-            "ordinary admin suspend, which the owner can resubmit from")
+    @Schema(description = "True if this listing was permanently removed for a confirmed report violation. " +
+            "Redundant with moderationStatus=REMOVED now; kept for backward compatibility.")
     Boolean permanentlyRemoved;
-
-    @Schema(description = "True when moderationStatus=SUSPENDED came from rejecting the listing in the review " +
-            "queue (creates an owner action requiring the owner to fix and resubmit). False/absent when it came " +
-            "from temporarily hiding the listing during report review instead — no owner action is created for that.")
-    Boolean hasPendingOwnerAction;
 
     @Getter
     @Setter

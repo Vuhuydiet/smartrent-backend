@@ -559,6 +559,10 @@ public class Listing {
                     return com.smartrent.enums.ListingStatus.REJECTED;
                 case REJECTED:
                     return com.smartrent.enums.ListingStatus.REJECTED;
+                case REMOVED:
+                    // Permanently removed — not publicly visible; grouped under the
+                    // REJECTED listing status like the other non-live moderation states.
+                    return com.smartrent.enums.ListingStatus.REJECTED;
                 case APPROVED:
                     if (this.expired != null && this.expired) {
                         return com.smartrent.enums.ListingStatus.EXPIRED;
