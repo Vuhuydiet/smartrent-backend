@@ -945,12 +945,18 @@ public class ListingSpecification {
                 );
 
             case REJECTED ->
-                // verified = false AND isVerify = false AND isDraft = false AND postDate is not null
+                // verified = false AND isVerify = false AND isDraft = false AND postDate is not
+                // null AND transactionId is null. That last condition is required — without it
+                // this predicate is a strict subset match of PENDING_PAYMENT's own predicate
+                // (verified=false AND isVerify=false, plus transactionId is not null), so a
+                // listing awaiting payment satisfies REJECTED's conditions too and leaks into
+                // admin's "Đã Từ Chối" filter/status column.
                 criteriaBuilder.and(
                     criteriaBuilder.isFalse(root.get("verified")),
                     criteriaBuilder.isFalse(root.get("isVerify")),
                     criteriaBuilder.isFalse(root.get("isDraft")),
-                    criteriaBuilder.isNotNull(root.get("postDate"))
+                    criteriaBuilder.isNotNull(root.get("postDate")),
+                    criteriaBuilder.isNull(root.get("transactionId"))
                 );
 
             case VERIFIED ->
