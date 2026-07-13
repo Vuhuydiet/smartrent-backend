@@ -924,18 +924,27 @@ public class ListingSpecification {
                 );
 
             case REJECTED ->
-                // verified = false AND isVerify = false AND isDraft = false AND postDate is not
-                // null AND transactionId is null. That last condition is required — without it
-                // this predicate is a strict subset match of PENDING_PAYMENT's own predicate
-                // (verified=false AND isVerify=false, plus transactionId is not null), so a
-                // listing awaiting payment satisfies REJECTED's conditions too and leaks into
-                // admin's "Đã Từ Chối" filter/status column.
+                // verified=false AND isVerify=false AND isDraft=false AND postDate not null,
+                // EXCLUDING only genuine pending-payment listings. This must mirror
+                // Listing.computeListingStatus() exactly: a listing that was paid and then
+                // rejected/suspended keeps its transactionId but is REJECTED, not
+                // PENDING_PAYMENT — so a blanket "transactionId is null" wrongly dropped
+                // paid-then-rejected listings out of the "Đã Từ Chối" filter. Pending-payment
+                // is only "has a transaction AND not yet moderated to a decided state"
+                // (moderationStatus null or PENDING_REVIEW); exclude exactly that.
                 criteriaBuilder.and(
                     criteriaBuilder.isFalse(root.get("verified")),
                     criteriaBuilder.isFalse(root.get("isVerify")),
                     criteriaBuilder.isFalse(root.get("isDraft")),
                     criteriaBuilder.isNotNull(root.get("postDate")),
-                    criteriaBuilder.isNull(root.get("transactionId"))
+                    criteriaBuilder.not(criteriaBuilder.and(
+                        criteriaBuilder.isNotNull(root.get("transactionId")),
+                        criteriaBuilder.or(
+                            criteriaBuilder.isNull(root.get("moderationStatus")),
+                            criteriaBuilder.equal(root.get("moderationStatus"),
+                                com.smartrent.enums.ModerationStatus.PENDING_REVIEW)
+                        )
+                    ))
                 );
 
             case VERIFIED ->
