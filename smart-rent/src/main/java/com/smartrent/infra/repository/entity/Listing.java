@@ -539,10 +539,17 @@ public class Listing {
             return com.smartrent.enums.ListingStatus.EXPIRED;
         }
 
-        // 2. PENDING_PAYMENT - Has transaction but not completed
+        // 2. PENDING_PAYMENT - transaction started but not completed, AND the
+        // listing has not been moderated to a decided state yet. A listing that
+        // was paid and later rejected/suspended/removed still carries its
+        // transactionId, so without the moderationStatus guard it would read as
+        // "pending payment" and mask the real rejection (the moderation outcome in
+        // 2.5 must win). A genuinely unpaid listing sits at PENDING_REVIEW/null.
         if (this.transactionId != null && !this.transactionId.isEmpty() &&
             (this.verified == null || !this.verified) &&
-            (this.isVerify == null || !this.isVerify)) {
+            (this.isVerify == null || !this.isVerify) &&
+            (this.moderationStatus == null
+                || this.moderationStatus == com.smartrent.enums.ModerationStatus.PENDING_REVIEW)) {
             return com.smartrent.enums.ListingStatus.PENDING_PAYMENT;
         }
 
