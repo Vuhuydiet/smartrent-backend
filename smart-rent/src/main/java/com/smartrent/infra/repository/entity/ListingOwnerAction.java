@@ -3,6 +3,8 @@ package com.smartrent.infra.repository.entity;
 import com.smartrent.enums.OwnerActionStatus;
 import com.smartrent.enums.OwnerActionTriggerType;
 import com.smartrent.enums.OwnerActionType;
+import com.smartrent.infra.repository.entity.converter.OwnerActionStatusConverter;
+import com.smartrent.infra.repository.entity.converter.OwnerActionTriggerTypeConverter;
 import com.smartrent.infra.repository.entity.converter.OwnerActionTypeConverter;
 import jakarta.persistence.*;
 import lombok.*;
@@ -38,7 +40,7 @@ public class ListingOwnerAction {
     @Column(name = "listing_id", nullable = false)
     Long listingId;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = OwnerActionTriggerTypeConverter.class)
     @Column(name = "trigger_type", nullable = false, length = 30)
     OwnerActionTriggerType triggerType;
 
@@ -50,7 +52,7 @@ public class ListingOwnerAction {
     OwnerActionType requiredAction;
 
     @Builder.Default
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = OwnerActionStatusConverter.class)
     @Column(name = "status", nullable = false, length = 30)
     OwnerActionStatus status = OwnerActionStatus.PENDING_OWNER;
 
