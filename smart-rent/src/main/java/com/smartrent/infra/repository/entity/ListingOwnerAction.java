@@ -3,6 +3,7 @@ package com.smartrent.infra.repository.entity;
 import com.smartrent.enums.OwnerActionStatus;
 import com.smartrent.enums.OwnerActionTriggerType;
 import com.smartrent.enums.OwnerActionType;
+import com.smartrent.infra.repository.entity.converter.OwnerActionTypeConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -44,7 +45,7 @@ public class ListingOwnerAction {
     @Column(name = "trigger_ref_id")
     Long triggerRefId;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = OwnerActionTypeConverter.class)
     @Column(name = "required_action", nullable = false, length = 30)
     OwnerActionType requiredAction;
 

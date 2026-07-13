@@ -2,6 +2,11 @@ package com.smartrent.infra.repository.entity;
 
 import com.smartrent.enums.ModerationStatus;
 import com.smartrent.enums.PostSource;
+import com.smartrent.infra.repository.entity.converter.ListingDirectionConverter;
+import com.smartrent.infra.repository.entity.converter.ListingFurnishingConverter;
+import com.smartrent.infra.repository.entity.converter.ListingPostSourceConverter;
+import com.smartrent.infra.repository.entity.converter.ListingPriceUnitConverter;
+import com.smartrent.infra.repository.entity.converter.ListingVipTypeConverter;
 import com.smartrent.util.TextNormalizer;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -162,7 +167,7 @@ public class Listing {
     Boolean expired = false;
 
     @Builder.Default
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ListingVipTypeConverter.class)
     @Column(name = "vip_type", nullable = false)
     VipType vipType = VipType.NORMAL;
 
@@ -171,7 +176,7 @@ public class Listing {
     Integer vipTypeSortOrder = 4; // NORMAL=4, SILVER=3, GOLD=2, DIAMOND=1
 
     @Builder.Default
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ListingPostSourceConverter.class)
     @Column(name = "post_source")
     PostSource postSource = PostSource.QUOTA;
 
@@ -234,7 +239,7 @@ public class Listing {
     BigDecimal price;
 
     @Builder.Default
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ListingPriceUnitConverter.class)
     @Column(name = "price_unit", nullable = false)
     PriceUnit priceUnit = PriceUnit.MONTH;
 
@@ -287,11 +292,11 @@ public class Listing {
     @Column(name = "bathrooms")
     Integer bathrooms;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ListingDirectionConverter.class)
     @Column(name = "direction")
     Direction direction;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = ListingFurnishingConverter.class)
     @Column(name = "furnishing")
     Furnishing furnishing;
 

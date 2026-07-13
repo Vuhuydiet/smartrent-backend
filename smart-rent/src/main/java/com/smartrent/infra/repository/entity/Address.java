@@ -1,5 +1,6 @@
 package com.smartrent.infra.repository.entity;
 
+import com.smartrent.infra.repository.entity.converter.AddressTypeConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -112,7 +113,7 @@ public class Address {
      * Address structure type
      */
     @Builder.Default
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = AddressTypeConverter.class)
     @Column(name = "address_type", nullable = false)
     AddressMetadata.AddressType addressType = AddressMetadata.AddressType.OLD;
 
