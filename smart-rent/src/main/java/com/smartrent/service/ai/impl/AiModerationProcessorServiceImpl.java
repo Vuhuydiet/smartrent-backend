@@ -103,6 +103,12 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
                 listing.setVerified(false);
                 listing.setIsVerify(false); // not pending review anymore, it's rejected
                 listing.setModerationStatus(ModerationStatus.REJECTED);
+                // Surface a human-readable reason to the owner. The full AI payload is
+                // kept in moderation.aiReason, but the seller only reads
+                // listing.lastModerationReasonText (mapped to verificationNotes), so
+                // without this an AI-rejected listing showed "Bị từ chối" with no reason.
+                listing.setLastModerationReasonText(buildOwnerReasonText(response));
+                listing.setLastModerationReasonCode("AI_REJECTED");
             } else {
                 // NEEDS_REVIEW or any unrecognized value → manual review queue
                 moderation.setVerificationStatus(VerificationStatus.UNDER_REVIEW);
@@ -237,5 +243,32 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
                     listing.getListingId(), e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Build a short, owner-facing reason from the AI verification response, shown on
+     * the seller's rejected-listing banner. Prefers the model's structured details,
+     * then falls back to the violation messages, then a generic message. Never null.
+     */
+    private String buildOwnerReasonText(AiListingVerificationResponse response) {
+        if (response != null && response.getReason() != null) {
+            String details = response.getReason().getDetails();
+            if (details != null && !details.isBlank()) {
+                return details.trim();
+            }
+        }
+        if (response != null && response.getViolations() != null
+                && !response.getViolations().isEmpty()) {
+            String joined = response.getViolations().stream()
+                    .map(AiListingVerificationResponse.Violation::getMessage)
+                    .filter(m -> m != null && !m.isBlank())
+                    .distinct()
+                    .collect(java.util.stream.Collectors.joining("; "));
+            if (!joined.isBlank()) {
+                return joined;
+            }
+        }
+        return "Tin đăng không đạt yêu cầu kiểm duyệt tự động. Vui lòng kiểm tra lại thông tin, "
+                + "hình ảnh và nội dung, sau đó chỉnh sửa và gửi lại.";
     }
 }
