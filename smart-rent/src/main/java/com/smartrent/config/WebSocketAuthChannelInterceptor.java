@@ -1,6 +1,7 @@
 package com.smartrent.config;
 
 import com.smartrent.config.security.CustomJwtDecoder;
+import com.smartrent.util.JwtRecipientResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
@@ -17,8 +18,8 @@ import java.security.Principal;
 
 /**
  * Authenticates the STOMP CONNECT frame and pins a {@link Principal} (the
- * recipientId — admin_id / user_id, matching NotificationController.resolveRecipientId)
- * to the WebSocket session. Notifications are then routed with
+ * recipientId resolved by {@link JwtRecipientResolver}) to the WebSocket
+ * session. Notifications are then routed with
  * {@code convertAndSendToUser(recipientId, "/queue/notifications", ...)} to that
  * one session's private user-destination.
  *
@@ -55,7 +56,7 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
 
         try {
             Jwt jwt = jwtDecoder.decode(authHeader.substring(7));
-            String recipientId = resolveRecipientId(jwt);
+            String recipientId = JwtRecipientResolver.resolveRecipientId(jwt);
             accessor.setUser(new StompPrincipal(recipientId));
             log.debug("STOMP CONNECT authenticated for principal {}", recipientId);
         } catch (MessagingException e) {
@@ -66,20 +67,6 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
         }
 
         return message;
-    }
-
-    /** Mirrors NotificationController.resolveRecipientId so the Principal name
-     *  equals the recipientId notifications are addressed to. */
-    private String resolveRecipientId(Jwt jwt) {
-        String adminId = jwt.getClaimAsString("admin_id");
-        if (adminId != null) {
-            return adminId;
-        }
-        String userId = jwt.getClaimAsString("user_id");
-        if (userId != null) {
-            return userId;
-        }
-        return jwt.getSubject();
     }
 
     private record StompPrincipal(String name) implements Principal {

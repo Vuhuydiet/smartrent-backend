@@ -3,6 +3,7 @@ package com.smartrent.controller;
 import com.smartrent.dto.response.NotificationResponse;
 import com.smartrent.enums.RecipientType;
 import com.smartrent.service.notification.NotificationService;
+import com.smartrent.util.JwtRecipientResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -32,8 +33,8 @@ public class NotificationController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
-        String recipientId = resolveRecipientId(jwt);
-        RecipientType recipientType = resolveRecipientType(jwt);
+        String recipientId = JwtRecipientResolver.resolveRecipientId(jwt);
+        RecipientType recipientType = JwtRecipientResolver.resolveRecipientType(jwt);
         Pageable pageable = PageRequest.of(page, size);
 
         return ResponseEntity.ok(notificationService.getNotifications(recipientId, recipientType, pageable));
@@ -42,8 +43,8 @@ public class NotificationController {
     @Operation(summary = "Get unread notification count")
     @GetMapping("/unread-count")
     public ResponseEntity<Map<String, Long>> getUnreadCount(@AuthenticationPrincipal Jwt jwt) {
-        String recipientId = resolveRecipientId(jwt);
-        RecipientType recipientType = resolveRecipientType(jwt);
+        String recipientId = JwtRecipientResolver.resolveRecipientId(jwt);
+        RecipientType recipientType = JwtRecipientResolver.resolveRecipientType(jwt);
 
         long count = notificationService.getUnreadCount(recipientId, recipientType);
         return ResponseEntity.ok(Map.of("unreadCount", count));
@@ -55,8 +56,8 @@ public class NotificationController {
             @PathVariable Long id,
             @AuthenticationPrincipal Jwt jwt) {
 
-        String recipientId = resolveRecipientId(jwt);
-        RecipientType recipientType = resolveRecipientType(jwt);
+        String recipientId = JwtRecipientResolver.resolveRecipientId(jwt);
+        RecipientType recipientType = JwtRecipientResolver.resolveRecipientType(jwt);
         notificationService.markAsRead(id, recipientId, recipientType);
         return ResponseEntity.ok().build();
     }
@@ -64,28 +65,10 @@ public class NotificationController {
     @Operation(summary = "Mark all notifications as read")
     @PatchMapping("/read-all")
     public ResponseEntity<Void> markAllAsRead(@AuthenticationPrincipal Jwt jwt) {
-        String recipientId = resolveRecipientId(jwt);
-        RecipientType recipientType = resolveRecipientType(jwt);
+        String recipientId = JwtRecipientResolver.resolveRecipientId(jwt);
+        RecipientType recipientType = JwtRecipientResolver.resolveRecipientType(jwt);
 
         notificationService.markAllAsRead(recipientId, recipientType);
         return ResponseEntity.ok().build();
-    }
-
-    // ── Helpers ──
-
-    private String resolveRecipientId(Jwt jwt) {
-        // Try admin_id first, then user_id (matches existing JWT claim structure)
-        String adminId = jwt.getClaimAsString("admin_id");
-        if (adminId != null) return adminId;
-
-        String userId = jwt.getClaimAsString("user_id");
-        if (userId != null) return userId;
-
-        return jwt.getSubject();
-    }
-
-    private RecipientType resolveRecipientType(Jwt jwt) {
-        String adminId = jwt.getClaimAsString("admin_id");
-        return adminId != null ? RecipientType.ADMIN : RecipientType.USER;
     }
 }
