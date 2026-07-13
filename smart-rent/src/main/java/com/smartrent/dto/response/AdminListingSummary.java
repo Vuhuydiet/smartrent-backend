@@ -97,6 +97,11 @@ public class AdminListingSummary {
             "ordinary admin suspend, which the owner can resubmit from")
     Boolean permanentlyRemoved;
 
+    @Schema(description = "True when moderationStatus=SUSPENDED came from rejecting the listing in the review " +
+            "queue (creates an owner action requiring the owner to fix and resubmit). False/absent when it came " +
+            "from temporarily hiding the listing during report review instead — no owner action is created for that.")
+    Boolean hasPendingOwnerAction;
+
     @Getter
     @Setter
     @Builder

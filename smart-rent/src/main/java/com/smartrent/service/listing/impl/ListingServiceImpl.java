@@ -771,7 +771,10 @@ public class ListingServiceImpl implements ListingService {
                 ? userMapper.mapFromUserEntityToUserCreationResponse(userEntity)
                 : null;
 
-        return listingMapper.toResponseWithAdmin(listing, user, verifyingAdmin, verificationStatus, verificationNotes);
+        ListingResponseWithAdmin response =
+                listingMapper.toResponseWithAdmin(listing, user, verifyingAdmin, verificationStatus, verificationNotes);
+        response.setPendingOwnerAction(listingModerationService.getOwnerPendingAction(id));
+        return response;
     }
 
     /**
@@ -2072,6 +2075,13 @@ public class ListingServiceImpl implements ListingService {
                             LinkedHashMap::new,
                             Collectors.mapping(Media::getUrl, Collectors.toList())));
 
+            // ---- Batch-load pending owner actions — 1 query ----
+            // Lets the admin FE tell "rejected in review queue" apart from
+            // "temporarily hidden via report review" even though both share
+            // moderationStatus=SUSPENDED (see AdminListingSummary#hasPendingOwnerAction).
+            Map<Long, com.smartrent.dto.response.OwnerActionResponse> pendingActionsByListingId =
+                    listingModerationService.getOwnerPendingActions(listingIds);
+
             // ---- Map to slim AdminListingSummary DTOs ----
             // (No amenity/address fetch — list view does not need them.)
             listings = content.stream()
@@ -2086,7 +2096,11 @@ public class ListingServiceImpl implements ListingService {
                         }
                         com.smartrent.infra.repository.entity.User owner = userMap.get(listing.getUserId());
                         List<String> images = imagesByListingId.getOrDefault(listing.getListingId(), Collections.emptyList());
-                        return listingMapper.toAdminSummary(listing, owner, verificationStatus, images);
+                        com.smartrent.dto.response.AdminListingSummary summary =
+                                listingMapper.toAdminSummary(listing, owner, verificationStatus, images);
+                        summary.setHasPendingOwnerAction(
+                                pendingActionsByListingId.containsKey(listing.getListingId()));
+                        return summary;
                     })
                     .collect(Collectors.toList());
         } else {
