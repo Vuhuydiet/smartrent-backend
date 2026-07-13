@@ -1,5 +1,6 @@
 package com.smartrent.infra.repository.entity;
 
+import com.smartrent.infra.repository.entity.converter.AmenityCategoryConverter;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -42,7 +43,7 @@ public class Amenity {
     @Column(columnDefinition = "TEXT")
     String description;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = AmenityCategoryConverter.class)
     @Column(nullable = false)
     AmenityCategory category;
 

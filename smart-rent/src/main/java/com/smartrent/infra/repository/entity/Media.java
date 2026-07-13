@@ -1,5 +1,6 @@
 package com.smartrent.infra.repository.entity;
 
+import com.smartrent.infra.repository.entity.converter.MediaStatusConverter;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -58,7 +59,7 @@ public class Media {
     @Column(name = "source_type", nullable = false, length = 20)
     MediaSourceType sourceType;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = MediaStatusConverter.class)
     @Column(nullable = false, length = 20)
     MediaStatus status;
 
