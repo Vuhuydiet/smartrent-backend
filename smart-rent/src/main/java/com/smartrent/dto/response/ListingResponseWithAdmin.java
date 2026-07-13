@@ -130,6 +130,11 @@ public class ListingResponseWithAdmin {
             "ordinary admin suspend, which the owner can resubmit from")
     Boolean permanentlyRemoved;
 
+    @Schema(description = "Pending owner action (if any) — present when moderationStatus=SUSPENDED came from " +
+            "rejecting the listing in the review queue, absent when it came from temporarily hiding the listing " +
+            "during report review instead")
+    OwnerActionResponse pendingOwnerAction;
+
     @Schema(description = "Property information summary")
     PropertyInfo propertyInfo;
 
