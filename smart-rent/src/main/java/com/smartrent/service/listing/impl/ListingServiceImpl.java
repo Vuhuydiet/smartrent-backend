@@ -27,6 +27,7 @@ import com.smartrent.dto.response.ProvinceListingStatsResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.ListingStatus;
 import com.smartrent.enums.ModerationStatus;
+import com.smartrent.enums.NotificationType;
 import com.smartrent.enums.PostSource;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.DomainException;
@@ -57,6 +58,7 @@ import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.ListingQueryService;
 import com.smartrent.service.listing.PostingAccessGuard;
 import com.smartrent.service.listing.cache.ListingRequestCacheService;
+import com.smartrent.service.notification.NotificationService;
 import com.smartrent.util.TextNormalizer;
 // import com.smartrent.service.pricing.LocationPricingService;  // DISABLED: Not in use
 import com.smartrent.service.quota.QuotaService;
@@ -135,6 +137,7 @@ public class ListingServiceImpl implements ListingService {
     com.smartrent.service.moderation.ListingModerationService listingModerationService;
     com.smartrent.infra.repository.UserFollowRepository userFollowRepository;
     PostingAccessGuard postingAccessGuard;
+    NotificationService notificationService;
 
     @Override
     @Transactional
@@ -253,6 +256,7 @@ public class ListingServiceImpl implements ListingService {
         Listing saved = listingRepository.save(listing);
         log.info("Listing created successfully with quota - id: {}, vipType: {}, benefitIds: {}",
                 saved.getListingId(), vipType, request.getBenefitIds());
+        notifyAdminsNewListingPendingReview(saved);
 
         // Link media to listing if provided (within same transaction)
         if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
@@ -569,6 +573,25 @@ public class ListingServiceImpl implements ListingService {
 
         listingRepository.save(shadowListing);
         log.info("Shadow listing created successfully");
+    }
+
+    /**
+     * Realtime notification: tell all admins a newly submitted listing entered
+     * the moderation queue (covers quota/package postings and paid/SePay
+     * postings alike). Best-effort — a notification failure must not fail
+     * listing creation.
+     */
+    private void notifyAdminsNewListingPendingReview(Listing listing) {
+        try {
+            notificationService.sendToAllAdmins(
+                    NotificationType.NEW_LISTING_PENDING_REVIEW,
+                    "Có tin đăng mới chờ duyệt",
+                    "Tin đăng \"" + listing.getTitle() + "\" đang chờ được xem xét.",
+                    listing.getListingId(), "LISTING");
+        } catch (Exception e) {
+            log.warn("Failed to send new-listing admin notification for listing {}: {}",
+                    listing.getListingId(), e.getMessage());
+        }
     }
 
     @Override
@@ -1098,6 +1121,7 @@ public class ListingServiceImpl implements ListingService {
             Listing saved = listingRepository.save(listing);
             log.info("NORMAL listing created successfully with id: {} for transaction: {}",
                     saved.getListingId(), transactionId);
+            notifyAdminsNewListingPendingReview(saved);
 
             // Link media if provided
             if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
@@ -1153,6 +1177,7 @@ public class ListingServiceImpl implements ListingService {
             Listing savedVipListing = listingRepository.save(vipListing);
             log.info("VIP listing created with id: {} for transaction: {}",
                     savedVipListing.getListingId(), transactionId);
+            notifyAdminsNewListingPendingReview(savedVipListing);
 
             // Link media if provided
             if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
