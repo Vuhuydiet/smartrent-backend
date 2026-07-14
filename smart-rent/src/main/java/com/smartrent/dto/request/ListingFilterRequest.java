@@ -272,8 +272,8 @@ public class ListingFilterRequest {
     String title;
 
     @Schema(description = """
-            Admin-only search across owner first name, last name, and phone numbers
-            (matches contactPhoneNumber OR phoneNumber). Case-insensitive substring match.
+            Admin-only search across owner first name, last name, phone numbers, and email
+            (matches contactPhoneNumber OR phoneNumber OR email). Case-insensitive substring match.
             Useful for finding all listings posted by a given user from the admin list.
             """, example = "0367919024")
     String ownerSearch;
