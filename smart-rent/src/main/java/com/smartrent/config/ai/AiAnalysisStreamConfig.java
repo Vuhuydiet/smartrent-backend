@@ -20,6 +20,9 @@ import org.springframework.data.redis.stream.StreamMessageListenerContainer.Stre
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Wires the AI-analysis queue: a Redis Streams consumer group that pre-computes a
@@ -45,10 +48,44 @@ public class AiAnalysisStreamConfig {
     @Value("${smartrent.ai.verification.queue.consumer-name:worker-1}")
     private String consumerName;
 
+    /**
+     * How many listings may be analysed at once.
+     *
+     * <p>Kept small on purpose: the AI service is the bottleneck, not us. Flooding it
+     * with concurrent multimodal requests buys no throughput and just pins its CPU.
+     */
+    @Value("${smartrent.ai.verification.queue.concurrency:4}")
+    private int concurrency;
+
+    /**
+     * Bounded pool the consumer offloads analyses onto.
+     *
+     * <p>{@link ThreadPoolExecutor.CallerRunsPolicy} is the back-pressure: once the pool
+     * and its queue are full, the poll thread runs the analysis itself, which stops it
+     * reading more from the stream until it catches up. Unacked entries simply stay
+     * pending in Redis — nothing is lost and nothing piles up in memory.
+     */
+    @Bean(destroyMethod = "shutdown")
+    public ThreadPoolExecutor aiAnalysisQueuePool() {
+        int size = concurrency > 0 ? concurrency : 4;
+        return new ThreadPoolExecutor(
+                size, size,
+                60L, TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(size * 4),
+                r -> {
+                    Thread t = new Thread(r, "ai-queue-worker");
+                    t.setDaemon(true);
+                    return t;
+                },
+                new ThreadPoolExecutor.CallerRunsPolicy());
+    }
+
     @Bean
     public AiAnalysisStreamConsumer aiAnalysisStreamConsumer(
-            AiAnalysisWorker worker, StringRedisTemplate redisTemplate) {
-        return new AiAnalysisStreamConsumer(worker, redisTemplate, GROUP);
+            AiAnalysisWorker worker,
+            StringRedisTemplate redisTemplate,
+            ThreadPoolExecutor aiAnalysisQueuePool) {
+        return new AiAnalysisStreamConsumer(worker, redisTemplate, GROUP, aiAnalysisQueuePool);
     }
 
     @Bean(destroyMethod = "stop")
@@ -62,9 +99,8 @@ public class AiAnalysisStreamConfig {
 
         StreamMessageListenerContainerOptions<String, MapRecord<String, String, String>> options =
                 StreamMessageListenerContainerOptions.builder()
-                        // An AI analysis is a slow, blocking I/O job (~30s). Give the container
-                        // its own bounded pool so several listings can be analysed at once
-                        // without a slow one stalling the others behind it.
+                        // The container calls the listener synchronously on this poll thread —
+                        // the parallelism lives in the consumer's pool, not here.
                         .pollTimeout(Duration.ofSeconds(1))
                         .batchSize(1)
                         .build();
