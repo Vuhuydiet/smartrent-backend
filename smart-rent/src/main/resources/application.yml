@@ -529,13 +529,6 @@ otp:
 smartrent:
   ai:
     verification:
-      enabled: ${AI_VERIFICATION_ENABLED:true}
-      scheduler:
-        enabled: ${AI_SCHEDULER_ENABLED:true}
-        delay: ${AI_SCHEDULER_DELAY_MS:300000}
-        # Listings processed per tick. Lower (e.g. 3-5) to drain a large one-time
-        # backlog without pinning the single AI worker's CPU. Default 20.
-        batch-size: ${AI_SCHEDULER_BATCH_SIZE:20}
       url: ${AI_VERIFICATION_URL:http://localhost:8000/ai/verify-listing}
       timeout-seconds: ${AI_VERIFICATION_TIMEOUT:90}
       max-retry-attempts: ${AI_VERIFICATION_MAX_RETRY:3}
