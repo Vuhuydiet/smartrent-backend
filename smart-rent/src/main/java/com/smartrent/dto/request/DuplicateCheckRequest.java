@@ -12,6 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class DuplicateCheckRequest {
+    Long listingId;
     String title;
     String description;
     Double price;
