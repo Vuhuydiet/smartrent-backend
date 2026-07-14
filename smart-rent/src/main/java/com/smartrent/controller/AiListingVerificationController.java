@@ -3,6 +3,7 @@ package com.smartrent.controller;
 import com.smartrent.dto.request.AiListingVerificationRequest;
 import com.smartrent.dto.response.AiListingVerificationResponse;
 import com.smartrent.dto.response.ApiResponse;
+import com.smartrent.dto.response.DuplicateCheckResponse;
 import com.smartrent.service.ai.AiListingVerificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -195,6 +196,30 @@ public class AiListingVerificationController {
 
         return ResponseEntity.ok(ApiResponse.<AiListingVerificationResponse>builder()
                 .message("Listing verification completed successfully")
+                .data(response)
+                .build());
+    }
+
+    @PostMapping("/{listingId}/check-duplicate")
+    @Operation(
+        summary = "Check an existing listing for duplicates using AI",
+        description = "Runs the AI duplicate-detection pipeline (candidate retrieval + TF-IDF/fuzzy "
+                + "scoring + LLM & perceptual-hash image confirmation) for an existing listing by ID. "
+                + "Stateless: persists nothing. Returns the decision (PASS/SUSPICIOUS/DUPLICATE), the "
+                + "highest similarity score, and the matched listings for the admin to review manually.",
+        parameters = {
+            @Parameter(name = "listingId", description = "The ID of the listing to check", required = true, example = "123")
+        }
+    )
+    public ResponseEntity<ApiResponse<DuplicateCheckResponse>> checkDuplicate(
+            @PathVariable Long listingId) {
+
+        log.info("Received AI duplicate check request for listing ID: {}", listingId);
+
+        DuplicateCheckResponse response = aiListingVerificationService.checkDuplicateById(listingId);
+
+        return ResponseEntity.ok(ApiResponse.<DuplicateCheckResponse>builder()
+                .message("Duplicate check completed successfully")
                 .data(response)
                 .build());
     }

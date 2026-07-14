@@ -1,9 +1,12 @@
 package com.smartrent.service.ai.impl;
 
 import com.smartrent.dto.request.AiListingVerificationRequest;
+import com.smartrent.dto.request.DuplicateCheckRequest;
 import com.smartrent.dto.response.AiListingVerificationResponse;
+import com.smartrent.dto.response.DuplicateCheckResponse;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.model.DomainCode;
+import com.smartrent.infra.repository.entity.Address;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.mapper.AiListingMapper;
 import com.smartrent.service.ai.AiListingVerificationService;
@@ -236,6 +239,37 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
         }
         
         return request;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DuplicateCheckResponse checkDuplicateById(Long listingId) {
+        AiListingVerificationRequest request = buildVerificationRequest(listingId);
+        Listing listing = listingRepository.findByIdWithAmenities(listingId)
+            .orElseThrow(() -> new IllegalArgumentException("Listing not found with id: " + listingId));
+
+        // Same mapping the auto-moderation cronjob uses (runDuplicateCheck): reuse
+        // the fields already gathered for verification and enrich with structured
+        // location + product type so the AI can retrieve candidates.
+        DuplicateCheckRequest.DuplicateCheckRequestBuilder builder = DuplicateCheckRequest.builder()
+            .listingId(listing.getListingId())
+            .title(request.getTitle())
+            .description(request.getDescription())
+            .price(request.getPrice() != null ? request.getPrice().doubleValue() : null)
+            .area(request.getArea())
+            .address(request.getAddress())
+            .productType(listing.getProductType() != null ? listing.getProductType().name() : null)
+            .imageUrls(request.getImages());
+
+        Address addr = listing.getAddress();
+        if (addr != null) {
+            String provinceCode = addr.getNewProvinceCode() != null
+                ? addr.getNewProvinceCode()
+                : (addr.getLegacyProvinceId() != null ? String.valueOf(addr.getLegacyProvinceId()) : null);
+            builder.provinceCode(provinceCode).districtId(addr.getLegacyDistrictId());
+        }
+
+        return smartRentAiConnector.checkDuplicate(builder.build());
     }
 
     @Override
