@@ -724,8 +724,8 @@ public class ListingSpecification {
                     criteriaBuilder.lower(root.get("title")), titleNeedle));
             }
 
-            // ============ ADMIN: OWNER NAME / PHONE SEARCH ============
-            // Matches owner firstName, lastName, contactPhoneNumber, or phoneNumber (case-insensitive contains).
+            // ============ ADMIN: OWNER NAME / PHONE / EMAIL SEARCH ============
+            // Matches owner firstName, lastName, contactPhoneNumber, phoneNumber, or email (case-insensitive contains).
             if (filter.getOwnerSearch() != null && !filter.getOwnerSearch().trim().isEmpty()) {
                 String ownerNeedle = "%" + filter.getOwnerSearch().trim().toLowerCase() + "%";
                 Subquery<String> ownerSubquery = query.subquery(String.class);
@@ -741,7 +741,9 @@ public class ListingSpecification {
                                         criteriaBuilder.like(
                                                 criteriaBuilder.lower(ownerRoot.get("contactPhoneNumber")), ownerNeedle),
                                         criteriaBuilder.like(
-                                                criteriaBuilder.lower(ownerRoot.get("phoneNumber")), ownerNeedle)
+                                                criteriaBuilder.lower(ownerRoot.get("phoneNumber")), ownerNeedle),
+                                        criteriaBuilder.like(
+                                                criteriaBuilder.lower(ownerRoot.get("email")), ownerNeedle)
                                 )
                         ));
                 predicates.add(root.get("userId").in(ownerSubquery));

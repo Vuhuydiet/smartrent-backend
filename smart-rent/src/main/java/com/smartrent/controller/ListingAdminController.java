@@ -157,7 +157,7 @@ public class ListingAdminController {
                     ),
                     @ExampleObject(
                         name = "Find listings by owner",
-                        summary = "Match owner name or phone (firstName / lastName / contactPhoneNumber / phoneNumber)",
+                        summary = "Match owner name, phone, or email (firstName / lastName / contactPhoneNumber / phoneNumber / email)",
                         value = """
                             {
                               "page": 1,
