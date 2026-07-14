@@ -200,6 +200,19 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
                 throw new AppException(DomainCode.AI_SERVICE_INVALID_RESPONSE);
             }
             
+        } catch (feign.FeignException e) {
+            // The AI service now reports a failed analysis as a real HTTP error
+            // (503, body {"error": "<error_code>", "message": ..., ...}) instead of
+            // a fake 200 with fabricated scores. Log the body here — it carries the
+            // classified error_code (LLM_QUOTA_EXCEEDED, LLM_AUTH, ...) — so a
+            // failure is diagnosable from server logs even though the admin only
+            // sees a generic "AI verification failed" in the UI.
+            long processingTime = System.currentTimeMillis() - startTime;
+            log.error("AI service returned an error after {}ms (status={}): {}",
+                    processingTime, e.status(), e.contentUTF8());
+            throw new AppException(e.status() == 503
+                    ? DomainCode.AI_SERVICE_UNAVAILABLE
+                    : DomainCode.AI_SERVICE_ERROR);
         } catch (ResourceAccessException e) {
             long processingTime = System.currentTimeMillis() - startTime;
             log.error("AI service timeout or connection error after {}ms: {}", processingTime, e.getMessage());
