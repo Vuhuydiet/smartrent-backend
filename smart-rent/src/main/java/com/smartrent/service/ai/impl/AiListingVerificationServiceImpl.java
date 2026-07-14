@@ -2,12 +2,16 @@ package com.smartrent.service.ai.impl;
 
 import com.smartrent.dto.request.AiListingVerificationRequest;
 import com.smartrent.dto.request.DuplicateCheckRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartrent.dto.response.AiListingVerificationResponse;
 import com.smartrent.dto.response.DuplicateCheckResponse;
+import com.smartrent.dto.response.StoredAiModerationResponse;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.model.DomainCode;
+import com.smartrent.infra.repository.ListingAiModerationRepository;
 import com.smartrent.infra.repository.entity.Address;
 import com.smartrent.infra.repository.entity.Listing;
+import com.smartrent.infra.repository.entity.ListingAiModeration;
 import com.smartrent.mapper.AiListingMapper;
 import com.smartrent.service.ai.AiListingVerificationService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +37,8 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
     private final com.smartrent.infra.connector.SmartRentAiConnector smartRentAiConnector;
     private final AiListingMapper aiListingMapper;
     private final ListingRepository listingRepository;
+    private final ListingAiModerationRepository listingAiModerationRepository;
+    private final ObjectMapper objectMapper;
 
 
     @Override
@@ -270,6 +276,33 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
         }
 
         return smartRentAiConnector.checkDuplicate(builder.build());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StoredAiModerationResponse getStoredModerationResult(Long listingId) {
+        ListingAiModeration moderation =
+            listingAiModerationRepository.findById(listingId).orElse(null);
+        if (moderation == null
+                || moderation.getAiReason() == null
+                || moderation.getAiReason().isBlank()) {
+            return null;
+        }
+        try {
+            // ai_reason is {verification, duplicateCheck}; verification re-serializes
+            // snake_case and duplicateCheck camelCase — matching the FE types.
+            StoredAiModerationResponse stored = objectMapper.readValue(
+                moderation.getAiReason(), StoredAiModerationResponse.class);
+            stored.setAiScore(moderation.getAiScore());
+            stored.setVerificationStatus(moderation.getVerificationStatus() != null
+                ? moderation.getVerificationStatus().name() : null);
+            stored.setAnalyzedAt(moderation.getUpdatedAt());
+            return stored;
+        } catch (Exception e) {
+            log.warn("Failed to parse stored aiReason for listing {}: {}",
+                listingId, e.getMessage());
+            return null;
+        }
     }
 
     @Override
