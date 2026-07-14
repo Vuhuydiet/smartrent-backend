@@ -4,6 +4,7 @@ import com.smartrent.dto.request.AiListingVerificationRequest;
 import com.smartrent.dto.response.AiListingVerificationResponse;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.DuplicateCheckResponse;
+import com.smartrent.dto.response.StoredAiModerationResponse;
 import com.smartrent.service.ai.AiListingVerificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -196,6 +197,30 @@ public class AiListingVerificationController {
 
         return ResponseEntity.ok(ApiResponse.<AiListingVerificationResponse>builder()
                 .message("Listing verification completed successfully")
+                .data(response)
+                .build());
+    }
+
+    @GetMapping("/{listingId}/moderation-result")
+    @Operation(
+        summary = "Get the stored AI moderation result for a listing",
+        description = "Returns the AI analysis (verification + duplicate check) the auto-moderation "
+                + "cronjob already persisted for a listing, so the admin review UI can show it without "
+                + "re-running the AI. Returns data=null when no stored result exists.",
+        parameters = {
+            @Parameter(name = "listingId", description = "The ID of the listing", required = true, example = "123")
+        }
+    )
+    public ResponseEntity<ApiResponse<StoredAiModerationResponse>> getStoredModerationResult(
+            @PathVariable Long listingId) {
+
+        StoredAiModerationResponse response =
+                aiListingVerificationService.getStoredModerationResult(listingId);
+
+        return ResponseEntity.ok(ApiResponse.<StoredAiModerationResponse>builder()
+                .message(response != null
+                        ? "Stored moderation result retrieved successfully"
+                        : "No stored moderation result for this listing")
                 .data(response)
                 .build());
     }
