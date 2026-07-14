@@ -140,6 +140,7 @@ public class ListingServiceImpl implements ListingService {
     PostingAccessGuard postingAccessGuard;
     NotificationService notificationService;
     org.springframework.context.ApplicationEventPublisher eventPublisher;
+    com.smartrent.infra.repository.ListingAiModerationRepository listingAiModerationRepository;
 
     @Override
     @Transactional
@@ -277,12 +278,27 @@ public class ListingServiceImpl implements ListingService {
             createShadowListing(saved);
         }
 
-        // Queue the AI analysis so it is already computed by the time an admin opens
-        // the review dialog. Delivered after commit — media/amenities above are part
-        // of this transaction and the worker must not read the listing without them.
-        eventPublisher.publishEvent(new ListingSubmittedEvent(saved.getListingId()));
+        queueAiAnalysis(saved);
 
         return listingMapper.toCreationResponse(saved);
+    }
+
+    /**
+     * Queue a listing for AI pre-computation, so the analysis is already stored by the
+     * time an admin opens the review dialog.
+     *
+     * <p>Call this from <b>every</b> path that puts a listing into the review queue —
+     * first submit, paid submit, VIP, edit-of-an-approved-listing, repost. The
+     * reconciliation sweep that used to catch a missed call site is off, so a path
+     * that forgets this simply never gets analysed.
+     *
+     * <p>Delivered after commit (see {@code ListingSubmittedAiEnqueuer}): media and
+     * amenities are linked in the same transaction, and the worker must not read the
+     * listing before they are visible.
+     */
+    private void queueAiAnalysis(Listing listing) {
+        if (listing == null || listing.getListingId() == null) return;
+        eventPublisher.publishEvent(new ListingSubmittedEvent(listing.getListingId()));
     }
 
     /**
@@ -421,6 +437,8 @@ public class ListingServiceImpl implements ListingService {
                 if ("DIAMOND".equalsIgnoreCase(request.getVipType())) {
                     createShadowListing(saved);
                 }
+
+                queueAiAnalysis(saved);
 
                 return listingMapper.toCreationResponse(saved);
             }
@@ -755,16 +773,38 @@ public class ListingServiceImpl implements ListingService {
         }
 
         // An approved listing edited by the owner must go back through review
-        if (existing.getModerationStatus() == ModerationStatus.APPROVED) {
+        boolean sentBackToReview = existing.getModerationStatus() == ModerationStatus.APPROVED;
+        if (sentBackToReview) {
             existing.setVerified(false);
             existing.setIsVerify(true);
             existing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+            // The stored AI analysis describes the *pre-edit* content. Reset the record so
+            // the worker re-analyses instead of skipping it as already-computed — otherwise
+            // the review dialog would show a stale verdict for content that has changed.
+            resetAiModerationForReanalysis(existing.getListingId());
         }
 
         Listing saved = listingRepository.save(existing);
+        if (sentBackToReview) {
+            queueAiAnalysis(saved);
+        }
         com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(saved.getUserId());
         com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(saved.getAddress());
         return listingMapper.toResponse(saved, user, addressResponse);
+    }
+
+    /**
+     * Put a listing's AI moderation record back to PENDING so the queue worker will
+     * re-analyse it. Used when the content changed under an existing analysis.
+     */
+    private void resetAiModerationForReanalysis(Long listingId) {
+        listingAiModerationRepository.findById(listingId).ifPresent(moderation -> {
+            moderation.setVerificationStatus(
+                    com.smartrent.infra.repository.entity.enums.VerificationStatus.PENDING);
+            moderation.setRetryCount(0);
+            moderation.setManualOverride(false);
+            listingAiModerationRepository.save(moderation);
+        });
     }
 
     @Override
@@ -1147,6 +1187,8 @@ public class ListingServiceImpl implements ListingService {
             // (so a failed payment wouldn't lose it). Payment succeeded - delete it.
             deleteSourceDraftIfPresent(request);
 
+            queueAiAnalysis(saved);
+
             return listingMapper.toCreationResponse(saved);
 
         } catch (Exception e) {
@@ -1203,6 +1245,8 @@ public class ListingServiceImpl implements ListingService {
 
             // Remove from cache
             listingRequestCacheService.removeVipListingRequest(transactionId);
+
+            queueAiAnalysis(savedVipListing);
 
             return listingMapper.toCreationResponse(savedVipListing);
 

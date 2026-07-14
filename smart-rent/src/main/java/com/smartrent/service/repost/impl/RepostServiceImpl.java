@@ -11,6 +11,7 @@ import com.smartrent.dto.response.RepostResponse;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.ListingStatus;
 import com.smartrent.enums.ModerationStatus;
+import com.smartrent.event.ListingSubmittedEvent;
 import com.smartrent.enums.PaymentProvider;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.TransactionRepository;
@@ -52,6 +53,7 @@ public class RepostServiceImpl implements RepostService {
     TransactionService transactionService;
     PaymentService paymentService;
     com.smartrent.service.listing.PostingAccessGuard postingAccessGuard;
+    org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -274,6 +276,11 @@ public class RepostServiceImpl implements RepostService {
         listing.setIsVerify(true);
         listing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
         listingRepository.save(listing);
+
+        // Back in the review queue, so the admin dialog needs an AI analysis to show.
+        // The content is unchanged, so a listing that already has one is skipped by the
+        // worker (no repeat AI spend); one that never got analysed picks it up here.
+        eventPublisher.publishEvent(new ListingSubmittedEvent(listing.getListingId()));
 
         log.info("Successfully reactivated listing {} via {} — new expiry {}",
                 listing.getListingId(), source, newExpiry);
