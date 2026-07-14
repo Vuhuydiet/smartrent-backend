@@ -58,6 +58,7 @@ import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.ListingQueryService;
 import com.smartrent.service.listing.PostingAccessGuard;
 import com.smartrent.service.listing.cache.ListingRequestCacheService;
+import com.smartrent.event.ListingSubmittedEvent;
 import com.smartrent.service.notification.NotificationService;
 import com.smartrent.util.TextNormalizer;
 // import com.smartrent.service.pricing.LocationPricingService;  // DISABLED: Not in use
@@ -138,6 +139,7 @@ public class ListingServiceImpl implements ListingService {
     com.smartrent.infra.repository.UserFollowRepository userFollowRepository;
     PostingAccessGuard postingAccessGuard;
     NotificationService notificationService;
+    org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -274,6 +276,11 @@ public class ListingServiceImpl implements ListingService {
         if ("DIAMOND".equalsIgnoreCase(vipType)) {
             createShadowListing(saved);
         }
+
+        // Queue the AI analysis so it is already computed by the time an admin opens
+        // the review dialog. Delivered after commit — media/amenities above are part
+        // of this transaction and the worker must not read the listing without them.
+        eventPublisher.publishEvent(new ListingSubmittedEvent(saved.getListingId()));
 
         return listingMapper.toCreationResponse(saved);
     }
