@@ -205,9 +205,10 @@ public class AiListingVerificationController {
     @GetMapping("/{listingId}/moderation-result")
     @Operation(
         summary = "Get the stored AI moderation result for a listing",
-        description = "Returns a previously persisted AI analysis (verification + duplicate check) "
-                + "for a listing, if one exists, so the admin review UI can show it without "
-                + "re-running the AI. Returns data=null when no stored result exists.",
+        description = "Returns the AI analysis (verification + duplicate check) the background "
+                + "pre-computation job already stored for a listing, so the admin review dialog can "
+                + "show it instantly without re-running the AI. Returns data=null when nothing has "
+                + "been computed yet (the admin can then run it manually).",
         parameters = {
             @Parameter(name = "listingId", description = "The ID of the listing", required = true, example = "123")
         }
@@ -359,9 +360,10 @@ public class AiListingVerificationController {
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(
         summary = "Get AI auto-verify setting (Admin only)",
-        description = "Returns whether AI auto-verify is currently enabled. When enabled, the post "
-                + "review dialog automatically runs AI analysis as soon as it opens instead of "
-                + "requiring the admin to click the manual Verify button.",
+        description = "Returns whether AI auto-verify is currently enabled. When enabled, a background "
+                + "job pre-computes and stores the AI analysis for pending listings, so the review "
+                + "dialog shows the result the instant it opens instead of the admin clicking Verify "
+                + "and waiting. It never approves/rejects — the admin always decides.",
         parameters = {
             @Parameter(name = "X-Admin-Id", description = "Admin ID", required = true)
         }
@@ -384,11 +386,13 @@ public class AiListingVerificationController {
     @Operation(
         summary = "Toggle AI auto-verify on/off (Admin only)",
         description = """
-            Enables or disables AI auto-verify. The flag is persisted in the database so it
-            survives server restarts.
+            Enables or disables background AI pre-computation. The flag is persisted in the
+            database so it survives server restarts, and is re-read on every scheduler tick.
 
-            - **enabled=true** → the post review dialog auto-runs AI analysis as soon as it opens.
-            - **enabled=false** → admins must click the manual Verify button in the dialog.
+            - **enabled=true** → a background job analyses pending listings and stores the result,
+              so the review dialog shows it instantly on open (no waiting).
+            - **enabled=false** → nothing runs in the background; admins click the manual Verify
+              button in the dialog to run the AI on demand.
 
             This does NOT auto-approve or auto-reject listings — the AI result stays advisory and
             the admin still makes the final decision from the dialog.
@@ -404,7 +408,7 @@ public class AiListingVerificationController {
         aiVerificationSettingService.setAutoVerifyEnabled(enabled, adminId);
         log.info("Admin {} {} AI auto-verify", adminId, enabled ? "ENABLED" : "DISABLED");
         String message = enabled
-                ? "AI auto-verify has been enabled. The review dialog will auto-run AI analysis on open."
+                ? "AI auto-verify has been enabled. Pending listings will be analysed in the background so results are ready when the review dialog opens."
                 : "AI auto-verify has been disabled. Admins will need to click Verify manually.";
         return ResponseEntity.ok(ApiResponse.builder()
                 .message(message)
