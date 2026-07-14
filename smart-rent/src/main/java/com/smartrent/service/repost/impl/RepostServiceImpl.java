@@ -155,6 +155,9 @@ public class RepostServiceImpl implements RepostService {
     public RenewListingResponse renewListing(String userId, RenewListingRequest request) {
         log.info("Renewing listing {} for user {}", request.getListingId(), userId);
 
+        // Renewing extends visibility just like repost — block barred users
+        postingAccessGuard.ensureCanPost(userId);
+
         Listing listing = listingRepository.findById(request.getListingId())
                 .orElseThrow(() -> new RuntimeException("Listing not found: " + request.getListingId()));
 
