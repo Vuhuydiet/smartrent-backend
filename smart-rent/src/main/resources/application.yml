@@ -541,6 +541,10 @@ smartrent:
         enabled: ${AI_QUEUE_ENABLED:true}
         # Give each instance a distinct name when running >1 replica.
         consumer-name: ${AI_QUEUE_CONSUMER_NAME:worker-1}
+        # Listings analysed at once. Small on purpose — the AI service is the
+        # bottleneck; flooding it with concurrent multimodal requests buys no
+        # throughput and just pins its CPU.
+        concurrency: ${AI_QUEUE_CONCURRENCY:4}
       # BACKSTOP sweep — OFF for now. The queue is the only trigger.
       #
       # It exists to catch listings the queue could never have delivered (Redis
