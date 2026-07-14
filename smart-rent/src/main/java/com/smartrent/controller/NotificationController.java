@@ -1,6 +1,8 @@
 package com.smartrent.controller;
 
+import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.NotificationResponse;
+import com.smartrent.dto.response.PageResponse;
 import com.smartrent.enums.RecipientType;
 import com.smartrent.service.notification.NotificationService;
 import com.smartrent.util.JwtRecipientResolver;
@@ -28,7 +30,7 @@ public class NotificationController {
     @Operation(summary = "Get notifications",
             description = "Get paginated notification history for the authenticated user/admin")
     @GetMapping
-    public ResponseEntity<Page<NotificationResponse>> getNotifications(
+    public ApiResponse<PageResponse<NotificationResponse>> getNotifications(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -37,17 +39,32 @@ public class NotificationController {
         RecipientType recipientType = JwtRecipientResolver.resolveRecipientType(jwt);
         Pageable pageable = PageRequest.of(page, size);
 
-        return ResponseEntity.ok(notificationService.getNotifications(recipientId, recipientType, pageable));
+        Page<NotificationResponse> notifications =
+                notificationService.getNotifications(recipientId, recipientType, pageable);
+
+        PageResponse<NotificationResponse> pageResponse = PageResponse.<NotificationResponse>builder()
+                .page(notifications.getNumber())
+                .size(notifications.getSize())
+                .totalElements(notifications.getTotalElements())
+                .totalPages(notifications.getTotalPages())
+                .data(notifications.getContent())
+                .build();
+
+        return ApiResponse.<PageResponse<NotificationResponse>>builder()
+                .data(pageResponse)
+                .build();
     }
 
     @Operation(summary = "Get unread notification count")
     @GetMapping("/unread-count")
-    public ResponseEntity<Map<String, Long>> getUnreadCount(@AuthenticationPrincipal Jwt jwt) {
+    public ApiResponse<Map<String, Long>> getUnreadCount(@AuthenticationPrincipal Jwt jwt) {
         String recipientId = JwtRecipientResolver.resolveRecipientId(jwt);
         RecipientType recipientType = JwtRecipientResolver.resolveRecipientType(jwt);
 
         long count = notificationService.getUnreadCount(recipientId, recipientType);
-        return ResponseEntity.ok(Map.of("unreadCount", count));
+        return ApiResponse.<Map<String, Long>>builder()
+                .data(Map.of("unreadCount", count))
+                .build();
     }
 
     @Operation(summary = "Mark a notification as read")
