@@ -81,6 +81,18 @@ public class AiListingVerificationResponse {
     @Schema(description = "Time taken to process the verification", example = "6.2")
     private Double processingTimeSeconds;
 
+    @JsonProperty("ai_available")
+    @Schema(description = "False when the LLM failed and scores come from basic rules, not a real AI analysis", example = "true")
+    private Boolean aiAvailable;
+
+    @JsonProperty("error_code")
+    @Schema(description = "Machine-readable reason the AI did not run (e.g. LLM_QUOTA_EXCEEDED); null on success", example = "LLM_QUOTA_EXCEEDED")
+    private String errorCode;
+
+    @JsonProperty("error_detail")
+    @Schema(description = "Underlying provider error, for diagnostics; null on success")
+    private String errorDetail;
+
     @Getter
     @Setter
     @Builder
