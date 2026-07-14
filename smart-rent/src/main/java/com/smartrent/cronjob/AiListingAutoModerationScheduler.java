@@ -49,17 +49,27 @@ public class AiListingAutoModerationScheduler {
      */
     private final AtomicBoolean aiAutoModerationEnabled;
 
+    /**
+     * Number of listings pulled per scheduler tick. Lower it (e.g. 3-5) to drain a
+     * large one-time backlog without pinning the single AI worker's CPU — fewer
+     * concurrent CPU-bound duplicate checks, roughly the same throughput (the GIL
+     * serializes them anyway). Default 20 preserves the original behavior.
+     */
+    private final int batchSize;
+
     public AiListingAutoModerationScheduler(
             ListingRepository listingRepository,
             ListingAiModerationRepository listingAiModerationRepository,
             AiModerationProcessorService aiModerationProcessorService,
             AiModerationExecutor aiModerationExecutor,
-            @Value("${smartrent.ai.verification.scheduler.enabled:true}") boolean initiallyEnabled) {
+            @Value("${smartrent.ai.verification.scheduler.enabled:true}") boolean initiallyEnabled,
+            @Value("${smartrent.ai.verification.scheduler.batch-size:20}") int batchSize) {
         this.listingRepository = listingRepository;
         this.listingAiModerationRepository = listingAiModerationRepository;
         this.aiModerationProcessorService = aiModerationProcessorService;
         this.aiModerationExecutor = aiModerationExecutor;
         this.aiAutoModerationEnabled = new AtomicBoolean(initiallyEnabled);
+        this.batchSize = batchSize > 0 ? batchSize : 20;
     }
 
     /** Called by the admin API to enable AI auto-moderation. */
@@ -123,7 +133,7 @@ public class AiListingAutoModerationScheduler {
         log.info("Starting AI Auto Moderation Scheduler...");
 
         try {
-            Page<Listing> pendingListings = listingRepository.findListingsNeedingAiVerification(PageRequest.of(0, 20));
+            Page<Listing> pendingListings = listingRepository.findListingsNeedingAiVerification(PageRequest.of(0, batchSize));
             List<Listing> listings = pendingListings.getContent();
 
             if (listings.isEmpty()) {
