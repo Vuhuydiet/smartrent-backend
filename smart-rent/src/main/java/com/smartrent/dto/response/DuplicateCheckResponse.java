@@ -31,6 +31,7 @@ public class DuplicateCheckResponse {
         double descriptionSimilarity;
         double addressSimilarity;
         double priceSimilarity;
+        double imageSimilarity;
         Double llmScore;
         String llmReason;
     }

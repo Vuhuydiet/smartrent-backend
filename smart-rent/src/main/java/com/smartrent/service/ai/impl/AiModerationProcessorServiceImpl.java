@@ -147,12 +147,17 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
             log.info("Finished processing listing ID: {}, verificationStatus: {}, moderationStatus: {}",
                     listing.getListingId(), moderation.getVerificationStatus(), listing.getModerationStatus());
 
-            boolean downgradedByDuplicate = duplicateResult != null
-                    && ("DUPLICATE".equals(duplicateResult.getDecision()) || "SUSPICIOUS".equals(duplicateResult.getDecision()))
-                    && "APPROVED".equals(suggestedStatus);
+            boolean flaggedDuplicate = duplicateResult != null
+                    && ("DUPLICATE".equals(duplicateResult.getDecision())
+                        || "SUSPICIOUS".equals(duplicateResult.getDecision()));
+            // Notify whenever the listing is flagged as a duplicate AND is not
+            // rejected — covers both a downgraded APPROVE and a listing already
+            // heading to manual review (NEEDS_REVIEW), which previously got no
+            // duplicate-specific alert to either owner or admins.
+            boolean duplicateNeedsReview = flaggedDuplicate && !"REJECTED".equals(suggestedStatus);
 
-            sendOwnerNotification(listing, suggestedStatus, downgradedByDuplicate);
-            if (downgradedByDuplicate) {
+            sendOwnerNotification(listing, suggestedStatus, duplicateNeedsReview);
+            if (duplicateNeedsReview) {
                 sendAdminDuplicateNotification(listing, duplicateResult);
             }
 
@@ -164,13 +169,13 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
         }
     }
 
-    private void sendOwnerNotification(Listing listing, String suggestedStatus, boolean downgradedByDuplicate) {
+    private void sendOwnerNotification(Listing listing, String suggestedStatus, boolean duplicateNeedsReview) {
         if (listing.getUserId() == null) return;
 
         NotificationType notifType;
         String notifMessage;
 
-        if (downgradedByDuplicate) {
+        if (duplicateNeedsReview) {
             notifType = NotificationType.LISTING_PENDING_REVIEW;
             notifMessage = "Tin đăng \"" + listing.getTitle() + "\" của bạn đang được xem xét thủ công do hệ thống phát hiện nội dung tương tự với tin đăng khác.";
         } else if ("APPROVED".equals(suggestedStatus)) {
@@ -221,6 +226,7 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
     private DuplicateCheckResponse runDuplicateCheck(Listing listing, AiListingVerificationRequest request) {
         try {
             DuplicateCheckRequest.DuplicateCheckRequestBuilder builder = DuplicateCheckRequest.builder()
+                    .listingId(listing.getListingId())
                     .title(request.getTitle())
                     .description(request.getDescription())
                     .price(request.getPrice() != null ? request.getPrice().doubleValue() : null)
