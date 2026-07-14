@@ -677,7 +677,7 @@ public class ListingSpecification {
                 ));
             }
 
-            // ============ KEYWORD SEARCH (FULLTEXT) ============
+            // ============ KEYWORD SEARCH (FULLTEXT + LIKE fallback) ============
             if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()) {
                 String normalized = TextNormalizer.normalize(filter.getKeyword());
                 if (normalized != null && !normalized.isEmpty()) {
@@ -685,19 +685,34 @@ public class ListingSpecification {
                     // Each word gets a '+' prefix for AND semantics, '*' suffix for prefix matching
                     String[] words = normalized.split("\\s+");
                     StringBuilder ftQuery = new StringBuilder();
+                    // searchText is already normalized (see Listing.searchText: diacritics
+                    // stripped, lowercased, alphanumeric) exactly like `normalized`, so an
+                    // AND of substring LIKEs on it mirrors the FULLTEXT AND semantics.
+                    List<Predicate> likeAllWords = new ArrayList<>();
                     for (String word : words) {
                         if (!word.isEmpty()) {
                             ftQuery.append("+").append(word).append("* ");
+                            likeAllWords.add(criteriaBuilder.like(
+                                root.get("searchText"), "%" + word + "%"));
                         }
                     }
                     String fulltextQuery = ftQuery.toString().trim();
                     if (!fulltextQuery.isEmpty()) {
-                        predicates.add(criteriaBuilder.greaterThan(
+                        Predicate ftMatch = criteriaBuilder.greaterThan(
                             criteriaBuilder.function("match_against",
                                 Double.class,
                                 root.get("searchText"),
                                 criteriaBuilder.literal(fulltextQuery)),
-                            0.0));
+                            0.0);
+                        // FULLTEXT BOOLEAN mode silently drops tokens shorter than the
+                        // server's min token size (innodb_ft_min_token_size, default 3) and
+                        // stopwords. With +token* AND semantics, one such token (e.g. "Q7",
+                        // a house number) makes the whole match fail — so pasting a full
+                        // title returns nothing. OR in an AND-of-LIKEs so every token is
+                        // honored and exact substrings always match.
+                        Predicate likeMatch = criteriaBuilder.and(
+                            likeAllWords.toArray(new Predicate[0]));
+                        predicates.add(criteriaBuilder.or(ftMatch, likeMatch));
                     }
                 }
             }
