@@ -517,6 +517,12 @@ public class ListingServiceImpl implements ListingService {
                 // IN_REVIEW and must carry PENDING_REVIEW so it shows on the seller's
                 // IN_REVIEW tab and enters the admin moderation queue.
                 .moderationStatus(ModerationStatus.PENDING_REVIEW)
+                // Mirror ListingMapperImpl.toEntity:42 — without postDate, a VIP
+                // listing that's later rejected fails buildStatusPredicate(REJECTED)'s
+                // "postDate IS NOT NULL" check (computeListingStatus doesn't check it,
+                // so the listing still shows unfiltered — it just vanishes from any
+                // REJECTED filter/search).
+                .postDate(java.time.LocalDateTime.now())
                 .expired(false)
                 .build();
     }
@@ -555,6 +561,10 @@ public class ListingServiceImpl implements ListingService {
                 .parentListingId(premiumListing.getListingId())
                 .postSource(premiumListing.getPostSource()) // Same source as parent
                 .transactionId(premiumListing.getTransactionId()) // Same transaction as parent
+                // Mirror the parent's postDate (see buildListingFromVipRequest) — a null
+                // postDate makes buildStatusPredicate(REJECTED) never match this row.
+                .postDate(premiumListing.getPostDate() != null
+                        ? premiumListing.getPostDate() : java.time.LocalDateTime.now())
                 .build();
 
         listingRepository.save(shadowListing);
