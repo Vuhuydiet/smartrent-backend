@@ -23,12 +23,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.IntStream;
 
 /**
- * <b>Reconciliation backstop</b> for AI pre-computation — not the primary trigger.
+ * <b>Reconciliation backstop</b> for AI pre-computation — <b>disabled by default.</b>
  *
- * <p>A listing is normally analysed within seconds of being submitted, pushed onto
- * the Redis Streams queue by {@code ListingSubmittedAiEnqueuer}. This sweep exists
- * for the listings that never made it onto that queue and would otherwise be
- * analysed by nobody, leaving the admin staring at an empty dialog forever:
+ * <p>The queue ({@code ListingSubmittedAiEnqueuer} → Redis Stream) is the trigger:
+ * a listing is analysed within seconds of being submitted. This sweep only exists
+ * for listings the queue could never have delivered:
  * <ul>
  *   <li>Redis was down (or the enqueue threw) at submit time.</li>
  *   <li>The consumer died mid-message and the entry aged out of the pending list.</li>
@@ -36,8 +35,11 @@ import java.util.stream.IntStream;
  *       and the admin has since switched it back ON.</li>
  * </ul>
  *
- * <p>Because the queue does the real work, this runs infrequently (30 min) on a
- * small batch — it is a safety net, not a throughput mechanism.
+ * <p>It is currently turned off — such a listing simply has no stored analysis and
+ * the admin runs it by hand from the review dialog. Nothing is ever blocked by
+ * this being off. Set {@code AI_SCHEDULER_ENABLED=true} to bring the safety net
+ * back (it is deliberately infrequent and small-batch: a net, not a throughput
+ * mechanism).
  *
  * <p><b>Store-only.</b> This never approves or rejects a listing — it only stores
  * the AI's analysis on {@link ListingAiModeration}. Every listing still lands in
@@ -45,8 +47,8 @@ import java.util.stream.IntStream;
  *
  * <p>Two independent switches gate it:
  * <ul>
- *   <li>{@code smartrent.ai.verification.scheduler.enabled} — infra-level kill switch
- *       (env/config, e.g. to keep it off in tests or local dev).</li>
+ *   <li>{@code smartrent.ai.verification.scheduler.enabled} — infra kill switch.
+ *       Off unless explicitly set to {@code true}.</li>
  *   <li>The {@code ai_auto_verify_enabled} setting in the DB — the admin-facing
  *       toggle, read fresh on every tick so it takes effect immediately and
  *       survives restarts. See {@link AiVerificationSettingService}.</li>
@@ -58,7 +60,7 @@ import java.util.stream.IntStream;
 @ConditionalOnProperty(
     name = "smartrent.ai.verification.scheduler.enabled",
     havingValue = "true",
-    matchIfMissing = true
+    matchIfMissing = false
 )
 public class AiListingAutoModerationScheduler {
 

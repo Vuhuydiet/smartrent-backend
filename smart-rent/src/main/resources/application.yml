@@ -541,11 +541,19 @@ smartrent:
         enabled: ${AI_QUEUE_ENABLED:true}
         # Give each instance a distinct name when running >1 replica.
         consumer-name: ${AI_QUEUE_CONSUMER_NAME:worker-1}
-      # BACKSTOP only: sweeps up listings the queue never analysed (Redis down at
-      # submit time, consumer died, listings that predate the queue). Finds nothing
-      # on a healthy system — hence the long delay and small batch.
+      # BACKSTOP sweep — OFF for now. The queue is the only trigger.
+      #
+      # It exists to catch listings the queue could never have delivered (Redis
+      # down at submit time, consumer died mid-message, listings predating the
+      # queue). With it off, such a listing is never analysed automatically and
+      # the admin runs it by hand from the review dialog — acceptable, and no
+      # listing is ever blocked by this.
+      #
+      # Flip AI_SCHEDULER_ENABLED=true to turn the safety net back on (no code
+      # change, no redeploy of anything else); tune delay/batch-size to drain a
+      # backlog.
       scheduler:
-        enabled: ${AI_SCHEDULER_ENABLED:true}
+        enabled: ${AI_SCHEDULER_ENABLED:false}
         delay: ${AI_SCHEDULER_DELAY_MS:1800000}
         batch-size: ${AI_SCHEDULER_BATCH_SIZE:10}
       url: ${AI_VERIFICATION_URL:http://localhost:8000/ai/verify-listing}
