@@ -23,9 +23,21 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.IntStream;
 
 /**
- * Pre-computes AI analysis for pending listings in the background, so the admin
- * review dialog can show the result instantly on open instead of running the AI
- * live and making the admin wait ~30s.
+ * <b>Reconciliation backstop</b> for AI pre-computation — not the primary trigger.
+ *
+ * <p>A listing is normally analysed within seconds of being submitted, pushed onto
+ * the Redis Streams queue by {@code ListingSubmittedAiEnqueuer}. This sweep exists
+ * for the listings that never made it onto that queue and would otherwise be
+ * analysed by nobody, leaving the admin staring at an empty dialog forever:
+ * <ul>
+ *   <li>Redis was down (or the enqueue threw) at submit time.</li>
+ *   <li>The consumer died mid-message and the entry aged out of the pending list.</li>
+ *   <li>The listing predates the queue, or was submitted while auto-verify was OFF
+ *       and the admin has since switched it back ON.</li>
+ * </ul>
+ *
+ * <p>Because the queue does the real work, this runs infrequently (30 min) on a
+ * small batch — it is a safety net, not a throughput mechanism.
  *
  * <p><b>Store-only.</b> This never approves or rejects a listing — it only stores
  * the AI's analysis on {@link ListingAiModeration}. Every listing still lands in
@@ -65,12 +77,12 @@ public class AiListingAutoModerationScheduler {
     private final AiVerificationSettingService aiVerificationSettingService;
 
     /**
-     * Number of listings pulled per tick. Lower it (e.g. 3-5) to drain a large
-     * one-time backlog without pinning the single AI worker's CPU — fewer
-     * concurrent CPU-bound duplicate checks, roughly the same throughput (the GIL
-     * serializes them anyway). Default 20.
+     * Number of listings pulled per sweep. Deliberately small: this only picks up
+     * stragglers the queue missed, and a large batch would pin the single AI
+     * worker's CPU with concurrent duplicate checks for no throughput gain (the
+     * GIL serializes them anyway). Raise it temporarily to drain a big backlog.
      */
-    @Value("${smartrent.ai.verification.scheduler.batch-size:20}")
+    @Value("${smartrent.ai.verification.scheduler.batch-size:10}")
     private int batchSize;
 
     /**
@@ -95,12 +107,14 @@ public class AiListingAutoModerationScheduler {
     }
 
     /**
-     * Run every 5 minutes to pre-compute + store the AI analysis for pending listings.
+     * Sweep every 30 minutes for listings the queue never analysed, and store their
+     * AI result. Finds nothing on a healthy system — the queue got there first.
      *
      * <p>Strategy:
      * <ol>
      *   <li>Load a page of pending listings in a single read transaction.</li>
-     *   <li>Batch-mark all as IN_PROGRESS in one query before dispatching.</li>
+     *   <li>Batch-mark all as IN_PROGRESS in one query before dispatching — this also
+     *       stops the queue consumer double-analysing anything picked up here.</li>
      *   <li>Call {@link AiModerationProcessorService#processSingleListing} for each listing
      *       via the Spring proxy so each item runs in its own {@code REQUIRES_NEW} transaction.
      *       Tasks run concurrently on {@link AiModerationExecutor#batchPool()} — a dedicated
@@ -108,25 +122,26 @@ public class AiListingAutoModerationScheduler {
      *       designed for CPU-bound work and limited to {@code cores - 1} threads.</li>
      * </ol>
      */
-    @Scheduled(fixedDelayString = "${smartrent.ai.verification.scheduler.delay:300000}")
+    @Scheduled(fixedDelayString = "${smartrent.ai.verification.scheduler.delay:1800000}")
     public void processPendingListings() {
         if (!aiVerificationSettingService.isAutoVerifyEnabled()) {
-            log.debug("AI auto-verify is DISABLED by admin — skipping background pre-computation.");
+            log.debug("AI auto-verify is DISABLED by admin — skipping reconciliation sweep.");
             return;
         }
-        log.info("Starting AI background pre-computation...");
+        log.debug("Starting AI reconciliation sweep...");
 
         try {
-            int size = batchSize > 0 ? batchSize : 20;
+            int size = batchSize > 0 ? batchSize : 10;
             Page<Listing> pendingListings = listingRepository.findListingsNeedingAiVerification(PageRequest.of(0, size));
             List<Listing> listings = pendingListings.getContent();
 
             if (listings.isEmpty()) {
-                log.info("No pending listings need AI pre-computation.");
+                log.debug("Reconciliation sweep found nothing — the queue kept up.");
                 return;
             }
 
-            log.info("Found {} listings to pre-compute", listings.size());
+            // Not empty means the queue missed these — worth surfacing at INFO.
+            log.info("Reconciliation sweep picked up {} listing(s) the queue missed", listings.size());
 
             // 1. Upsert moderation records, then batch-mark all as IN_PROGRESS in one query.
             List<ListingAiModeration> moderations = listings.stream().map(listing ->
