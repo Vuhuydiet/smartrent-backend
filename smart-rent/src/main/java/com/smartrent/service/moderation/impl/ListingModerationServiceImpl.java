@@ -1,5 +1,6 @@
 package com.smartrent.service.moderation.impl;
 
+import com.smartrent.event.ListingSubmittedEvent;
 import com.smartrent.dto.request.ListingStatusChangeRequest;
 import com.smartrent.dto.request.ResolveReportRequest;
 import com.smartrent.dto.request.ResubmitListingRequest;
@@ -70,6 +71,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     EmailService emailService;
     NotificationService notificationService;
     UserFollowService userFollowService;
+    org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @NonFinal
     @Value("${application.email.sender.email}")
@@ -368,6 +370,9 @@ public class ListingModerationServiceImpl implements ListingModerationService {
                     listingAiModerationRepository.save(moderation);
                     log.info("Created new AI moderation entry for resubmitted listing {}", listing.getListingId());
                 });
+        // Re-queue: the record above is back to PENDING, so the AI must re-analyse the
+        // revised content. Delivered after commit.
+        eventPublisher.publishEvent(new ListingSubmittedEvent(listing.getListingId()));
         // ---------------------------------
 
         // Advance any pending owner actions
@@ -505,6 +510,9 @@ public class ListingModerationServiceImpl implements ListingModerationService {
                     listingAiModerationRepository.save(moderation);
                     log.info("Created new AI moderation entry for updated listing {}", listing.getListingId());
                 });
+        // Re-queue: the record above is back to PENDING, so the AI must re-analyse the
+        // revised content. Delivered after commit.
+        eventPublisher.publishEvent(new ListingSubmittedEvent(listing.getListingId()));
         // ---------------------------------
 
         // Advance any pending owner actions

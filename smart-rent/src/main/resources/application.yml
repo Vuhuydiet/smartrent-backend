@@ -529,17 +529,25 @@ otp:
 smartrent:
   ai:
     verification:
-      # Background job that pre-computes + STORES the AI analysis for pending
-      # listings, so the admin review dialog shows it instantly on open. It never
-      # approves/rejects — the admin always decides.
-      # `enabled` here is the infra kill switch; the admin-facing on/off toggle
-      # lives in the DB (system_settings.ai_auto_verify_enabled).
+      # AI analysis is pre-computed + STORED so the admin review dialog shows it
+      # instantly on open. It never approves/rejects — the admin always decides.
+      # The admin-facing on/off toggle lives in the DB
+      # (system_settings.ai_auto_verify_enabled); the switches below are infra
+      # kill switches only.
+      #
+      # PRIMARY trigger: a listing is pushed onto a Redis Stream the moment it is
+      # submitted/resubmitted, so its analysis is ready within seconds.
+      queue:
+        enabled: ${AI_QUEUE_ENABLED:true}
+        # Give each instance a distinct name when running >1 replica.
+        consumer-name: ${AI_QUEUE_CONSUMER_NAME:worker-1}
+      # BACKSTOP only: sweeps up listings the queue never analysed (Redis down at
+      # submit time, consumer died, listings that predate the queue). Finds nothing
+      # on a healthy system — hence the long delay and small batch.
       scheduler:
         enabled: ${AI_SCHEDULER_ENABLED:true}
-        delay: ${AI_SCHEDULER_DELAY_MS:300000}
-        # Listings processed per tick. Lower (e.g. 3-5) to drain a large one-time
-        # backlog without pinning the single AI worker's CPU. Default 20.
-        batch-size: ${AI_SCHEDULER_BATCH_SIZE:20}
+        delay: ${AI_SCHEDULER_DELAY_MS:1800000}
+        batch-size: ${AI_SCHEDULER_BATCH_SIZE:10}
       url: ${AI_VERIFICATION_URL:http://localhost:8000/ai/verify-listing}
       timeout-seconds: ${AI_VERIFICATION_TIMEOUT:90}
       max-retry-attempts: ${AI_VERIFICATION_MAX_RETRY:3}
