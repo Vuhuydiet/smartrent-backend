@@ -6,6 +6,7 @@ import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.DuplicateCheckResponse;
 import com.smartrent.dto.response.StoredAiModerationResponse;
 import com.smartrent.service.ai.AiListingVerificationService;
+import com.smartrent.service.ai.AiVerificationSettingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -30,7 +31,7 @@ import org.springframework.web.bind.annotation.*;
 public class AiListingVerificationController {
 
     private final AiListingVerificationService aiListingVerificationService;
-    private final com.smartrent.cronjob.AiListingAutoModerationScheduler aiListingAutoModerationScheduler;
+    private final AiVerificationSettingService aiVerificationSettingService;
 
 
     @PostMapping("/verify")
@@ -204,8 +205,8 @@ public class AiListingVerificationController {
     @GetMapping("/{listingId}/moderation-result")
     @Operation(
         summary = "Get the stored AI moderation result for a listing",
-        description = "Returns the AI analysis (verification + duplicate check) the auto-moderation "
-                + "cronjob already persisted for a listing, so the admin review UI can show it without "
+        description = "Returns a previously persisted AI analysis (verification + duplicate check) "
+                + "for a listing, if one exists, so the admin review UI can show it without "
                 + "re-running the AI. Returns data=null when no stored result exists.",
         parameters = {
             @Parameter(name = "listingId", description = "The ID of the listing", required = true, example = "123")
@@ -350,65 +351,65 @@ public class AiListingVerificationController {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Admin: AI scheduler toggle
+    // Admin: AI auto-verify toggle
     // ─────────────────────────────────────────────────────────────────────────
 
-    @GetMapping("/scheduler/status")
+    @GetMapping("/auto-verify/status")
     @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(
-        summary = "Get AI auto-moderation scheduler status (Admin only)",
-        description = "Returns whether the AI auto-moderation scheduler is currently enabled or disabled.",
+        summary = "Get AI auto-verify setting (Admin only)",
+        description = "Returns whether AI auto-verify is currently enabled. When enabled, the post "
+                + "review dialog automatically runs AI analysis as soon as it opens instead of "
+                + "requiring the admin to click the manual Verify button.",
         parameters = {
             @Parameter(name = "X-Admin-Id", description = "Admin ID", required = true)
         }
     )
-    public ResponseEntity<ApiResponse<Object>> getSchedulerStatus(
+    public ResponseEntity<ApiResponse<Object>> getAutoVerifyStatus(
             @RequestHeader("X-Admin-Id") String adminId) {
-        boolean enabled = aiListingAutoModerationScheduler.isEnabled();
+        boolean enabled = aiVerificationSettingService.isAutoVerifyEnabled();
         return ResponseEntity.ok(ApiResponse.builder()
-                .message("AI scheduler status retrieved successfully")
+                .message("AI auto-verify status retrieved successfully")
                 .data(new Object() {
-                    public final boolean aiSchedulerEnabled = enabled;
+                    public final boolean aiAutoVerifyEnabled = enabled;
                     public final String checkedAt = java.time.LocalDateTime.now().toString();
                 })
                 .build());
     }
 
-    @PutMapping("/scheduler/toggle")
+    @PutMapping("/auto-verify/toggle")
     @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA', 'ROLE_SPA')")
     @SecurityRequirement(name = "Bearer Authentication")
     @Operation(
-        summary = "Toggle AI auto-moderation scheduler on/off (Admin only)",
+        summary = "Toggle AI auto-verify on/off (Admin only)",
         description = """
-            Enables or disables the AI automatic listing moderation scheduler at runtime.
+            Enables or disables AI auto-verify. The flag is persisted in the database so it
+            survives server restarts.
 
-            - **enabled=true** → scheduler will process pending listings every 5 minutes.
-            - **enabled=false** → scheduler is paused; listings stay in PENDING state until manually reviewed or re-enabled.
+            - **enabled=true** → the post review dialog auto-runs AI analysis as soon as it opens.
+            - **enabled=false** → admins must click the manual Verify button in the dialog.
 
-            This does NOT restart the server — the change takes effect immediately for the next scheduled run.
+            This does NOT auto-approve or auto-reject listings — the AI result stays advisory and
+            the admin still makes the final decision from the dialog.
             """,
         parameters = {
             @Parameter(name = "X-Admin-Id", description = "Admin ID", required = true),
             @Parameter(name = "enabled", description = "true to enable, false to disable", required = true, example = "false")
         }
     )
-    public ResponseEntity<ApiResponse<Object>> toggleScheduler(
+    public ResponseEntity<ApiResponse<Object>> toggleAutoVerify(
             @RequestHeader("X-Admin-Id") String adminId,
             @RequestParam boolean enabled) {
-        if (enabled) {
-            aiListingAutoModerationScheduler.enable();
-        } else {
-            aiListingAutoModerationScheduler.disable();
-        }
-        log.info("Admin {} {} the AI Auto Moderation Scheduler", adminId, enabled ? "ENABLED" : "DISABLED");
+        aiVerificationSettingService.setAutoVerifyEnabled(enabled, adminId);
+        log.info("Admin {} {} AI auto-verify", adminId, enabled ? "ENABLED" : "DISABLED");
         String message = enabled
-                ? "AI auto-moderation scheduler has been enabled. Listings will be processed automatically."
-                : "AI auto-moderation scheduler has been disabled. Listings will require manual review.";
+                ? "AI auto-verify has been enabled. The review dialog will auto-run AI analysis on open."
+                : "AI auto-verify has been disabled. Admins will need to click Verify manually.";
         return ResponseEntity.ok(ApiResponse.builder()
                 .message(message)
                 .data(new Object() {
-                    public final boolean aiSchedulerEnabled = enabled;
+                    public final boolean aiAutoVerifyEnabled = enabled;
                     public final String updatedAt = java.time.LocalDateTime.now().toString();
                     public final String updatedBy = adminId;
                 })
