@@ -57,11 +57,20 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
                 .title(normalizedRequest.getTitle())
                 .description(normalizedRequest.getDescription())
                 .price(normalizedRequest.getPrice())
+                .priceUnit(normalizedRequest.getPriceUnit())
+                .listingType(normalizedRequest.getListingType())
                 .area(normalizedRequest.getArea() != null ? normalizedRequest.getArea().floatValue() : null)
                 .address(normalizedRequest.getAddress())
                 .propertyType(normalizedRequest.getPropertyType() != null ? normalizedRequest.getPropertyType().name() : null)
                 .amenities(normalizedRequest.getAmenities())
                 .images(normalizedRequest.getImages())
+                .direction(normalizedRequest.getDirection())
+                .furnishing(normalizedRequest.getFurnishing())
+                .roomCapacity(normalizedRequest.getRoomCapacity())
+                .waterPrice(normalizedRequest.getWaterPrice())
+                .electricityPrice(normalizedRequest.getElectricityPrice())
+                .internetPrice(normalizedRequest.getInternetPrice())
+                .serviceFee(normalizedRequest.getServiceFee())
                 .build();
                 
             // Set metadata if present

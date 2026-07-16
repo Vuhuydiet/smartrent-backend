@@ -46,6 +46,14 @@ public class AiListingVerificationRequest {
     @Schema(description = "Listing price", example = "20000000", required = true)
     private BigDecimal price;
 
+    @JsonProperty("price_unit")
+    @Schema(description = "Unit the price is denominated in", example = "MONTH")
+    private String priceUnit;
+
+    @JsonProperty("listing_type")
+    @Schema(description = "Listing type (RENT, SALE, SHARE)", example = "RENT")
+    private String listingType;
+
     @JsonProperty("address")
     @NotBlank(message = "Address is required")
     @Size(min = 5, max = 500, message = "Address must be between 5 and 500 characters")
@@ -78,6 +86,35 @@ public class AiListingVerificationRequest {
     @JsonProperty("metadata")
     @Schema(description = "Additional property metadata")
     private PropertyMetadata metadata;
+
+    @JsonProperty("direction")
+    @Schema(description = "House/room direction", example = "SOUTH")
+    private String direction;
+
+    @JsonProperty("furnishing")
+    @Schema(description = "Furnishing status", example = "FULLY_FURNISHED")
+    private String furnishing;
+
+    @JsonProperty("room_capacity")
+    @Min(value = 0, message = "Room capacity must be non-negative")
+    @Schema(description = "Max occupants the room supports", example = "4")
+    private Integer roomCapacity;
+
+    @JsonProperty("water_price")
+    @Schema(description = "Water cost", example = "20000/m3")
+    private String waterPrice;
+
+    @JsonProperty("electricity_price")
+    @Schema(description = "Electricity cost", example = "3500/kWh")
+    private String electricityPrice;
+
+    @JsonProperty("internet_price")
+    @Schema(description = "Internet cost", example = "100000/thang")
+    private String internetPrice;
+
+    @JsonProperty("service_fee")
+    @Schema(description = "Service/management fee", example = "500000/thang")
+    private String serviceFee;
 
     @Getter
     @Setter

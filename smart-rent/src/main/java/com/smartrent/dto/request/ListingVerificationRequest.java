@@ -21,6 +21,12 @@ public class ListingVerificationRequest {
     @JsonProperty("price")
     private BigDecimal price;
 
+    @JsonProperty("price_unit")
+    private String priceUnit;
+
+    @JsonProperty("listing_type")
+    private String listingType;
+
     @JsonProperty("area")
     private Float area;
 
@@ -41,6 +47,27 @@ public class ListingVerificationRequest {
 
     @JsonProperty("metadata")
     private MetadataDto metadata;
+
+    @JsonProperty("direction")
+    private String direction;
+
+    @JsonProperty("furnishing")
+    private String furnishing;
+
+    @JsonProperty("room_capacity")
+    private Integer roomCapacity;
+
+    @JsonProperty("water_price")
+    private String waterPrice;
+
+    @JsonProperty("electricity_price")
+    private String electricityPrice;
+
+    @JsonProperty("internet_price")
+    private String internetPrice;
+
+    @JsonProperty("service_fee")
+    private String serviceFee;
 
     @Data
     @Builder
