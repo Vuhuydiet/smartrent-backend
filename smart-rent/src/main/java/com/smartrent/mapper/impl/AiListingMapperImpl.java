@@ -31,6 +31,8 @@ public class AiListingMapperImpl implements AiListingMapper {
                 .title(listing.getTitle())
                 .description(listing.getDescription())
                 .price(listing.getPrice())
+                .priceUnit(listing.getPriceUnit() != null ? listing.getPriceUnit().name() : null)
+                .listingType(listing.getListingType() != null ? listing.getListingType().name() : null)
                 .address(getAddressString(listing))
                 .propertyType(convertProductType(listing.getProductType()))
                 .area(listing.getArea() != null ? listing.getArea().doubleValue() : null)
@@ -38,6 +40,13 @@ public class AiListingMapperImpl implements AiListingMapper {
                 .images(buildImages(listing.getMedia()))
                 .videos(buildVideos(listing.getMedia()))
                 .metadata(buildMetadata(listing))
+                .direction(listing.getDirection() != null ? listing.getDirection().name() : null)
+                .furnishing(listing.getFurnishing() != null ? listing.getFurnishing().name() : null)
+                .roomCapacity(listing.getRoomCapacity())
+                .waterPrice(listing.getWaterPrice())
+                .electricityPrice(listing.getElectricityPrice())
+                .internetPrice(listing.getInternetPrice())
+                .serviceFee(listing.getServiceFee())
                 .build();
     }
 
