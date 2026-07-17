@@ -1,6 +1,7 @@
 package com.smartrent.infra.repository.entity;
 
 import com.smartrent.enums.ReportCategory;
+import com.smartrent.enums.ReportResolutionAction;
 import com.smartrent.enums.ReportStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -89,6 +90,12 @@ public class ListingReport {
 
     @Column(name = "admin_notes", columnDefinition = "TEXT")
     String adminNotes;
+
+    // Concrete action taken at resolution time (suspend / request revision / dismiss).
+    // Null for still-pending reports and legacy rows resolved before this was tracked.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "resolution_action", length = 32)
+    ReportResolutionAction resolutionAction;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

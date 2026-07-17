@@ -55,6 +55,10 @@ public class ListingReportResponse {
     @Schema(description = "Admin notes/comments on the report", example = "Verified and took action")
     String adminNotes;
 
+    @Schema(description = "Concrete action taken at resolution (null while pending / for legacy rows)",
+            example = "SUSPENDED", allowableValues = {"SUSPENDED", "REVISION_REQUESTED", "DISMISSED", "RESOLVED"})
+    String resolutionAction;
+
     @Schema(description = "Report creation timestamp")
     LocalDateTime createdAt;
 

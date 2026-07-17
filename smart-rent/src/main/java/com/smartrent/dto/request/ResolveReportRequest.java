@@ -25,6 +25,12 @@ public class ResolveReportRequest {
             example = "Please update listing title and real area")
     String adminNotes;
 
+    @Schema(description = "The concrete action taken, recorded for later display. " +
+            "If omitted, the server derives it from status/removeListing/ownerActionRequired.",
+            example = "SUSPENDED",
+            allowableValues = {"SUSPENDED", "REVISION_REQUESTED", "DISMISSED", "RESOLVED"})
+    String resolutionAction;
+
     // ── Owner action fields ──
     @Schema(description = "Whether the listing owner must take action", example = "true")
     Boolean ownerActionRequired;
