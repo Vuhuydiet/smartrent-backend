@@ -109,7 +109,16 @@ import java.util.List;
                 // (~9.3s measured) the APPROVED tab hit. Mirrors idx_listings_admin_default_sort
                 // (V100) with moderation_status inserted. Built by V109.
                 @Index(name = "idx_listings_admin_moderation_sort",
-                        columnList = "is_shadow, moderation_status, vip_type_sort_order, updated_at")
+                        columnList = "is_shadow, moderation_status, vip_type_sort_order, updated_at"),
+                // Admin analytics breakdowns (GET /v1/admin/analytics/listings). Same
+                // (is_shadow, is_draft) equality + created_at range prefix as the daily
+                // series, then the three breakdown columns (listing_type, product_type,
+                // verified) as a covering-only suffix so each aggregate is an index-only
+                // range scan over the requested date slice instead of a ~99k-row scan via
+                // idx_is_shadow (measured 6.38s -> 0.07s). Supersedes the manually-created
+                // idx_listings_shadow_draft_created (a strict prefix of this). Built by V115.
+                @Index(name = "idx_listings_analytics_breakdown",
+                        columnList = "is_shadow, is_draft, created_at, listing_type, product_type, verified")
         })
 @Getter
 @Setter
