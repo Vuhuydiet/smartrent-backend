@@ -9,6 +9,7 @@ import com.smartrent.enums.ListingStatus;
 import com.smartrent.enums.NotificationType;
 import com.smartrent.enums.RecipientType;
 import com.smartrent.enums.ReportCategory;
+import com.smartrent.enums.ReportResolutionAction;
 import com.smartrent.enums.ReportStatus;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.ResourceNotFoundException;
@@ -273,6 +274,7 @@ public class ListingReportServiceImpl implements ListingReportService {
         report.setResolvedBy(adminId);
         report.setResolvedAt(LocalDateTime.now());
         report.setAdminNotes(request.getAdminNotes());
+        report.setResolutionAction(resolveResolutionAction(request, newStatus));
 
         ListingReport savedReport = listingReportRepository.save(report);
         log.info("Report {} successfully {} by admin {}", reportId, newStatus.name().toLowerCase(), adminId);
@@ -420,6 +422,31 @@ public class ListingReportServiceImpl implements ListingReportService {
     /**
      * Helper method to map report to response with admin information
      */
+    /**
+     * Resolve which concrete action to record on the report. Prefers the value the
+     * admin console sends explicitly; otherwise derives it from the request flags so
+     * older/other callers still get a sensible value.
+     */
+    private ReportResolutionAction resolveResolutionAction(ResolveReportRequest request, ReportStatus status) {
+        if (request.getResolutionAction() != null && !request.getResolutionAction().isBlank()) {
+            try {
+                return ReportResolutionAction.valueOf(request.getResolutionAction().trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                // Unknown value — fall through to derive from flags.
+            }
+        }
+        if (status == ReportStatus.REJECTED) {
+            return ReportResolutionAction.DISMISSED;
+        }
+        if (Boolean.TRUE.equals(request.getRemoveListing())) {
+            return ReportResolutionAction.SUSPENDED;
+        }
+        if (Boolean.TRUE.equals(request.getOwnerActionRequired())) {
+            return ReportResolutionAction.REVISION_REQUESTED;
+        }
+        return ReportResolutionAction.RESOLVED;
+    }
+
     private ListingReportResponse mapToResponseWithAdminInfo(ListingReport report) {
         ListingReportResponse response = listingReportMapper.mapFromListingReportEntityToResponse(report);
 

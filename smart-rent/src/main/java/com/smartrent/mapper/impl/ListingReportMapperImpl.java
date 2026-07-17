@@ -39,6 +39,8 @@ public class ListingReportMapperImpl implements ListingReportMapper {
                 .resolvedBy(listingReport.getResolvedBy())
                 .resolvedAt(listingReport.getResolvedAt())
                 .adminNotes(listingReport.getAdminNotes())
+                .resolutionAction(listingReport.getResolutionAction() != null
+                        ? listingReport.getResolutionAction().name() : null)
                 .createdAt(listingReport.getCreatedAt())
                 .updatedAt(listingReport.getUpdatedAt())
                 .build();
