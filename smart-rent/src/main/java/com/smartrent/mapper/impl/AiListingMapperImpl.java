@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -115,16 +116,35 @@ public class AiListingMapperImpl implements AiListingMapper {
                 .build();
     }
 
+    /**
+     * Orders media exactly as the listing gallery shows it: primary first, then by
+     * sortOrder. The AI numbers its per-media findings ("Ảnh N" / "Video N") by the
+     * order it receives the media, so this MUST match the display order in
+     * {@link ListingMapperImpl}. Otherwise "Ảnh 1" in the AI result points at a
+     * different image than the admin sees first in the review dialog — the media
+     * collection comes back in JPA/PK order, which is unrelated to display order.
+     */
+    private static final Comparator<Media> DISPLAY_ORDER =
+            Comparator.comparing((Media m) -> !Boolean.TRUE.equals(m.getIsPrimary()))
+                    .thenComparing(Media::getSortOrder,
+                            Comparator.nullsLast(Comparator.naturalOrder()));
+
     private List<String> buildImages(List<Media> mediaList) {
         return mediaList.stream()
+                // ACTIVE-only + display order so the AI sees the same images, in the
+                // same order, the admin/user does (mirrors ListingMapperImpl).
+                .filter(media -> media.getStatus() == Media.MediaStatus.ACTIVE)
                 .filter(media -> media.getMediaType() == Media.MediaType.IMAGE)
+                .sorted(DISPLAY_ORDER)
                 .map(Media::getUrl)
                 .collect(Collectors.toList());
     }
 
     private List<AiListingVerificationRequest.VideoObject> buildVideos(List<Media> mediaList) {
         return mediaList.stream()
+                .filter(media -> media.getStatus() == Media.MediaStatus.ACTIVE)
                 .filter(media -> media.getMediaType() == Media.MediaType.VIDEO)
+                .sorted(DISPLAY_ORDER)
                 .map(media -> AiListingVerificationRequest.VideoObject.builder()
                         .url(media.getUrl())
                         .caption(media.getDescription())
