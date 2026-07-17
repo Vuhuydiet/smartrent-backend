@@ -96,8 +96,12 @@ public interface ListingReportRepository extends JpaRepository<ListingReport, Lo
             "GROUP BY r.status ORDER BY cnt DESC", nativeQuery = true)
     List<Object[]> countReportsByStatus(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+    // Exclude rows where resolved_at precedes created_at: such records are data
+    // errors (a report can't be resolved before it exists) and would drag the
+    // average resolution time negative. Only genuine, non-negative durations count.
     @Query(value = "SELECT AVG(TIMESTAMPDIFF(MINUTE, r.created_at, r.resolved_at)) FROM listing_reports r " +
-            "WHERE r.created_at BETWEEN :start AND :end AND r.resolved_at IS NOT NULL", nativeQuery = true)
+            "WHERE r.created_at BETWEEN :start AND :end AND r.resolved_at IS NOT NULL " +
+            "AND r.resolved_at >= r.created_at", nativeQuery = true)
     Double avgResolutionMinutes(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     long countByCreatedAtBefore(LocalDateTime dateTime);

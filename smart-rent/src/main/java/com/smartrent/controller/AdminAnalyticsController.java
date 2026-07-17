@@ -193,7 +193,8 @@ public class AdminAnalyticsController {
                                         "brokerVerificationBreakdown": [
                                           {"category": "PENDING", "count": 3, "percentage": 60.0},
                                           {"category": "APPROVED", "count": 2, "percentage": 40.0}
-                                        ]
+                                        ],
+                                        "brokersPendingApproval": 12
                                       }
                                     }
                                     """)

@@ -24,4 +24,11 @@ public class AdminUserAnalyticsResponse {
 
     List<CategoryBreakdownItem> roleBreakdown;
     List<CategoryBreakdownItem> brokerVerificationBreakdown;
+
+    /**
+     * Current, system-wide number of brokers awaiting approval (verification status PENDING),
+     * independent of the selected date range. Backs the "brokers pending" KPI so it reflects the
+     * live backlog rather than only brokers registered within the window.
+     */
+    Long brokersPendingApproval;
 }

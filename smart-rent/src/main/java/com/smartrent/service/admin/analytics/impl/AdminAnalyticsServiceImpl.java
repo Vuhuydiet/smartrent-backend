@@ -1,6 +1,7 @@
 package com.smartrent.service.admin.analytics.impl;
 
 import com.smartrent.dto.response.*;
+import com.smartrent.enums.BrokerVerificationStatus;
 import com.smartrent.infra.repository.ListingReportRepository;
 import com.smartrent.infra.repository.ListingRepository;
 import com.smartrent.infra.repository.TransactionRepository;
@@ -174,6 +175,9 @@ public class AdminAnalyticsServiceImpl implements AdminAnalyticsService {
         List<Object[]> roleRows = userRepository.countNewUsersByRole(start, end);
         List<Object[]> brokerVerificationRows = userRepository.countNewBrokersByVerificationStatus(start, end);
 
+        // Live backlog, not range-scoped: how many brokers are awaiting approval right now.
+        long brokersPendingApproval = userRepository.countByBrokerVerificationStatus(BrokerVerificationStatus.PENDING);
+
         return AdminUserAnalyticsResponse.builder()
                 .dataPoints(series.dataPoints())
                 .total(series.total())
@@ -182,6 +186,7 @@ public class AdminAnalyticsServiceImpl implements AdminAnalyticsService {
                 .totalUsersAsOfRangeEnd(baseline + series.total())
                 .roleBreakdown(buildBreakdown(roleRows))
                 .brokerVerificationBreakdown(buildBreakdown(brokerVerificationRows))
+                .brokersPendingApproval(brokersPendingApproval)
                 .build();
     }
 
