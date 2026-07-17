@@ -5,6 +5,7 @@ import com.smartrent.dto.response.AiListingVerificationResponse;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.DuplicateCheckResponse;
 import com.smartrent.dto.response.StoredAiModerationResponse;
+import com.smartrent.service.ai.AiListingReVerifyService;
 import com.smartrent.service.ai.AiListingVerificationService;
 import com.smartrent.service.ai.AiVerificationSettingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.*;
 public class AiListingVerificationController {
 
     private final AiListingVerificationService aiListingVerificationService;
+    private final AiListingReVerifyService aiListingReVerifyService;
     private final AiVerificationSettingService aiVerificationSettingService;
 
 
@@ -254,12 +256,18 @@ public class AiListingVerificationController {
     @PostMapping("/{listingId}/verify")
     // @PreAuthorize("authentication.authorities.stream().anyMatch(a -> a.authority.startsWith('ROLE_ADMIN') || a.authority.startsWith('ROLE_SUPER_ADMIN'))") // Temporarily disabled for testing
     @Operation(
-        summary = "Verify existing listing by ID",
-        description = "Verifies an existing listing in the system using its ID. Only admins can perform this operation.",
+        summary = "Re-verify an existing listing by ID and store the result",
+        description = "Runs the AI moderation pipeline (verify + duplicate check) for an existing "
+                + "listing by ID and PERSISTS the result as the latest stored moderation, then "
+                + "returns it. Unlike POST /verify (stateless), this updates "
+                + "listing_ai_moderation so the next GET /{listingId}/moderation-result — what the "
+                + "admin review dialog loads when the post is opened — reflects this run. "
+                + "Store-only: it never approves/rejects the listing and never clears the admin's "
+                + "manual decision (manual_override is preserved).",
         parameters = {
             @Parameter(
                 name = "listingId",
-                description = "The ID of the listing to verify",
+                description = "The ID of the listing to re-verify",
                 required = true,
                 example = "123"
             )
@@ -268,7 +276,7 @@ public class AiListingVerificationController {
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200",
-            description = "Listing verified successfully",
+            description = "Listing re-verified and stored successfully",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = ApiResponse.class)
@@ -284,7 +292,7 @@ public class AiListingVerificationController {
                     name = "Listing not found",
                     value = """
                         {
-                          "code": "4003",
+                          "code": "4004",
                           "message": "Listing not found",
                           "data": null
                         }
@@ -301,14 +309,17 @@ public class AiListingVerificationController {
             )
         )
     })
-    public ResponseEntity<ApiResponse<AiListingVerificationResponse>> verifyListingById(
+    public ResponseEntity<ApiResponse<StoredAiModerationResponse>> verifyListingById(
             @PathVariable Long listingId) {
 
-        log.info("Received AI verification request for listing ID: {}", listingId);
+        log.info("Received AI re-verification request for listing ID: {}", listingId);
 
-        // Note: This would require injecting ListingService to fetch the listing
-        // For now, we'll leave this as a placeholder for future implementation
-        throw new UnsupportedOperationException("Verify by listing ID not yet implemented");
+        StoredAiModerationResponse response = aiListingReVerifyService.reVerifyAndStore(listingId);
+
+        return ResponseEntity.ok(ApiResponse.<StoredAiModerationResponse>builder()
+                .message("Listing re-verified and stored successfully")
+                .data(response)
+                .build());
     }
 
     @GetMapping("/service-status")
