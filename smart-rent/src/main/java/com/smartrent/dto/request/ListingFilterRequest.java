@@ -265,8 +265,13 @@ public class ListingFilterRequest {
     Integer minMediaCount;
 
     // ============ CONTENT SEARCH ============
-    @Schema(description = "Keyword search in title and description (FULLTEXT)", example = "căn hộ cao cấp view đẹp")
+    @Schema(description = "Keyword search in title and description (FULLTEXT). A purely-numeric keyword " +
+            "also matches the listing ID exactly (e.g. typing \"12345\" finds listing #12345).",
+            example = "căn hộ cao cấp view đẹp")
     String keyword;
+
+    @Schema(description = "Admin-only: exact match on listing ID (PK lookup, O(1) regardless of table size).", example = "12345")
+    Long id;
 
     @Schema(description = "Case-insensitive substring search on listing TITLE only (admin table view)", example = "Tân Bình")
     String title;
