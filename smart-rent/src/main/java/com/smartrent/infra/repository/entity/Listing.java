@@ -633,4 +633,19 @@ public class Listing {
         // Default to IN_REVIEW if not verified
         return com.smartrent.enums.ListingStatus.IN_REVIEW;
     }
+
+    /**
+     * Whether this listing may be shown to a normal viewer (e.g. the public
+     * detail endpoint, a user's saved-listings list). Mirrors the status
+     * gate {@code getListingById} enforces, so any list built from data that
+     * skips that gate can reuse this single source of truth instead of
+     * duplicating (and risking drift from) the {@link #computeListingStatus()}
+     * rules.
+     */
+    public boolean isPubliclyVisible() {
+        com.smartrent.enums.ListingStatus status = computeListingStatus();
+        return status == com.smartrent.enums.ListingStatus.DISPLAYING
+                || status == com.smartrent.enums.ListingStatus.EXPIRING_SOON
+                || status == com.smartrent.enums.ListingStatus.VERIFIED;
+    }
 }

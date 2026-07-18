@@ -155,7 +155,10 @@ public enum DomainCode {
   USER_POSTING_BLOCKED("23001", HttpStatus.FORBIDDEN,
       "Tài khoản của bạn đã bị chặn đăng tin do có nhiều tin vi phạm bị báo cáo. Vui lòng liên hệ quản trị viên để được hỗ trợ."),
   USER_NOT_BLOCK_ELIGIBLE("23002", HttpStatus.BAD_REQUEST,
-      "Người dùng chưa đủ điều kiện bị chặn đăng tin. Cần trên %d report đã được admin duyệt, hiện tại chỉ có %d.")
+      "Người dùng chưa đủ điều kiện bị chặn đăng tin. Cần trên %d report đã được admin duyệt, hiện tại chỉ có %d."),
+  //    Saved Listing Error 24xxx
+  SAVED_LISTING_LIMIT_EXCEEDED("24001", HttpStatus.BAD_REQUEST,
+      "Bạn chỉ có thể lưu tối đa %d tin. Hãy bỏ lưu một tin để lưu tin khác.")
   ;
 
   private final String value;
