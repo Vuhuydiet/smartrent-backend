@@ -55,9 +55,11 @@ public interface BrokerService {
      * Admin: get paginated list of users with PENDING broker registration.
      * Ordered oldest-first (FIFO). Each entry includes presigned document URLs.
      *
-     * @param page 1-based page number
-     * @param size page size
+     * @param page    1-based page number
+     * @param size    page size
+     * @param keyword optional search term matched against first name, last name,
+     *                email, and phone number (OR-combined, case-insensitive)
      * @return paginated list of pending broker users
      */
-    PageResponse<AdminBrokerUserResponse> getPendingBrokers(int page, int size);
+    PageResponse<AdminBrokerUserResponse> getPendingBrokers(int page, int size, String keyword);
 }

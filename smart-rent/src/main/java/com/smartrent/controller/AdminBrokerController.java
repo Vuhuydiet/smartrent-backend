@@ -56,6 +56,9 @@ public class AdminBrokerController {
 
                     Results are ordered oldest-first (FIFO) so admins process requests in submission order.
 
+                    Optional `keyword` searches first name, last name, email, and phone number
+                    (OR-combined, case-insensitive).
+
                     **Admin workflow:**
                     1. Call this endpoint to find pending users.
                     2. Manually verify the user at: https://www.nangluchdxd.gov.vn/Canhan?page=2&pagesize=20
@@ -118,9 +121,11 @@ public class AdminBrokerController {
             @Parameter(description = "Page number (1-indexed)", example = "1")
             @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Number of items per page (max 100)", example = "20")
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Search term matched against name, email, and phone number (case-insensitive)")
+            @RequestParam(required = false) String keyword) {
 
-        PageResponse<AdminBrokerUserResponse> result = brokerService.getPendingBrokers(page, size);
+        PageResponse<AdminBrokerUserResponse> result = brokerService.getPendingBrokers(page, size, keyword);
         return ApiResponse.<PageResponse<AdminBrokerUserResponse>>builder().data(result).build();
     }
 

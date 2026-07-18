@@ -1,12 +1,9 @@
 package com.smartrent.infra.repository;
 
-import com.smartrent.enums.BrokerVerificationStatus;
 import com.smartrent.infra.repository.entity.User;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -47,15 +44,4 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
                         "FROM users u WHERE u.created_at BETWEEN :start AND :end AND u.is_broker = true " +
                         "GROUP BY u.broker_verification_status", nativeQuery = true)
         List<Object[]> countNewBrokersByVerificationStatus(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
-
-        /**
-         * System-wide count of brokers in a given verification state, independent of any date range.
-         * Used for the "brokers pending approval" KPI, which reflects the current backlog rather
-         * than only brokers who registered within the selected analytics window.
-         */
-        long countByBrokerVerificationStatus(BrokerVerificationStatus status);
-
-        Page<User> findAllByBrokerVerificationStatusOrderByBrokerRegisteredAtAsc(
-                        BrokerVerificationStatus status,
-                        Pageable pageable);
 }

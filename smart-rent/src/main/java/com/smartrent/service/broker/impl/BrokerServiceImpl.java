@@ -30,6 +30,8 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -241,11 +243,28 @@ public class BrokerServiceImpl implements BrokerService {
     }
 
     @Override
-    public PageResponse<AdminBrokerUserResponse> getPendingBrokers(int page, int size) {
-        Pageable pageable = PageRequest.of(page - 1, size);
-        Page<User> pageResult = userRepository
-                .findAllByBrokerVerificationStatusOrderByBrokerRegisteredAtAsc(
-                        BrokerVerificationStatus.PENDING, pageable);
+    public PageResponse<AdminBrokerUserResponse> getPendingBrokers(int page, int size, String keyword) {
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(Sort.Direction.ASC, "brokerRegisteredAt"));
+
+        Specification<User> spec = (root, query, cb) ->
+                cb.equal(root.get("brokerVerificationStatus"), BrokerVerificationStatus.PENDING);
+
+        String kw = keyword != null ? keyword.trim() : null;
+        if (kw != null && !kw.isEmpty()) {
+            // name/email/phone already have B-tree indexes (idx_users_first_name,
+            // idx_users_last_name, idx_users_email, idx_users_phone_number), and
+            // idx_users_broker_status narrows to PENDING rows first, so this OR
+            // scan runs over a small, already-filtered set.
+            String pattern = "%" + kw.toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.or(
+                    cb.like(cb.lower(root.get("firstName")), pattern),
+                    cb.like(cb.lower(root.get("lastName")), pattern),
+                    cb.like(cb.lower(root.get("email")), pattern),
+                    cb.like(root.get("phoneNumber"), "%" + kw + "%")
+            ));
+        }
+
+        Page<User> pageResult = userRepository.findAll(spec, pageable);
 
         List<AdminBrokerUserResponse> items = pageResult.getContent().stream()
                 .map(this::toAdminBrokerResponse)
