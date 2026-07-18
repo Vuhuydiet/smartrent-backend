@@ -195,6 +195,63 @@ public class PricingHistoryServiceImpl implements PricingHistoryService {
     }
 
     @Override
+    @Transactional
+    public void recordExternalPriceChange(Long listingId, BigDecimal oldPrice, Listing.PriceUnit oldPriceUnit,
+                                           BigDecimal newPrice, Listing.PriceUnit newPriceUnit,
+                                           String changedBy, String changeReason) {
+        log.info("Recording external price change for listing: {} ({} -> {})", listingId, oldPrice, newPrice);
+
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new RuntimeException("Listing not found with id: " + listingId));
+
+        boolean hasCurrent = pricingHistoryRepository.findByListingListingIdAndIsCurrentTrue(listingId).isPresent();
+        if (!hasCurrent && oldPrice != null) {
+            // No history yet (createInitialPricing isn't wired into listing creation) — backfill
+            // a baseline at the pre-edit price so this edit renders as a real delta on the chart,
+            // mirroring what the V68 migration did for pre-existing listings.
+            PricingHistory baseline = PricingHistory.builder()
+                    .listing(listing)
+                    .oldPrice(null)
+                    .newPrice(oldPrice)
+                    .oldPriceUnit(null)
+                    .newPriceUnit(oldPriceUnit != null ? oldPriceUnit : newPriceUnit)
+                    .changeType(PricingHistory.PriceChangeType.INITIAL)
+                    .changePercentage(BigDecimal.ZERO)
+                    .changeAmount(BigDecimal.ZERO)
+                    .isCurrent(false)
+                    .changedBy(changedBy)
+                    .changeReason("Initial pricing (backfilled on edit)")
+                    .changedAt(listing.getCreatedAt() != null ? listing.getCreatedAt() : LocalDateTime.now())
+                    .build();
+            pricingHistoryRepository.save(baseline);
+        }
+
+        BigDecimal effectiveOldPrice = oldPrice != null ? oldPrice : newPrice;
+        Listing.PriceUnit effectiveOldUnit = oldPriceUnit != null ? oldPriceUnit : newPriceUnit;
+        PricingHistory.PriceChangeType changeType = determineChangeType(effectiveOldPrice, newPrice, effectiveOldUnit, newPriceUnit);
+        BigDecimal changeAmount = newPrice.subtract(effectiveOldPrice);
+        BigDecimal changePercentage = calculateChangePercentage(effectiveOldPrice, newPrice);
+
+        pricingHistoryRepository.updateIsCurrentFalseByListingListingId(listingId);
+
+        PricingHistory newPricing = PricingHistory.builder()
+                .listing(listing)
+                .oldPrice(oldPrice)
+                .newPrice(newPrice)
+                .oldPriceUnit(oldPriceUnit)
+                .newPriceUnit(newPriceUnit)
+                .changeType(changeType)
+                .changePercentage(changePercentage)
+                .changeAmount(changeAmount)
+                .isCurrent(true)
+                .changedBy(changedBy)
+                .changeReason(changeReason)
+                .changedAt(LocalDateTime.now())
+                .build();
+        pricingHistoryRepository.save(newPricing);
+    }
+
+    @Override
     public PriceStatistics getPriceStatistics(Long listingId) {
         log.info("Getting price statistics for listing: {}", listingId);
 

@@ -3,6 +3,7 @@ package com.smartrent.service.pricing;
 import com.smartrent.dto.request.PriceUpdateRequest;
 import com.smartrent.dto.response.PageResponse;
 import com.smartrent.dto.response.PricingHistoryResponse;
+import com.smartrent.infra.repository.entity.Listing;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -15,6 +16,14 @@ public interface PricingHistoryService {
 
     // Update price and create pricing history
     PricingHistoryResponse updatePrice(Long listingId, PriceUpdateRequest request, String changedBy);
+
+    // Record a price change made through a non-dedicated flow (e.g. the generic
+    // listing edit form), where the caller already knows old/new price and has
+    // already performed ownership checks. Backfills a baseline row first if the
+    // listing has no pricing history yet, so the edit shows up as a real delta.
+    void recordExternalPriceChange(Long listingId, BigDecimal oldPrice, Listing.PriceUnit oldPriceUnit,
+                                    BigDecimal newPrice, Listing.PriceUnit newPriceUnit,
+                                    String changedBy, String changeReason);
 
     // Get pricing history for a listing
     List<PricingHistoryResponse> getPricingHistoryByListingId(Long listingId);
