@@ -46,6 +46,7 @@ import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -72,6 +73,7 @@ public class ListingModerationServiceImpl implements ListingModerationService {
     NotificationService notificationService;
     UserFollowService userFollowService;
     org.springframework.context.ApplicationEventPublisher eventPublisher;
+    com.smartrent.service.pricing.PricingHistoryService pricingHistoryService;
 
     @NonFinal
     @Value("${application.email.sender.email}")
@@ -451,6 +453,8 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         if (request.getListingType() != null) listing.setListingType(Listing.ListingType.valueOf(request.getListingType()));
         if (request.getCategoryId() != null) listing.setCategoryId(request.getCategoryId());
         if (request.getProductType() != null) listing.setProductType(Listing.ProductType.valueOf(request.getProductType()));
+        BigDecimal oldPrice = listing.getPrice();
+        Listing.PriceUnit oldPriceUnit = listing.getPriceUnit();
         if (request.getPrice() != null) listing.setPrice(request.getPrice());
         if (request.getPriceUnit() != null) listing.setPriceUnit(Listing.PriceUnit.valueOf(request.getPriceUnit()));
         if (request.getArea() != null) listing.setArea(request.getArea());
@@ -489,7 +493,14 @@ public class ListingModerationServiceImpl implements ListingModerationService {
         listing.setVerified(false);
         listing.setIsVerify(true); // Back to IN_REVIEW in legacy view
         listing.setRevisionCount(listing.getRevisionCount() + 1);
-        listingRepository.save(listing);
+        Listing saved = listingRepository.save(listing);
+
+        boolean priceChanged = request.getPrice() != null
+                && (oldPrice == null || oldPrice.compareTo(saved.getPrice()) != 0 || oldPriceUnit != saved.getPriceUnit());
+        if (priceChanged) {
+            pricingHistoryService.recordExternalPriceChange(listingId, oldPrice, oldPriceUnit,
+                    saved.getPrice(), saved.getPriceUnit(), userId, "Cập nhật qua chỉnh sửa & gửi lại tin đăng");
+        }
 
         // --- AI Moderation Integration ---
         listingAiModerationRepository.findById(listing.getListingId())

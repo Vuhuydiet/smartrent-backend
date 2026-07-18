@@ -140,6 +140,7 @@ public class ListingServiceImpl implements ListingService {
     NotificationService notificationService;
     org.springframework.context.ApplicationEventPublisher eventPublisher;
     com.smartrent.infra.repository.ListingAiModerationRepository listingAiModerationRepository;
+    com.smartrent.service.pricing.PricingHistoryService pricingHistoryService;
 
     @Override
     @Transactional
@@ -722,6 +723,8 @@ public class ListingServiceImpl implements ListingService {
         if (request.getVipType() != null) existing.setVipType(Listing.VipType.valueOf(request.getVipType()));
         if (request.getCategoryId() != null) existing.setCategoryId(request.getCategoryId());
         if (request.getProductType() != null) existing.setProductType(Listing.ProductType.valueOf(request.getProductType()));
+        BigDecimal oldPrice = existing.getPrice();
+        Listing.PriceUnit oldPriceUnit = existing.getPriceUnit();
         if (request.getPrice() != null) existing.setPrice(request.getPrice());
         if (request.getPriceUnit() != null) existing.setPriceUnit(Listing.PriceUnit.valueOf(request.getPriceUnit()));
         if (request.getArea() != null) existing.setArea(request.getArea());
@@ -782,6 +785,12 @@ public class ListingServiceImpl implements ListingService {
         Listing saved = listingRepository.save(existing);
         if (sentBackToReview) {
             queueAiAnalysis(saved);
+        }
+        boolean priceChanged = request.getPrice() != null
+                && (oldPrice == null || oldPrice.compareTo(saved.getPrice()) != 0 || oldPriceUnit != saved.getPriceUnit());
+        if (priceChanged) {
+            pricingHistoryService.recordExternalPriceChange(id, oldPrice, oldPriceUnit,
+                    saved.getPrice(), saved.getPriceUnit(), userId, "Cập nhật qua chỉnh sửa tin đăng");
         }
         com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(saved.getUserId());
         com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(saved.getAddress());
