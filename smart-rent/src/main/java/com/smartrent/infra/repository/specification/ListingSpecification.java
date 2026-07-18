@@ -677,9 +677,31 @@ public class ListingSpecification {
                 ));
             }
 
-            // ============ KEYWORD SEARCH (FULLTEXT + LIKE fallback) ============
+            // ============ ADMIN: EXACT LISTING ID FILTER ============
+            // Pure PK equality — MySQL always picks the clustered-index seek for this
+            // regardless of what else is filtered, so no dedicated index is needed.
+            if (filter.getId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("listingId"), filter.getId()));
+            }
+
+            // ============ KEYWORD SEARCH (FULLTEXT + LIKE fallback + numeric ID) ============
             if (filter.getKeyword() != null && !filter.getKeyword().trim().isEmpty()) {
-                String normalized = TextNormalizer.normalize(filter.getKeyword());
+                String trimmedKeyword = filter.getKeyword().trim();
+
+                // A purely-numeric keyword (e.g. a pasted listing ID) also matches the
+                // listing PK directly — OR'd with the text match below — so the one
+                // quick-search box doubles as an ID lookup with no separate field needed.
+                Predicate idMatch = null;
+                if (trimmedKeyword.matches("\\d+")) {
+                    try {
+                        idMatch = criteriaBuilder.equal(root.get("listingId"), Long.valueOf(trimmedKeyword));
+                    } catch (NumberFormatException ignored) {
+                        // Too large for a Long (unrealistic for a listing id) — skip the ID match.
+                    }
+                }
+
+                String normalized = TextNormalizer.normalize(trimmedKeyword);
+                Predicate textMatch = null;
                 if (normalized != null && !normalized.isEmpty()) {
                     // Use MySQL FULLTEXT MATCH...AGAINST in BOOLEAN MODE for indexed search
                     // Each word gets a '+' prefix for AND semantics, '*' suffix for prefix matching
@@ -712,8 +734,16 @@ public class ListingSpecification {
                         // honored and exact substrings always match.
                         Predicate likeMatch = criteriaBuilder.and(
                             likeAllWords.toArray(new Predicate[0]));
-                        predicates.add(criteriaBuilder.or(ftMatch, likeMatch));
+                        textMatch = criteriaBuilder.or(ftMatch, likeMatch);
                     }
+                }
+
+                if (idMatch != null && textMatch != null) {
+                    predicates.add(criteriaBuilder.or(idMatch, textMatch));
+                } else if (idMatch != null) {
+                    predicates.add(idMatch);
+                } else if (textMatch != null) {
+                    predicates.add(textMatch);
                 }
             }
 

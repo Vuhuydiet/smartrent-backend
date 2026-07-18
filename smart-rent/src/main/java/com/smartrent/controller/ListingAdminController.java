@@ -29,6 +29,8 @@ import org.springframework.web.bind.annotation.*;
         **Dashboard statistics:** pendingVerification, verified, expired, rejected counts, VIP tier breakdown.
 
         **Common filter combinations:**
+        - By exact listing ID: `{"id": 12345}` (PK lookup — fastest possible filter)
+        - Quick search also matches ID: `{"keyword": "12345"}` matches listing #12345 as well as title/address/description text
         - Pending review: `{"verified": false, "isVerify": true}`
         - By moderation status: `{"moderationStatus": "PENDING_REVIEW"}`
         - By VIP tier: `{"vipType": "GOLD"}`
@@ -141,6 +143,17 @@ public class ListingAdminController {
                               "page": 1,
                               "size": 20,
                               "moderationStatus": "PENDING_REVIEW"
+                            }
+                            """
+                    ),
+                    @ExampleObject(
+                        name = "Find by exact listing ID",
+                        summary = "Exact match on the listing ID (PK lookup)",
+                        value = """
+                            {
+                              "page": 1,
+                              "size": 20,
+                              "id": 12345
                             }
                             """
                     ),
