@@ -14,13 +14,17 @@ import java.util.List;
  * Dashboard statistics for {@code POST /v1/listings/admin/list}.
  *
  * <p>{@code getStatistics()} aggregates over the ENTIRE listings table
- * (no WHERE clause) — every admin list request was paying that full scan on
- * top of the paginated query, regardless of page/filters. Cached with a
- * short TTL (see application.yml) so repeated admin requests within the
- * window reuse one computed result instead of re-scanning the table each
- * time. Lives in its own bean (not a private method on ListingServiceImpl)
- * because {@code @Cacheable} can't intercept self-invoked calls within the
- * same class.
+ * (no WHERE clause on moderation status/page filters) — every admin list
+ * request was paying that full scan on top of the paginated query,
+ * regardless of page/filters. Cached with a short TTL (see application.yml)
+ * so repeated admin requests within the window reuse one computed result
+ * instead of re-scanning the table each time. Lives in its own bean (not a
+ * private method on ListingServiceImpl) because {@code @Cacheable} can't
+ * intercept self-invoked calls within the same class.
+ *
+ * <p>{@code totalListings} itself still excludes drafts and shadow listings
+ * (see {@link ListingRepository#getAdminStatistics()}), matching the
+ * "total listings" figure on the analytics dashboard.
  */
 @Service
 @RequiredArgsConstructor
