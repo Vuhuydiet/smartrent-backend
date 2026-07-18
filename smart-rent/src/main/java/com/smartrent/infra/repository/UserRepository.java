@@ -36,13 +36,20 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
 
         long countByCreatedAtBefore(LocalDateTime dateTime);
 
-        @Query(value = "SELECT CASE WHEN u.is_broker = true THEN 'BROKER' ELSE 'REGULAR' END AS label, COUNT(*) AS cnt " +
+        // Classifies by whether the user ever submitted a broker application (verification
+        // status <> NONE), not by the current is_broker flag — is_broker only flips to true
+        // once an admin approves, so keying off it made almost every signup cohort show up
+        // as REGULAR even when a chunk of them had a pending/rejected broker application.
+        @Query(value = "SELECT CASE WHEN u.broker_verification_status <> 'NONE' THEN 'BROKER' ELSE 'REGULAR' END AS label, COUNT(*) AS cnt " +
                         "FROM users u WHERE u.created_at BETWEEN :start AND :end " +
-                        "GROUP BY u.is_broker", nativeQuery = true)
+                        "GROUP BY 1", nativeQuery = true)
         List<Object[]> countNewUsersByRole(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
+        // Filtering on is_broker = true here excluded PENDING and REJECTED entirely, since
+        // is_broker is only ever true for APPROVED users — the breakdown could never show
+        // anything but 100% APPROVED. Filter on having applied at all instead.
         @Query(value = "SELECT u.broker_verification_status AS label, COUNT(*) AS cnt " +
-                        "FROM users u WHERE u.created_at BETWEEN :start AND :end AND u.is_broker = true " +
+                        "FROM users u WHERE u.created_at BETWEEN :start AND :end AND u.broker_verification_status <> 'NONE' " +
                         "GROUP BY u.broker_verification_status", nativeQuery = true)
         List<Object[]> countNewBrokersByVerificationStatus(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
