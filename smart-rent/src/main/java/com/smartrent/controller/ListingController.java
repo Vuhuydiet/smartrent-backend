@@ -356,7 +356,7 @@ public class ListingController {
     @GetMapping("/my-following-feed")
     @Operation(
             summary = "List public listings from users I follow",
-            description = "Authenticated. Returns paginated card-shaped listings posted by users that the current viewer follows, newest first. Drafts, shadow rows, and unverified listings are excluded. Pass `userId` to narrow the feed to a single followed user — ignored if the viewer does not actually follow that user.",
+            description = "Authenticated. Returns paginated card-shaped listings posted by users that the current viewer follows, sorted by VIP tier (DIAMOND, then GOLD, SILVER, NORMAL) and newest first within each tier. Drafts, shadow rows, and unverified listings are excluded. Pass `userId` to narrow the feed to a single followed user — ignored if the viewer does not actually follow that user.",
             security = @SecurityRequirement(name = "Bearer Authentication"),
             parameters = {
                     @Parameter(name = "userId", description = "Optional — when provided, narrow the feed to listings from this single followed user", example = "u-1234"),

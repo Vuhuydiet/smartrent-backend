@@ -2333,12 +2333,18 @@ public class ListingServiceImpl implements ListingService {
             followingIds = java.util.List.of(targetUserId);
         }
 
+        // VIP tier first (vipTypeSortOrder: DIAMOND=1, GOLD=2, SILVER=3, NORMAL=4),
+        // same default ordering as the main search endpoint (see
+        // ListingQueryService#buildSort), then newest within each tier.
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
                 safePage - 1,
                 safeSize,
                 org.springframework.data.domain.Sort.by(
-                        org.springframework.data.domain.Sort.Direction.DESC,
-                        "postDate", "createdAt"));
+                                org.springframework.data.domain.Sort.Direction.ASC,
+                                "vipTypeSortOrder")
+                        .and(org.springframework.data.domain.Sort.by(
+                                org.springframework.data.domain.Sort.Direction.DESC,
+                                "postDate", "createdAt")));
 
         Page<Listing> result = listingRepository.findPublicListingsByUserIdIn(followingIds, pageable);
         List<ListingCardResponse> cards = batchMapCardListings(result.getContent());
