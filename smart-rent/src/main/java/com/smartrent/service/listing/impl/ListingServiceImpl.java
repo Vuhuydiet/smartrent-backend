@@ -25,7 +25,6 @@ import com.smartrent.dto.response.ListingResponseWithAdmin;
 import com.smartrent.dto.response.PaymentResponse;
 import com.smartrent.dto.response.ProvinceListingStatsResponse;
 import com.smartrent.enums.BenefitType;
-import com.smartrent.enums.ListingStatus;
 import com.smartrent.enums.ModerationStatus;
 import com.smartrent.enums.NotificationType;
 import com.smartrent.enums.PostSource;
@@ -631,11 +630,7 @@ public class ListingServiceImpl implements ListingService {
         // This endpoint is public (no auth) — only listings currently visible to the public
         // (not pending review, rejected, suspended, expired, etc.) may be served here. Anything
         // else is indistinguishable from "not found" to an anonymous caller.
-        ListingStatus listingStatus = listing.computeListingStatus();
-        boolean isPubliclyVisible = listingStatus == ListingStatus.DISPLAYING
-                || listingStatus == ListingStatus.EXPIRING_SOON
-                || listingStatus == ListingStatus.VERIFIED;
-        if (!isPubliclyVisible) {
+        if (!listing.isPubliclyVisible()) {
             throw new DomainException(DomainCode.LISTING_NOT_FOUND);
         }
 
