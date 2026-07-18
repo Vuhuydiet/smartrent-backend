@@ -396,6 +396,13 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
      * Get admin statistics in a single query instead of 11 separate COUNT queries.
      * Returns: [pendingVerification, verified, expired, rejected, drafts, shadows,
      *          normalListings, silverListings, goldListings, diamondListings, totalListings]
+     *
+     * <p>{@code totalListings} excludes drafts and shadow listings — same convention as
+     * {@link #countByCreatedAtBeforeAndIsDraftFalseAndIsShadowFalse}, which backs the
+     * "total listings" figure on the analytics dashboard (GET /v1/admin/analytics/listings).
+     * A plain {@code COUNT(l)} here would count unsubmitted drafts and internal shadow
+     * listings as "posts", inflating this total above that page's and contradicting the
+     * "all submitted posts" label shown with it.
      */
     @Query("""
         SELECT
@@ -409,7 +416,7 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
             SUM(CASE WHEN l.vipType = 'SILVER' THEN 1 ELSE 0 END),
             SUM(CASE WHEN l.vipType = 'GOLD' THEN 1 ELSE 0 END),
             SUM(CASE WHEN l.vipType = 'DIAMOND' THEN 1 ELSE 0 END),
-            COUNT(l)
+            SUM(CASE WHEN l.isDraft = false AND l.isShadow = false THEN 1 ELSE 0 END)
         FROM listings l
     """)
     List<Object[]> getAdminStatistics();
