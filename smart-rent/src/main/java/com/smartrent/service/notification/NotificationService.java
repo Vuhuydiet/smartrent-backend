@@ -20,16 +20,6 @@ public interface NotificationService {
                           Long referenceId, String referenceType);
 
     /**
-     * Create a notification for a specific recipient, optionally skipping the
-     * realtime WebSocket push. When {@code pushRealtime} is false the notification
-     * is still persisted and shows up the next time the recipient checks their
-     * notifications (poll / open the notification list) — it just isn't delivered live.
-     */
-    void sendNotification(String recipientId, RecipientType recipientType,
-                          NotificationType type, String title, String message,
-                          Long referenceId, String referenceType, boolean pushRealtime);
-
-    /**
      * Create and send a notification to ALL admins.
      */
     void sendToAllAdmins(NotificationType type, String title, String message,

@@ -37,14 +37,6 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendNotification(String recipientId, RecipientType recipientType,
                                  NotificationType type, String title, String message,
                                  Long referenceId, String referenceType) {
-        sendNotification(recipientId, recipientType, type, title, message, referenceId, referenceType, true);
-    }
-
-    @Override
-    @Transactional
-    public void sendNotification(String recipientId, RecipientType recipientType,
-                                 NotificationType type, String title, String message,
-                                 Long referenceId, String referenceType, boolean pushRealtime) {
         try {
             Notification notification = Notification.builder()
                     .recipientId(recipientId)
@@ -58,10 +50,6 @@ public class NotificationServiceImpl implements NotificationService {
 
             Notification saved = notificationRepository.save(notification);
             log.info("Notification saved: type={}, recipient={}:{}", type, recipientType, recipientId);
-
-            if (!pushRealtime) {
-                return;
-            }
 
             // Send WebSocket AFTER transaction commits to avoid race condition
             // where frontend queries DB before TX is visible.
