@@ -165,7 +165,8 @@ public class ListingQueryService {
      * @return Pageable object for JPA query
      */
     private Pageable buildPageable(ListingFilterRequest filter) {
-        Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection());
+        Sort sort = buildSort(filter.getSortBy(), filter.getSortDirection(),
+                Boolean.TRUE.equals(filter.getIsOwnerRequest()));
 
         // Ensure valid page and size values
         // Convert from 1-based (frontend) to 0-based (Spring Data)
@@ -177,20 +178,26 @@ public class ListingQueryService {
 
     /**
      * Build Sort object from sort field and direction
-     * DEFAULT SORTING: All listings are always sorted by:
+     * DEFAULT SORTING (public/admin requests): All listings are sorted by:
      * 1. vipTypeSortOrder ASC (DIAMOND=1, GOLD=2, SILVER=3, NORMAL=4)
      * 2. updatedAt DESC (newest first within each VIP tier)
+     *
+     * Owner requests (the seller's own "My Listings" dashboard) skip the VIP-tier
+     * grouping entirely — a seller looking at only their own listings expects
+     * "Newest"/"Oldest" to be a plain date sort, not grouped by package tier.
      *
      * User can specify additional sorting criteria which will be applied AFTER the default sorting
      *
      * @param sortBy Sort field name (postDate, price, area, createdAt, updatedAt)
      * @param sortDirection Sort direction (ASC or DESC)
+     * @param isOwnerRequest true for the seller's own listings dashboard
      * @return Sort object for JPA query
      */
-    private Sort buildSort(String sortBy, String sortDirection) {
-        // Default sorting: vipTypeSortOrder ASC, then updatedAt DESC
-        Sort defaultSort = Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
-                .and(Sort.by(Sort.Direction.DESC, "updatedAt"));
+    private Sort buildSort(String sortBy, String sortDirection, boolean isOwnerRequest) {
+        Sort defaultSort = isOwnerRequest
+                ? Sort.by(Sort.Direction.DESC, "updatedAt")
+                : Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                        .and(Sort.by(Sort.Direction.DESC, "updatedAt"));
 
         // If user specifies custom sorting, apply it
         if (sortBy != null && !sortBy.isEmpty()) {
@@ -201,10 +208,14 @@ public class ListingQueryService {
             // NEWEST/OLDEST replace default sort entirely (otherwise updatedAt conflicts)
             // PRICE_ASC/PRICE_DESC prepend price sort before default
             return switch (sortBy) {
-                case "NEWEST" -> Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
-                        .and(Sort.by(Sort.Direction.DESC, "updatedAt"));
-                case "OLDEST" -> Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
-                        .and(Sort.by(Sort.Direction.ASC, "updatedAt"));
+                case "NEWEST" -> isOwnerRequest
+                        ? Sort.by(Sort.Direction.DESC, "updatedAt")
+                        : Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                                .and(Sort.by(Sort.Direction.DESC, "updatedAt"));
+                case "OLDEST" -> isOwnerRequest
+                        ? Sort.by(Sort.Direction.ASC, "updatedAt")
+                        : Sort.by(Sort.Direction.ASC, "vipTypeSortOrder")
+                                .and(Sort.by(Sort.Direction.ASC, "updatedAt"));
                 case "PRICE_ASC" -> Sort.by(Sort.Direction.ASC, "price")
                         .and(defaultSort);
                 case "PRICE_DESC" -> Sort.by(Sort.Direction.DESC, "price")
