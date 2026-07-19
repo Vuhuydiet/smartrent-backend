@@ -285,7 +285,9 @@ public class ListingReportServiceImpl implements ListingReportService {
         // Notify the listing owner about the resolution
         sendOwnerNotificationEmail(savedReport, newStatus);
 
-        // Realtime notification: notify reporter
+        // In-app notification: notify reporter. Saved for the user to see next time
+        // they check their notifications — no realtime WebSocket push for report
+        // resolutions, so this doesn't interrupt them with a live toast/badge.
         NotificationType reporterNotifType = (newStatus == ReportStatus.RESOLVED)
                 ? NotificationType.REPORT_RESOLVED : NotificationType.REPORT_REJECTED;
         if (report.getReporterEmail() != null) {
@@ -295,10 +297,10 @@ public class ListingReportServiceImpl implements ListingReportService {
                             reporterNotifType,
                             "Báo cáo của bạn đã được xem xét",
                             "Báo cáo #" + reportId + " của bạn đã được " + newStatus.name().toLowerCase() + ".",
-                            reportId, "REPORT"));
+                            reportId, "REPORT", false));
         }
 
-        // Realtime notification: notify listing owner
+        // In-app notification: notify listing owner (same no-realtime-push behavior).
         Listing listing = listingRepository.findById(report.getListingId()).orElse(null);
         if (listing != null && listing.getUserId() != null) {
             notificationService.sendNotification(
@@ -306,7 +308,7 @@ public class ListingReportServiceImpl implements ListingReportService {
                     reporterNotifType,
                     "Báo cáo về tin đăng của bạn đã được xem xét",
                     "Một báo cáo về tin đăng \"" + listing.getTitle() + "\" của bạn đã được " + newStatus.name().toLowerCase() + ".",
-                    listing.getListingId(), "LISTING");
+                    listing.getListingId(), "LISTING", false);
         }
 
         // If admin resolved and owner action is required, delegate to moderation service
