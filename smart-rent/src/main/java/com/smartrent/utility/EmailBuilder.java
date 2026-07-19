@@ -101,8 +101,7 @@ public class EmailBuilder {
 
     // Footer
     htmlContent.append("<div class=\"footer\">");
-    htmlContent.append("Nếu bạn không yêu cầu xác minh này, vui lòng bỏ qua email này.<br>");
-    htmlContent.append("&copy; %d %s. Bản quyền được bảo lưu.".formatted(currentYear(), senderName));
+    htmlContent.append("Nếu bạn không yêu cầu xác minh này, vui lòng bỏ qua email này.");
     htmlContent.append("</div>");
 
     htmlContent.append("</div>"); // End container
@@ -156,8 +155,7 @@ public class EmailBuilder {
 
     // Footer
     htmlContent.append("<div class=\"footer\">");
-    htmlContent.append("Email này được gửi tự động &mdash; bạn không cần phản hồi.<br>");
-    htmlContent.append("&copy; %d %s. Bản quyền được bảo lưu.".formatted(currentYear(), senderName));
+    htmlContent.append("Email này được gửi tự động &mdash; bạn không cần phản hồi.");
     htmlContent.append("</div>");
 
     htmlContent.append("</div>"); // End container
@@ -211,8 +209,7 @@ public class EmailBuilder {
 
     // Footer
     htmlContent.append("<div class=\"footer\">");
-    htmlContent.append("Email này được gửi tự động &mdash; bạn không cần phản hồi.<br>");
-    htmlContent.append("&copy; %d %s. Bản quyền được bảo lưu.".formatted(currentYear(), senderName));
+    htmlContent.append("Email này được gửi tự động &mdash; bạn không cần phản hồi.");
     htmlContent.append("</div>");
 
     htmlContent.append("</div>"); // End container
@@ -269,8 +266,7 @@ public class EmailBuilder {
     htmlContent.append("</div>"); // End content
 
     htmlContent.append("<div class=\"footer\">");
-    htmlContent.append("Email này được gửi tự động &mdash; bạn không cần phản hồi.<br>");
-    htmlContent.append("&copy; %d %s. Bản quyền được bảo lưu.".formatted(currentYear(), senderName));
+    htmlContent.append("Email này được gửi tự động &mdash; bạn không cần phản hồi.");
     htmlContent.append("</div>");
 
     htmlContent.append("</div>"); // End container
