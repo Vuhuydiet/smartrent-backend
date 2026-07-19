@@ -22,7 +22,6 @@ public class ModerationEmailBuilder {
         html.append("<div class=\"card-body\">Đã duyệt &mdash; đang hiển thị công khai.</div>");
         html.append("</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">&copy; %d SmartRent. Bản quyền được bảo lưu.</div>".formatted(EmailBuilder.currentYear()));
         html.append("</div></body></html>");
         return html.toString();
     }
@@ -42,9 +41,7 @@ public class ModerationEmailBuilder {
             html.append("<div class=\"card-body\">%s</div>".formatted(safe(reason)));
             html.append("</div>");
         }
-        html.append("<div class=\"message\">Vui lòng cập nhật tin đăng và gửi lại để được xem xét.</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">&copy; %d SmartRent. Bản quyền được bảo lưu.</div>".formatted(EmailBuilder.currentYear()));
         html.append("</div></body></html>");
         return html.toString();
     }
@@ -66,7 +63,6 @@ public class ModerationEmailBuilder {
         }
         html.append("<div class=\"message\">Vui lòng chỉnh sửa tin đăng và nhấn &ldquo;Gửi lại để xem xét&rdquo; khi bạn hoàn tất.</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">&copy; %d SmartRent. Bản quyền được bảo lưu.</div>".formatted(EmailBuilder.currentYear()));
         html.append("</div></body></html>");
         return html.toString();
     }
@@ -88,7 +84,6 @@ public class ModerationEmailBuilder {
         }
         html.append("<div class=\"message\">Vui lòng cập nhật tin đăng và gửi lại để được xem xét.</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">&copy; %d SmartRent. Bản quyền được bảo lưu.</div>".formatted(EmailBuilder.currentYear()));
         html.append("</div></body></html>");
         return html.toString();
     }
@@ -114,7 +109,6 @@ public class ModerationEmailBuilder {
         }
         html.append("<div class=\"message\">Nếu bạn cho rằng đây là nhầm lẫn, vui lòng liên hệ đội ngũ hỗ trợ của SmartRent.</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">&copy; %d SmartRent. Bản quyền được bảo lưu.</div>".formatted(EmailBuilder.currentYear()));
         html.append("</div></body></html>");
         return html.toString();
     }
@@ -152,7 +146,6 @@ public class ModerationEmailBuilder {
         }
         html.append("<div class=\"message\">Chúng tôi đánh giá cao sự giúp đỡ của bạn trong việc giữ SmartRent trở thành nền tảng an toàn và chính xác.</div>");
         html.append("</div>");
-        html.append("<div class=\"footer\">&copy; %d SmartRent. Bản quyền được bảo lưu.</div>".formatted(EmailBuilder.currentYear()));
         html.append("</div></body></html>");
         return html.toString();
     }
@@ -189,7 +182,6 @@ public class ModerationEmailBuilder {
             html.append("</div>");
         }
         html.append("</div>");
-        html.append("<div class=\"footer\">&copy; %d SmartRent. Bản quyền được bảo lưu.</div>".formatted(EmailBuilder.currentYear()));
         html.append("</div></body></html>");
         return html.toString();
     }
