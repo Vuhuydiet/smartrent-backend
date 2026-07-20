@@ -6,6 +6,7 @@ import com.smartrent.dto.response.ChatResponse;
 import com.smartrent.service.ai.ChatRateLimitService;
 import com.smartrent.service.ai.ChatService;
 import com.smartrent.service.ai.ChatStreamService;
+import com.smartrent.util.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -159,10 +160,15 @@ public class ChatController {
       @Valid @RequestBody ChatRequest request,
       HttpServletRequest httpRequest) {
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    // Guests may stream chat (see OPTIONAL_AUTH_POST_PATTERNS), and for them the
+    // identity is the client IP. getRemoteAddr() resolves to Caddy behind the
+    // reverse proxy, which collapsed every anonymous caller into one shared
+    // bucket; ClientIpResolver reads X-Forwarded-For so the per-IP cap the
+    // config describes is actually per-IP.
     String identity = (auth != null && auth.isAuthenticated()
         && !"anonymousUser".equals(auth.getName()))
         ? auth.getName()
-        : httpRequest.getRemoteAddr();
+        : ClientIpResolver.resolve(httpRequest);
 
     if (!chatRateLimitService.tryConsume(identity)) {
       throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Chat rate limit exceeded");
