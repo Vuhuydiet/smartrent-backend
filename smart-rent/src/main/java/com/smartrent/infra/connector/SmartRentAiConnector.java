@@ -1,5 +1,6 @@
 package com.smartrent.infra.connector;
 
+import com.smartrent.config.ai.AiFeignClientConfig;
 import com.smartrent.dto.request.AIRecommendationRequest;
 import com.smartrent.dto.request.ChatRequest;
 import com.smartrent.dto.request.HousingPredictorRequest;
@@ -22,7 +23,10 @@ import com.smartrent.dto.response.ListingVerificationResponse;
 import java.util.List;
 import org.springframework.web.bind.annotation.RequestHeader;
 
-@FeignClient(name = "smartrent-ai", url = "${feign.client.config.smartrent-ai.url}")
+@FeignClient(
+    name = "smartrent-ai",
+    url = "${feign.client.config.smartrent-ai.url}",
+    configuration = AiFeignClientConfig.class)
 public interface SmartRentAiConnector {
 
   /**

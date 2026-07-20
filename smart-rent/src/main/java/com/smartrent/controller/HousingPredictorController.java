@@ -4,6 +4,8 @@ import com.smartrent.dto.request.HousingPredictorRequest;
 import com.smartrent.dto.response.ApiResponse;
 import com.smartrent.dto.response.HousingPredictorResponse;
 import com.smartrent.service.predictor.HousingPredictorService;
+import com.smartrent.service.predictor.PriceSuggestionRateLimitService;
+import com.smartrent.util.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -11,14 +13,19 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @RestController
@@ -28,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HousingPredictorController {
 
     private final HousingPredictorService housingPredictorService;
+    private final PriceSuggestionRateLimitService priceSuggestionRateLimitService;
 
     @PostMapping("/predict")
     @Operation(
@@ -96,10 +104,25 @@ public class HousingPredictorController {
                     )
                 )
             )
-            @Valid @RequestBody HousingPredictorRequest request) {
-        
+            @Valid @RequestBody HousingPredictorRequest request,
+            HttpServletRequest httpRequest) {
+
+        // Endpoint is public (no auth required) but each call runs a multi-turn
+        // LLM agent, so it still needs a per-identity cap. Prefer the
+        // authenticated username — the create-listing wizard that calls this
+        // is only reachable logged-in, and the FE attaches the JWT — falling
+        // back to client IP for any caller that isn't authenticated.
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String identity = (auth != null && auth.isAuthenticated() && !"anonymousUser".equals(auth.getName()))
+                ? auth.getName()
+                : ClientIpResolver.resolve(httpRequest);
+
+        if (!priceSuggestionRateLimitService.tryConsume(identity)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Price suggestion rate limit exceeded");
+        }
+
         log.info("Received housing price prediction request: {}", request);
-        
+
         HousingPredictorResponse response = housingPredictorService.predictHousingPrice(request);
         
         return ResponseEntity.ok(ApiResponse.<HousingPredictorResponse>builder()
