@@ -106,5 +106,14 @@ public class DraftListingRequest {
 
     @Schema(description = "Service fee")
     String serviceFee;
+
+    @Schema(description = "Listing duration in days for the chosen package", example = "30")
+    Integer durationDays;
+
+    @Schema(description = "Whether the listing is to be published with membership quota")
+    Boolean useMembershipQuota;
+
+    @Schema(description = "Membership benefit IDs to spend when publishing with quota")
+    Set<Long> benefitIds;
 }
 

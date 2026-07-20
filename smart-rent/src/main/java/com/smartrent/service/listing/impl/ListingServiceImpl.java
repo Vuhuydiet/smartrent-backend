@@ -1337,6 +1337,8 @@ public class ListingServiceImpl implements ListingService {
                 .electricityPrice(request.getElectricityPrice())
                 .internetPrice(request.getInternetPrice())
                 .serviceFee(request.getServiceFee())
+                .durationDays(request.getDurationDays())
+                .useMembershipQuota(request.getUseMembershipQuota())
                 .build();
 
         // Extract address fields if provided (support BOTH legacy AND new structures)
@@ -1394,6 +1396,13 @@ public class ListingServiceImpl implements ListingService {
         // Store media IDs as comma-separated string
         if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
             draft.setMediaIds(request.getMediaIds().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",")));
+        }
+
+        // Store the package/quota selection so reopening the draft restores it
+        if (request.getBenefitIds() != null && !request.getBenefitIds().isEmpty()) {
+            draft.setBenefitIds(request.getBenefitIds().stream()
                     .map(String::valueOf)
                     .collect(Collectors.joining(",")));
         }
@@ -2539,6 +2548,19 @@ public class ListingServiceImpl implements ListingService {
                     .collect(Collectors.joining(",")));
         }
 
+        // Update the package/quota selection if provided
+        if (request.getDurationDays() != null) {
+            draft.setDurationDays(request.getDurationDays());
+        }
+        if (request.getUseMembershipQuota() != null) {
+            draft.setUseMembershipQuota(request.getUseMembershipQuota());
+        }
+        if (request.getBenefitIds() != null) {
+            draft.setBenefitIds(request.getBenefitIds().stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(",")));
+        }
+
         // Save draft
         ListingDraft savedDraft = listingDraftRepository.save(draft);
         log.info("Draft listing {} updated successfully", draftId);
@@ -2703,9 +2725,28 @@ public class ListingServiceImpl implements ListingService {
                 .serviceFee(draft.getServiceFee())
                 .amenities(amenities)
                 .media(media)
+                .durationDays(draft.getDurationDays())
+                .useMembershipQuota(draft.getUseMembershipQuota())
+                .benefitIds(parseCsvIds(draft.getBenefitIds()))
                 .createdAt(draft.getCreatedAt())
                 .updatedAt(draft.getUpdatedAt())
                 .build();
+    }
+
+    /**
+     * Parse one of the draft's comma-separated id columns. Null/blank yields null so
+     * the response omits the field rather than reporting an empty selection.
+     */
+    private Set<Long> parseCsvIds(String csv) {
+        if (csv == null || csv.isBlank()) {
+            return null;
+        }
+        Set<Long> ids = java.util.Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Long::parseLong)
+                .collect(Collectors.toSet());
+        return ids.isEmpty() ? null : ids;
     }
 
     /**
@@ -3101,7 +3142,13 @@ public class ListingServiceImpl implements ListingService {
                 NewAddressData newAddr = new NewAddressData();
                 newAddr.setProvinceCode(draft.getProvinceCode());
                 newAddr.setWardCode(draft.getWardCode());
-                newAddr.setStreet(draft.getStreet());
+                // new_street, not street: createDraftListing/updateDraft persist the two
+                // structures' streets to separate columns, and a pure new-address draft
+                // only fills new_street. Reading street here published them with none.
+                // Fall back for drafts that only ever got the legacy column filled.
+                newAddr.setStreet(draft.getNewStreet() != null
+                        ? draft.getNewStreet()
+                        : draft.getStreet());
                 addressReq.setNewAddress(newAddr);
             }
             addressReq.setProjectId(draft.getProjectId() != null ? draft.getProjectId().intValue() : null);
@@ -3110,8 +3157,11 @@ public class ListingServiceImpl implements ListingService {
             merged.setAddress(addressReq);
         }
 
-        // Handle amenity IDs
-        if (request.getAmenityIds() != null) {
+        // Handle amenity IDs.
+        // An empty collection counts as "not provided", the same way createDraftListing
+        // reads it. Treating it as authoritative let a publish body carrying
+        // "amenityIds": [] wipe what the draft had, and the draft is deleted right after.
+        if (request.getAmenityIds() != null && !request.getAmenityIds().isEmpty()) {
             merged.setAmenityIds(request.getAmenityIds());
         } else if (draft.getAmenityIds() != null && !draft.getAmenityIds().isEmpty()) {
             merged.setAmenityIds(java.util.Arrays.stream(draft.getAmenityIds().split(","))
@@ -3121,8 +3171,10 @@ public class ListingServiceImpl implements ListingService {
                     .collect(Collectors.toSet()));
         }
 
-        // Handle media IDs
-        if (request.getMediaIds() != null) {
+        // Handle media IDs — same empty-means-absent rule as amenities above. This one
+        // is the costlier of the two: an empty list published the listing with no photos
+        // at all, after the user had uploaded them into the draft.
+        if (request.getMediaIds() != null && !request.getMediaIds().isEmpty()) {
             merged.setMediaIds(request.getMediaIds());
         } else if (draft.getMediaIds() != null && !draft.getMediaIds().isEmpty()) {
             merged.setMediaIds(java.util.Arrays.stream(draft.getMediaIds().split(","))
