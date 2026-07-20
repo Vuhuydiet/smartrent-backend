@@ -25,7 +25,20 @@ public class HousingPredictorResponse {
     @JsonProperty("currency")
     @Schema(description = "Currency code for the price", example = "VND")
     private String currency;
-    
+
+    @JsonProperty("source")
+    @Schema(description = "How the range was produced: 'ai_comparables' means it was derived from real listings; 'rule_based_fallback' means the AI path failed and a hardcoded table was used",
+            example = "ai_comparables", allowableValues = {"ai_comparables", "rule_based_fallback"})
+    private String source;
+
+    @JsonProperty("listings_found")
+    @Schema(description = "Number of comparable listings actually used as evidence. 0 means the range is not backed by market data", example = "12")
+    private Integer listingsFound;
+
+    @JsonProperty("confidence")
+    @Schema(description = "Confidence in the estimate", example = "medium", allowableValues = {"high", "medium", "low"})
+    private String confidence;
+
     @Getter
     @Setter
     @Schema(description = "Price range with minimum and maximum values")
