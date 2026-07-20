@@ -54,7 +54,10 @@ public class HousingPredictorController {
                             },
                             "location": "My Tho, Tien Giang",
                             "property_type": "House",
-                            "currency": "VND"
+                            "currency": "VND",
+                            "source": "ai_comparables",
+                            "listings_found": 12,
+                            "confidence": "medium"
                           }
                         }
                         """
