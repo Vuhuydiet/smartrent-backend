@@ -190,6 +190,18 @@ public class QuotaServiceImpl implements QuotaService {
 
     @Override
     @Transactional(readOnly = true)
+    public java.util.Optional<UserMembershipBenefit> findSpendableBenefit(String userId, Long benefitId) {
+        if (benefitId == null) {
+            return java.util.Optional.empty();
+        }
+        return userBenefitRepository.findById(benefitId)
+                .filter(benefit -> benefit.getUserId().equals(userId))
+                .filter(benefit -> !benefit.isExpired())
+                .filter(UserMembershipBenefit::hasQuotaAvailable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public boolean hasSufficientQuota(String userId, BenefitType benefitType, int quantity) {
         QuotaStatusResponse quota = checkQuotaAvailability(userId, benefitType);
         return quota.getTotalAvailable() >= quantity;
