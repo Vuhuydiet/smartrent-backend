@@ -101,6 +101,10 @@ public enum DomainCode {
   LISTING_CREATION_CACHE_NOT_FOUND("12001", HttpStatus.NOT_FOUND, "Listing creation request not found in cache"),
   LISTING_CREATION_PAYMENT_FAILED("12002", HttpStatus.PAYMENT_REQUIRED, "Payment failed for listing creation"),
   LISTING_ALREADY_EXISTS_FOR_TRANSACTION("12003", HttpStatus.CONFLICT, "Listing already exists for this transaction"),
+  // Raised when a publish reuses media that a previous publish already consumed — in
+  // practice the draft was published before and the client is republishing a stale copy.
+  LISTING_MEDIA_ALREADY_LINKED("12004", HttpStatus.CONFLICT,
+      "Media %s is already linked to listing %s"),
   //    Quota Error 13xxx
   INSUFFICIENT_QUOTA("13001", HttpStatus.BAD_REQUEST, "Insufficient quota: %s"),
   BENEFIT_NOT_FOUND("13002", HttpStatus.NOT_FOUND, "Membership benefit not found: %s"),

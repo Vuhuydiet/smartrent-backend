@@ -920,9 +920,11 @@ public class ListingServiceImpl implements ListingService {
                         "Media " + mediaId + " is not active (status: " + media.getStatus() + ")");
             }
 
-            // Validate media is not already linked to another listing
+            // Validate media is not already linked to another listing.
+            // Distinct code (not a generic 400) so the client can tell the user their
+            // draft was already published instead of surfacing a raw internal message.
             if (media.getListing() != null) {
-                throw new AppException(DomainCode.BAD_REQUEST_ERROR,
+                throw new AppException(DomainCode.LISTING_MEDIA_ALREADY_LINKED,
                         "Media " + mediaId + " is already linked to listing " +
                         media.getListing().getListingId());
             }
