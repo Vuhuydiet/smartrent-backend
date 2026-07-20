@@ -114,6 +114,16 @@ public class DraftListingResponse {
             "May be empty if no media uploaded yet.", implementation = MediaResponse.class)
     Set<MediaResponse> media;
 
+    // Package / payment selection, so reopening a draft restores what the user picked
+    @Schema(description = "Listing duration in days for the chosen package", example = "30")
+    Integer durationDays;
+
+    @Schema(description = "Whether the listing is to be published with membership quota")
+    Boolean useMembershipQuota;
+
+    @Schema(description = "Membership benefit IDs to spend when publishing with quota")
+    Set<Long> benefitIds;
+
     // Timestamps
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     @Schema(description = "Timestamp when draft was created", example = "2024-12-06T10:30:00")

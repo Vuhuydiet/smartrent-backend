@@ -150,6 +150,18 @@ public class ListingDraft {
     @Column(name = "media_ids", length = 500)
     String mediaIds;
 
+    // How the listing is meant to be paid for. Kept on the draft so reopening one
+    // restores the package the user picked instead of silently re-defaulting it.
+    @Column(name = "duration_days")
+    Integer durationDays;
+
+    @Column(name = "use_membership_quota")
+    Boolean useMembershipQuota;
+
+    // Benefit IDs stored as comma-separated string, like amenity_ids/media_ids
+    @Column(name = "benefit_ids", length = 500)
+    String benefitIds;
+
     // Timestamps
     @Column(name = "created_at", updatable = false)
     @CreationTimestamp

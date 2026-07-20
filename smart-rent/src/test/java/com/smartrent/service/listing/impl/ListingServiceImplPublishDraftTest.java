@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -101,6 +102,56 @@ class ListingServiceImplPublishDraftTest {
 
         // Quota path: listing already exists, no pending payment -> draft is safe to remove now.
         verify(listingDraftRepository).delete(draft);
+    }
+
+    @Test
+    void publishesNewAddressDraftWithItsOwnStreet() {
+        // A pure new-address draft only fills new_street; street stays null. Reading the
+        // legacy column here published the listing with no street at all, and the draft
+        // screen hid it by rendering new_street correctly.
+        Long draftId = 4L;
+        String userId = "user-1";
+        ListingDraft draft = ListingDraft.builder()
+                .addressType("NEW")
+                .provinceCode("79")
+                .wardCode("26734")
+                .newStreet("Nguyễn Huệ")
+                .build();
+        when(listingDraftRepository.findByDraftIdAndUserId(draftId, userId))
+                .thenReturn(Optional.of(draft));
+        doReturn(ListingCreationResponse.builder().listingId(1L).build())
+                .when(service).createListing(any());
+
+        ListingCreationRequest request = validPublishRequest();
+        request.setAddress(null); // client sends no address -> merge must fall back to the draft
+
+        service.publishDraft(draftId, request, userId);
+
+        ArgumentCaptor<ListingCreationRequest> captor = ArgumentCaptor.forClass(ListingCreationRequest.class);
+        verify(service).createListing(captor.capture());
+        assertEquals("Nguyễn Huệ", captor.getValue().getAddress().getNewAddress().getStreet());
+    }
+
+    @Test
+    void emptyMediaIdsInPublishBodyDoesNotWipeTheDraftsMedia() {
+        // "mediaIds": [] used to count as authoritative, so the listing published with no
+        // photos and the draft holding them was deleted immediately after.
+        Long draftId = 5L;
+        String userId = "user-1";
+        ListingDraft draft = ListingDraft.builder().mediaIds("11,22,33").build();
+        when(listingDraftRepository.findByDraftIdAndUserId(draftId, userId))
+                .thenReturn(Optional.of(draft));
+        doReturn(ListingCreationResponse.builder().listingId(1L).build())
+                .when(service).createListing(any());
+
+        ListingCreationRequest request = validPublishRequest();
+        request.setMediaIds(Set.of());
+
+        service.publishDraft(draftId, request, userId);
+
+        ArgumentCaptor<ListingCreationRequest> captor = ArgumentCaptor.forClass(ListingCreationRequest.class);
+        verify(service).createListing(captor.capture());
+        assertEquals(Set.of(11L, 22L, 33L), captor.getValue().getMediaIds());
     }
 
     @Test
