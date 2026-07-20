@@ -102,4 +102,23 @@ class ListingServiceImplPublishDraftTest {
         // Quota path: listing already exists, no pending payment -> draft is safe to remove now.
         verify(listingDraftRepository).delete(draft);
     }
+
+    @Test
+    void deletesDraftWhenListingWentStraightToReview() {
+        // What the quota path actually returns: toCreationResponse() only fills
+        // listingId + status, so paymentRequired comes back null rather than false.
+        // The listing is live in the moderation queue ("đang chờ duyệt") and the
+        // draft has to go with it — a null here must not read as "payment pending".
+        Long draftId = 3L;
+        String userId = "user-1";
+        ListingDraft draft = ListingDraft.builder().build();
+        when(listingDraftRepository.findByDraftIdAndUserId(draftId, userId))
+                .thenReturn(Optional.of(draft));
+        doReturn(ListingCreationResponse.builder().listingId(99L).status("CREATED").build())
+                .when(service).createListing(any());
+
+        service.publishDraft(draftId, validPublishRequest(), userId);
+
+        verify(listingDraftRepository).delete(draft);
+    }
 }
