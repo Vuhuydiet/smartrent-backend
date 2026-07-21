@@ -72,6 +72,7 @@ application:
         - "/v1/listings/search"
         - "/v1/listings/search/cursor"
         - "/v1/listings/map-bounds"
+        - "/v1/listings/price-comparables"
 # Enable debug logging for authentication
 logging:
   level:

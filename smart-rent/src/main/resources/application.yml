@@ -250,6 +250,7 @@ application:
         - "/v1/listings/stats/provinces"
         - "/v1/listings/stats/categories"
         - "/v1/listings/map-bounds"
+        - "/v1/listings/price-comparables"
         - "/v1/listings/search-suggestions/click"
         - "/v1/views"
         # AI chat streaming is optional-auth (see OPTIONAL_AUTH_POST_PATTERNS):
