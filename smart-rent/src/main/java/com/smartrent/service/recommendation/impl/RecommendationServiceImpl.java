@@ -285,42 +285,30 @@ public class RecommendationServiceImpl implements RecommendationService {
                 (tAfterInteractions - tAfterViewed) / 1_000_000);
 
         // 3. Location profiling
-        // 3.1 Find most frequent (preferred) locations
-        String preferredProvinceCode = interactionFeatures.stream()
-                .filter(f -> f.getProvinceCode() != null && !f.getProvinceCode().equals("UNKNOWN"))
-                .collect(Collectors.groupingBy(AIRecommendationRequest.ListingFeatureDto::getProvinceCode,
-                        Collectors.counting()))
-                .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+        // 3.1 Find most frequent (preferred) locations.
+        // The ward/district/wardId lookups are scoped to the winning province on
+        // purpose. Picking each of them with an independent max-by-count lets them
+        // land in DIFFERENT places when the counts are close — e.g. 3 views in
+        // phuong Binh Duong (HCM) and 3 in Tuyen Quang yields province=HCM but
+        // ward=Tuyen Quang, a zone no listing can ever match. Everything downstream
+        // (isDifferentFromPreferred, preferredMatchLevel, the preferred-side
+        // fallback query) then treats the whole feed as out-of-zone.
+        String preferredProvinceCode = dominantValue(interactionFeatures,
+                f -> "UNKNOWN".equals(f.getProvinceCode()) ? null : f.getProvinceCode());
 
-        String preferredWardCode = interactionFeatures.stream()
-                .filter(f -> f.getNewWardCode() != null)
-                .collect(Collectors.groupingBy(AIRecommendationRequest.ListingFeatureDto::getNewWardCode,
-                        Collectors.counting()))
-                .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
+        final String provinceScope = preferredProvinceCode;
+        List<AIRecommendationRequest.ListingFeatureDto> inPreferredProvince = provinceScope == null
+                ? interactionFeatures
+                : interactionFeatures.stream()
+                        .filter(f -> provinceScope.equals(f.getProvinceCode()))
+                        .collect(Collectors.toList());
 
-        Integer preferredDistrictId = interactionFeatures.stream()
-                .filter(f -> f.getDistrictId() != null)
-                .collect(Collectors.groupingBy(AIRecommendationRequest.ListingFeatureDto::getDistrictId,
-                        Collectors.counting()))
-                .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
-
-        Integer preferredWardId = interactionFeatures.stream()
-                .filter(f -> f.getWardId() != null)
-                .collect(Collectors.groupingBy(AIRecommendationRequest.ListingFeatureDto::getWardId,
-                        Collectors.counting()))
-                .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey).orElse(null);
-
-        Double preferredLat = null;
-        Double preferredLon = null;
-        if (interactionFeatures != null && !interactionFeatures.isEmpty()) {
-            List<AIRecommendationRequest.ListingFeatureDto> coords = interactionFeatures.stream()
-                    .filter(f -> f.getLatitude() != null && f.getLatitude() > 0 && f.getLongitude() != null && f.getLongitude() > 0)
-                    .collect(Collectors.toList());
-            if (!coords.isEmpty()) {
-                preferredLat = coords.stream().mapToDouble(AIRecommendationRequest.ListingFeatureDto::getLatitude).average().orElse(0.0);
-                preferredLon = coords.stream().mapToDouble(AIRecommendationRequest.ListingFeatureDto::getLongitude).average().orElse(0.0);
-            }
-        }
+        String preferredWardCode = dominantValue(inPreferredProvince,
+                AIRecommendationRequest.ListingFeatureDto::getNewWardCode);
+        Integer preferredDistrictId = dominantValue(inPreferredProvince,
+                AIRecommendationRequest.ListingFeatureDto::getDistrictId);
+        Integer preferredWardId = dominantValue(inPreferredProvince,
+                AIRecommendationRequest.ListingFeatureDto::getWardId);
 
         // 3.1.2 Calculate condition counts for Discovery Shift triggering.
         // Spec: shift only when the user has explored a NEW place — 3 views OR
@@ -364,12 +352,40 @@ public class RecommendationServiceImpl implements RecommendationService {
         // Fall back to the plain latest interaction when nothing differs (isShift
         // stays false in that case).
         Long latestListingId = null;
-        if (!viewedListingIds.isEmpty()) {
-            latestListingId = viewedListingIds.get(0);
-        } else if (!savedListings.isEmpty()) {
-            latestListingId = savedListings.get(0).getId().getListingId();
-        } else if (!clickedListingIds.isEmpty()) {
-            latestListingId = clickedListingIds.get(0);
+        for (Long id : viewedListingIds) {
+            if (isDifferentFromPreferred(featureById.get(id),
+                    preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode)) {
+                latestListingId = id;
+                break;
+            }
+        }
+        if (latestListingId == null) {
+            for (SavedListing s : savedListings) {
+                Long id = s.getId().getListingId();
+                if (isDifferentFromPreferred(featureById.get(id),
+                        preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode)) {
+                    latestListingId = id;
+                    break;
+                }
+            }
+        }
+        if (latestListingId == null) {
+            for (Long id : clickedListingIds) {
+                if (isDifferentFromPreferred(featureById.get(id),
+                        preferredProvinceCode, preferredDistrictId, preferredWardId, preferredWardCode)) {
+                    latestListingId = id;
+                    break;
+                }
+            }
+        }
+        if (latestListingId == null) {
+            if (!viewedListingIds.isEmpty()) {
+                latestListingId = viewedListingIds.get(0);
+            } else if (!savedListings.isEmpty()) {
+                latestListingId = savedListings.get(0).getId().getListingId();
+            } else if (!clickedListingIds.isEmpty()) {
+                latestListingId = clickedListingIds.get(0);
+            }
         }
 
         String discoveryWardCode = null;
@@ -390,27 +406,11 @@ public class RecommendationServiceImpl implements RecommendationService {
         log.info("[Recommendation Test] latestListingId = {}, discoveryProvinceCode = {}, preferredProvinceCode = {}",
                 latestListingId, discoveryProvinceCode, preferredProvinceCode);
 
-        boolean isShift = false;
-        if (meetsShiftCondition) {
-            if (discoveryProvinceCode != null && preferredProvinceCode != null
-                    && !discoveryProvinceCode.equals(preferredProvinceCode)) {
-                isShift = true;
-            } else if (discoveryDistrictId != null && preferredDistrictId != null
-                    && !discoveryDistrictId.equals(preferredDistrictId)) {
-                isShift = true;
-            } else if (discoveryWardCode != null && preferredWardCode != null
-                    && !discoveryWardCode.equals(preferredWardCode)) {
-                isShift = true;
-            } else if (discoveryWardId != null && preferredWardId != null && !discoveryWardId.equals(preferredWardId)) {
-                isShift = true;
-            }
-        }
-
         final Integer finalDiscoveryDistrictId = discoveryDistrictId;
         final String finalDiscoveryWardCode = discoveryWardCode;
         final Integer finalDiscoveryWardId = discoveryWardId;
 
-
+        // 4. Parallel Multi-channel candidate pool retrieval with over-fetching
         java.util.concurrent.CompletableFuture<List<Listing>> proximityFuture = java.util.concurrent.CompletableFuture
                 .supplyAsync(() -> {
                     List<Listing> list = new ArrayList<>();
@@ -512,60 +512,17 @@ public class RecommendationServiceImpl implements RecommendationService {
             candidateSet.addAll(freshFuture.get());
 
             // Stage-2 Fallback Top-up if candidate pool is less than 150 (prevent candidate
-            // starvation). Priority order: preferred province → discovery province → global.
-            // Going straight to global (ORDER BY pushedAt DESC, no province filter) was the
-            // root cause of HCM VIP listings flooding the pool when the preferred zone
-            // (e.g. tỉnh Bình Dương) has few listings, making them dominate the top slots.
+            // starvation)
             if (candidateSet.size() < 150) {
+                int needed = 300 - candidateSet.size();
                 List<Long> threadExclusions = new ArrayList<>(interactedListingIds);
-                candidateSet.forEach(l -> threadExclusions.add(l.getListingId()));
-                if (threadExclusions.isEmpty()) threadExclusions.add(-1L);
+                if (threadExclusions.isEmpty())
+                    threadExclusions.add(-1L);
 
-                // 1. Preferred province top-up
-                if (candidateSet.size() < 150 && preferredProvinceCode != null
-                        && !preferredProvinceCode.isEmpty() && !preferredProvinceCode.equals("UNKNOWN")) {
-                    int need = 300 - candidateSet.size();
-                    try {
-                        Integer pId = null;
-                        try { pId = Integer.parseInt(preferredProvinceCode); } catch (Exception ignored) {}
-                        if (pId != null) {
-                            candidateSet.addAll(listingRepository.findCandidatesForPersonalizedByLegacyProvince(
-                                    pId, threadExclusions, PageRequest.of(0, need)));
-                        } else {
-                            candidateSet.addAll(listingRepository.findCandidatesForPersonalizedByNewProvince(
-                                    preferredProvinceCode, threadExclusions, PageRequest.of(0, need)));
-                        }
-                        candidateSet.forEach(l -> { if (!threadExclusions.contains(l.getListingId())) threadExclusions.add(l.getListingId()); });
-                    } catch (Exception ignored) {}
-                }
-
-                // 2. Discovery province top-up (only when shift is active)
-                if (candidateSet.size() < 150 && isShift && discoveryProvinceCode != null
-                        && !discoveryProvinceCode.isEmpty() && !discoveryProvinceCode.equals("UNKNOWN")) {
-                    int need = 300 - candidateSet.size();
-                    try {
-                        Integer dPId = null;
-                        try { dPId = Integer.parseInt(discoveryProvinceCode); } catch (Exception ignored) {}
-                        if (dPId != null) {
-                            candidateSet.addAll(listingRepository.findCandidatesForPersonalizedByLegacyProvince(
-                                    dPId, threadExclusions, PageRequest.of(0, need)));
-                        } else {
-                            candidateSet.addAll(listingRepository.findCandidatesForPersonalizedByNewProvince(
-                                    discoveryProvinceCode, threadExclusions, PageRequest.of(0, need)));
-                        }
-                        candidateSet.forEach(l -> { if (!threadExclusions.contains(l.getListingId())) threadExclusions.add(l.getListingId()); });
-                    } catch (Exception ignored) {}
-                }
-
-                // 3. Global top-up as last resort only if still starved
-                if (candidateSet.size() < 50) {
-                    int needed = 300 - candidateSet.size();
-                    List<Listing> topUp = listingRepository.findCandidatesForPersonalizedGlobal(
-                            threadExclusions, PageRequest.of(0, needed));
-                    candidateSet.addAll(topUp);
-                }
+                List<Listing> topUp = listingRepository.findCandidatesForPersonalizedGlobal(
+                        threadExclusions, PageRequest.of(0, needed));
+                candidateSet.addAll(topUp);
             }
-
 
             candidates = candidateSet.stream()
                     .limit(300)
@@ -608,10 +565,17 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
         }
 
-        // When discovery shift pinning will run, ask AI for 3× the items so the
-        // Java post-processing step has enough preferred-zone candidates to fill
-        // the top 7 slots after pinning 3 discovery slots.
-        int aiTopN = isShift ? Math.min(topN * 3, distinctCandidates.size()) : topN;
+        // Over-fetch when the shift is on. The pinning below has to carve 7 preferred
+        // + 3 discovery items out of the AI's ranking, but the AI's dual-anchor geo
+        // decay scores same-province-different-ward listings almost as high as the
+        // preferred ward — so a top_n of exactly topN can come back with fewer than 7
+        // preferred-zone items and the shortfall silently backfills slots 1-7 with
+        // that neighbouring-ward noise. Asking for topN * 3 costs virtually nothing
+        // (the AI scores the whole candidate pool either way and only slices at the
+        // end) and the feed is still trimmed back to topN before it reaches the UI.
+        int aiTopN = meetsShiftCondition
+                ? Math.min(topN * 3, distinctCandidates.size())
+                : topN;
 
         AIRecommendationRequest.PersonalizedFeedAiRequest aiRequest = AIRecommendationRequest.PersonalizedFeedAiRequest
                 .builder()
@@ -642,7 +606,22 @@ public class RecommendationServiceImpl implements RecommendationService {
             RecommendationResponse response = buildResponse(result, "personalized", false, false);
 
             // Apply Discovery Shift slot pinning (Slots 8, 9, 10 for Discovery Zone)
-            // isShift was pre-computed before the AI call.
+            boolean isShift = false;
+            if (meetsShiftCondition) {
+                if (discoveryProvinceCode != null && preferredProvinceCode != null
+                        && !discoveryProvinceCode.equals(preferredProvinceCode)) {
+                    isShift = true;
+                } else if (discoveryDistrictId != null && preferredDistrictId != null
+                        && !discoveryDistrictId.equals(preferredDistrictId)) {
+                    isShift = true;
+                } else if (discoveryWardCode != null && preferredWardCode != null
+                        && !discoveryWardCode.equals(preferredWardCode)) {
+                    isShift = true;
+                } else if (discoveryWardId != null && preferredWardId != null && !discoveryWardId.equals(preferredWardId)) {
+                    isShift = true;
+                }
+            }
+
             if (isShift && response.getListings() != null && response.getListings().size() >= 10) {
                 List<ListingResponse> originalListings = response.getListings();
                 List<ListingResponse> wardItems = new ArrayList<>();
@@ -678,18 +657,105 @@ public class RecommendationServiceImpl implements RecommendationService {
                     }
                 }
 
+                Map<Long, Integer> preferredLevelById = new HashMap<>();
+                for (ListingResponse res : otherItems) {
+                    preferredLevelById.put(res.getListingId(),
+                            preferredMatchLevel(entityById.get(res.getListingId()),
+                                    preferredProvinceCode, preferredDistrictId,
+                                    preferredWardId, preferredWardCode));
+                }
+
+                // HARD FALLBACK (preferred side): slots 1-7 are supposed to hold the
+                // zone the user actually browses. Over-fetching from the AI usually
+                // supplies enough of them, but when the preferred ward is thin the
+                // ranking simply has nothing to give — and without this the shortfall
+                // backfills with weaker same-province matches while stronger ward
+                // matches sit unused in the database. Mirrors the discovery-side
+                // fallback below: widen ward -> district -> province until we can
+                // fill 7.
+                int strongPreferred = 0;
+                for (Integer level : preferredLevelById.values()) {
+                    if (level != null && level == 3) {
+                        strongPreferred++;
+                    }
+                }
+                if (strongPreferred < 7) {
+                    List<Long> preferredExcluded = new ArrayList<>(interactedListingIds);
+                    for (ListingResponse res : originalListings) {
+                        preferredExcluded.add(res.getListingId());
+                    }
+                    if (preferredExcluded.isEmpty())
+                        preferredExcluded.add(-1L);
+
+                    int stillNeeded = 7 - strongPreferred;
+                    List<Listing> preferredBackup = new ArrayList<>();
+
+                    // 1. Ward
+                    if (preferredWardCode != null && !preferredWardCode.isEmpty()) {
+                        List<Listing> bWard = listingRepository.findCandidatesByNewWard(
+                                preferredWardCode, preferredExcluded, PageRequest.of(0, stillNeeded));
+                        preferredBackup.addAll(bWard);
+                        bWard.forEach(b -> preferredExcluded.add(b.getListingId()));
+                    } else if (preferredWardId != null) {
+                        List<Listing> bWard = listingRepository.findCandidatesByLegacyWard(
+                                preferredWardId, preferredExcluded, PageRequest.of(0, stillNeeded));
+                        preferredBackup.addAll(bWard);
+                        bWard.forEach(b -> preferredExcluded.add(b.getListingId()));
+                    }
+
+                    // 2. District
+                    if (preferredBackup.size() < stillNeeded && preferredDistrictId != null) {
+                        List<Listing> bDistrict = listingRepository.findCandidatesByDistrict(
+                                preferredDistrictId, preferredExcluded,
+                                PageRequest.of(0, stillNeeded - preferredBackup.size()));
+                        preferredBackup.addAll(bDistrict);
+                        bDistrict.forEach(b -> preferredExcluded.add(b.getListingId()));
+                    }
+
+                    // 3. Province
+                    if (preferredBackup.size() < stillNeeded && preferredProvinceCode != null
+                            && !preferredProvinceCode.isEmpty() && !preferredProvinceCode.equals("UNKNOWN")) {
+                        preferredBackup.addAll(listingRepository.findCandidatesForPersonalizedByNewProvince(
+                                preferredProvinceCode, preferredExcluded,
+                                PageRequest.of(0, stillNeeded - preferredBackup.size())));
+                    } else if (preferredBackup.size() < stillNeeded && preferredProvinceCode != null) {
+                        Integer pId = null;
+                        try {
+                            pId = Integer.parseInt(preferredProvinceCode);
+                        } catch (Exception ignored) {
+                        }
+                        if (pId != null) {
+                            preferredBackup.addAll(listingRepository.findCandidatesForPersonalizedByLegacyProvince(
+                                    pId, preferredExcluded,
+                                    PageRequest.of(0, stillNeeded - preferredBackup.size())));
+                        }
+                    }
+
+                    if (!preferredBackup.isEmpty()) {
+                        Set<Long> backupIds = preferredBackup.stream().map(Listing::getListingId)
+                                .collect(Collectors.toSet());
+                        Map<Long, ListingResponse> respMap = listingService.getListingsByIds(backupIds).stream()
+                                .collect(Collectors.toMap(ListingResponse::getListingId, item -> item));
+                        Set<Long> seenOtherIds = otherItems.stream().map(ListingResponse::getListingId)
+                                .collect(Collectors.toCollection(HashSet::new));
+                        for (Listing l : preferredBackup) {
+                            ListingResponse br = respMap.get(l.getListingId());
+                            if (br != null && seenOtherIds.add(br.getListingId())) {
+                                otherItems.add(br);
+                                preferredLevelById.put(br.getListingId(), preferredMatchLevel(
+                                        l, preferredProvinceCode, preferredDistrictId,
+                                        preferredWardId, preferredWardCode));
+                            }
+                        }
+                        log.info("[Recommendation] Preferred-side fallback for user {}: had {} ward matches, "
+                                + "topped up with {} listings", userId, strongPreferred, preferredBackup.size());
+                    }
+                }
+
                 // Sort otherItems by preferred location match level descending to prioritize most viewed locations
-                final Double fPrefLat = preferredLat;
-                final Double fPrefLon = preferredLon;
-                otherItems.sort((a, b) -> {
-                    double levelA = preferredMatchLevel(entityById.get(a.getListingId()),
-                            preferredProvinceCode, preferredDistrictId,
-                            preferredWardId, preferredWardCode, fPrefLat, fPrefLon);
-                    double levelB = preferredMatchLevel(entityById.get(b.getListingId()),
-                            preferredProvinceCode, preferredDistrictId,
-                            preferredWardId, preferredWardCode, fPrefLat, fPrefLon);
-                    return Double.compare(levelB, levelA);
-                });
+                otherItems.sort((a, b) -> Integer.compare(
+                        preferredLevelById.getOrDefault(b.getListingId(), 0),
+                        preferredLevelById.getOrDefault(a.getListingId(), 0)));
 
                 // Combine into discoveryItems with Priority: Ward > District > Province
                 List<ListingResponse> rawDiscoveryItems = new ArrayList<>();
@@ -802,76 +868,6 @@ public class RecommendationServiceImpl implements RecommendationService {
                     discoveryItems.addAll(finalProvinceItems);
                 }
 
-                // HARD FALLBACK FOR PREFERRED DISTRICT: If AI returned < 7 items at
-                // district-level or close distance (preferredMatchLevel >= 1.25, i.e., within 3km)
-                // for slots 1-7, fetch more from the preferred district directly from DB.
-                if (preferredDistrictId != null) {
-                    long prefDistrictCount = otherItems.stream()
-                            .limit(7)
-                            .filter(r -> preferredMatchLevel(entityById.get(r.getListingId()),
-                                    preferredProvinceCode, preferredDistrictId,
-                                    preferredWardId, preferredWardCode, fPrefLat, fPrefLon) >= 1.25)
-                            .count();
-
-                    if (prefDistrictCount < 7) {
-                        int needed = (int) (7 - prefDistrictCount);
-                        List<Long> prefExclusionIds = new ArrayList<>(interactedListingIds);
-                        otherItems.forEach(r -> prefExclusionIds.add(r.getListingId()));
-                        discoveryItems.forEach(r -> prefExclusionIds.add(r.getListingId()));
-                        if (prefExclusionIds.isEmpty()) prefExclusionIds.add(-1L);
-
-                        List<Listing> morePref = new ArrayList<>(
-                                listingRepository.findCandidatesByDistrict(
-                                        preferredDistrictId, prefExclusionIds,
-                                        PageRequest.of(0, needed)));
-
-                        // Fallback to preferred ward if district still insufficient
-                        if (morePref.isEmpty() && preferredWardCode != null
-                                && !preferredWardCode.isEmpty()) {
-                            morePref.addAll(listingRepository.findCandidatesByNewWard(
-                                    preferredWardCode, prefExclusionIds,
-                                    PageRequest.of(0, needed)));
-                        } else if (morePref.isEmpty() && preferredWardId != null) {
-                            morePref.addAll(listingRepository.findCandidatesByLegacyWard(
-                                    preferredWardId, prefExclusionIds,
-                                    PageRequest.of(0, needed)));
-                        }
-
-                        if (!morePref.isEmpty()) {
-                            Set<Long> morePrefIds = morePref.stream()
-                                    .map(Listing::getListingId).collect(Collectors.toSet());
-                            List<ListingResponse> morePrefResponses =
-                                    listingService.getListingsByIds(morePrefIds);
-                            Map<Long, ListingResponse> morePrefMap = morePrefResponses.stream()
-                                    .collect(Collectors.toMap(
-                                            ListingResponse::getListingId, r -> r));
-
-                            Set<Long> prefSeenIds = new HashSet<>();
-                            otherItems.forEach(r -> prefSeenIds.add(r.getListingId()));
-
-                            for (Listing l : morePref) {
-                                ListingResponse r = morePrefMap.get(l.getListingId());
-                                if (r != null && prefSeenIds.add(r.getListingId())) {
-                                    entityById.putIfAbsent(l.getListingId(), l);
-                                    otherItems.add(r);
-                                }
-                            }
-                            // Re-sort after appending new preferred-district items
-                            final String fppc = preferredProvinceCode;
-                            final Integer fpdi = preferredDistrictId;
-                            final Integer fpwi = preferredWardId;
-                            final String fpwc = preferredWardCode;
-                            otherItems.sort((a, b) -> Double.compare(
-                                    preferredMatchLevel(entityById.get(b.getListingId()),
-                                            fppc, fpdi, fpwi, fpwc, fPrefLat, fPrefLon),
-                                    preferredMatchLevel(entityById.get(a.getListingId()),
-                                            fppc, fpdi, fpwi, fpwc, fPrefLat, fPrefLon)));
-                            log.info("[Recommendation] Preferred-district hard fallback for user {}: "
-                                    + "added {} items from district {}", userId, morePref.size(), preferredDistrictId);
-                        }
-                    }
-                }
-
                 // If we have discovery items, let's pin exactly 3 to slots 8, 9, 10
                 if (!discoveryItems.isEmpty()) {
                     List<ListingResponse> pinnedListings = new ArrayList<>();
@@ -925,6 +921,16 @@ public class RecommendationServiceImpl implements RecommendationService {
                             "[Recommendation] Applied Discovery Shift Pinning for user {}: pinned {} items, final size {}",
                             userId, discoveryToTake, pinnedListings.size());
                 }
+            }
+
+            // Safety net for the over-fetch above: the pinning block trims to topN
+            // itself, but it only runs when the shift actually resolves to a
+            // different zone. meetsShiftCondition can be true while isShift ends up
+            // false (discovery zone equals the preferred one), and then the extra
+            // aiTopN items would leak straight through to the UI.
+            if (response.getListings() != null && response.getListings().size() > topN) {
+                response.setListings(new ArrayList<>(response.getListings().subList(0, topN)));
+                response.setTotalReturned(response.getListings().size());
             }
 
             return response;
@@ -1042,6 +1048,46 @@ public class RecommendationServiceImpl implements RecommendationService {
      *
      * @return 3 = ward, 2 = district, 1 = province, 0 = outside the discovery zone.
      */
+    /**
+     * Most frequent non-null value across the interaction features, with ties
+     * broken in favour of the value the user has been browsing LONGER.
+     *
+     * <p>
+     * {@code features} arrives newest-first, so a larger first-occurrence index
+     * means the value only shows up deeper in the history — that is the
+     * established preference, not the place currently being explored. Breaking
+     * ties towards it keeps a 3-vs-3 split resolving to the old zone (which stays
+     * the preferred one, slots 1-7) and leaves the new zone as the discovery zone
+     * (slots 8-10), instead of depending on hash order.
+     */
+    private <T> T dominantValue(List<AIRecommendationRequest.ListingFeatureDto> features,
+            java.util.function.Function<AIRecommendationRequest.ListingFeatureDto, T> extractor) {
+        Map<T, Long> counts = new LinkedHashMap<>();
+        Map<T, Integer> firstIndex = new HashMap<>();
+        for (int i = 0; i < features.size(); i++) {
+            T value = extractor.apply(features.get(i));
+            if (value == null) {
+                continue;
+            }
+            counts.merge(value, 1L, Long::sum);
+            firstIndex.putIfAbsent(value, i);
+        }
+
+        T best = null;
+        long bestCount = -1L;
+        int bestIndex = -1;
+        for (Map.Entry<T, Long> entry : counts.entrySet()) {
+            int index = firstIndex.get(entry.getKey());
+            if (entry.getValue() > bestCount
+                    || (entry.getValue() == bestCount && index > bestIndex)) {
+                best = entry.getKey();
+                bestCount = entry.getValue();
+                bestIndex = index;
+            }
+        }
+        return best;
+    }
+
     private int discoveryMatchLevel(Listing listing, String discoveryProvinceCode,
             Integer discoveryDistrictId, Integer discoveryWardId, String discoveryWardCode) {
         if (listing == null) {
@@ -1061,57 +1107,32 @@ public class RecommendationServiceImpl implements RecommendationService {
         return 0;
     }
 
-    private double calculateDistance(Double lat1, Double lon1, Double lat2, Double lon2) {
-        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) {
-            return Double.MAX_VALUE;
-        }
-        double earthRadius = 6371; // kilometers
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return earthRadius * c;
-    }
-
-    private double preferredMatchLevel(Listing listing, String preferredProvinceCode,
-            Integer preferredDistrictId, Integer preferredWardId, String preferredWardCode,
-            Double preferredLat, Double preferredLon) {
+    private int preferredMatchLevel(Listing listing, String preferredProvinceCode,
+            Integer preferredDistrictId, Integer preferredWardId, String preferredWardCode) {
         if (listing == null) {
-            return 0.0;
+            return 0;
         }
         AIRecommendationRequest.ListingFeatureDto f = toFeatureDto(listing);
         if ((preferredWardCode != null && preferredWardCode.equals(f.getNewWardCode()))
                 || (preferredWardId != null && preferredWardId.equals(f.getWardId()))) {
-            return 3.0;
+            return 3;
         }
         if (preferredDistrictId != null && preferredDistrictId.equals(f.getDistrictId())) {
-            return 2.0;
+            return 2;
         }
         if (preferredProvinceCode != null && preferredProvinceCode.equals(f.getProvinceCode())) {
-            if (preferredLat != null && preferredLat > 0 && preferredLon != null && preferredLon > 0
-                    && f.getLatitude() != null && f.getLatitude() > 0
-                    && f.getLongitude() != null && f.getLongitude() > 0) {
-                double distance = calculateDistance(preferredLat, preferredLon, f.getLatitude(), f.getLongitude());
-                return 1.0 + (1.0 / (1.0 + distance));
-            }
-            return 1.0;
+            return 1;
         }
-        return 0.0;
+        return 0;
     }
 
     /**
      * Whether an interacted listing sits in a DIFFERENT place than the user's
-     * preferred location.
-     *
-     * Discovery Shift is a province-level concept: we only count a listing as
-     * "different from preferred" when it is in a DIFFERENT PROVINCE. Within-province
-     * browsing (different ward / district in the same city) is normal behaviour and
-     * must NOT inflate diffLocViews or trigger shift.
-     *
-     * A null feature (listing not resolvable) does not count as different, to
-     * avoid over-triggering the shift.
+     * preferred location. Operates on the toFeatureDto feature (new province/ward
+     * code + legacy district/ward id) so it compares like-for-like with the
+     * preferred values derived the same way. Returns true as soon as any populated
+     * preferred field fails to match; a null feature (listing not resolvable) does
+     * not count as different, to avoid over-triggering the shift.
      */
     private boolean isDifferentFromPreferred(AIRecommendationRequest.ListingFeatureDto f,
             String preferredProvinceCode, Integer preferredDistrictId,
