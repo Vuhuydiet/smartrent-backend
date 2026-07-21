@@ -1045,4 +1045,63 @@ public interface ListingRepository extends JpaRepository<Listing, Long>, JpaSpec
         @Param("categoryId")    Long    categoryId,
         @Param("lim")           int     limit
     );
+
+    /**
+     * Comparable rental prices near a point, for the price-comparables aggregate
+     * endpoint. Returns raw {@code [price, area]} tuples for publicly-visible,
+     * verified, non-expired listings of the exact requested
+     * (listing_type, product_type, price_unit) segment, restricted to a latitude/
+     * longitude bounding box (cheap index range scan) and then refined by
+     * Haversine distance, nearest first.
+     *
+     * <p>The bounding box (minLat/maxLat/minLng/maxLng) is computed by the service
+     * from the center + radius so the leading equality columns and the latitude
+     * range column of {@code idx_listings_price_comps} do the heavy lifting; the
+     * Haversine term only refines/orders the already-narrow candidate set.
+     * Percentiles are computed in Java from these tuples — kept out of SQL because
+     * MySQL has no first-class percentile aggregate and the sampled set is small.
+     *
+     * @return rows of {@code [price (DECIMAL), area (FLOAT)]}, nearest first
+     */
+    @Query(nativeQuery = true, value = """
+        SELECT   l.price,
+                 l.area
+        FROM     listings l
+        WHERE    l.latitude  BETWEEN :minLat AND :maxLat
+          AND    l.longitude BETWEEN :minLng AND :maxLng
+          AND    l.listing_type = :listingType
+          AND    l.product_type = :productType
+          AND    l.price_unit   = :priceUnit
+          AND    l.is_draft  = false
+          AND    l.is_shadow = false
+          AND    l.verified  = true
+          AND    l.expired   = false
+          AND    l.price > 0
+          AND    (:minArea IS NULL OR l.area >= :minArea)
+          AND    (:maxArea IS NULL OR l.area <= :maxArea)
+          AND    (6371 * ACOS(LEAST(1, GREATEST(-1,
+                     COS(RADIANS(:lat)) * COS(RADIANS(l.latitude)) *
+                     COS(RADIANS(l.longitude) - RADIANS(:lng)) +
+                     SIN(RADIANS(:lat)) * SIN(RADIANS(l.latitude)))))) <= :radiusKm
+        ORDER BY (6371 * ACOS(LEAST(1, GREATEST(-1,
+                     COS(RADIANS(:lat)) * COS(RADIANS(l.latitude)) *
+                     COS(RADIANS(l.longitude) - RADIANS(:lng)) +
+                     SIN(RADIANS(:lat)) * SIN(RADIANS(l.latitude)))))) ASC
+        LIMIT    :lim
+        """)
+    List<Object[]> findPriceComparables(
+        @Param("lat")         double  lat,
+        @Param("lng")         double  lng,
+        @Param("minLat")      double  minLat,
+        @Param("maxLat")      double  maxLat,
+        @Param("minLng")      double  minLng,
+        @Param("maxLng")      double  maxLng,
+        @Param("radiusKm")    double  radiusKm,
+        @Param("listingType") String  listingType,
+        @Param("productType") String  productType,
+        @Param("priceUnit")   String  priceUnit,
+        @Param("minArea")     Float   minArea,
+        @Param("maxArea")     Float   maxArea,
+        @Param("lim")         int     limit
+    );
 }
