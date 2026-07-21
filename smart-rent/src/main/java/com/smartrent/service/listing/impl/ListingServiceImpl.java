@@ -1338,7 +1338,7 @@ public class ListingServiceImpl implements ListingService {
                 .internetPrice(request.getInternetPrice())
                 .serviceFee(request.getServiceFee())
                 .durationDays(request.getDurationDays())
-                .useMembershipQuota(request.getUseMembershipQuota())
+                .useMembershipQuota(request.getUseMembershipQuota() != null ? request.getUseMembershipQuota() : false)
                 .build();
 
         // Extract address fields if provided (support BOTH legacy AND new structures)
