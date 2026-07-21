@@ -410,7 +410,20 @@ public class RecommendationServiceImpl implements RecommendationService {
         final String finalDiscoveryWardCode = discoveryWardCode;
         final Integer finalDiscoveryWardId = discoveryWardId;
 
-        // 4. Parallel Multi-channel candidate pool retrieval with over-fetching
+        // Pre-compute isShift here (all needed variables are resolved above) so it
+        // can be used both in Stage-2 candidate top-up AND in the AI top_n inflation
+        // without being a forward reference.
+        boolean isShift = meetsShiftCondition && (
+                (discoveryProvinceCode != null && preferredProvinceCode != null
+                        && !discoveryProvinceCode.equals(preferredProvinceCode))
+                || (discoveryDistrictId != null && preferredDistrictId != null
+                        && !discoveryDistrictId.equals(preferredDistrictId))
+                || (discoveryWardCode != null && preferredWardCode != null
+                        && !discoveryWardCode.equals(preferredWardCode))
+                || (discoveryWardId != null && preferredWardId != null
+                        && !discoveryWardId.equals(preferredWardId)));
+
+
         java.util.concurrent.CompletableFuture<List<Listing>> proximityFuture = java.util.concurrent.CompletableFuture
                 .supplyAsync(() -> {
                     List<Listing> list = new ArrayList<>();
@@ -512,17 +525,60 @@ public class RecommendationServiceImpl implements RecommendationService {
             candidateSet.addAll(freshFuture.get());
 
             // Stage-2 Fallback Top-up if candidate pool is less than 150 (prevent candidate
-            // starvation)
+            // starvation). Priority order: preferred province → discovery province → global.
+            // Going straight to global (ORDER BY pushedAt DESC, no province filter) was the
+            // root cause of HCM VIP listings flooding the pool when the preferred zone
+            // (e.g. tỉnh Bình Dương) has few listings, making them dominate the top slots.
             if (candidateSet.size() < 150) {
-                int needed = 300 - candidateSet.size();
                 List<Long> threadExclusions = new ArrayList<>(interactedListingIds);
-                if (threadExclusions.isEmpty())
-                    threadExclusions.add(-1L);
+                candidateSet.forEach(l -> threadExclusions.add(l.getListingId()));
+                if (threadExclusions.isEmpty()) threadExclusions.add(-1L);
 
-                List<Listing> topUp = listingRepository.findCandidatesForPersonalizedGlobal(
-                        threadExclusions, PageRequest.of(0, needed));
-                candidateSet.addAll(topUp);
+                // 1. Preferred province top-up
+                if (candidateSet.size() < 150 && preferredProvinceCode != null
+                        && !preferredProvinceCode.isEmpty() && !preferredProvinceCode.equals("UNKNOWN")) {
+                    int need = 300 - candidateSet.size();
+                    try {
+                        Integer pId = null;
+                        try { pId = Integer.parseInt(preferredProvinceCode); } catch (Exception ignored) {}
+                        if (pId != null) {
+                            candidateSet.addAll(listingRepository.findCandidatesForPersonalizedByLegacyProvince(
+                                    pId, threadExclusions, PageRequest.of(0, need)));
+                        } else {
+                            candidateSet.addAll(listingRepository.findCandidatesForPersonalizedByNewProvince(
+                                    preferredProvinceCode, threadExclusions, PageRequest.of(0, need)));
+                        }
+                        candidateSet.forEach(l -> { if (!threadExclusions.contains(l.getListingId())) threadExclusions.add(l.getListingId()); });
+                    } catch (Exception ignored) {}
+                }
+
+                // 2. Discovery province top-up (only when shift is active)
+                if (candidateSet.size() < 150 && isShift && discoveryProvinceCode != null
+                        && !discoveryProvinceCode.isEmpty() && !discoveryProvinceCode.equals("UNKNOWN")) {
+                    int need = 300 - candidateSet.size();
+                    try {
+                        Integer dPId = null;
+                        try { dPId = Integer.parseInt(discoveryProvinceCode); } catch (Exception ignored) {}
+                        if (dPId != null) {
+                            candidateSet.addAll(listingRepository.findCandidatesForPersonalizedByLegacyProvince(
+                                    dPId, threadExclusions, PageRequest.of(0, need)));
+                        } else {
+                            candidateSet.addAll(listingRepository.findCandidatesForPersonalizedByNewProvince(
+                                    discoveryProvinceCode, threadExclusions, PageRequest.of(0, need)));
+                        }
+                        candidateSet.forEach(l -> { if (!threadExclusions.contains(l.getListingId())) threadExclusions.add(l.getListingId()); });
+                    } catch (Exception ignored) {}
+                }
+
+                // 3. Global top-up as last resort only if still starved
+                if (candidateSet.size() < 50) {
+                    int needed = 300 - candidateSet.size();
+                    List<Listing> topUp = listingRepository.findCandidatesForPersonalizedGlobal(
+                            threadExclusions, PageRequest.of(0, needed));
+                    candidateSet.addAll(topUp);
+                }
             }
+
 
             candidates = candidateSet.stream()
                     .limit(300)
@@ -565,13 +621,18 @@ public class RecommendationServiceImpl implements RecommendationService {
             }
         }
 
+        // When discovery shift pinning will run, ask AI for 3× the items so the
+        // Java post-processing step has enough preferred-zone candidates to fill
+        // the top 7 slots after pinning 3 discovery slots.
+        int aiTopN = isShift ? Math.min(topN * 3, distinctCandidates.size()) : topN;
+
         AIRecommendationRequest.PersonalizedFeedAiRequest aiRequest = AIRecommendationRequest.PersonalizedFeedAiRequest
                 .builder()
                 .user_id(userId)
                 .user_interactions(userInteractions)
                 .all_interactions(allInteractions)
                 .candidates(distinctCandidates)
-                .top_n(topN)
+                .top_n(aiTopN)
                 .interactionFeatures(interactionFeatures)
                 .meetsShiftCondition(meetsShiftCondition)
                 .build();
@@ -594,21 +655,7 @@ public class RecommendationServiceImpl implements RecommendationService {
             RecommendationResponse response = buildResponse(result, "personalized", false, false);
 
             // Apply Discovery Shift slot pinning (Slots 8, 9, 10 for Discovery Zone)
-            boolean isShift = false;
-            if (meetsShiftCondition) {
-                if (discoveryProvinceCode != null && preferredProvinceCode != null
-                        && !discoveryProvinceCode.equals(preferredProvinceCode)) {
-                    isShift = true;
-                } else if (discoveryDistrictId != null && preferredDistrictId != null
-                        && !discoveryDistrictId.equals(preferredDistrictId)) {
-                    isShift = true;
-                } else if (discoveryWardCode != null && preferredWardCode != null
-                        && !discoveryWardCode.equals(preferredWardCode)) {
-                    isShift = true;
-                } else if (discoveryWardId != null && preferredWardId != null && !discoveryWardId.equals(preferredWardId)) {
-                    isShift = true;
-                }
-            }
+            // isShift was pre-computed before the AI call.
 
             if (isShift && response.getListings() != null && response.getListings().size() >= 10) {
                 List<ListingResponse> originalListings = response.getListings();
