@@ -48,6 +48,18 @@ public class RecommendationServiceImpl implements RecommendationService {
     Map<String, Optional<com.smartrent.infra.repository.entity.AddressMapping>> legacyMappingCache =
             new java.util.concurrent.ConcurrentHashMap<>();
 
+    // Intent strength per interaction type, shared by the CF weights sent to the AI
+    // and the location vote below.
+    private static final double SAVE_WEIGHT = 3.0;
+    private static final double PHONE_CLICK_WEIGHT = 2.5;
+    private static final double VIEW_WEIGHT = 1.0;
+
+    // Half-life of an interaction's influence on the PREFERRED LOCATION vote.
+    // Renting is a bounded search: a user finds a place in ~2-4 weeks and stops,
+    // and when they come back months later their target area has often changed.
+    // 30 days leaves a 6-month-old save at ~1.5% of its original vote.
+    private static final double LOCATION_VOTE_HALF_LIFE_DAYS = 30.0;
+
     // ─────────────────────────────────────────────
     // PUBLIC: Similar Listings
     // ─────────────────────────────────────────────
@@ -220,27 +232,47 @@ public class RecommendationServiceImpl implements RecommendationService {
     public RecommendationResponse getPersonalizedFeed(String userId, int topN) {
         long tStart = System.nanoTime();
         Map<Long, Double> interactionWeightMap = new LinkedHashMap<>();
+
+        // Age-decayed copy of the same signals, used ONLY for the preferred-location
+        // vote in step 3.1. Deliberately separate from interactionWeightMap, which
+        // feeds the AI's CF matrix and stays on the raw intent scale.
+        Map<Long, Double> locationVoteWeights = new LinkedHashMap<>();
+        LocalDateTime now = LocalDateTime.now();
+
         List<SavedListing> savedListings = savedListingRepository.findByUserIdOrderByCreatedAtDesc(userId);
         long tAfterSaved = System.nanoTime();
 
-        List<Long> clickedListingIds = phoneClickDetailRepository.findListingIdsByUserId(userId);
+        // [listingId, lastClickedAt] rather than bare DISTINCT ids: the location
+        // vote needs a timestamp per listing to age it.
+        List<Object[]> clickRows = phoneClickDetailRepository.findListingIdsWithLastClickByUserId(userId);
+        List<Long> clickedListingIds = clickRows.stream()
+                .map(row -> (Long) row[0]).collect(Collectors.toList());
         long tAfterClicks = System.nanoTime();
 
         // IDs-only recency read (no full-DTO hydration): this path only needs the
-        // viewed listing IDs and their order below, so getRecentlyViewedIds skips
+        // viewed listing IDs, their order and their view timestamps, so this skips
         // the getDisplayingListingsByIds hydration of up to 20 listings that
         // getRecentlyViewed() would run.
-        List<Long> viewedListingIds = recentlyViewedService.getRecentlyViewedIds(userId);
+        LinkedHashMap<Long, Long> viewedWithTimestamps =
+                recentlyViewedService.getRecentlyViewedIdsWithTimestamps(userId);
+        List<Long> viewedListingIds = new ArrayList<>(viewedWithTimestamps.keySet());
         long tAfterViewed = System.nanoTime();
 
         for (SavedListing s : savedListings) {
-            interactionWeightMap.merge(s.getId().getListingId(), 3.0, Math::max);
+            Long lId = s.getId().getListingId();
+            interactionWeightMap.merge(lId, SAVE_WEIGHT, Math::max);
+            locationVoteWeights.merge(lId, SAVE_WEIGHT * recencyFactor(s.getCreatedAt(), now), Math::max);
         }
-        for (Long lId : clickedListingIds) {
-            interactionWeightMap.merge(lId, 2.5, Math::max);
+        for (Object[] row : clickRows) {
+            Long lId = (Long) row[0];
+            interactionWeightMap.merge(lId, PHONE_CLICK_WEIGHT, Math::max);
+            locationVoteWeights.merge(lId,
+                    PHONE_CLICK_WEIGHT * recencyFactor(toLocalDateTime(row[1]), now), Math::max);
         }
-        for (Long lId : viewedListingIds) {
-            interactionWeightMap.merge(lId, 1.0, Math::max);
+        for (Map.Entry<Long, Long> viewed : viewedWithTimestamps.entrySet()) {
+            interactionWeightMap.merge(viewed.getKey(), VIEW_WEIGHT, Math::max);
+            locationVoteWeights.merge(viewed.getKey(),
+                    VIEW_WEIGHT * recencyFactor(viewed.getValue(), now), Math::max);
         }
 
         boolean hasEnoughInteractions = !savedListings.isEmpty() || !clickedListingIds.isEmpty()
@@ -293,7 +325,7 @@ public class RecommendationServiceImpl implements RecommendationService {
         // ward=Tuyen Quang, a zone no listing can ever match. Everything downstream
         // (isDifferentFromPreferred, preferredMatchLevel, the preferred-side
         // fallback query) then treats the whole feed as out-of-zone.
-        String preferredProvinceCode = dominantValue(interactionFeatures,
+        String preferredProvinceCode = dominantValue(interactionFeatures, locationVoteWeights,
                 f -> "UNKNOWN".equals(f.getProvinceCode()) ? null : f.getProvinceCode());
 
         final String provinceScope = preferredProvinceCode;
@@ -303,11 +335,11 @@ public class RecommendationServiceImpl implements RecommendationService {
                         .filter(f -> provinceScope.equals(f.getProvinceCode()))
                         .collect(Collectors.toList());
 
-        String preferredWardCode = dominantValue(inPreferredProvince,
+        String preferredWardCode = dominantValue(inPreferredProvince, locationVoteWeights,
                 AIRecommendationRequest.ListingFeatureDto::getNewWardCode);
-        Integer preferredDistrictId = dominantValue(inPreferredProvince,
+        Integer preferredDistrictId = dominantValue(inPreferredProvince, locationVoteWeights,
                 AIRecommendationRequest.ListingFeatureDto::getDistrictId);
-        Integer preferredWardId = dominantValue(inPreferredProvince,
+        Integer preferredWardId = dominantValue(inPreferredProvince, locationVoteWeights,
                 AIRecommendationRequest.ListingFeatureDto::getWardId);
 
         // 3.1.2 Calculate condition counts for Discovery Shift triggering.
@@ -1049,43 +1081,102 @@ public class RecommendationServiceImpl implements RecommendationService {
      * @return 3 = ward, 2 = district, 1 = province, 0 = outside the discovery zone.
      */
     /**
-     * Most frequent non-null value across the interaction features, with ties
+     * Highest-scoring non-null value across the interaction features, with ties
      * broken in favour of the value the user has been browsing LONGER.
+     *
+     * <p>
+     * Each listing contributes its {@code weights} entry rather than a flat 1, so
+     * a save or a phone click outvotes a passing view, and a stale interaction
+     * outvotes nothing — see {@link #recencyFactor}. A listing missing from
+     * {@code weights} falls back to {@link #VIEW_WEIGHT} so it still counts.
      *
      * <p>
      * {@code features} arrives newest-first, so a larger first-occurrence index
      * means the value only shows up deeper in the history — that is the
      * established preference, not the place currently being explored. Breaking
-     * ties towards it keeps a 3-vs-3 split resolving to the old zone (which stays
+     * ties towards it keeps an even split resolving to the old zone (which stays
      * the preferred one, slots 1-7) and leaves the new zone as the discovery zone
      * (slots 8-10), instead of depending on hash order.
      */
     private <T> T dominantValue(List<AIRecommendationRequest.ListingFeatureDto> features,
+            Map<Long, Double> weights,
             java.util.function.Function<AIRecommendationRequest.ListingFeatureDto, T> extractor) {
-        Map<T, Long> counts = new LinkedHashMap<>();
+        Map<T, Double> scores = new LinkedHashMap<>();
         Map<T, Integer> firstIndex = new HashMap<>();
         for (int i = 0; i < features.size(); i++) {
-            T value = extractor.apply(features.get(i));
+            AIRecommendationRequest.ListingFeatureDto feature = features.get(i);
+            T value = extractor.apply(feature);
             if (value == null) {
                 continue;
             }
-            counts.merge(value, 1L, Long::sum);
+            Double weight = weights.get(feature.getListingId());
+            scores.merge(value, weight != null ? weight : VIEW_WEIGHT, Double::sum);
             firstIndex.putIfAbsent(value, i);
         }
 
         T best = null;
-        long bestCount = -1L;
+        double bestScore = Double.NEGATIVE_INFINITY;
         int bestIndex = -1;
-        for (Map.Entry<T, Long> entry : counts.entrySet()) {
+        for (Map.Entry<T, Double> entry : scores.entrySet()) {
             int index = firstIndex.get(entry.getKey());
-            if (entry.getValue() > bestCount
-                    || (entry.getValue() == bestCount && index > bestIndex)) {
+            double score = entry.getValue();
+            boolean tie = Math.abs(score - bestScore) < 1e-9;
+            if ((!tie && score > bestScore) || (tie && index > bestIndex)) {
                 best = entry.getKey();
-                bestCount = entry.getValue();
+                bestScore = score;
                 bestIndex = index;
             }
         }
         return best;
+    }
+
+    /**
+     * Exponential time decay for an interaction's influence on the preferred-location
+     * vote: {@code 0.5 ^ (ageDays / LOCATION_VOTE_HALF_LIFE_DAYS)}.
+     *
+     * <p>
+     * Saves and phone clicks are read from the user's FULL history while recently
+     * viewed listings are bounded by a 20-entry Redis window. Without decay that
+     * asymmetry lets a finished rental search outvote the current one indefinitely,
+     * freezing the preferred ward on an area the user has already moved on from.
+     */
+    private double recencyFactor(LocalDateTime interactedAt, LocalDateTime now) {
+        if (interactedAt == null) {
+            return 1.0;
+        }
+        double ageDays = Math.max(0.0, ChronoUnit.MINUTES.between(interactedAt, now) / (60.0 * 24.0));
+        return Math.pow(0.5, ageDays / LOCATION_VOTE_HALF_LIFE_DAYS);
+    }
+
+    /**
+     * Coerces the {@code MAX(clickedAt)} projection to {@link LocalDateTime}.
+     * Hibernate returns a LocalDateTime for an aggregate over a LocalDateTime
+     * attribute, but older/native paths can hand back a java.sql.Timestamp — an
+     * unchecked cast here would blow up the whole personalized feed, so an
+     * unexpected type degrades to "no decay" instead.
+     */
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value instanceof LocalDateTime) {
+            return (LocalDateTime) value;
+        }
+        if (value instanceof java.sql.Timestamp) {
+            return ((java.sql.Timestamp) value).toLocalDateTime();
+        }
+        if (value != null) {
+            log.warn("Unexpected clickedAt projection type {} — skipping recency decay for this interaction",
+                    value.getClass().getName());
+        }
+        return null;
+    }
+
+    /** {@link #recencyFactor(LocalDateTime, LocalDateTime)} for the epoch-millis view timestamps from Redis. */
+    private double recencyFactor(Long viewedAtEpochMillis, LocalDateTime now) {
+        if (viewedAtEpochMillis == null || viewedAtEpochMillis <= 0L) {
+            return 1.0;
+        }
+        LocalDateTime viewedAt = LocalDateTime.ofInstant(
+                java.time.Instant.ofEpochMilli(viewedAtEpochMillis), java.time.ZoneId.systemDefault());
+        return recencyFactor(viewedAt, now);
     }
 
     private int discoveryMatchLevel(Listing listing, String discoveryProvinceCode,
