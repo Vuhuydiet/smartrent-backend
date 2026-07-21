@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -75,15 +76,6 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
 
         boolean duplicateByUser = phoneClickDetailRepository
                 .existsByUser_UserIdAndListing_ListingIdAndClickedAtAfter(userId, request.getListingId(), tenMinutesAgo);
-
-        if (!duplicateByUser && ipAddress != null) {
-            boolean duplicateByIp = phoneClickDetailRepository
-                    .existsByIpAddressAndListing_ListingIdAndClickedAtAfter(ipAddress, request.getListingId(), tenMinutesAgo);
-            if (duplicateByIp) {
-                log.info("Duplicate click from IP {} on listing {} within 10 minutes, ignoring", ipAddress, request.getListingId());
-                return buildSpamResponse(listing, user);
-            }
-        }
 
         if (duplicateByUser) {
             log.info("Duplicate click from user {} on listing {} within 10 minutes, ignoring", userId, request.getListingId());
@@ -436,6 +428,7 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
                                 .clickCount(clicks.size())
                                 .build();
                     })
+                    .sorted(Comparator.comparing(ListingClickInfo::getClickedAt).reversed())
                     .collect(Collectors.toList());
 
             // Build user response
