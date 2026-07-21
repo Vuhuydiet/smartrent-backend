@@ -190,6 +190,34 @@ public class RecentlyViewedServiceImpl implements RecentlyViewedService {
         return result;
     }
 
+    @Override
+    public java.util.LinkedHashMap<Long, Long> getRecentlyViewedIdsWithTimestamps(String userId) {
+        String redisKey = buildKey(userId);
+
+        // Same ZSET read as getRecentlyViewedIds, but keeping the scores. Spring
+        // Data returns an insertion-ordered LinkedHashSet, so iterating the tuples
+        // preserves the most-recent-first order into the LinkedHashMap.
+        Set<ZSetOperations.TypedTuple<String>> tuples =
+                redisTemplate.opsForZSet().reverseRangeWithScores(redisKey, 0, MAX_LISTINGS - 1);
+
+        java.util.LinkedHashMap<Long, Long> result = new java.util.LinkedHashMap<>();
+        if (tuples == null || tuples.isEmpty()) {
+            return result;
+        }
+
+        for (ZSetOperations.TypedTuple<String> tuple : tuples) {
+            if (tuple.getValue() == null || tuple.getScore() == null) {
+                continue;
+            }
+            try {
+                result.put(Long.parseLong(tuple.getValue()), tuple.getScore().longValue());
+            } catch (NumberFormatException e) {
+                log.warn("Skipping non-numeric recently-viewed entry '{}' for user {}", tuple.getValue(), userId);
+            }
+        }
+        return result;
+    }
+
     /**
      * Validate timestamp to prevent invalid values
      * @param listing Listing to validate

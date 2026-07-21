@@ -255,5 +255,19 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
      */
     @Query("SELECT pc FROM phone_clicks pc ORDER BY pc.clickedAt DESC")
     List<PhoneClickDetail> findRecentGlobalPhoneClicks(Pageable pageable);
+
+    /**
+     * Every listing a user clicked a phone number on, paired with that user's MOST
+     * RECENT click on it. The personalized feed ages the location vote, so it needs
+     * a timestamp per listing rather than the bare DISTINCT ids of
+     * {@link #findListingIdsByUserId(String)}.
+     *
+     * @return rows of [listingId (Long), lastClickedAt (LocalDateTime)]
+     */
+    @Query("SELECT pc.listing.listingId, MAX(pc.clickedAt) FROM phone_clicks pc " +
+           "WHERE pc.user.userId = :userId " +
+           "GROUP BY pc.listing.listingId " +
+           "ORDER BY MAX(pc.clickedAt) DESC")
+    List<Object[]> findListingIdsWithLastClickByUserId(@Param("userId") String userId);
 }
 
