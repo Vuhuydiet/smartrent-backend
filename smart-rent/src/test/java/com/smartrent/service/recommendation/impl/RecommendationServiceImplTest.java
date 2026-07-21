@@ -81,10 +81,10 @@ public class RecommendationServiceImplTest {
         // If there are no user interactions, it should fall back to cold start feed
         when(savedListingRepository.findByUserIdOrderByCreatedAtDesc("user1"))
                 .thenReturn(Collections.emptyList());
-        when(phoneClickDetailRepository.findListingIdsByUserId("user1"))
+        when(phoneClickDetailRepository.findListingIdsWithLastClickByUserId("user1"))
                 .thenReturn(Collections.emptyList());
-        when(recentlyViewedService.getRecentlyViewedIds("user1"))
-                .thenReturn(Collections.emptyList());
+        when(recentlyViewedService.getRecentlyViewedIdsWithTimestamps("user1"))
+                .thenReturn(new java.util.LinkedHashMap<>());
 
         // For cold start
         Listing coldListing = new Listing();

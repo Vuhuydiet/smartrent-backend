@@ -37,4 +37,13 @@ public interface RecentlyViewedService {
      * @return listing IDs, most recent first (empty if none)
      */
     List<Long> getRecentlyViewedIds(String userId);
+
+    /**
+     * Recently-viewed listing IDs mapped to the epoch-millis timestamp of the view,
+     * most recent first, WITHOUT hydrating listing details. Same ZSET read as
+     * {@link #getRecentlyViewedIds(String)} but keeps the scores, which the
+     * personalized feed needs to age-weight the location vote.
+     * @return ordered map listingId → viewedAt epoch millis (empty if none)
+     */
+    java.util.LinkedHashMap<Long, Long> getRecentlyViewedIdsWithTimestamps(String userId);
 }
