@@ -167,9 +167,6 @@ public interface PhoneClickDetailRepository extends JpaRepository<PhoneClickDeta
             @Param("ownerId") String ownerId,
             @Param("clickingUserId") String clickingUserId);
 
-    boolean existsByUser_UserIdAndListing_ListingIdAndClickedAtAfter(
-            String userId, Long listingId, LocalDateTime since);
-
     long countByListing_ListingIdAndClickedAtAfter(Long listingId, LocalDateTime since);
 
     @Query("SELECT CAST(pc.clickedAt AS LocalDate) AS clickDate, COUNT(pc) AS cnt " +
