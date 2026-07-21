@@ -72,16 +72,6 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
-        LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
-
-        boolean duplicateByUser = phoneClickDetailRepository
-                .existsByUser_UserIdAndListing_ListingIdAndClickedAtAfter(userId, request.getListingId(), tenMinutesAgo);
-
-        if (duplicateByUser) {
-            log.info("Duplicate click from user {} on listing {} within 10 minutes, ignoring", userId, request.getListingId());
-            return buildSpamResponse(listing, user);
-        }
-
         PhoneClickDetail phoneClickDetail = PhoneClickDetail.builder()
                 .listing(listing)
                 .user(user)
@@ -94,21 +84,6 @@ public class PhoneClickDetailServiceImpl implements PhoneClickDetailService {
         evictPersonalizedCache(userId);
 
         return mapToResponse(saved);
-    }
-
-    private PhoneClickResponse buildSpamResponse(Listing listing, User user) {
-        return PhoneClickResponse.builder()
-                .listingId(listing.getListingId())
-                .listingTitle(listing.getTitle())
-                .userId(user.getUserId())
-                .userFirstName(user.getFirstName())
-                .userLastName(user.getLastName())
-                .userEmail(user.getEmail())
-                .userContactPhone(user.getContactPhoneNumber())
-                .userContactPhoneVerified(user.getContactPhoneVerified())
-                .userAvatarUrl(user.getAvatarUrl())
-                .clickedAt(LocalDateTime.now())
-                .build();
     }
 
     @Override
