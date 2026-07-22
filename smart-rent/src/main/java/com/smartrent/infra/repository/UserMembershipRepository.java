@@ -49,6 +49,13 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
 
     boolean existsByUserIdAndStatus(String userId, MembershipStatus status);
 
+    // Admin reset: wipe every membership row the user owns, in any status. Call after
+    // deleting their benefit rows — the self-referencing upgraded_from_membership_id FK
+    // is ON DELETE SET NULL, but user_membership_benefits still points here.
+    @Modifying
+    @Query("DELETE FROM user_memberships um WHERE um.userId = :userId")
+    int deleteByUserId(@Param("userId") String userId);
+
     // Idempotency guard for completeMembershipUpgrade — a payment webhook retry
     // (IPN redelivery) re-running that method with the same transaction must not
     // create a second upgraded slot + grant its benefits a second time.

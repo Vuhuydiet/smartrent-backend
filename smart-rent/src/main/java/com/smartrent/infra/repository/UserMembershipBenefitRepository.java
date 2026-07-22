@@ -69,5 +69,12 @@ public interface UserMembershipBenefitRepository extends JpaRepository<UserMembe
     Integer getTotalUsedQuota(@Param("userId") String userId, @Param("benefitType") BenefitType benefitType, @Param("now") LocalDateTime now);
 
     List<UserMembershipBenefit> findByUserMembershipUserMembershipId(Long userMembershipId);
+
+    // Admin reset: wipe every benefit row the user owns, whatever its status and
+    // whatever state its parent membership is in. Bulk delete rather than the derived
+    // load-then-delete so a long-lived account with hundreds of rows is one statement.
+    @Modifying
+    @Query("DELETE FROM user_membership_benefits umb WHERE umb.userId = :userId")
+    int deleteByUserId(@Param("userId") String userId);
 }
 
