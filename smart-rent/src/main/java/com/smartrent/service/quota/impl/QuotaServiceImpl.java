@@ -1,9 +1,11 @@
 package com.smartrent.service.quota.impl;
 
 import com.smartrent.dto.response.QuotaStatusResponse;
+import com.smartrent.enums.BenefitStatus;
 import com.smartrent.enums.BenefitType;
 import com.smartrent.infra.repository.UserMembershipBenefitRepository;
 import com.smartrent.infra.repository.UserMembershipRepository;
+import com.smartrent.infra.repository.entity.UserMembership;
 import com.smartrent.infra.repository.entity.UserMembershipBenefit;
 import com.smartrent.service.quota.QuotaService;
 import lombok.AccessLevel;
@@ -14,7 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -36,10 +40,18 @@ public class QuotaServiceImpl implements QuotaService {
     public QuotaStatusResponse checkQuotaAvailability(String userId, BenefitType benefitType) {
         log.info("Checking quota availability for user {} and benefit type {}", userId, benefitType);
 
-        Integer totalAvailable = userBenefitRepository.getTotalAvailableQuota(userId, benefitType, LocalDateTime.now());
-        boolean hasActiveMembership = hasActiveMembership(userId);
+        LocalDateTime now = LocalDateTime.now();
 
-        if (!hasActiveMembership) {
+        // Scope quota to THE single current membership — the exact slot getMyMembership
+        // returns (findActiveUserMembership: latest endDate, startDate<=now<endDate).
+        // Summing across every active membership (the old behaviour) meant that if two
+        // slots were ever valid at once — legacy stacked purchases, an overlap during
+        // upgrade/renewal, a race — their quotas ADDED UP, so check/PUSH reported far
+        // more than the current package actually grants. Reading from one slot makes the
+        // number always match what the user sees on their membership card and can never
+        // accumulate, regardless of stale rows in the table.
+        UserMembership current = userMembershipRepository.findActiveUserMembership(userId, now).orElse(null);
+        if (current == null) {
             log.info("User {} has no active membership", userId);
             return QuotaStatusResponse.builder()
                     .totalAvailable(0)
@@ -48,14 +60,33 @@ public class QuotaServiceImpl implements QuotaService {
                     .build();
         }
 
-        Integer totalGranted = userBenefitRepository.getTotalGrantedQuota(userId, benefitType, LocalDateTime.now());
-        Integer totalUsed = userBenefitRepository.getTotalUsedQuota(userId, benefitType, LocalDateTime.now());
+        int totalGranted = 0;
+        int totalUsed = 0;
+        for (UserMembershipBenefit benefit : currentBenefitsOfType(current, benefitType, now)) {
+            totalGranted += benefit.getTotalQuantity();
+            totalUsed += benefit.getQuantityUsed();
+        }
 
         return QuotaStatusResponse.builder()
-                .totalAvailable(totalAvailable != null ? totalAvailable : 0)
-                .totalUsed(totalUsed != null ? totalUsed : 0)
-                .totalGranted(totalGranted != null ? totalGranted : 0)
+                .totalAvailable(totalGranted - totalUsed)
+                .totalUsed(totalUsed)
+                .totalGranted(totalGranted)
                 .build();
+    }
+
+    /**
+     * Benefits of a given type belonging to one membership slot that are still usable
+     * right now (ACTIVE status, not past their own expiry). Shared by the availability
+     * read and the consume path so both always agree on the same set of rows.
+     */
+    private List<UserMembershipBenefit> currentBenefitsOfType(UserMembership membership, BenefitType benefitType, LocalDateTime now) {
+        return userBenefitRepository
+                .findByUserMembershipUserMembershipId(membership.getUserMembershipId())
+                .stream()
+                .filter(b -> b.getBenefitType() == benefitType)
+                .filter(b -> b.getStatus() == BenefitStatus.ACTIVE)
+                .filter(b -> b.getExpiresAt().isAfter(now))
+                .toList();
     }
 
     @Override
@@ -78,10 +109,18 @@ public class QuotaServiceImpl implements QuotaService {
     public boolean consumeQuota(String userId, BenefitType benefitType, int quantity) {
         log.info("Consuming {} quota of type {} for user {}", quantity, benefitType, userId);
 
-        // Find first available benefit with quota - use benefitType.name() for native query
-        UserMembershipBenefit benefit = userBenefitRepository
-                .findFirstAvailableBenefit(userId, benefitType.name(), LocalDateTime.now())
-                .orElse(null);
+        LocalDateTime now = LocalDateTime.now();
+
+        // Consume from THE current membership only — same slot and same row set the
+        // availability read uses (currentBenefitsOfType), so what we decrement is always
+        // exactly what check/PUSH counted. Picking the benefit expiring soonest first
+        // drains near-expiry quota before it's lost.
+        UserMembership current = userMembershipRepository.findActiveUserMembership(userId, now).orElse(null);
+        UserMembershipBenefit benefit = current == null ? null
+                : currentBenefitsOfType(current, benefitType, now).stream()
+                        .filter(UserMembershipBenefit::hasQuotaAvailable)
+                        .min(Comparator.comparing(UserMembershipBenefit::getExpiresAt))
+                        .orElse(null);
 
         if (benefit == null) {
             log.warn("No available quota for user {} and benefit type {}", userId, benefitType);
