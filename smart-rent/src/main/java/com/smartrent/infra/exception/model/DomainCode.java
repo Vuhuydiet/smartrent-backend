@@ -162,7 +162,14 @@ public enum DomainCode {
       "Người dùng chưa đủ điều kiện bị chặn đăng tin. Cần trên %d report đã được admin duyệt, hiện tại chỉ có %d."),
   //    Saved Listing Error 24xxx
   SAVED_LISTING_LIMIT_EXCEEDED("24001", HttpStatus.BAD_REQUEST,
-      "Bạn chỉ có thể lưu tối đa %d tin. Hãy bỏ lưu một tin để lưu tin khác.")
+      "Bạn chỉ có thể lưu tối đa %d tin. Hãy bỏ lưu một tin để lưu tin khác."),
+  // Saving twice / unsaving something that was never saved are both "the state
+  // you asked for is already the state you have" — a client (chatbot, double
+  // tap, retry) should be able to say so, not report a 500 Unknown error.
+  SAVED_LISTING_ALREADY_SAVED("24002", HttpStatus.CONFLICT,
+      "Tin này đã có trong danh sách yêu thích của bạn."),
+  SAVED_LISTING_NOT_SAVED("24003", HttpStatus.NOT_FOUND,
+      "Tin này không có trong danh sách yêu thích của bạn.")
   ;
 
   private final String value;

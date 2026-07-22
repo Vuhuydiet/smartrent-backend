@@ -139,8 +139,8 @@ public class SavedListingController {
                             examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
                                     value = """
                                             {
-                                              "code": "LISTING_ALREADY_SAVED",
-                                              "message": "Listing 123 is already saved by this user"
+                                              "code": "24002",
+                                              "message": "Tin này đã có trong danh sách yêu thích của bạn."
                                             }
                                             """
                             )
@@ -192,8 +192,8 @@ public class SavedListingController {
                             examples = @io.swagger.v3.oas.annotations.media.ExampleObject(
                                     value = """
                                             {
-                                              "code": "SAVED_LISTING_NOT_FOUND",
-                                              "message": "Saved listing not found for user and listing ID: 123"
+                                              "code": "24003",
+                                              "message": "Tin này không có trong danh sách yêu thích của bạn."
                                             }
                                             """
                             )
