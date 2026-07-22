@@ -111,7 +111,7 @@ public class AdminMembershipController {
         // Triggered from the Users management page (SA, UA), not the membership
         // package screen — so it follows user-management write access.
         @PreAuthorize("hasAnyAuthority('ROLE_SA', 'ROLE_UA')")
-        @Operation(summary = "Clear user active memberships (Admin)", description = "Expires all ACTIVE membership records for a user. Use this to fix duplicate-active-membership issues.")
+        @Operation(summary = "Clear user memberships (Admin)", description = "Deletes every membership record and every membership benefit (post/push quota) belonging to a user, resetting the account to 'never bought a package'. Payment transactions are kept. Use this to fix duplicate-active-membership and accumulated-quota issues.")
         public void clearUserMembership(
                         @Parameter(description = "User ID", required = true) @PathVariable String userId) {
                 log.info("Admin clearing memberships for user: {}", userId);

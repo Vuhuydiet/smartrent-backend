@@ -1272,34 +1272,27 @@ public class MembershipServiceImpl implements MembershipService {
     @Override
     @Transactional
     public void adminClearUserMembership(String userId) {
-        log.info("Admin clearing all memberships and quota for user: {}", userId);
+        log.info("Admin clearing all membership data for user: {}", userId);
 
-        // "Clear this user's membership" has to leave the account with nothing left to
-        // spend, so it works on two axes instead of one:
+        // This endpoint exists to put an account back to "never bought anything", so it
+        // deletes every membership row and every benefit row the user owns rather than
+        // flipping statuses.
         //
-        //  - every membership row that is still live, not just status=ACTIVE ones whose
-        //    window contains now. A queued slot from a chained renewal is also ACTIVE
-        //    (it just starts later), and would otherwise survive the clear and hand the
-        //    user a fresh package the moment the lifecycle job promoted it.
-        //  - every ACTIVE benefit row owned by the user, keyed off user_id rather than
-        //    walked from the memberships retired in this call. Older paths retired a
-        //    membership without cascading to its benefits, so accounts carry orphaned
-        //    ACTIVE push/post rows whose parent membership is long expired; scoping the
-        //    cleanup to the memberships we just touched would step right over them and
-        //    leave the stale push quota the clear was called to get rid of.
-        List<UserMembership> memberships = userMembershipRepository.findByUserId(userId).stream()
-                .filter(um -> um.getStatus() == MembershipStatus.ACTIVE)
-                .collect(Collectors.toList());
-        memberships.forEach(um -> um.setStatus(MembershipStatus.EXPIRED));
-        userMembershipRepository.saveAll(memberships);
+        // Marking them EXPIRED is not enough. The rows that make quota accumulate are
+        // precisely the ones a status flip leaves behind: benefit rows whose parent
+        // membership was retired long ago but which stayed status=ACTIVE themselves
+        // (older code paths retired the membership without cascading), and memberships
+        // in every non-ACTIVE state that still anchor those rows. Any read that forgets
+        // one of the two status predicates starts summing them again, and the next
+        // purchase lands on top of that pile instead of on a clean slate.
+        //
+        // Transactions are deliberately untouched — they are the payment record, not
+        // entitlement, and deleting them would rewrite revenue history.
+        int benefitsDeleted = userBenefitRepository.deleteByUserId(userId);
+        int membershipsDeleted = userMembershipRepository.deleteByUserId(userId);
 
-        List<UserMembershipBenefit> benefits = userBenefitRepository
-                .findByUserIdAndStatus(userId, BenefitStatus.ACTIVE);
-        benefits.forEach(UserMembershipBenefit::expire);
-        userBenefitRepository.saveAll(benefits);
-
-        log.info("Cleared {} membership(s) and {} benefit(s) for user: {}",
-                memberships.size(), benefits.size(), userId);
+        log.info("Deleted {} membership(s) and {} benefit(s) for user: {}",
+                membershipsDeleted, benefitsDeleted, userId);
     }
 
     // =====================================================
