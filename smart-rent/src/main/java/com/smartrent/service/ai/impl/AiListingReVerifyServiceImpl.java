@@ -36,10 +36,10 @@ public class AiListingReVerifyServiceImpl implements AiListingReVerifyService {
     public StoredAiModerationResponse reVerifyAndStore(Long listingId) {
         log.info("Admin-triggered AI re-verification for listing ID: {}", listingId);
 
-        // Fetch with address + amenities so the entity stays usable once detached:
-        // processSingleListing runs in its own (REQUIRES_NEW) transaction and reads
-        // listing.getAddress() for the duplicate check, so that association must be
-        // initialized here to avoid a LazyInitializationException.
+        // Fetch with amenities so the entity stays usable once detached:
+        // processSingleListing runs in its own (REQUIRES_NEW) transaction. The
+        // duplicate check no longer touches the address association — it reads
+        // the denormalized location columns off the listing itself.
         Listing listing = listingRepository.findByIdWithAmenities(listingId)
                 .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND));
 
