@@ -105,6 +105,10 @@ public enum DomainCode {
   // practice the draft was published before and the client is republishing a stale copy.
   LISTING_MEDIA_ALREADY_LINKED("12004", HttpStatus.CONFLICT,
       "Media %s is already linked to listing %s"),
+  // Raised when a draft is published again while an earlier publish of the same draft
+  // is still waiting on its payment.
+  DRAFT_PUBLISH_ALREADY_PENDING("12005", HttpStatus.CONFLICT,
+      "This draft is already waiting on payment %s"),
   //    Quota Error 13xxx
   INSUFFICIENT_QUOTA("13001", HttpStatus.BAD_REQUEST, "Insufficient quota: %s"),
   BENEFIT_NOT_FOUND("13002", HttpStatus.NOT_FOUND, "Membership benefit not found: %s"),

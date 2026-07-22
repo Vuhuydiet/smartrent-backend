@@ -28,6 +28,7 @@ import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.ModerationStatus;
 import com.smartrent.enums.NotificationType;
 import com.smartrent.enums.PostSource;
+import com.smartrent.enums.TransactionStatus;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.model.DomainCode;
@@ -91,6 +92,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -180,24 +182,26 @@ public class ListingServiceImpl implements ListingService {
             return createListingWithPayment(request);
         }
 
-        // Get the first benefit to determine the benefit type and infer vipType
+        // Decide quota-vs-payment WITHOUT letting an exception cross a transactional
+        // boundary. quotaService methods are @Transactional and participate in this
+        // transaction, so an exception thrown out of one marks the shared transaction
+        // rollback-only (globalRollbackOnParticipationFailure). Catching it here used to
+        // look like a graceful fallback while the transaction was already doomed: we
+        // then inserted a payment transaction row, wrote Redis and called out to the
+        // payment provider for a real checkout URL, only for the commit to blow up with
+        // UnexpectedRollbackException. The user got a 500 and an live payment link whose
+        // local transaction row no longer existed — and paying it hit
+        // triggerBusinessLogicCompletion's "transaction == null -> log and return".
         Long firstBenefitId = request.getBenefitIds().iterator().next();
-        UserMembershipBenefit firstBenefit;
-        try {
-            firstBenefit = quotaService.getBenefitById(request.getUserId(), firstBenefitId);
-        } catch (IllegalArgumentException e) {
-            log.warn("Benefit not found for user {}: {}, falling back to payment flow",
-                    request.getUserId(), e.getMessage());
-            // Fall back to payment flow when benefit not found
-            return createListingWithPayment(request);
-        } catch (IllegalStateException e) {
-            log.warn("Benefit expired for user {}: {}, falling back to payment flow",
-                    request.getUserId(), e.getMessage());
-            // Fall back to payment flow when benefit expired
+        Optional<UserMembershipBenefit> firstBenefitLookup =
+                quotaService.findSpendableBenefit(request.getUserId(), firstBenefitId);
+        if (firstBenefitLookup.isEmpty()) {
+            log.warn("Benefit {} not spendable for user {}, falling back to payment flow",
+                    firstBenefitId, request.getUserId());
             return createListingWithPayment(request);
         }
 
-        BenefitType benefitType = firstBenefit.getBenefitType();
+        BenefitType benefitType = firstBenefitLookup.get().getBenefitType();
 
         // Validate benefit type is a posting type (POST_SILVER, POST_GOLD, POST_DIAMOND)
         String vipType;
@@ -222,20 +226,26 @@ public class ListingServiceImpl implements ListingService {
         // doesn't burn a post benefit on a request we'd reject afterwards.
         vipTierLimitValidator.validateForCreate(vipType, request.getMediaIds());
 
-        // Consume quota from specified benefit IDs (this also validates all benefits have the same type)
-        try {
-            quotaService.consumeQuotaByBenefitIds(request.getUserId(), request.getBenefitIds(), benefitType);
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid benefit IDs for user {}: {}, falling back to payment flow",
-                    request.getUserId(), e.getMessage());
-            // Fall back to payment flow when benefit IDs are invalid
-            return createListingWithPayment(request);
-        } catch (IllegalStateException e) {
-            log.warn("Insufficient quota for user {}: {}, falling back to payment flow",
-                    request.getUserId(), e.getMessage());
-            // Fall back to payment flow when quota is insufficient
+        // Every benefit must be spendable and of the same type before we consume any of
+        // them. consumeQuotaByBenefitIds validates and deducts inside one loop, so a
+        // rejection on the third id happens after the first two were already deducted —
+        // it relies on the rollback to give them back, which is exactly why its
+        // exceptions must not be swallowed.
+        boolean allSpendable = request.getBenefitIds().stream()
+                .map(benefitId -> quotaService.findSpendableBenefit(request.getUserId(), benefitId))
+                .allMatch(benefit -> benefit
+                        .filter(b -> b.getBenefitType() == benefitType)
+                        .isPresent());
+        if (!allSpendable) {
+            log.warn("Not all benefits {} are spendable for user {}, falling back to payment flow",
+                    request.getBenefitIds(), request.getUserId());
             return createListingWithPayment(request);
         }
+
+        // Pre-checked above, so a failure here is a genuine inconsistency (a concurrent
+        // spend, say) and must surface as an error rather than silently becoming a
+        // payment the user did not ask for.
+        quotaService.consumeQuotaByBenefitIds(request.getUserId(), request.getBenefitIds(), benefitType);
 
         // Set the inferred vipType on the request so the mapper uses it
         request.setVipType(vipType);
@@ -2603,6 +2613,8 @@ public class ListingServiceImpl implements ListingService {
                 .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND,
                         "Draft not found with id: " + draftId));
 
+        rejectIfPaymentStillPending(draft);
+
         // Merge draft data with request (request takes precedence)
         ListingCreationRequest mergedRequest = mergeDraftWithRequest(draft, request);
         mergedRequest.setUserId(userId);
@@ -2619,7 +2631,10 @@ public class ListingServiceImpl implements ListingService {
         if (Boolean.TRUE.equals(response.getPaymentRequired())) {
             // Listing is not created yet - it will be materialised from the cache after
             // payment succeeds, and the draft is deleted there. Keep the draft for now so a
-            // failed/abandoned payment doesn't lose the user's work.
+            // failed/abandoned payment doesn't lose the user's work. Record which payment
+            // it is waiting on so it cannot be published again in the meantime.
+            draft.setPendingTransactionId(response.getTransactionId());
+            listingDraftRepository.save(draft);
             log.info("Draft {} kept pending payment for transaction {}",
                     draftId, response.getTransactionId());
         } else {
@@ -2644,6 +2659,46 @@ public class ListingServiceImpl implements ListingService {
 
         listingDraftRepository.delete(draft);
         log.info("Draft listing {} deleted successfully", draftId);
+    }
+
+    /**
+     * Refuse to publish a draft that is still waiting on an earlier publish's payment.
+     *
+     * <p>Without this, a draft could be published twice: once through payment (which keeps
+     * the draft alive while the payment is outstanding) and again through quota. The
+     * second publish creates the listing and stamps its id onto the media, so when the
+     * first payment finally lands the callback cannot link that media and fails — and the
+     * IPN handler swallows the failure. The user is charged, no listing is created for
+     * that transaction, and nothing surfaces but a log line.
+     *
+     * <p>Only a still-PENDING transaction blocks. A failed, cancelled or vanished one is
+     * cleared so the user can publish the draft again, which is the whole point of keeping
+     * it. A COMPLETED one means the listing exists and the draft is about to be deleted by
+     * the callback, so it blocks too.
+     */
+    private void rejectIfPaymentStillPending(ListingDraft draft) {
+        String pendingTransactionId = draft.getPendingTransactionId();
+        if (pendingTransactionId == null || pendingTransactionId.isBlank()) {
+            return;
+        }
+
+        Transaction pending = transactionService.getTransaction(pendingTransactionId);
+        boolean stillOutstanding = pending != null
+                && (pending.getStatus() == TransactionStatus.PENDING
+                    || pending.getStatus() == TransactionStatus.COMPLETED);
+
+        if (stillOutstanding) {
+            log.warn("Draft {} republish blocked: transaction {} is {}",
+                    draft.getDraftId(), pendingTransactionId, pending.getStatus());
+            throw new AppException(DomainCode.DRAFT_PUBLISH_ALREADY_PENDING,
+                    "This draft is already waiting on payment " + pendingTransactionId);
+        }
+
+        // Payment failed, was cancelled, or the row is gone - let the user try again.
+        log.info("Draft {} clearing stale pending transaction {} (status {})",
+                draft.getDraftId(), pendingTransactionId,
+                pending != null ? pending.getStatus() : "MISSING");
+        draft.setPendingTransactionId(null);
     }
 
     /**

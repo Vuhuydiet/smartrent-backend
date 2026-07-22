@@ -79,5 +79,19 @@ public interface QuotaService {
      * @return true if user has active membership
      */
     boolean hasActiveMembership(String userId);
+
+    /**
+     * Look up a benefit the user can actually spend, without throwing.
+     *
+     * <p>{@link #getBenefitById} signals "not yours / expired" by throwing, which is
+     * fine for a genuine error but not for a routing decision: the exception escapes a
+     * participating transaction, so Spring marks the caller's transaction rollback-only
+     * and catching it upstream no longer helps. Callers that need to *decide* whether
+     * the quota path is viable must use this instead.
+     *
+     * @return the benefit when it exists, belongs to the user, is unexpired and still
+     *         has quota left; otherwise empty
+     */
+    java.util.Optional<UserMembershipBenefit> findSpendableBenefit(String userId, Long benefitId);
 }
 

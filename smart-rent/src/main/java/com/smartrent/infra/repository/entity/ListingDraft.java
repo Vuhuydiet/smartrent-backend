@@ -162,6 +162,12 @@ public class ListingDraft {
     @Column(name = "benefit_ids", length = 500)
     String benefitIds;
 
+    // Payment this draft is currently waiting on, if any. Set when a publish returns
+    // "payment required" and cleared once that payment is no longer outstanding, so the
+    // same draft cannot be published a second time while the first is in flight.
+    @Column(name = "pending_transaction_id", length = 100)
+    String pendingTransactionId;
+
     // Timestamps
     @Column(name = "created_at", updatable = false)
     @CreationTimestamp
