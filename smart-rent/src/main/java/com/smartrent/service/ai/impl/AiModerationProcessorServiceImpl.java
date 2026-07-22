@@ -9,7 +9,6 @@ import com.smartrent.dto.response.DuplicateCheckResponse;
 import com.smartrent.enums.NotificationType;
 import com.smartrent.infra.connector.SmartRentAiConnector;
 import com.smartrent.infra.repository.ListingAiModerationRepository;
-import com.smartrent.infra.repository.entity.Address;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.ListingAiModeration;
 import com.smartrent.infra.repository.entity.enums.VerificationStatus;
@@ -175,13 +174,14 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
                     .productType(listing.getProductType() != null ? listing.getProductType().name() : null)
                     .imageUrls(request.getImages());
 
-            Address addr = listing.getAddress();
-            if (addr != null) {
-                String provinceCode = addr.getNewProvinceCode() != null
-                        ? addr.getNewProvinceCode()
-                        : (addr.getLegacyProvinceId() != null ? String.valueOf(addr.getLegacyProvinceId()) : null);
-                builder.provinceCode(provinceCode).districtId(addr.getLegacyDistrictId());
-            }
+            // Read location off the listing's own denormalized columns, not the
+            // LAZY address proxy: the reconciliation sweep fetches listings
+            // without the address association and processes them on the
+            // ai-mod-task pool, where touching the proxy threw
+            // LazyInitializationException — caught below and logged as
+            // "treating as PASS", i.e. duplicate detection silently disabled.
+            builder.provinceCode(listing.resolveProvinceCodeForAi())
+                    .districtId(listing.getLegacyDistrictId());
 
             return smartRentAiConnector.checkDuplicate(builder.build());
         } catch (Exception e) {
