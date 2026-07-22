@@ -20,11 +20,21 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
     List<UserMembership> findByUserIdAndStatus(String userId, MembershipStatus status);
 
     // Returns the membership the user is actively using right now (startDate in the past, not yet expired).
-    @Query("SELECT um FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.startDate <= :now AND um.endDate > :now ORDER BY um.endDate DESC")
+    // LIMIT 1 is not cosmetic: an Optional-returning query that matches more than one row throws
+    // IncorrectResultSizeDataAccessException, and legacy accounts DO have several overlapping ACTIVE
+    // slots (stacked purchases from before completeMembershipPurchase started retiring the old one).
+    // Those accounts are exactly the ones the quota scoping is meant to rescue, so this must degrade
+    // to "pick the latest-ending slot", not blow up. Ties broken by id so the choice is stable
+    // between calls — the availability read and the consume path have to land on the same row.
+    @Query(value = "SELECT um.* FROM user_memberships um WHERE um.user_id = :userId AND um.status = 'ACTIVE' " +
+            "AND um.start_date <= :now AND um.end_date > :now " +
+            "ORDER BY um.end_date DESC, um.user_membership_id DESC LIMIT 1", nativeQuery = true)
     Optional<UserMembership> findActiveUserMembership(@Param("userId") String userId, @Param("now") LocalDateTime now);
 
     // Returns the next queued membership (startDate in the future, still ACTIVE status).
-    @Query("SELECT um FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.startDate > :now ORDER BY um.startDate ASC")
+    @Query(value = "SELECT um.* FROM user_memberships um WHERE um.user_id = :userId AND um.status = 'ACTIVE' " +
+            "AND um.start_date > :now " +
+            "ORDER BY um.start_date ASC, um.user_membership_id ASC LIMIT 1", nativeQuery = true)
     Optional<UserMembership> findQueuedMembership(@Param("userId") String userId, @Param("now") LocalDateTime now);
 
     // Returns current (non-queued) ACTIVE memberships whose endDate has passed — used by the lifecycle job.

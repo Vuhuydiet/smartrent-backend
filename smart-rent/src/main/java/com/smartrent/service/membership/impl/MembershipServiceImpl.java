@@ -1272,32 +1272,34 @@ public class MembershipServiceImpl implements MembershipService {
     @Override
     @Transactional
     public void adminClearUserMembership(String userId) {
-        log.info("Admin clearing all active memberships for user: {}", userId);
-        List<UserMembership> active = userMembershipRepository
-                .findByUserIdAndStatus(userId, MembershipStatus.ACTIVE);
-        if (active.isEmpty()) {
-            log.info("No active memberships found for user: {}", userId);
-            return;
-        }
-        active.forEach(um -> um.setStatus(MembershipStatus.EXPIRED));
-        userMembershipRepository.saveAll(active);
+        log.info("Admin clearing all memberships and quota for user: {}", userId);
 
-        // Every other place that retires a membership (upgrade, renewal lifecycle
-        // job) also expires its linked benefits — this one didn't, leaving orphaned
-        // rows with status=ACTIVE in user_membership_benefits. The quota queries now
-        // exclude them indirectly (they join back to the membership's own status),
-        // but leaving the benefit's own status stale is misleading for anything that
-        // reads it directly (admin views, history, future features) and just wrong
-        // data. Expire them explicitly, same as everywhere else.
-        List<UserMembershipBenefit> benefits = active.stream()
-                .map(UserMembership::getUserMembershipId)
-                .flatMap(id -> userBenefitRepository.findByUserMembershipUserMembershipId(id).stream())
+        // "Clear this user's membership" has to leave the account with nothing left to
+        // spend, so it works on two axes instead of one:
+        //
+        //  - every membership row that is still live, not just status=ACTIVE ones whose
+        //    window contains now. A queued slot from a chained renewal is also ACTIVE
+        //    (it just starts later), and would otherwise survive the clear and hand the
+        //    user a fresh package the moment the lifecycle job promoted it.
+        //  - every ACTIVE benefit row owned by the user, keyed off user_id rather than
+        //    walked from the memberships retired in this call. Older paths retired a
+        //    membership without cascading to its benefits, so accounts carry orphaned
+        //    ACTIVE push/post rows whose parent membership is long expired; scoping the
+        //    cleanup to the memberships we just touched would step right over them and
+        //    leave the stale push quota the clear was called to get rid of.
+        List<UserMembership> memberships = userMembershipRepository.findByUserId(userId).stream()
+                .filter(um -> um.getStatus() == MembershipStatus.ACTIVE)
                 .collect(Collectors.toList());
+        memberships.forEach(um -> um.setStatus(MembershipStatus.EXPIRED));
+        userMembershipRepository.saveAll(memberships);
+
+        List<UserMembershipBenefit> benefits = userBenefitRepository
+                .findByUserIdAndStatus(userId, BenefitStatus.ACTIVE);
         benefits.forEach(UserMembershipBenefit::expire);
         userBenefitRepository.saveAll(benefits);
 
-        log.info("Expired {} active membership(s) and {} linked benefit(s) for user: {}",
-                active.size(), benefits.size(), userId);
+        log.info("Cleared {} membership(s) and {} benefit(s) for user: {}",
+                memberships.size(), benefits.size(), userId);
     }
 
     // =====================================================
