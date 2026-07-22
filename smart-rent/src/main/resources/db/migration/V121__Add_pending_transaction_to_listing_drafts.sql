@@ -1,4 +1,12 @@
--- V118: remember which payment a draft is currently waiting on.
+-- V121: remember which payment a draft is currently waiting on.
+--
+-- Was authored as V118 on a branch cut before V118__Add_price_comparables_index landed
+-- on main, and merged after it. Two files claiming version 118 is a hard Flyway
+-- resolution error ("Found more than one migration with version 118") — not something
+-- validate-on-migrate: false relaxes — so the application refused to start from the
+-- moment both were on main, and every deploy since has kept serving the previous image.
+-- Renumbered above the already-applied 118 rather than renumbering that one, which is
+-- recorded in flyway_schema_history on every environment that booted before this broke.
 --
 -- publishDraft deliberately keeps the draft alive while a payment is pending, so an
 -- abandoned payment doesn't lose the user's work. But nothing stopped the same draft
