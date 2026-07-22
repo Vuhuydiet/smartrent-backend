@@ -3402,7 +3402,17 @@ public class ListingServiceImpl implements ListingService {
         // description body. Drop it on this path (up to 500 listings per call)
         // so full descriptions don't inflate the payload; the other
         // batchMapCardListings callers keep theirs untouched.
-        listings.forEach(card -> card.setDescription(null));
+        //
+        // Same reasoning for the other two trims below. This response carries up
+        // to 500 cards and is public + unauthenticated, so anything the map does
+        // not draw is pure weight (and, for the contact fields, pure exposure).
+        // The search/homepage cards keep both — their carousel needs every image
+        // and they are shaped by the same DTO.
+        listings.forEach(card -> {
+            card.setDescription(null);
+            card.setMedia(thumbnailOnly(card.getMedia()));
+            card.setUser(withoutContactDetails(card.getUser()));
+        });
 
         // Build bounds info
         com.smartrent.dto.response.MapListingsResponse.MapBoundsInfo boundsInfo =
@@ -3428,5 +3438,58 @@ public class ListingServiceImpl implements ListingService {
                 listings.size(), page.getTotalElements());
 
         return response;
+    }
+
+    /**
+     * Reduces a card's media list to the single entry the map card actually
+     * draws — its thumbnail. A listing routinely carries 5-6 images, none of
+     * which the map renders beyond the first, and the count behind the
+     * "N photos" badge survives in {@code imageCount}.
+     *
+     * <p>Picks the first IMAGE rather than the first entry outright: the list is
+     * ordered primary-first then by sortOrder regardless of type, so a listing
+     * whose primary media is a video would otherwise be left with no thumbnail
+     * at all. Falls back to the first entry when there is no image.
+     *
+     * <p>Returns a plain {@link ArrayList} — this response is cached in Redis
+     * with default typing enabled, and the JDK's immutable list classes are not
+     * publicly constructible on the way back out.
+     */
+    private static List<ListingCardResponse.MediaCard> thumbnailOnly(
+            List<ListingCardResponse.MediaCard> media) {
+        if (media == null || media.size() <= 1) {
+            return media;
+        }
+        ListingCardResponse.MediaCard thumbnail = media.stream()
+                .filter(m -> Media.MediaType.IMAGE.name().equals(m.getMediaType()))
+                .findFirst()
+                .orElse(media.get(0));
+        List<ListingCardResponse.MediaCard> trimmed = new ArrayList<>(1);
+        trimmed.add(thumbnail);
+        return trimmed;
+    }
+
+    /**
+     * Copies a card's owner block without {@code email} and
+     * {@code contactPhoneNumber}. The map card shows a name, avatar and broker
+     * badge only, while {@code POST /v1/listings/map-bounds} is public and
+     * unauthenticated — so shipping those two fields handed anyone the contact
+     * details of up to 500 landlords per request for nothing in return.
+     * {@code contactPhoneVerified} stays: it is the trust badge, not the number.
+     */
+    private static ListingCardResponse.UserCard withoutContactDetails(
+            ListingCardResponse.UserCard user) {
+        if (user == null) {
+            return null;
+        }
+        return ListingCardResponse.UserCard.builder()
+                .userId(user.getUserId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .contactPhoneVerified(user.getContactPhoneVerified())
+                .avatarUrl(user.getAvatarUrl())
+                .isBroker(user.getIsBroker())
+                .brokerVerificationStatus(user.getBrokerVerificationStatus())
+                .build();
     }
 }

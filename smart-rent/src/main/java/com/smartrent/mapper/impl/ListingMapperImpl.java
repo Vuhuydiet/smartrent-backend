@@ -181,6 +181,12 @@ public class ListingMapperImpl implements ListingMapper {
                     .collect(Collectors.toList());
         }
 
+        // Counted from the mapped cards (already ACTIVE-filtered) so it stays in
+        // step with `media` even when a caller later trims that list.
+        int imageCount = mediaCards == null ? 0 : (int) mediaCards.stream()
+                .filter(m -> Media.MediaType.IMAGE.name().equals(m.getMediaType()))
+                .count();
+
         ListingCardResponse.AddressCard addressCard = null;
         if (address != null) {
             addressCard = ListingCardResponse.AddressCard.builder()
@@ -224,6 +230,7 @@ public class ListingMapperImpl implements ListingMapper {
                 .postDate(entity.getPostDate())
                 .address(addressCard)
                 .media(mediaCards)
+                .imageCount(imageCount)
                 .user(userCard)
                 .build();
     }
