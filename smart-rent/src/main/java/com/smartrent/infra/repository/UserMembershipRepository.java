@@ -61,6 +61,10 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
     // create a second upgraded slot + grant its benefits a second time.
     Optional<UserMembership> findByUpgradedFromMembershipId(Long upgradedFromMembershipId);
 
+    // Same guard, expressed as identity rather than inference, for every completion
+    // path: purchase, upgrade and renewal all record the transaction they came from.
+    Optional<UserMembership> findByCreatedFromTransactionId(String createdFromTransactionId);
+
     // Returns true when the user has ANY non-expired ACTIVE slot (current or queued).
     // Used as purchase guard — prevents buying a new membership when one already exists.
     @Query("SELECT COUNT(um) > 0 FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.endDate > :now")

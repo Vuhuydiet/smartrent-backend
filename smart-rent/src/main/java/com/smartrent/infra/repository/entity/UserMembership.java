@@ -62,6 +62,16 @@ public class UserMembership {
     @Column(name = "upgraded_from_membership_id")
     Long upgradedFromMembershipId;
 
+    /**
+     * Transaction this membership was created from. Unique in the database, so a
+     * redelivered payment webhook cannot produce a second membership (and a second
+     * benefit grant) for a payment that was already honoured. Null for rows created
+     * before this column existed and for slots the lifecycle job promotes, which have
+     * no transaction of their own.
+     */
+    @Column(name = "created_from_transaction_id", length = 36)
+    String createdFromTransactionId;
+
     @OneToMany(mappedBy = "userMembership", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     List<UserMembershipBenefit> benefits;
 
