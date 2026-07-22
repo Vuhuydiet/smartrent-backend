@@ -969,6 +969,20 @@ public class MembershipServiceImpl implements MembershipService {
             throw new RuntimeException("Previous membership ID not found in transaction");
         }
 
+        // Idempotency guard: payment webhooks (SePay/VNPay IPN) can redeliver the same
+        // notification, and this method has no other way to tell a retry apart from the
+        // first call — transaction.isCompleted() stays true forever. Without this, a
+        // redelivered IPN would expire the old slot again (harmless) but ALSO create a
+        // second new membership and grant its benefits a second time, stacking the push/
+        // post quota on top of what the first (legitimate) completion already granted.
+        Optional<UserMembership> alreadyUpgraded = userMembershipRepository
+                .findByUpgradedFromMembershipId(previousMembershipId);
+        if (alreadyUpgraded.isPresent()) {
+            log.warn("Upgrade for transaction {} already completed (previous membership {} already upgraded to {}) - skipping duplicate completion",
+                    transactionId, previousMembershipId, alreadyUpgraded.get().getUserMembershipId());
+            return mapToUserMembershipResponse(alreadyUpgraded.get());
+        }
+
         UserMembership oldMembership = userMembershipRepository.findById(previousMembershipId)
                 .orElseThrow(() -> new RuntimeException("Previous membership not found: " + previousMembershipId));
 
