@@ -45,6 +45,14 @@ public class ListingCardResponse {
     List<MediaCard> media;
     UserCard user;
 
+    /**
+     * Number of ACTIVE image media on the listing, independent of how many
+     * entries {@link #media} actually carries. Cards render one thumbnail plus a
+     * "N photos" badge, so a caller that trims {@code media} down to the
+     * thumbnail (the map-bounds path) can still show the real count.
+     */
+    Integer imageCount;
+
     @Getter
     @Builder
     @NoArgsConstructor
