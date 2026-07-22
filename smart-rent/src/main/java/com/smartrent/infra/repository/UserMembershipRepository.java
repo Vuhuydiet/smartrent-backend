@@ -39,6 +39,11 @@ public interface UserMembershipRepository extends JpaRepository<UserMembership, 
 
     boolean existsByUserIdAndStatus(String userId, MembershipStatus status);
 
+    // Idempotency guard for completeMembershipUpgrade — a payment webhook retry
+    // (IPN redelivery) re-running that method with the same transaction must not
+    // create a second upgraded slot + grant its benefits a second time.
+    Optional<UserMembership> findByUpgradedFromMembershipId(Long upgradedFromMembershipId);
+
     // Returns true when the user has ANY non-expired ACTIVE slot (current or queued).
     // Used as purchase guard — prevents buying a new membership when one already exists.
     @Query("SELECT COUNT(um) > 0 FROM user_memberships um WHERE um.userId = :userId AND um.status = 'ACTIVE' AND um.endDate > :now")
