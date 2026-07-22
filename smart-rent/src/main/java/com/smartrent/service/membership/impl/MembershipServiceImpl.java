@@ -386,16 +386,30 @@ public class MembershipServiceImpl implements MembershipService {
         MembershipPackage membershipPackage = membershipPackageRepository.findById(membershipId)
                 .orElseThrow(MembershipPackageNotFoundException::new);
 
-        // Check if user already has an active membership
-        boolean hasActiveMembership = userMembershipRepository.hasActiveMembership(
-                transaction.getUserId(),
-                LocalDateTime.now()
-        );
+        // initiateMembershipPurchase already blocks starting a fresh purchase while
+        // one is active (users are supposed to use upgrade/renewal instead), so
+        // reaching this with an active membership means something slipped past that
+        // guard (e.g. a delayed webhook redelivery outside the dedup check above, or
+        // an admin/test tool completing a transaction directly). This used to just
+        // log a warning and activate the new membership anyway, letting both grant
+        // their benefits — every purchase attempt kept stacking quota on top of
+        // whatever was already active, unbounded. Expire whatever's currently active
+        // (and its benefits, same cascade as adminClearUserMembership) first so at
+        // most one membership is ever contributing quota.
+        List<UserMembership> currentlyActive = userMembershipRepository
+                .findByUserIdAndStatus(transaction.getUserId(), MembershipStatus.ACTIVE);
+        if (!currentlyActive.isEmpty()) {
+            log.warn("User {} already has {} active membership(s) when completing a new purchase - expiring them before activating the new one",
+                    transaction.getUserId(), currentlyActive.size());
+            currentlyActive.forEach(um -> um.setStatus(MembershipStatus.EXPIRED));
+            userMembershipRepository.saveAll(currentlyActive);
 
-        if (hasActiveMembership) {
-            log.warn("User {} already has an active membership, but proceeding with new purchase", transaction.getUserId());
-            // Optionally: expire the old membership or extend it
-            // For now, we'll allow multiple active memberships (they can stack)
+            List<UserMembershipBenefit> staleBenefits = currentlyActive.stream()
+                    .map(UserMembership::getUserMembershipId)
+                    .flatMap(id -> userBenefitRepository.findByUserMembershipUserMembershipId(id).stream())
+                    .collect(Collectors.toList());
+            staleBenefits.forEach(UserMembershipBenefit::expire);
+            userBenefitRepository.saveAll(staleBenefits);
         }
 
         // Calculate dates
