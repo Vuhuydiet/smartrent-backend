@@ -1267,7 +1267,23 @@ public class MembershipServiceImpl implements MembershipService {
         }
         active.forEach(um -> um.setStatus(MembershipStatus.EXPIRED));
         userMembershipRepository.saveAll(active);
-        log.info("Expired {} active membership(s) for user: {}", active.size(), userId);
+
+        // Every other place that retires a membership (upgrade, renewal lifecycle
+        // job) also expires its linked benefits — this one didn't, leaving orphaned
+        // rows with status=ACTIVE in user_membership_benefits. The quota queries now
+        // exclude them indirectly (they join back to the membership's own status),
+        // but leaving the benefit's own status stale is misleading for anything that
+        // reads it directly (admin views, history, future features) and just wrong
+        // data. Expire them explicitly, same as everywhere else.
+        List<UserMembershipBenefit> benefits = active.stream()
+                .map(UserMembership::getUserMembershipId)
+                .flatMap(id -> userBenefitRepository.findByUserMembershipUserMembershipId(id).stream())
+                .collect(Collectors.toList());
+        benefits.forEach(UserMembershipBenefit::expire);
+        userBenefitRepository.saveAll(benefits);
+
+        log.info("Expired {} active membership(s) and {} linked benefit(s) for user: {}",
+                active.size(), benefits.size(), userId);
     }
 
     // =====================================================
