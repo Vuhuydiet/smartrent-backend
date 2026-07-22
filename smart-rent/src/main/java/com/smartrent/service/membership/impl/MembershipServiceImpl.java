@@ -274,6 +274,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .durationDays(durationDays)
                 .status(MembershipStatus.ACTIVE)
                 .totalPaid(membershipPackage.getSalePrice())
+                .createdFromTransactionId(transaction.getTransactionId())
                 .build();
 
         userMembership = userMembershipRepository.save(userMembership);
@@ -362,12 +363,13 @@ public class MembershipServiceImpl implements MembershipService {
         }
 
         // Check if membership already created for this transaction (idempotency)
-        // This prevents duplicate memberships when both callback and IPN are processed
-        Optional<UserMembership> existingMembership = userMembershipRepository.findByUserId(transaction.getUserId())
-                .stream()
-                .filter(um -> um.getCreatedAt().isAfter(transaction.getCreatedAt().minusMinutes(5)))
-                .filter(um -> um.getStatus() == MembershipStatus.ACTIVE)
-                .findFirst();
+        // This prevents duplicate memberships when both callback and IPN are processed.
+        // Matched on the transaction that created the membership rather than the old
+        // "any ACTIVE membership created within 5 minutes of this transaction" window,
+        // which both over- and under-matched: it claimed an unrelated membership that
+        // happened to land in the window, and let a webhook redelivered later through.
+        Optional<UserMembership> existingMembership =
+                userMembershipRepository.findByCreatedFromTransactionId(transactionId);
 
         if (existingMembership.isPresent()) {
             log.info("Membership already created for transaction: {}, returning existing membership", transactionId);
@@ -426,6 +428,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .durationDays(durationDays)
                 .status(MembershipStatus.ACTIVE)
                 .totalPaid(membershipPackage.getSalePrice())
+                .createdFromTransactionId(transactionId)
                 .build();
 
         userMembership = userMembershipRepository.save(userMembership);
@@ -990,7 +993,8 @@ public class MembershipServiceImpl implements MembershipService {
         // second new membership and grant its benefits a second time, stacking the push/
         // post quota on top of what the first (legitimate) completion already granted.
         Optional<UserMembership> alreadyUpgraded = userMembershipRepository
-                .findByUpgradedFromMembershipId(previousMembershipId);
+                .findByCreatedFromTransactionId(transactionId)
+                .or(() -> userMembershipRepository.findByUpgradedFromMembershipId(previousMembershipId));
         if (alreadyUpgraded.isPresent()) {
             log.warn("Upgrade for transaction {} already completed (previous membership {} already upgraded to {}) - skipping duplicate completion",
                     transactionId, previousMembershipId, alreadyUpgraded.get().getUserMembershipId());
@@ -1039,6 +1043,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .status(MembershipStatus.ACTIVE)
                 .totalPaid(transaction.getAmount())
                 .upgradedFromMembershipId(previousMembershipId)
+                .createdFromTransactionId(transactionId)
                 .build();
 
         newMembership = userMembershipRepository.save(newMembership);
@@ -1227,6 +1232,20 @@ public class MembershipServiceImpl implements MembershipService {
             throw new RuntimeException("Transaction is not a membership renewal: " + transactionId);
         }
 
+        // Idempotency guard. This path had none at all, and it is reachable twice for a
+        // single payment (provider callback + SePay webhook, which retries until it gets
+        // a 200). Each extra run chained another membership off the same previous slot;
+        // when the renewal started immediately rather than being queued, it also granted
+        // that package's post/push benefits again — quota accumulating on a user who paid
+        // once.
+        Optional<UserMembership> alreadyRenewed =
+                userMembershipRepository.findByCreatedFromTransactionId(transactionId);
+        if (alreadyRenewed.isPresent()) {
+            log.warn("Renewal for transaction {} already completed (membership {}) - skipping duplicate completion",
+                    transactionId, alreadyRenewed.get().getUserMembershipId());
+            return mapToUserMembershipResponse(alreadyRenewed.get());
+        }
+
         Long membershipId = Long.parseLong(transaction.getReferenceId());
         MembershipPackage pkg = membershipPackageRepository.findById(membershipId)
                 .orElseThrow(MembershipPackageNotFoundException::new);
@@ -1236,11 +1255,26 @@ public class MembershipServiceImpl implements MembershipService {
                 ? userMembershipRepository.findById(previousMembershipId).orElse(null)
                 : null;
 
-        // Chain from previous endDate if it hasn't expired yet; otherwise start from now
+        // Chain onto the end of the user's existing timeline, not just onto the slot the
+        // transaction names. initiateMembershipRenewal rejects a second renewal while a
+        // queued slot exists, but that check runs at initiate: two renewals started
+        // before either payment lands both pass it, and both name the same current slot
+        // as `previous`. Chaining from `previous` alone would then give them identical
+        // start/end dates — two memberships live at once, which is the state the quota
+        // reads have to defend against. Starting from the latest endDate the user holds
+        // queues the second renewal behind the first instead, so the paid time is kept
+        // and the timeline stays a line.
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime startDate = (previous != null && previous.getEndDate().isAfter(now))
-                ? previous.getEndDate()
-                : now;
+        LocalDateTime timelineEnd = userMembershipRepository
+                .findByUserIdAndStatus(transaction.getUserId(), MembershipStatus.ACTIVE)
+                .stream()
+                .map(UserMembership::getEndDate)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
+        if (timelineEnd == null && previous != null) {
+            timelineEnd = previous.getEndDate();
+        }
+        LocalDateTime startDate = (timelineEnd != null && timelineEnd.isAfter(now)) ? timelineEnd : now;
         LocalDateTime endDate = startDate.plusMonths(pkg.getDurationMonths());
         int durationDays = pkg.getDurationMonths() * 30;
 
@@ -1252,6 +1286,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .durationDays(durationDays)
                 .status(MembershipStatus.ACTIVE)
                 .totalPaid(transaction.getAmount())
+                .createdFromTransactionId(transactionId)
                 .build();
 
         renewed = userMembershipRepository.save(renewed);
