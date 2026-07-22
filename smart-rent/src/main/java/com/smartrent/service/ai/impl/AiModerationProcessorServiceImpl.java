@@ -1,6 +1,7 @@
 package com.smartrent.service.ai.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartrent.dto.request.AiListingVerificationRequest;
 import com.smartrent.dto.request.DuplicateCheckRequest;
@@ -18,6 +19,7 @@ import com.smartrent.service.ai.AiModerationProcessorService;
 import com.smartrent.service.notification.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,14 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
     private final SmartRentAiConnector smartRentAiConnector;
     private final ObjectMapper objectMapper;
     private final AiModerationExecutor aiModerationExecutor;
+
+    /** Page admins on the AI's low-confidence bucket too. Off: it is noise. */
+    @Value("${smartrent.ai.duplicate.notify-suspicious:false}")
+    private boolean notifySuspicious;
+
+    /** Similarity below this never pages admins, whatever the decision says. */
+    @Value("${smartrent.ai.duplicate.notify-min-score:0.85}")
+    private double notifyMinScore;
 
     /**
      * Pre-computes the AI analysis for a single listing and STORES it, in its own
@@ -104,6 +114,11 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
                 moderation.setVerificationStatus(VerificationStatus.UNDER_REVIEW);
             }
 
+            // Captured before the row is overwritten: it is how we tell a first
+            // detection from a re-analysis of a listing admins were already told
+            // about (re-verify button, retry, backstop sweep re-running).
+            String previousAiReason = moderation.getAiReason();
+
             try {
                 // Persist verification + duplicate result together so the review dialog can
                 // show image/video issues, violations, and any duplicate matches in one place.
@@ -122,9 +137,7 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
 
             // Duplicates are the one thing worth proactively alerting admins about, since
             // the listing would otherwise look unremarkable in the review queue.
-            if (duplicateResult != null
-                    && ("DUPLICATE".equals(duplicateResult.getDecision())
-                        || "SUSPICIOUS".equals(duplicateResult.getDecision()))) {
+            if (shouldNotifyDuplicate(listing, duplicateResult, previousAiReason)) {
                 log.info("Listing ID {} flagged as {} (score={}) — notifying admins.",
                         listing.getListingId(), duplicateResult.getDecision(), duplicateResult.getHighestScore());
                 sendAdminDuplicateNotification(listing, duplicateResult);
@@ -135,6 +148,74 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
             moderation.setRetryCount(moderation.getRetryCount() + 1);
             moderation.setVerificationStatus(VerificationStatus.PENDING); // revert for retry
             listingAiModerationRepository.save(moderation);
+        }
+    }
+
+    /**
+     * Whether this duplicate result is worth paging every admin about.
+     *
+     * <p>Every hit used to notify: both DUPLICATE and SUSPICIOUS, at any score,
+     * every time a listing was re-analysed, one notification row per admin. A
+     * backlog drained through the backstop sweep would bury the admin inbox in
+     * exactly the notifications they are least able to act on in bulk. Three
+     * gates, all defaulting to the quiet side:
+     *
+     * <ul>
+     *   <li>SUSPICIOUS is off by default — it is the AI's low-confidence bucket,
+     *       and it is already visible in the review dialog either way. Set
+     *       {@code AI_DUPLICATE_NOTIFY_SUSPICIOUS=true} to page on it too.</li>
+     *   <li>Below {@code AI_DUPLICATE_NOTIFY_MIN_SCORE} is off — a DUPLICATE
+     *       verdict scraping the decision threshold is not worth an alert.</li>
+     *   <li>A listing already reported as a duplicate is never reported twice.
+     *       Re-verify, retry and the sweep all re-run the check on listings the
+     *       admin has already been told about.</li>
+     * </ul>
+     *
+     * None of this hides anything: the full duplicate result is still stored on
+     * the moderation row and rendered in the review dialog. This only decides
+     * whether to interrupt an admin about it.
+     */
+    private boolean shouldNotifyDuplicate(Listing listing,
+                                          DuplicateCheckResponse duplicateResult,
+                                          String previousAiReason) {
+        if (duplicateResult == null) {
+            return false;
+        }
+        String decision = duplicateResult.getDecision();
+        boolean flagged = "DUPLICATE".equals(decision)
+                || (notifySuspicious && "SUSPICIOUS".equals(decision));
+        if (!flagged) {
+            return false;
+        }
+        if (duplicateResult.getHighestScore() < notifyMinScore) {
+            log.debug("Listing ID {} flagged as {} but score {} < {} — not notifying admins.",
+                    listing.getListingId(), decision, duplicateResult.getHighestScore(), notifyMinScore);
+            return false;
+        }
+        if (wasAlreadyReportedAsDuplicate(previousAiReason)) {
+            log.debug("Listing ID {} was already reported as a duplicate — not notifying admins again.",
+                    listing.getListingId());
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Reads the decision out of the previously stored aiReason JSON. Parse
+     * failures answer "not reported before", so a malformed old row costs a
+     * duplicate notification rather than a missed one.
+     */
+    private boolean wasAlreadyReportedAsDuplicate(String previousAiReason) {
+        if (previousAiReason == null || previousAiReason.isBlank()) {
+            return false;
+        }
+        try {
+            JsonNode decision = objectMapper.readTree(previousAiReason)
+                    .path("duplicateCheck").path("decision");
+            return "DUPLICATE".equals(decision.asText(null))
+                    || (notifySuspicious && "SUSPICIOUS".equals(decision.asText(null)));
+        } catch (JsonProcessingException e) {
+            return false;
         }
     }
 
