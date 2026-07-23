@@ -720,6 +720,13 @@ public class ListingServiceImpl implements ListingService {
                 || modStatus == ModerationStatus.REMOVED) {
             throw new DomainException(DomainCode.UPDATE_NOT_ALLOWED);
         }
+
+        // Snapshot exactly what the AI is shown (see AiListingMapperImpl) so an edit that
+        // touches nothing it moderates — expiry date, vipType — costs no AI spend.
+        ModeratedContent contentBeforeEdit = ModeratedContent.of(existing);
+        boolean mediaChanged = false;
+        boolean amenitiesChanged = false;
+
         // Update fields from request (null-safe for partial update)
         if (request.getTitle() != null) existing.setTitle(request.getTitle());
         if (request.getDescription() != null) existing.setDescription(request.getDescription());
@@ -761,6 +768,10 @@ public class ListingServiceImpl implements ListingService {
             // Unlink existing media (set listing to null)
             List<Media> existingMedia = mediaRepository.findByListing_ListingIdAndStatusOrderBySortOrderAsc(
                     id, Media.MediaStatus.ACTIVE);
+            Set<Long> currentMediaIds = existingMedia.stream()
+                    .map(Media::getMediaId)
+                    .collect(Collectors.toSet());
+            mediaChanged = !currentMediaIds.equals(request.getMediaIds());
             for (Media media : existingMedia) {
                 media.setListing(null);
                 mediaRepository.save(media);
@@ -777,23 +788,40 @@ public class ListingServiceImpl implements ListingService {
         // Handle amenity update if provided (empty set clears all amenities)
         if (request.getAmenityIds() != null) {
             log.info("Updating amenities for listing {}: {} amenities", id, request.getAmenityIds().size());
+            Set<Long> currentAmenityIds = existing.getAmenities() == null
+                    ? Collections.emptySet()
+                    : existing.getAmenities().stream()
+                            .map(Amenity::getAmenityId)
+                            .collect(Collectors.toSet());
+            amenitiesChanged = !currentAmenityIds.equals(request.getAmenityIds());
             linkAmenitiesToListing(existing, request.getAmenityIds());
         }
 
+        boolean contentChanged = mediaChanged || amenitiesChanged
+                || !ModeratedContent.of(existing).equals(contentBeforeEdit);
+
         // An approved listing edited by the owner must go back through review
-        boolean sentBackToReview = existing.getModerationStatus() == ModerationStatus.APPROVED;
+        boolean sentBackToReview = contentChanged
+                && existing.getModerationStatus() == ModerationStatus.APPROVED;
         if (sentBackToReview) {
             existing.setVerified(false);
             existing.setIsVerify(true);
             existing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+        }
+        if (contentChanged) {
             // The stored AI analysis describes the *pre-edit* content. Reset the record so
             // the worker re-analyses instead of skipping it as already-computed — otherwise
             // the review dialog would show a stale verdict for content that has changed.
+            // Applies to a listing still waiting in the queue too: it was edited under an
+            // analysis the admin has not looked at yet.
             resetAiModerationForReanalysis(existing.getListingId());
         }
 
         Listing saved = listingRepository.save(existing);
-        if (sentBackToReview) {
+        // REVISION_REQUIRED is deliberately not re-queued here — the worker only analyses
+        // PENDING_REVIEW/RESUBMITTED, and the owner still has to resubmit explicitly. The
+        // reset above is what makes that resubmit analyse the edited content.
+        if (contentChanged && awaitingAiAnalysis(saved.getModerationStatus())) {
             queueAiAnalysis(saved);
         }
         boolean priceChanged = request.getPrice() != null
@@ -805,6 +833,53 @@ public class ListingServiceImpl implements ListingService {
         com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(saved.getUserId());
         com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(saved.getAddress());
         return listingMapper.toResponse(saved, user, addressResponse);
+    }
+
+    /**
+     * States in which the AI queue worker will actually analyse a listing — mirrors
+     * {@code AiAnalysisWorker.needsAnalysis}. Queueing anything else is wasted work.
+     */
+    private static boolean awaitingAiAnalysis(ModerationStatus status) {
+        return status == null
+                || status == ModerationStatus.PENDING_REVIEW
+                || status == ModerationStatus.RESUBMITTED;
+    }
+
+    /**
+     * The slice of a listing the AI actually moderates — mirrors what
+     * {@code AiListingMapperImpl} puts in the verification request (media and amenities
+     * are compared separately, from the request). Snapshotted before an owner edit and
+     * compared after, so a stored verdict is only invalidated when the content it
+     * describes really changed.
+     */
+    private record ModeratedContent(
+            String title, String description, BigDecimal price, Listing.PriceUnit priceUnit,
+            Listing.ListingType listingType, Listing.ProductType productType, Float area,
+            Integer bedrooms, Integer bathrooms, Integer roomCapacity,
+            Listing.Direction direction, Listing.Furnishing furnishing,
+            String waterPrice, String electricityPrice, String internetPrice, String serviceFee) {
+
+        static ModeratedContent of(Listing listing) {
+            return new ModeratedContent(
+                    listing.getTitle(),
+                    listing.getDescription(),
+                    // stripTrailingZeros: BigDecimal.equals is scale-sensitive, so 5000
+                    // vs 5000.00 would otherwise read as a price change
+                    listing.getPrice() != null ? listing.getPrice().stripTrailingZeros() : null,
+                    listing.getPriceUnit(),
+                    listing.getListingType(),
+                    listing.getProductType(),
+                    listing.getArea(),
+                    listing.getBedrooms(),
+                    listing.getBathrooms(),
+                    listing.getRoomCapacity(),
+                    listing.getDirection(),
+                    listing.getFurnishing(),
+                    listing.getWaterPrice(),
+                    listing.getElectricityPrice(),
+                    listing.getInternetPrice(),
+                    listing.getServiceFee());
+        }
     }
 
     /**

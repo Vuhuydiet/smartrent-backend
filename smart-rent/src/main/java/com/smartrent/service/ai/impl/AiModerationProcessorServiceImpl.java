@@ -116,6 +116,16 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
                 log.warn("Failed to serialize AI moderation result for listing ID: {}", listing.getListingId(), e);
             }
 
+            // The owner may have edited the listing while this analysis was running. That
+            // edit resets the row to PENDING and re-queues it, so this verdict now describes
+            // content that no longer exists — writing it would both show the admin a stale
+            // result and make the re-queued delivery skip as "already computed".
+            if (wasResetWhileRunning(listing.getListingId())) {
+                log.info("Listing ID {} was edited during AI analysis — discarding stale result, "
+                        + "the re-queued analysis will replace it", listing.getListingId());
+                return;
+            }
+
             listingAiModerationRepository.save(moderation);
 
             log.info("Stored AI analysis for listing ID: {} (aiSuggestion: {}) — awaiting admin review",
@@ -137,6 +147,18 @@ public class AiModerationProcessorServiceImpl implements AiModerationProcessorSe
             moderation.setVerificationStatus(VerificationStatus.PENDING); // revert for retry
             listingAiModerationRepository.save(moderation);
         }
+    }
+
+    /**
+     * True when the stored row went back to PENDING after this run claimed it as
+     * IN_PROGRESS — i.e. an owner edit or resubmit invalidated the content this
+     * analysis was computed from. Read fresh from the DB: the {@code moderation}
+     * handed to us is the pre-claim, detached copy.
+     */
+    private boolean wasResetWhileRunning(Long listingId) {
+        return listingAiModerationRepository.findById(listingId)
+                .map(current -> current.getVerificationStatus() == VerificationStatus.PENDING)
+                .orElse(false);
     }
 
     private void sendAdminDuplicateNotification(Listing listing, DuplicateCheckResponse duplicateResult) {
