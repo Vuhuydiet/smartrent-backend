@@ -31,7 +31,7 @@ public class AdminListingSummary {
     @Schema(description = "Listing title", example = "Cho thuê căn hộ tầng cao, view thoáng Quận Tân Bình - 34m²")
     String title;
 
-    @Schema(description = "Owner summary (name + contact phone only)")
+    @Schema(description = "Owner summary (id + name + contact phone + avatar only)")
     OwnerSummary user;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
@@ -106,6 +106,9 @@ public class AdminListingSummary {
     @Schema(description = "Owner summary for admin list view")
     public static class OwnerSummary {
 
+        @Schema(description = "Owner user ID", example = "9f1c2b7e-4d3a-4a1e-9c22-5b0a7d8e6f10")
+        String userId;
+
         @Schema(description = "First name", example = "Trương")
         String firstName;
 
@@ -114,6 +117,10 @@ public class AdminListingSummary {
 
         @Schema(description = "Contact phone number", example = "0367919024")
         String contactPhoneNumber;
+
+        @Schema(description = "Avatar image URL (null when the owner has no avatar)",
+                example = "https://cdn.example.com/avatars/9f1c2b7e.jpg")
+        String avatarUrl;
     }
 
     @Getter

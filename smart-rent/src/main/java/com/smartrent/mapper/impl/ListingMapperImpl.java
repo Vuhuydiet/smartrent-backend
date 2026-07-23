@@ -366,9 +366,11 @@ public class ListingMapperImpl implements ListingMapper {
     public AdminListingSummary toAdminSummary(Listing entity, User owner, String verificationStatus, List<String> images) {
         AdminListingSummary.OwnerSummary ownerSummary = owner == null ? null
                 : AdminListingSummary.OwnerSummary.builder()
+                        .userId(owner.getUserId())
                         .firstName(owner.getFirstName())
                         .lastName(owner.getLastName())
                         .contactPhoneNumber(owner.getContactPhoneNumber())
+                        .avatarUrl(owner.getAvatarUrl())
                         .build();
 
         AdminListingSummary.AdminVerificationSummary verification = AdminListingSummary.AdminVerificationSummary.builder()
