@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -392,10 +393,18 @@ public class NewsServiceImpl implements NewsService {
     }
 
     /**
-     * Generate URL-friendly slug from title
+     * Generate URL-friendly slug from title.
+     * <p>
+     * Vietnamese diacritics are transliterated to ASCII (NFD decomposition then
+     * combining-mark removal) rather than stripped, so "Bất động sản" yields
+     * "bat-dong-san" instead of the unreadable "bt-ng-sn". {@code đ}/{@code Đ}
+     * have no NFD decomposition and are handled explicitly.
      */
-    private String generateSlug(String title) {
-        return title.toLowerCase()
+    String generateSlug(String title) {
+        return Normalizer.normalize(title, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase()
+                .replace("đ", "d")
                 .replaceAll("[^a-z0-9\\s-]", "")
                 .replaceAll("\\s+", "-")
                 .replaceAll("-+", "-")
