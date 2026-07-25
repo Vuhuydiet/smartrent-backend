@@ -6,6 +6,7 @@ import com.smartrent.dto.response.ListingCardListResponse;
 import com.smartrent.dto.response.*;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.discovery.SearchSuggestionService;
+import com.smartrent.util.MapBoundsGrid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -466,7 +467,13 @@ public class ListingSearchController {
     )
     public ApiResponse<MapListingsResponse> getListingsByMapBounds(
             @Valid @RequestBody MapBoundsRequest request) {
-        MapListingsResponse response = listingService.getListingsByMapBounds(request);
+        // Snap the viewport to a zoom grid BEFORE the @Cacheable service boundary
+        // (its key is derived from these bounds). Different users browsing the same
+        // area collapse onto shared grid cells, so the first load of a popular
+        // viewport becomes a cache hit instead of a fresh geo query. The snapped
+        // cell contains the requested one; the map filters pins client-side.
+        MapListingsResponse response =
+                listingService.getListingsByMapBounds(MapBoundsGrid.snap(request));
         return ApiResponse.<MapListingsResponse>builder().data(response).build();
     }
 }
