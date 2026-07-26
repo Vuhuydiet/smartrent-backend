@@ -51,6 +51,7 @@ public class ListingController {
 
     private final ListingService listingService;
     private final VipTierDetailService vipTierDetailService;
+    private final com.smartrent.service.listing.ContactVisibility contactVisibility;
 
     @Operation(
         summary = "Create a new listing with transactional address",
@@ -197,7 +198,7 @@ public class ListingController {
     @GetMapping("/{id}")
     public ApiResponse<ListingResponse> getListingById(@PathVariable Long id) {
         ListingResponse response = listingService.getListingById(id);
-        return ApiResponse.<ListingResponse>builder().data(response).build();
+        return ApiResponse.<ListingResponse>builder().data(contactVisibility.apply(response)).build();
     }
 
     @GetMapping
@@ -224,10 +225,10 @@ public class ListingController {
     ) {
         if (ids != null && !ids.isEmpty()) {
             List<ListingResponse> responses = listingService.getListingsByIds(ids);
-            return ApiResponse.<List<ListingResponse>>builder().data(responses).build();
+            return ApiResponse.<List<ListingResponse>>builder().data(contactVisibility.applyDetails(responses)).build();
         }
         List<ListingResponse> responses = listingService.getListings(page, size);
-        return ApiResponse.<List<ListingResponse>>builder().data(responses).build();
+        return ApiResponse.<List<ListingResponse>>builder().data(contactVisibility.applyDetails(responses)).build();
     }
 
     @Operation(
