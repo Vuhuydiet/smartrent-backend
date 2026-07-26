@@ -28,6 +28,7 @@ import com.smartrent.enums.BenefitType;
 import com.smartrent.enums.ModerationStatus;
 import com.smartrent.enums.NotificationType;
 import com.smartrent.enums.PostSource;
+import com.smartrent.enums.TransactionStatus;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.DomainException;
 import com.smartrent.infra.exception.model.DomainCode;
@@ -91,6 +92,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -180,24 +182,26 @@ public class ListingServiceImpl implements ListingService {
             return createListingWithPayment(request);
         }
 
-        // Get the first benefit to determine the benefit type and infer vipType
+        // Decide quota-vs-payment WITHOUT letting an exception cross a transactional
+        // boundary. quotaService methods are @Transactional and participate in this
+        // transaction, so an exception thrown out of one marks the shared transaction
+        // rollback-only (globalRollbackOnParticipationFailure). Catching it here used to
+        // look like a graceful fallback while the transaction was already doomed: we
+        // then inserted a payment transaction row, wrote Redis and called out to the
+        // payment provider for a real checkout URL, only for the commit to blow up with
+        // UnexpectedRollbackException. The user got a 500 and an live payment link whose
+        // local transaction row no longer existed — and paying it hit
+        // triggerBusinessLogicCompletion's "transaction == null -> log and return".
         Long firstBenefitId = request.getBenefitIds().iterator().next();
-        UserMembershipBenefit firstBenefit;
-        try {
-            firstBenefit = quotaService.getBenefitById(request.getUserId(), firstBenefitId);
-        } catch (IllegalArgumentException e) {
-            log.warn("Benefit not found for user {}: {}, falling back to payment flow",
-                    request.getUserId(), e.getMessage());
-            // Fall back to payment flow when benefit not found
-            return createListingWithPayment(request);
-        } catch (IllegalStateException e) {
-            log.warn("Benefit expired for user {}: {}, falling back to payment flow",
-                    request.getUserId(), e.getMessage());
-            // Fall back to payment flow when benefit expired
+        Optional<UserMembershipBenefit> firstBenefitLookup =
+                quotaService.findSpendableBenefit(request.getUserId(), firstBenefitId);
+        if (firstBenefitLookup.isEmpty()) {
+            log.warn("Benefit {} not spendable for user {}, falling back to payment flow",
+                    firstBenefitId, request.getUserId());
             return createListingWithPayment(request);
         }
 
-        BenefitType benefitType = firstBenefit.getBenefitType();
+        BenefitType benefitType = firstBenefitLookup.get().getBenefitType();
 
         // Validate benefit type is a posting type (POST_SILVER, POST_GOLD, POST_DIAMOND)
         String vipType;
@@ -222,20 +226,26 @@ public class ListingServiceImpl implements ListingService {
         // doesn't burn a post benefit on a request we'd reject afterwards.
         vipTierLimitValidator.validateForCreate(vipType, request.getMediaIds());
 
-        // Consume quota from specified benefit IDs (this also validates all benefits have the same type)
-        try {
-            quotaService.consumeQuotaByBenefitIds(request.getUserId(), request.getBenefitIds(), benefitType);
-        } catch (IllegalArgumentException e) {
-            log.warn("Invalid benefit IDs for user {}: {}, falling back to payment flow",
-                    request.getUserId(), e.getMessage());
-            // Fall back to payment flow when benefit IDs are invalid
-            return createListingWithPayment(request);
-        } catch (IllegalStateException e) {
-            log.warn("Insufficient quota for user {}: {}, falling back to payment flow",
-                    request.getUserId(), e.getMessage());
-            // Fall back to payment flow when quota is insufficient
+        // Every benefit must be spendable and of the same type before we consume any of
+        // them. consumeQuotaByBenefitIds validates and deducts inside one loop, so a
+        // rejection on the third id happens after the first two were already deducted —
+        // it relies on the rollback to give them back, which is exactly why its
+        // exceptions must not be swallowed.
+        boolean allSpendable = request.getBenefitIds().stream()
+                .map(benefitId -> quotaService.findSpendableBenefit(request.getUserId(), benefitId))
+                .allMatch(benefit -> benefit
+                        .filter(b -> b.getBenefitType() == benefitType)
+                        .isPresent());
+        if (!allSpendable) {
+            log.warn("Not all benefits {} are spendable for user {}, falling back to payment flow",
+                    request.getBenefitIds(), request.getUserId());
             return createListingWithPayment(request);
         }
+
+        // Pre-checked above, so a failure here is a genuine inconsistency (a concurrent
+        // spend, say) and must surface as an error rather than silently becoming a
+        // payment the user did not ask for.
+        quotaService.consumeQuotaByBenefitIds(request.getUserId(), request.getBenefitIds(), benefitType);
 
         // Set the inferred vipType on the request so the mapper uses it
         request.setVipType(vipType);
@@ -710,6 +720,13 @@ public class ListingServiceImpl implements ListingService {
                 || modStatus == ModerationStatus.REMOVED) {
             throw new DomainException(DomainCode.UPDATE_NOT_ALLOWED);
         }
+
+        // Snapshot exactly what the AI is shown (see AiListingMapperImpl) so an edit that
+        // touches nothing it moderates — expiry date, vipType — costs no AI spend.
+        ModeratedContent contentBeforeEdit = ModeratedContent.of(existing);
+        boolean mediaChanged = false;
+        boolean amenitiesChanged = false;
+
         // Update fields from request (null-safe for partial update)
         if (request.getTitle() != null) existing.setTitle(request.getTitle());
         if (request.getDescription() != null) existing.setDescription(request.getDescription());
@@ -751,6 +768,10 @@ public class ListingServiceImpl implements ListingService {
             // Unlink existing media (set listing to null)
             List<Media> existingMedia = mediaRepository.findByListing_ListingIdAndStatusOrderBySortOrderAsc(
                     id, Media.MediaStatus.ACTIVE);
+            Set<Long> currentMediaIds = existingMedia.stream()
+                    .map(Media::getMediaId)
+                    .collect(Collectors.toSet());
+            mediaChanged = !currentMediaIds.equals(request.getMediaIds());
             for (Media media : existingMedia) {
                 media.setListing(null);
                 mediaRepository.save(media);
@@ -767,23 +788,40 @@ public class ListingServiceImpl implements ListingService {
         // Handle amenity update if provided (empty set clears all amenities)
         if (request.getAmenityIds() != null) {
             log.info("Updating amenities for listing {}: {} amenities", id, request.getAmenityIds().size());
+            Set<Long> currentAmenityIds = existing.getAmenities() == null
+                    ? Collections.emptySet()
+                    : existing.getAmenities().stream()
+                            .map(Amenity::getAmenityId)
+                            .collect(Collectors.toSet());
+            amenitiesChanged = !currentAmenityIds.equals(request.getAmenityIds());
             linkAmenitiesToListing(existing, request.getAmenityIds());
         }
 
+        boolean contentChanged = mediaChanged || amenitiesChanged
+                || !ModeratedContent.of(existing).equals(contentBeforeEdit);
+
         // An approved listing edited by the owner must go back through review
-        boolean sentBackToReview = existing.getModerationStatus() == ModerationStatus.APPROVED;
+        boolean sentBackToReview = contentChanged
+                && existing.getModerationStatus() == ModerationStatus.APPROVED;
         if (sentBackToReview) {
             existing.setVerified(false);
             existing.setIsVerify(true);
             existing.setModerationStatus(ModerationStatus.PENDING_REVIEW);
+        }
+        if (contentChanged) {
             // The stored AI analysis describes the *pre-edit* content. Reset the record so
             // the worker re-analyses instead of skipping it as already-computed — otherwise
             // the review dialog would show a stale verdict for content that has changed.
+            // Applies to a listing still waiting in the queue too: it was edited under an
+            // analysis the admin has not looked at yet.
             resetAiModerationForReanalysis(existing.getListingId());
         }
 
         Listing saved = listingRepository.save(existing);
-        if (sentBackToReview) {
+        // REVISION_REQUIRED is deliberately not re-queued here — the worker only analyses
+        // PENDING_REVIEW/RESUBMITTED, and the owner still has to resubmit explicitly. The
+        // reset above is what makes that resubmit analyse the edited content.
+        if (contentChanged && awaitingAiAnalysis(saved.getModerationStatus())) {
             queueAiAnalysis(saved);
         }
         boolean priceChanged = request.getPrice() != null
@@ -795,6 +833,53 @@ public class ListingServiceImpl implements ListingService {
         com.smartrent.dto.response.UserCreationResponse user = buildUserResponse(saved.getUserId());
         com.smartrent.dto.response.AddressResponse addressResponse = buildAddressResponse(saved.getAddress());
         return listingMapper.toResponse(saved, user, addressResponse);
+    }
+
+    /**
+     * States in which the AI queue worker will actually analyse a listing — mirrors
+     * {@code AiAnalysisWorker.needsAnalysis}. Queueing anything else is wasted work.
+     */
+    private static boolean awaitingAiAnalysis(ModerationStatus status) {
+        return status == null
+                || status == ModerationStatus.PENDING_REVIEW
+                || status == ModerationStatus.RESUBMITTED;
+    }
+
+    /**
+     * The slice of a listing the AI actually moderates — mirrors what
+     * {@code AiListingMapperImpl} puts in the verification request (media and amenities
+     * are compared separately, from the request). Snapshotted before an owner edit and
+     * compared after, so a stored verdict is only invalidated when the content it
+     * describes really changed.
+     */
+    private record ModeratedContent(
+            String title, String description, BigDecimal price, Listing.PriceUnit priceUnit,
+            Listing.ListingType listingType, Listing.ProductType productType, Float area,
+            Integer bedrooms, Integer bathrooms, Integer roomCapacity,
+            Listing.Direction direction, Listing.Furnishing furnishing,
+            String waterPrice, String electricityPrice, String internetPrice, String serviceFee) {
+
+        static ModeratedContent of(Listing listing) {
+            return new ModeratedContent(
+                    listing.getTitle(),
+                    listing.getDescription(),
+                    // stripTrailingZeros: BigDecimal.equals is scale-sensitive, so 5000
+                    // vs 5000.00 would otherwise read as a price change
+                    listing.getPrice() != null ? listing.getPrice().stripTrailingZeros() : null,
+                    listing.getPriceUnit(),
+                    listing.getListingType(),
+                    listing.getProductType(),
+                    listing.getArea(),
+                    listing.getBedrooms(),
+                    listing.getBathrooms(),
+                    listing.getRoomCapacity(),
+                    listing.getDirection(),
+                    listing.getFurnishing(),
+                    listing.getWaterPrice(),
+                    listing.getElectricityPrice(),
+                    listing.getInternetPrice(),
+                    listing.getServiceFee());
+        }
     }
 
     /**
@@ -2603,6 +2688,8 @@ public class ListingServiceImpl implements ListingService {
                 .orElseThrow(() -> new AppException(DomainCode.LISTING_NOT_FOUND,
                         "Draft not found with id: " + draftId));
 
+        rejectIfPaymentStillPending(draft);
+
         // Merge draft data with request (request takes precedence)
         ListingCreationRequest mergedRequest = mergeDraftWithRequest(draft, request);
         mergedRequest.setUserId(userId);
@@ -2619,7 +2706,10 @@ public class ListingServiceImpl implements ListingService {
         if (Boolean.TRUE.equals(response.getPaymentRequired())) {
             // Listing is not created yet - it will be materialised from the cache after
             // payment succeeds, and the draft is deleted there. Keep the draft for now so a
-            // failed/abandoned payment doesn't lose the user's work.
+            // failed/abandoned payment doesn't lose the user's work. Record which payment
+            // it is waiting on so it cannot be published again in the meantime.
+            draft.setPendingTransactionId(response.getTransactionId());
+            listingDraftRepository.save(draft);
             log.info("Draft {} kept pending payment for transaction {}",
                     draftId, response.getTransactionId());
         } else {
@@ -2644,6 +2734,46 @@ public class ListingServiceImpl implements ListingService {
 
         listingDraftRepository.delete(draft);
         log.info("Draft listing {} deleted successfully", draftId);
+    }
+
+    /**
+     * Refuse to publish a draft that is still waiting on an earlier publish's payment.
+     *
+     * <p>Without this, a draft could be published twice: once through payment (which keeps
+     * the draft alive while the payment is outstanding) and again through quota. The
+     * second publish creates the listing and stamps its id onto the media, so when the
+     * first payment finally lands the callback cannot link that media and fails — and the
+     * IPN handler swallows the failure. The user is charged, no listing is created for
+     * that transaction, and nothing surfaces but a log line.
+     *
+     * <p>Only a still-PENDING transaction blocks. A failed, cancelled or vanished one is
+     * cleared so the user can publish the draft again, which is the whole point of keeping
+     * it. A COMPLETED one means the listing exists and the draft is about to be deleted by
+     * the callback, so it blocks too.
+     */
+    private void rejectIfPaymentStillPending(ListingDraft draft) {
+        String pendingTransactionId = draft.getPendingTransactionId();
+        if (pendingTransactionId == null || pendingTransactionId.isBlank()) {
+            return;
+        }
+
+        Transaction pending = transactionService.getTransaction(pendingTransactionId);
+        boolean stillOutstanding = pending != null
+                && (pending.getStatus() == TransactionStatus.PENDING
+                    || pending.getStatus() == TransactionStatus.COMPLETED);
+
+        if (stillOutstanding) {
+            log.warn("Draft {} republish blocked: transaction {} is {}",
+                    draft.getDraftId(), pendingTransactionId, pending.getStatus());
+            throw new AppException(DomainCode.DRAFT_PUBLISH_ALREADY_PENDING,
+                    "This draft is already waiting on payment " + pendingTransactionId);
+        }
+
+        // Payment failed, was cancelled, or the row is gone - let the user try again.
+        log.info("Draft {} clearing stale pending transaction {} (status {})",
+                draft.getDraftId(), pendingTransactionId,
+                pending != null ? pending.getStatus() : "MISSING");
+        draft.setPendingTransactionId(null);
     }
 
     /**
@@ -3347,7 +3477,17 @@ public class ListingServiceImpl implements ListingService {
         // description body. Drop it on this path (up to 500 listings per call)
         // so full descriptions don't inflate the payload; the other
         // batchMapCardListings callers keep theirs untouched.
-        listings.forEach(card -> card.setDescription(null));
+        //
+        // Same reasoning for the other two trims below. This response carries up
+        // to 500 cards and is public + unauthenticated, so anything the map does
+        // not draw is pure weight (and, for the contact fields, pure exposure).
+        // The search/homepage cards keep both — their carousel needs every image
+        // and they are shaped by the same DTO.
+        listings.forEach(card -> {
+            card.setDescription(null);
+            card.setMedia(thumbnailOnly(card.getMedia()));
+            card.setUser(withoutContactDetails(card.getUser()));
+        });
 
         // Build bounds info
         com.smartrent.dto.response.MapListingsResponse.MapBoundsInfo boundsInfo =
@@ -3373,5 +3513,58 @@ public class ListingServiceImpl implements ListingService {
                 listings.size(), page.getTotalElements());
 
         return response;
+    }
+
+    /**
+     * Reduces a card's media list to the single entry the map card actually
+     * draws — its thumbnail. A listing routinely carries 5-6 images, none of
+     * which the map renders beyond the first, and the count behind the
+     * "N photos" badge survives in {@code imageCount}.
+     *
+     * <p>Picks the first IMAGE rather than the first entry outright: the list is
+     * ordered primary-first then by sortOrder regardless of type, so a listing
+     * whose primary media is a video would otherwise be left with no thumbnail
+     * at all. Falls back to the first entry when there is no image.
+     *
+     * <p>Returns a plain {@link ArrayList} — this response is cached in Redis
+     * with default typing enabled, and the JDK's immutable list classes are not
+     * publicly constructible on the way back out.
+     */
+    private static List<ListingCardResponse.MediaCard> thumbnailOnly(
+            List<ListingCardResponse.MediaCard> media) {
+        if (media == null || media.size() <= 1) {
+            return media;
+        }
+        ListingCardResponse.MediaCard thumbnail = media.stream()
+                .filter(m -> Media.MediaType.IMAGE.name().equals(m.getMediaType()))
+                .findFirst()
+                .orElse(media.get(0));
+        List<ListingCardResponse.MediaCard> trimmed = new ArrayList<>(1);
+        trimmed.add(thumbnail);
+        return trimmed;
+    }
+
+    /**
+     * Copies a card's owner block without {@code email} and
+     * {@code contactPhoneNumber}. The map card shows a name, avatar and broker
+     * badge only, while {@code POST /v1/listings/map-bounds} is public and
+     * unauthenticated — so shipping those two fields handed anyone the contact
+     * details of up to 500 landlords per request for nothing in return.
+     * {@code contactPhoneVerified} stays: it is the trust badge, not the number.
+     */
+    private static ListingCardResponse.UserCard withoutContactDetails(
+            ListingCardResponse.UserCard user) {
+        if (user == null) {
+            return null;
+        }
+        return ListingCardResponse.UserCard.builder()
+                .userId(user.getUserId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .contactPhoneVerified(user.getContactPhoneVerified())
+                .avatarUrl(user.getAvatarUrl())
+                .isBroker(user.getIsBroker())
+                .brokerVerificationStatus(user.getBrokerVerificationStatus())
+                .build();
     }
 }

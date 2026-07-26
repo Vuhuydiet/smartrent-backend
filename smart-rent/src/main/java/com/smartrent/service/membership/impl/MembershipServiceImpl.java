@@ -274,6 +274,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .durationDays(durationDays)
                 .status(MembershipStatus.ACTIVE)
                 .totalPaid(membershipPackage.getSalePrice())
+                .createdFromTransactionId(transaction.getTransactionId())
                 .build();
 
         userMembership = userMembershipRepository.save(userMembership);
@@ -362,12 +363,13 @@ public class MembershipServiceImpl implements MembershipService {
         }
 
         // Check if membership already created for this transaction (idempotency)
-        // This prevents duplicate memberships when both callback and IPN are processed
-        Optional<UserMembership> existingMembership = userMembershipRepository.findByUserId(transaction.getUserId())
-                .stream()
-                .filter(um -> um.getCreatedAt().isAfter(transaction.getCreatedAt().minusMinutes(5)))
-                .filter(um -> um.getStatus() == MembershipStatus.ACTIVE)
-                .findFirst();
+        // This prevents duplicate memberships when both callback and IPN are processed.
+        // Matched on the transaction that created the membership rather than the old
+        // "any ACTIVE membership created within 5 minutes of this transaction" window,
+        // which both over- and under-matched: it claimed an unrelated membership that
+        // happened to land in the window, and let a webhook redelivered later through.
+        Optional<UserMembership> existingMembership =
+                userMembershipRepository.findByCreatedFromTransactionId(transactionId);
 
         if (existingMembership.isPresent()) {
             log.info("Membership already created for transaction: {}, returning existing membership", transactionId);
@@ -386,16 +388,30 @@ public class MembershipServiceImpl implements MembershipService {
         MembershipPackage membershipPackage = membershipPackageRepository.findById(membershipId)
                 .orElseThrow(MembershipPackageNotFoundException::new);
 
-        // Check if user already has an active membership
-        boolean hasActiveMembership = userMembershipRepository.hasActiveMembership(
-                transaction.getUserId(),
-                LocalDateTime.now()
-        );
+        // initiateMembershipPurchase already blocks starting a fresh purchase while
+        // one is active (users are supposed to use upgrade/renewal instead), so
+        // reaching this with an active membership means something slipped past that
+        // guard (e.g. a delayed webhook redelivery outside the dedup check above, or
+        // an admin/test tool completing a transaction directly). This used to just
+        // log a warning and activate the new membership anyway, letting both grant
+        // their benefits — every purchase attempt kept stacking quota on top of
+        // whatever was already active, unbounded. Expire whatever's currently active
+        // (and its benefits, same cascade as adminClearUserMembership) first so at
+        // most one membership is ever contributing quota.
+        List<UserMembership> currentlyActive = userMembershipRepository
+                .findByUserIdAndStatus(transaction.getUserId(), MembershipStatus.ACTIVE);
+        if (!currentlyActive.isEmpty()) {
+            log.warn("User {} already has {} active membership(s) when completing a new purchase - expiring them before activating the new one",
+                    transaction.getUserId(), currentlyActive.size());
+            currentlyActive.forEach(um -> um.setStatus(MembershipStatus.EXPIRED));
+            userMembershipRepository.saveAll(currentlyActive);
 
-        if (hasActiveMembership) {
-            log.warn("User {} already has an active membership, but proceeding with new purchase", transaction.getUserId());
-            // Optionally: expire the old membership or extend it
-            // For now, we'll allow multiple active memberships (they can stack)
+            List<UserMembershipBenefit> staleBenefits = currentlyActive.stream()
+                    .map(UserMembership::getUserMembershipId)
+                    .flatMap(id -> userBenefitRepository.findByUserMembershipUserMembershipId(id).stream())
+                    .collect(Collectors.toList());
+            staleBenefits.forEach(UserMembershipBenefit::expire);
+            userBenefitRepository.saveAll(staleBenefits);
         }
 
         // Calculate dates
@@ -412,6 +428,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .durationDays(durationDays)
                 .status(MembershipStatus.ACTIVE)
                 .totalPaid(membershipPackage.getSalePrice())
+                .createdFromTransactionId(transactionId)
                 .build();
 
         userMembership = userMembershipRepository.save(userMembership);
@@ -969,6 +986,21 @@ public class MembershipServiceImpl implements MembershipService {
             throw new RuntimeException("Previous membership ID not found in transaction");
         }
 
+        // Idempotency guard: payment webhooks (SePay/VNPay IPN) can redeliver the same
+        // notification, and this method has no other way to tell a retry apart from the
+        // first call — transaction.isCompleted() stays true forever. Without this, a
+        // redelivered IPN would expire the old slot again (harmless) but ALSO create a
+        // second new membership and grant its benefits a second time, stacking the push/
+        // post quota on top of what the first (legitimate) completion already granted.
+        Optional<UserMembership> alreadyUpgraded = userMembershipRepository
+                .findByCreatedFromTransactionId(transactionId)
+                .or(() -> userMembershipRepository.findByUpgradedFromMembershipId(previousMembershipId));
+        if (alreadyUpgraded.isPresent()) {
+            log.warn("Upgrade for transaction {} already completed (previous membership {} already upgraded to {}) - skipping duplicate completion",
+                    transactionId, previousMembershipId, alreadyUpgraded.get().getUserMembershipId());
+            return mapToUserMembershipResponse(alreadyUpgraded.get());
+        }
+
         UserMembership oldMembership = userMembershipRepository.findById(previousMembershipId)
                 .orElseThrow(() -> new RuntimeException("Previous membership not found: " + previousMembershipId));
 
@@ -1011,6 +1043,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .status(MembershipStatus.ACTIVE)
                 .totalPaid(transaction.getAmount())
                 .upgradedFromMembershipId(previousMembershipId)
+                .createdFromTransactionId(transactionId)
                 .build();
 
         newMembership = userMembershipRepository.save(newMembership);
@@ -1199,6 +1232,20 @@ public class MembershipServiceImpl implements MembershipService {
             throw new RuntimeException("Transaction is not a membership renewal: " + transactionId);
         }
 
+        // Idempotency guard. This path had none at all, and it is reachable twice for a
+        // single payment (provider callback + SePay webhook, which retries until it gets
+        // a 200). Each extra run chained another membership off the same previous slot;
+        // when the renewal started immediately rather than being queued, it also granted
+        // that package's post/push benefits again — quota accumulating on a user who paid
+        // once.
+        Optional<UserMembership> alreadyRenewed =
+                userMembershipRepository.findByCreatedFromTransactionId(transactionId);
+        if (alreadyRenewed.isPresent()) {
+            log.warn("Renewal for transaction {} already completed (membership {}) - skipping duplicate completion",
+                    transactionId, alreadyRenewed.get().getUserMembershipId());
+            return mapToUserMembershipResponse(alreadyRenewed.get());
+        }
+
         Long membershipId = Long.parseLong(transaction.getReferenceId());
         MembershipPackage pkg = membershipPackageRepository.findById(membershipId)
                 .orElseThrow(MembershipPackageNotFoundException::new);
@@ -1208,11 +1255,26 @@ public class MembershipServiceImpl implements MembershipService {
                 ? userMembershipRepository.findById(previousMembershipId).orElse(null)
                 : null;
 
-        // Chain from previous endDate if it hasn't expired yet; otherwise start from now
+        // Chain onto the end of the user's existing timeline, not just onto the slot the
+        // transaction names. initiateMembershipRenewal rejects a second renewal while a
+        // queued slot exists, but that check runs at initiate: two renewals started
+        // before either payment lands both pass it, and both name the same current slot
+        // as `previous`. Chaining from `previous` alone would then give them identical
+        // start/end dates — two memberships live at once, which is the state the quota
+        // reads have to defend against. Starting from the latest endDate the user holds
+        // queues the second renewal behind the first instead, so the paid time is kept
+        // and the timeline stays a line.
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime startDate = (previous != null && previous.getEndDate().isAfter(now))
-                ? previous.getEndDate()
-                : now;
+        LocalDateTime timelineEnd = userMembershipRepository
+                .findByUserIdAndStatus(transaction.getUserId(), MembershipStatus.ACTIVE)
+                .stream()
+                .map(UserMembership::getEndDate)
+                .max(LocalDateTime::compareTo)
+                .orElse(null);
+        if (timelineEnd == null && previous != null) {
+            timelineEnd = previous.getEndDate();
+        }
+        LocalDateTime startDate = (timelineEnd != null && timelineEnd.isAfter(now)) ? timelineEnd : now;
         LocalDateTime endDate = startDate.plusMonths(pkg.getDurationMonths());
         int durationDays = pkg.getDurationMonths() * 30;
 
@@ -1224,6 +1286,7 @@ public class MembershipServiceImpl implements MembershipService {
                 .durationDays(durationDays)
                 .status(MembershipStatus.ACTIVE)
                 .totalPaid(transaction.getAmount())
+                .createdFromTransactionId(transactionId)
                 .build();
 
         renewed = userMembershipRepository.save(renewed);
@@ -1244,16 +1307,27 @@ public class MembershipServiceImpl implements MembershipService {
     @Override
     @Transactional
     public void adminClearUserMembership(String userId) {
-        log.info("Admin clearing all active memberships for user: {}", userId);
-        List<UserMembership> active = userMembershipRepository
-                .findByUserIdAndStatus(userId, MembershipStatus.ACTIVE);
-        if (active.isEmpty()) {
-            log.info("No active memberships found for user: {}", userId);
-            return;
-        }
-        active.forEach(um -> um.setStatus(MembershipStatus.EXPIRED));
-        userMembershipRepository.saveAll(active);
-        log.info("Expired {} active membership(s) for user: {}", active.size(), userId);
+        log.info("Admin clearing all membership data for user: {}", userId);
+
+        // This endpoint exists to put an account back to "never bought anything", so it
+        // deletes every membership row and every benefit row the user owns rather than
+        // flipping statuses.
+        //
+        // Marking them EXPIRED is not enough. The rows that make quota accumulate are
+        // precisely the ones a status flip leaves behind: benefit rows whose parent
+        // membership was retired long ago but which stayed status=ACTIVE themselves
+        // (older code paths retired the membership without cascading), and memberships
+        // in every non-ACTIVE state that still anchor those rows. Any read that forgets
+        // one of the two status predicates starts summing them again, and the next
+        // purchase lands on top of that pile instead of on a clean slate.
+        //
+        // Transactions are deliberately untouched — they are the payment record, not
+        // entitlement, and deleting them would rewrite revenue history.
+        int benefitsDeleted = userBenefitRepository.deleteByUserId(userId);
+        int membershipsDeleted = userMembershipRepository.deleteByUserId(userId);
+
+        log.info("Deleted {} membership(s) and {} benefit(s) for user: {}",
+                membershipsDeleted, benefitsDeleted, userId);
     }
 
     // =====================================================

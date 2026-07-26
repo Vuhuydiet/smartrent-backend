@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -74,6 +75,36 @@ class SavedListingServiceImplTest {
 
         assertEquals(DomainCode.SAVED_LISTING_LIMIT_EXCEEDED, ex.getDomainCode());
         verify(savedListingRepository, never()).save(any());
+    }
+
+    /**
+     * Saving something already saved used to throw a bare RuntimeException,
+     * which GlobalExceptionHandler maps to UNKNOWN_ERROR / 500 — so a duplicate
+     * save (chatbot re-saving, double tap, retry) looked like a server crash
+     * even though the controller already documents a 409. Same for unsaving
+     * something that was never saved, documented as 404.
+     */
+    @Test
+    void saveListingThrowsConflictWhenAlreadySaved() {
+        SavedListingRequest request = SavedListingRequest.builder().listingId(999L).build();
+        when(savedListingRepository.existsByIdUserIdAndIdListingId(USER_ID, 999L)).thenReturn(true);
+
+        DomainException ex = assertThrows(DomainException.class, () -> service.saveListing(request));
+
+        assertEquals(DomainCode.SAVED_LISTING_ALREADY_SAVED, ex.getDomainCode());
+        assertEquals(HttpStatus.CONFLICT, ex.getDomainCode().getStatus());
+        verify(savedListingRepository, never()).save(any());
+    }
+
+    @Test
+    void unsaveListingThrowsNotFoundWhenNeverSaved() {
+        when(savedListingRepository.existsById(new SavedListingId(USER_ID, 999L))).thenReturn(false);
+
+        DomainException ex = assertThrows(DomainException.class, () -> service.unsaveListing(999L));
+
+        assertEquals(DomainCode.SAVED_LISTING_NOT_SAVED, ex.getDomainCode());
+        assertEquals(HttpStatus.NOT_FOUND, ex.getDomainCode().getStatus());
+        verify(savedListingRepository, never()).deleteByIdUserIdAndIdListingId(any(), any());
     }
 
     @Test

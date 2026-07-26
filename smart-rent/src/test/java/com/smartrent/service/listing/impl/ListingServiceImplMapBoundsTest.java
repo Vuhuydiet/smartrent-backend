@@ -17,9 +17,11 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.never;
@@ -91,5 +93,92 @@ class ListingServiceImplMapBoundsTest {
         // address lazy and caused the N+1) must not be used on the map path.
         verify(listingRepository).findByIdsWithMediaAndAddress(anyCollection());
         verify(listingRepository, never()).findByIdsWithMedia(anyCollection());
+    }
+
+    /**
+     * The map draws one thumbnail per pin and a "N photos" badge, so shipping
+     * every image URL for up to 500 cards is dead weight. Media must be trimmed
+     * to the first IMAGE while imageCount keeps the real total for the badge.
+     */
+    @Test
+    void mapBoundsTrimsMediaToTheThumbnailAndKeepsTheImageCount() {
+        MapListingsResponse response = runMapBounds(ListingCardResponse.builder()
+                .listingId(1L)
+                .imageCount(6)
+                .media(new ArrayList<>(List.of(
+                        mediaCard("VIDEO", "https://cdn/clip.mp4"),
+                        mediaCard("IMAGE", "https://cdn/first.jpg"),
+                        mediaCard("IMAGE", "https://cdn/second.jpg"))))
+                .build());
+
+        List<ListingCardResponse.MediaCard> media = response.getListings().get(0).getMedia();
+        assertEquals(1, media.size());
+        // The first IMAGE, not the first entry -- a listing whose primary media
+        // is a video must still come back with a usable thumbnail.
+        assertEquals("https://cdn/first.jpg", media.get(0).getUrl());
+        assertEquals(6, response.getListings().get(0).getImageCount());
+    }
+
+    /**
+     * POST /v1/listings/map-bounds is public and unauthenticated, so the owner
+     * contact fields must not ride along on up to 500 cards per request. The
+     * name/avatar/broker badge the card actually renders stays.
+     */
+    @Test
+    void mapBoundsStripsOwnerContactDetails() {
+        MapListingsResponse response = runMapBounds(ListingCardResponse.builder()
+                .listingId(1L)
+                .user(ListingCardResponse.UserCard.builder()
+                        .userId("u1")
+                        .firstName("Minh")
+                        .email("owner@example.com")
+                        .contactPhoneNumber("0900000000")
+                        .contactPhoneVerified(true)
+                        .isBroker(true)
+                        .build())
+                .build());
+
+        ListingCardResponse.UserCard user = response.getListings().get(0).getUser();
+        assertNull(user.getEmail());
+        assertNull(user.getContactPhoneNumber());
+        assertEquals("Minh", user.getFirstName());
+        assertEquals(Boolean.TRUE, user.getContactPhoneVerified());
+        assertEquals(Boolean.TRUE, user.getIsBroker());
+    }
+
+    /** The description body is never rendered on the map. */
+    @Test
+    void mapBoundsDropsTheDescription() {
+        MapListingsResponse response = runMapBounds(ListingCardResponse.builder()
+                .listingId(1L)
+                .description("A very long description body")
+                .build());
+
+        assertNull(response.getListings().get(0).getDescription());
+    }
+
+    private static ListingCardResponse.MediaCard mediaCard(String type, String url) {
+        return ListingCardResponse.MediaCard.builder().mediaType(type).url(url).build();
+    }
+
+    /** Drives getListingsByMapBounds with a single stubbed card. */
+    private MapListingsResponse runMapBounds(ListingCardResponse card) {
+        Listing listing = Listing.builder().listingId(1L).build();
+
+        when(listingQueryService.queryByMapBounds(
+                any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new PageImpl<>(List.of(listing), Pageable.unpaged(), 1));
+        when(listingRepository.findByIdsWithMediaAndAddress(anyCollection()))
+                .thenReturn(List.of(listing));
+        when(listingMapper.toCardResponse(any(), any(), any())).thenReturn(card);
+
+        return service.getListingsByMapBounds(MapBoundsRequest.builder()
+                .neLat(BigDecimal.valueOf(10.823))
+                .neLng(BigDecimal.valueOf(106.701))
+                .swLat(BigDecimal.valueOf(10.705))
+                .swLng(BigDecimal.valueOf(106.590))
+                .zoom(14)
+                .limit(100)
+                .build());
     }
 }

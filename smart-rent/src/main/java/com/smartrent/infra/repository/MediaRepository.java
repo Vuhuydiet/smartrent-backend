@@ -62,9 +62,14 @@ public interface MediaRepository extends JpaRepository<Media, Long> {
      * Find orphan media (ACTIVE media without listing after expiry time).
      * Avatar uploads live under users/{userId}/avatar/... and stay listing-less forever, so
      * they must be excluded or the cron would delete every user's avatar 24h after upload.
+     * Admin-uploaded media (adminId set) is excluded for the same reason: it backs news
+     * thumbnails and content images, which the news row references by URL string rather than
+     * a Media FK, so this listing-FK-based sweep can't tell they are in use and would delete
+     * the R2 objects 24h after a post is published.
      */
     @Query("SELECT m FROM media m WHERE m.status = 'ACTIVE' " +
            "AND m.listing IS NULL " +
+           "AND m.adminId IS NULL " +
            "AND m.sourceType = 'UPLOAD' " +
            "AND (m.storageKey IS NULL OR " +
            "     (m.storageKey NOT LIKE 'users/%/avatar/%' AND m.storageKey NOT LIKE 'users/%/broker/%')) " +

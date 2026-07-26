@@ -65,7 +65,7 @@ public class SavedListingServiceImpl implements SavedListingService {
         
         // Check if already saved
         if (savedListingRepository.existsByIdUserIdAndIdListingId(userId, request.getListingId())) {
-            throw new RuntimeException("Listing is already saved by this user");
+            throw new DomainException(DomainCode.SAVED_LISTING_ALREADY_SAVED);
         }
 
         // Soft cap so a user's saved list can't grow unbounded. Reads the count
@@ -94,7 +94,7 @@ public class SavedListingServiceImpl implements SavedListingService {
         
         SavedListingId id = new SavedListingId(userId, listingId);
         if (!savedListingRepository.existsById(id)) {
-            throw new RuntimeException("Saved listing not found");
+            throw new DomainException(DomainCode.SAVED_LISTING_NOT_SAVED);
         }
         
         savedListingRepository.deleteByIdUserIdAndIdListingId(userId, listingId);

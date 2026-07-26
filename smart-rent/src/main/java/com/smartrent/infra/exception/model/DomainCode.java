@@ -105,6 +105,10 @@ public enum DomainCode {
   // practice the draft was published before and the client is republishing a stale copy.
   LISTING_MEDIA_ALREADY_LINKED("12004", HttpStatus.CONFLICT,
       "Media %s is already linked to listing %s"),
+  // Raised when a draft is published again while an earlier publish of the same draft
+  // is still waiting on its payment.
+  DRAFT_PUBLISH_ALREADY_PENDING("12005", HttpStatus.CONFLICT,
+      "This draft is already waiting on payment %s"),
   //    Quota Error 13xxx
   INSUFFICIENT_QUOTA("13001", HttpStatus.BAD_REQUEST, "Insufficient quota: %s"),
   BENEFIT_NOT_FOUND("13002", HttpStatus.NOT_FOUND, "Membership benefit not found: %s"),
@@ -162,7 +166,14 @@ public enum DomainCode {
       "Người dùng chưa đủ điều kiện bị chặn đăng tin. Cần trên %d report đã được admin duyệt, hiện tại chỉ có %d."),
   //    Saved Listing Error 24xxx
   SAVED_LISTING_LIMIT_EXCEEDED("24001", HttpStatus.BAD_REQUEST,
-      "Bạn chỉ có thể lưu tối đa %d tin. Hãy bỏ lưu một tin để lưu tin khác.")
+      "Bạn chỉ có thể lưu tối đa %d tin. Hãy bỏ lưu một tin để lưu tin khác."),
+  // Saving twice / unsaving something that was never saved are both "the state
+  // you asked for is already the state you have" — a client (chatbot, double
+  // tap, retry) should be able to say so, not report a 500 Unknown error.
+  SAVED_LISTING_ALREADY_SAVED("24002", HttpStatus.CONFLICT,
+      "Tin này đã có trong danh sách yêu thích của bạn."),
+  SAVED_LISTING_NOT_SAVED("24003", HttpStatus.NOT_FOUND,
+      "Tin này không có trong danh sách yêu thích của bạn.")
   ;
 
   private final String value;
