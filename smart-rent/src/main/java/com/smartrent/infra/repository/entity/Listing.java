@@ -259,10 +259,12 @@ public class Listing {
 
     // Denormalized location keys copied from the referenced Address (fixed
     // reference data). Populated by updateSearchFields() on persist/update and
-    // backfilled in V97. These exist ONLY so the recommendation candidate
-    // queries can filter AND sort on listings alone (see idx_listings_reco_*),
-    // turning a cross-table filter+sort filesort into an index-ordered scan.
-    // Read the Address entity for canonical values; never write these directly.
+    // backfilled in V97. Originally added so the recommendation candidate
+    // queries could filter AND sort on listings alone (see idx_listings_reco_*),
+    // turning a cross-table filter+sort filesort into an index-ordered scan —
+    // and now also the only safe way to read a listing's location off a
+    // detached entity, since `address` is a LAZY proxy. Never write directly;
+    // updateSearchFields() owns them.
     @Column(name = "new_province_code", length = 10)
     String newProvinceCode;
 
@@ -470,6 +472,23 @@ public class Listing {
 
     public boolean isActive() {
         return !isExpiredListing() && (isAutoVerified() || isManuallyVerified());
+    }
+
+    /**
+     * Province code for AI duplicate detection: the post-reform code when the
+     * address has one, else the legacy province id as a string.
+     * <p>
+     * Reads the denormalized columns rather than the {@code address} proxy, so
+     * it works on a detached entity. The moderation sweep loads listings with a
+     * query that does not fetch the address and then hands them to a worker
+     * thread with no session — {@code getAddress()} there threw
+     * LazyInitializationException, which the duplicate check swallowed as PASS.
+     */
+    public String resolveProvinceCodeForAi() {
+        if (newProvinceCode != null) {
+            return newProvinceCode;
+        }
+        return legacyProvinceId != null ? String.valueOf(legacyProvinceId) : null;
     }
 
     @PrePersist

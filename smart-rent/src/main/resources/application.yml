@@ -570,6 +570,15 @@ smartrent:
         delay: ${AI_SCHEDULER_DELAY_MS:1800000}
         batch-size: ${AI_SCHEDULER_BATCH_SIZE:10}
       url: ${AI_VERIFICATION_URL:http://localhost:8000/ai/verify-listing}
+      # Which duplicate hits interrupt an admin. The full result is stored and
+      # shown in the review dialog regardless — these only gate the push
+      # notification, which fans out to EVERY admin. Draining a backlog through
+      # the backstop sweep would otherwise bury the inbox in low-confidence
+      # flags nobody can action in bulk. A listing already reported as a
+      # duplicate is never reported again (re-verify / retry / sweep re-runs).
+      duplicate:
+        notify-suspicious: ${AI_DUPLICATE_NOTIFY_SUSPICIOUS:false}
+        notify-min-score: ${AI_DUPLICATE_NOTIFY_MIN_SCORE:0.85}
       timeout-seconds: ${AI_VERIFICATION_TIMEOUT:90}
       max-retry-attempts: ${AI_VERIFICATION_MAX_RETRY:3}
       retry-backoff-seconds: ${AI_VERIFICATION_RETRY_BACKOFF:2}

@@ -9,7 +9,6 @@ import com.smartrent.dto.response.StoredAiModerationResponse;
 import com.smartrent.infra.exception.AppException;
 import com.smartrent.infra.exception.model.DomainCode;
 import com.smartrent.infra.repository.ListingAiModerationRepository;
-import com.smartrent.infra.repository.entity.Address;
 import com.smartrent.infra.repository.entity.Listing;
 import com.smartrent.infra.repository.entity.ListingAiModeration;
 import com.smartrent.mapper.AiListingMapper;
@@ -289,13 +288,10 @@ public class AiListingVerificationServiceImpl implements AiListingVerificationSe
             .productType(listing.getProductType() != null ? listing.getProductType().name() : null)
             .imageUrls(request.getImages());
 
-        Address addr = listing.getAddress();
-        if (addr != null) {
-            String provinceCode = addr.getNewProvinceCode() != null
-                ? addr.getNewProvinceCode()
-                : (addr.getLegacyProvinceId() != null ? String.valueOf(addr.getLegacyProvinceId()) : null);
-            builder.provinceCode(provinceCode).districtId(addr.getLegacyDistrictId());
-        }
+        // Denormalized columns, not the LAZY address proxy — same reason as in
+        // AiModerationProcessorServiceImpl: this runs on detached entities.
+        builder.provinceCode(listing.resolveProvinceCodeForAi())
+            .districtId(listing.getLegacyDistrictId());
 
         return smartRentAiConnector.checkDuplicate(builder.build());
     }
