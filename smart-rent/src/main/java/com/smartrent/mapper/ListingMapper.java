@@ -56,8 +56,10 @@ public interface ListingMapper {
      * @param owner Listing owner entity (nullable). Used to build the slim OwnerSummary.
      * @param verificationStatus Verification status (PENDING/APPROVED/REJECTED/NOT_SUBMITTED)
      * @param images Pre-resolved image URLs for the listing (primary first, then sortOrder).
+     * @param aiModeration Pre-built AI quick-approve summary (null unless the AI already suggests approval and no admin has acted yet).
      */
-    AdminListingSummary toAdminSummary(Listing entity, User owner, String verificationStatus, List<String> images);
+    AdminListingSummary toAdminSummary(Listing entity, User owner, String verificationStatus, List<String> images,
+            AdminListingSummary.AiModerationSummary aiModeration);
 
     /**
      * Map Listing entity to ListingResponseForOwner with owner-specific information

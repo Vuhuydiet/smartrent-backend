@@ -53,6 +53,7 @@ import com.smartrent.infra.repository.TransactionRepository;
 import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.VipTierDetailRepository;
 import com.smartrent.infra.repository.entity.*;
+import com.smartrent.infra.repository.entity.enums.VerificationStatus;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.ListingQueryService;
@@ -68,6 +69,7 @@ import com.smartrent.service.payment.PaymentService;
 import com.smartrent.service.transaction.TransactionService;
 import com.smartrent.service.address.AddressCreationService;
 import com.smartrent.service.address.AddressService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -143,6 +145,7 @@ public class ListingServiceImpl implements ListingService {
     org.springframework.context.ApplicationEventPublisher eventPublisher;
     com.smartrent.infra.repository.ListingAiModerationRepository listingAiModerationRepository;
     com.smartrent.service.pricing.PricingHistoryService pricingHistoryService;
+    ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -2263,6 +2266,14 @@ public class ListingServiceImpl implements ListingService {
                             LinkedHashMap::new,
                             Collectors.mapping(Media::getUrl, Collectors.toList())));
 
+            // ---- Batch-load AI moderation rows for the page — 1 query ----
+            // Drives the quick-approve affordance: only listings the AI already
+            // suggested approving, and that no admin has acted on yet, get a
+            // non-null aiModeration summary below.
+            Map<Long, ListingAiModeration> aiModerationByListingId =
+                    listingAiModerationRepository.findAllById(listingIds).stream()
+                            .collect(Collectors.toMap(ListingAiModeration::getListingId, Function.identity()));
+
             // ---- Map to slim AdminListingSummary DTOs ----
             // (No amenity/address fetch — list view does not need them.)
             // The moderationStatus itself (REJECTED / SUSPENDED / REMOVED) now carries
@@ -2279,7 +2290,9 @@ public class ListingServiceImpl implements ListingService {
                         }
                         com.smartrent.infra.repository.entity.User owner = userMap.get(listing.getUserId());
                         List<String> images = imagesByListingId.getOrDefault(listing.getListingId(), Collections.emptyList());
-                        return listingMapper.toAdminSummary(listing, owner, verificationStatus, images);
+                        com.smartrent.dto.response.AdminListingSummary.AiModerationSummary aiModeration =
+                                buildAiModerationSummary(aiModerationByListingId.get(listing.getListingId()));
+                        return listingMapper.toAdminSummary(listing, owner, verificationStatus, images, aiModeration);
                     })
                     .collect(Collectors.toList());
         } else {
@@ -2299,6 +2312,41 @@ public class ListingServiceImpl implements ListingService {
                 .totalPages(page.getTotalPages())
                 .filterCriteria(filter)
                 .statistics(statistics)
+                .build();
+    }
+
+    /**
+     * Builds the admin table's quick-approve summary for a single listing, or
+     * null when quick-approve doesn't apply. Only listings the AI's background
+     * moderation job already suggested approving ({@link VerificationStatus#VERIFIED})
+     * AND that no admin has since acted on ({@code manualOverride == false}) are
+     * eligible — ListingModerationServiceImpl flips manualOverride to true (and
+     * re-stamps verificationStatus) the moment an admin approves, rejects, or
+     * requests revision, so this naturally stops surfacing once a human has
+     * reviewed the listing.
+     */
+    private com.smartrent.dto.response.AdminListingSummary.AiModerationSummary buildAiModerationSummary(
+            ListingAiModeration moderation) {
+        if (moderation == null
+                || moderation.getVerificationStatus() != VerificationStatus.VERIFIED
+                || Boolean.TRUE.equals(moderation.getManualOverride())) {
+            return null;
+        }
+
+        String reason = null;
+        if (moderation.getAiReason() != null) {
+            try {
+                reason = objectMapper.readTree(moderation.getAiReason())
+                        .path("verification").path("reason").path("details").asText(null);
+            } catch (Exception e) {
+                log.warn("Failed to parse ai_reason for listing {}: {}", moderation.getListingId(), e.getMessage());
+            }
+        }
+
+        return com.smartrent.dto.response.AdminListingSummary.AiModerationSummary.builder()
+                .score(moderation.getAiScore())
+                .reason(reason)
+                .analyzedAt(moderation.getUpdatedAt())
                 .build();
     }
 

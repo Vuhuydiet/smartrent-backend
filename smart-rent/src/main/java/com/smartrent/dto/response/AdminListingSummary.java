@@ -96,6 +96,32 @@ public class AdminListingSummary {
             "Redundant with moderationStatus=REMOVED now; kept for backward compatibility.")
     Boolean permanentlyRemoved;
 
+    @Schema(description = "Present only when the AI background moderation job already suggests this listing " +
+            "is safe to approve and no admin has acted on it yet — drives the admin table's quick-approve affordance. " +
+            "Null for every other state (still pending, AI flagged it, or an admin already reviewed it).")
+    AiModerationSummary aiModeration;
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @Schema(description = "AI auto-moderation suggestion summary for the admin quick-approve affordance")
+    public static class AiModerationSummary {
+
+        @Schema(description = "AI confidence score, 0-1", example = "0.92")
+        Double score;
+
+        @Schema(description = "Short human-readable reason the AI gave for its suggestion")
+        String reason;
+
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
+        @Schema(description = "When the AI analysis was last run")
+        LocalDateTime analyzedAt;
+    }
+
     @Getter
     @Setter
     @Builder
