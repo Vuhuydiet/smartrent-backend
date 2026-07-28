@@ -46,22 +46,6 @@ public class Constants {
      * so even a 60s TTL absorbs most repeat hits while keeping pins fresh.
      */
     public static final String LISTING_MAP = LISTING + "map";
-    /**
-     * Dynamic filter-bucket counts (POST /v1/listings/filter-options) for the
-     * public listings sidebar (price/area/bedrooms). Keyed by the same shape as
-     * {@link #LISTING_SEARCH} — see application.yml for the TTL.
-     */
-    public static final String LISTING_FILTER_OPTIONS = LISTING + "filter-options";
-    /**
-     * Permanent (no-TTL) subset of {@link #LISTING_FILTER_OPTIONS} for the
-     * bounded "first load, no filters yet" (province × productType) baseline —
-     * refreshed daily by {@code FilterOptionsCacheScheduler}, same pattern as
-     * {@link #LISTING_STATS_CATEGORIES}/{@link #LISTING_STATS_PROVINCES}. Only
-     * ever read/written for requests matching
-     * {@code ListingFilterBucketDefinitions.BASELINE_WARM_PROVINCE_IDS} — see
-     * {@code ListingSearchController#isBaselineFilterOptionsRequest}.
-     */
-    public static final String LISTING_FILTER_OPTIONS_BASELINE = LISTING + "filter-options.baseline";
     public static final String LISTING_RECOMMENDATION_SIMILAR = LISTING + "recommendation.similar";
     public static final String LISTING_RECOMMENDATION_PERSONALIZED = LISTING + "recommendation.personalized";
   }

@@ -108,34 +108,13 @@ public interface ListingService {
             ListingFilterRequest filter, String cursor, int size);
 
     /**
-     * Dynamic bucket options (price / area / bedrooms) for the public listings
-     * sidebar filters. Each bucket is annotated with a live count of listings
-     * matching every OTHER active filter — so the frontend can grey out /
-     * hide buckets with zero results instead of letting users click into a
-     * dead-end filter. {@code filter.price}/{@code area}/{@code bedroomsRange}/
-     * {@code bedrooms} on the incoming request are ignored (they describe the
-     * dimension being computed, not a constraint on it); every other field
-     * (location, productType, categoryId, ...) is used as filter context.
+     * Static bucket definitions (price / area / bedrooms) for the public
+     * listings sidebar filters — no listing counts, no query, no per-request
+     * filter context. Just the canonical ranges from
+     * {@code ListingFilterBucketDefinitions}, mapped to the response shape.
+     * Cheap enough to compute on every call; no caching needed.
      */
-    com.smartrent.dto.response.ListingFilterOptionsResponse getFilterOptions(ListingFilterRequest filter);
-
-    /**
-     * Same computation as {@link #getFilterOptions}, but reads/writes the
-     * permanent, daily-refreshed cache reserved for the bounded
-     * "first load, no filters yet" (province × productType) baseline — see
-     * {@code ListingFilterBucketDefinitions#BASELINE_WARM_PROVINCE_IDS}.
-     * Callers must only pass requests that actually match that bounded shape
-     * (checked by the caller); anything else would permanently cache a key
-     * the daily scheduler never refreshes.
-     */
-    com.smartrent.dto.response.ListingFilterOptionsResponse getFilterOptionsBaseline(ListingFilterRequest filter);
-
-    /**
-     * Recomputes one baseline filter-options entry and OVERWRITES the
-     * permanent cache in place — mirrors {@link #refreshProvinceStats}. Called
-     * only by the daily scheduler, never from a request path.
-     */
-    com.smartrent.dto.response.ListingFilterOptionsResponse refreshFilterOptionsBaseline(ListingFilterRequest filter);
+    com.smartrent.dto.response.ListingFilterOptionsResponse getFilterOptions();
 
     /**
      * Public endpoint data source: get top saved listings for a specific seller.
