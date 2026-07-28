@@ -158,8 +158,6 @@ spring:
       - "listing.detail"
       - "listing.suggestions"
       - "listing.map"
-      - "listing.filter-options"
-      - "listing.filter-options.baseline"
       - "listing.stats.categories"
       - "listing.stats.provinces"
       - "listing.stats.admin"
@@ -178,18 +176,6 @@ spring:
         "[listing.detail]": 3m
         "[listing.suggestions]": 2m
         "[listing.map]": 1m
-        # Sidebar filter-bucket counts (price/area/bedrooms): each request runs up
-        # to ~14 COUNT(*) queries (one per bucket across 3 dimensions), so a short
-        # TTL matters more here than for a single-query endpoint — repeated calls
-        # for the same filter context (e.g. re-render, browser back/forward) reuse
-        # one computed result instead of re-running the whole batch.
-        "[listing.filter-options]": 3m
-        # Bounded (province × productType) "first load" subset of the above:
-        # permanent (0s = no TTL), refreshed daily at 00:15 by
-        # FilterOptionsCacheScheduler — same rationale as the homepage stats
-        # below, so the very first visitor for a warmed province never pays
-        # the cold ~14-query cost.
-        "[listing.filter-options.baseline]": 0s
         # Homepage stats: permanent (0s = no TTL). Refreshed daily at 00:00
         # Asia/Ho_Chi_Minh by HomepageStatsCacheScheduler.
         "[listing.stats.categories]": 0s
@@ -260,7 +246,6 @@ application:
         - "/v1/listings/*/reports"
         - "/v1/listings/search"
         - "/v1/listings/search/cursor"
-        - "/v1/listings/filter-options"
         - "/api/v1/advanced-search"
         - "/v1/listings/stats/provinces"
         - "/v1/listings/stats/categories"

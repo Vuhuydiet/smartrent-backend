@@ -56,7 +56,6 @@ import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.VipTierDetailRepository;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.infra.repository.entity.enums.VerificationStatus;
-import com.smartrent.infra.repository.specification.ListingSpecification;
 import com.smartrent.mapper.ListingMapper;
 import com.smartrent.service.listing.ListingFilterBucketDefinitions;
 import com.smartrent.service.listing.ListingService;
@@ -100,7 +99,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -1644,84 +1642,29 @@ public class ListingServiceImpl implements ListingService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_FILTER_OPTIONS,
-            key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
-            unless = "#result == null")
-    public ListingFilterOptionsResponse getFilterOptions(ListingFilterRequest filter) {
-        return computeFilterOptions(filter);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_FILTER_OPTIONS_BASELINE,
-            key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
-            unless = "#result == null")
-    public ListingFilterOptionsResponse getFilterOptionsBaseline(ListingFilterRequest filter) {
-        return computeFilterOptions(filter);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    @CachePut(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_FILTER_OPTIONS_BASELINE,
-            key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
-            unless = "#result == null")
-    public ListingFilterOptionsResponse refreshFilterOptionsBaseline(ListingFilterRequest filter) {
-        return computeFilterOptions(filter);
-    }
-
-    private ListingFilterOptionsResponse computeFilterOptions(ListingFilterRequest filter) {
-        // Resolve legacy<->new address mappings ONCE on the shared filter — each
-        // of the three toBuilder() copies below inherits the resolved fields, so
-        // the (DB-backed) resolution never re-runs per bucket.
-        resolveAddressMappings(filter);
-
+    public ListingFilterOptionsResponse getFilterOptions() {
+        // Static bucket definitions only — no DB query, no per-request filter
+        // context, no caching needed. Previously this ran up to ~14 COUNT(*)
+        // queries (one per bucket) to annotate each option with a live count;
+        // that made the endpoint the slowest thing on the page for no real
+        // benefit, so it was dropped in favor of just returning the ranges.
         return ListingFilterOptionsResponse.builder()
-                .priceOptions(countFilterBuckets(
-                        filter.toBuilder().price(null).build(),
-                        ListingFilterBucketDefinitions.PRICE,
-                        ListingFilterRequest::setPrice))
-                .areaOptions(countFilterBuckets(
-                        filter.toBuilder().area(null).build(),
-                        ListingFilterBucketDefinitions.AREA,
-                        ListingFilterRequest::setArea))
-                .bedroomOptions(countFilterBuckets(
-                        filter.toBuilder().bedroomsRange(null).bedrooms(null).build(),
-                        ListingFilterBucketDefinitions.BEDROOM,
-                        ListingFilterRequest::setBedroomsRange))
+                .priceOptions(mapBuckets(ListingFilterBucketDefinitions.PRICE))
+                .areaOptions(mapBuckets(ListingFilterBucketDefinitions.AREA))
+                .bedroomOptions(mapBuckets(ListingFilterBucketDefinitions.BEDROOM))
                 .build();
     }
 
-    /**
-     * Counts listings per bucket for one dimension (price/area/bedrooms). Every
-     * OTHER active filter on {@code contextFilter} (location, productType,
-     * category, ...) is kept, so a bucket with {@code count == 0} genuinely has
-     * no matching listings under the user's current selection — the frontend
-     * can grey it out instead of letting the user click into a dead end.
-     * {@code contextFilter} is mutated and reused across buckets (each
-     * {@code count(spec)} call fully evaluates before the next mutation), which
-     * avoids re-copying ~60 fields per bucket.
-     */
-    private List<FilterBucketOption> countFilterBuckets(
-            ListingFilterRequest contextFilter,
-            List<ListingFilterBucketDefinitions.Bucket> buckets,
-            BiConsumer<ListingFilterRequest, String> rangeSetter) {
+    private static List<FilterBucketOption> mapBuckets(List<ListingFilterBucketDefinitions.Bucket> buckets) {
         List<FilterBucketOption> options = new ArrayList<>(buckets.size());
         for (ListingFilterBucketDefinitions.Bucket bucket : buckets) {
-            rangeSetter.accept(contextFilter, bucketRangeString(bucket.min(), bucket.max()));
-            long count = listingRepository.count(ListingSpecification.fromFilterRequest(contextFilter));
             options.add(FilterBucketOption.builder()
                     .key(bucket.key())
                     .min(bucket.min() != null ? bucket.min().doubleValue() : null)
                     .max(bucket.max() != null ? bucket.max().doubleValue() : null)
-                    .count(count)
                     .build());
         }
         return options;
-    }
-
-    private static String bucketRangeString(Long min, Long max) {
-        return (min != null ? min : "") + ".." + (max != null ? max : "");
     }
 
             @Override

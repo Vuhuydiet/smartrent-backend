@@ -308,69 +308,22 @@ public class ListingSearchController {
         return ApiResponse.<ListingCardListResponse>builder().data(response).build();
     }
 
-    @PostMapping("/filter-options")
+    @GetMapping("/filter-options")
     @Operation(
-        summary = "[PUBLIC API] Dynamic filter bucket options with live counts",
+        summary = "[PUBLIC API] Static filter bucket options for the sidebar",
         description = """
             **PUBLIC API - Không cần authentication**
 
-            Trả về các khoảng lọc động (bucket, tối đa 5 mỗi nhóm) cho **giá**,
-            **diện tích** và **số phòng ngủ** hiển thị ở sidebar lọc trang tìm kiếm —
-            mỗi bucket kèm số lượng tin đăng còn khớp (`count`), để frontend có thể
-            ẩn/làm mờ bucket không còn dữ liệu thay vì để người dùng bấm vào ngõ cụt.
-
-            Body giống hệt `POST /search` (`ListingFilterRequest`). Field
-            `price`/`area`/`bedroomsRange`/`bedrooms` trong body bị BỎ QUA cho
-            chính nhóm bucket tương ứng (chúng mô tả nhóm đang tính, không phải một
-            ràng buộc lên nó) — mọi field còn lại (vị trí, `productType`,
-            `categoryId`, ...) được giữ nguyên làm ngữ cảnh lọc cho cả 3 nhóm.
+            Trả về các khoảng lọc (bucket, tối đa 5 mỗi nhóm) cho **giá**,
+            **diện tích** và **số phòng ngủ** hiển thị ở sidebar lọc trang tìm kiếm.
+            Đây là danh sách tĩnh (không phụ thuộc bộ lọc hiện tại, không đếm số tin
+            đăng khớp) — không nhận tham số, không cần gọi lại khi người dùng đổi
+            bộ lọc khác.
             """
     )
-    public ApiResponse<ListingFilterOptionsResponse> getListingFilterOptions(
-            @RequestBody(required = false) ListingFilterRequest filter) {
-        if (filter == null) {
-            filter = ListingFilterRequest.builder().build();
-        }
-        ListingFilterOptionsResponse response = isBaselineFilterOptionsRequest(filter)
-                ? listingService.getFilterOptionsBaseline(filter)
-                : listingService.getFilterOptions(filter);
+    public ApiResponse<ListingFilterOptionsResponse> getListingFilterOptions() {
+        ListingFilterOptionsResponse response = listingService.getFilterOptions();
         return ApiResponse.<ListingFilterOptionsResponse>builder().data(response).build();
-    }
-
-    /**
-     * True only for the bounded "first load, no filters yet" shape the daily
-     * {@code FilterOptionsCacheScheduler} pre-warms: a legacy-structure
-     * {@code provinceId} from {@code BASELINE_WARM_PROVINCE_IDS}, an optional
-     * {@code productType}, and nothing else set. Membership in that exact
-     * province list (not just "shape") matters — routing an unwarmed province
-     * into the permanent cache would cache it cold and never refresh it again.
-     */
-    private static boolean isBaselineFilterOptionsRequest(ListingFilterRequest filter) {
-        if (!Boolean.TRUE.equals(filter.getIsLegacy())
-                || filter.getProvinceId() == null
-                || !com.smartrent.service.listing.ListingFilterBucketDefinitions
-                        .BASELINE_WARM_PROVINCE_IDS.contains(filter.getProvinceId())
-                || filter.getProvinceCode() != null
-                || (filter.getProvinceCodes() != null && !filter.getProvinceCodes().isEmpty())) {
-            return false;
-        }
-
-        ListingFilterRequest cleared = clearBaselineContextFields(filter);
-        ListingFilterRequest empty = clearBaselineContextFields(ListingFilterRequest.builder().build());
-        return com.smartrent.util.CacheKeyBuilder.listingSearchKey(cleared)
-                .equals(com.smartrent.util.CacheKeyBuilder.listingSearchKey(empty));
-    }
-
-    private static ListingFilterRequest clearBaselineContextFields(ListingFilterRequest filter) {
-        return filter.toBuilder()
-                .provinceId(null)
-                .isLegacy(null)
-                .productType(null)
-                .page(null)
-                .size(null)
-                .sortBy(null)
-                .sortDirection(null)
-                .build();
     }
 
     @GetMapping("/autocomplete")
