@@ -21,24 +21,24 @@ public final class PricingConstants {
     // =====================================================
 
     /**
-     * Normal listing base price: 2,700 VND/day
+     * Normal listing base price: 500 VND/day
      */
-    public static final BigDecimal NORMAL_POST_PER_DAY = new BigDecimal("2700");
+    public static final BigDecimal NORMAL_POST_PER_DAY = new BigDecimal("500");
 
     /**
-     * VIP Silver listing base price: 50,000 VND/day
+     * VIP Silver listing base price: 5,000 VND/day
      */
-    public static final BigDecimal SILVER_POST_PER_DAY = new BigDecimal("50000");
+    public static final BigDecimal SILVER_POST_PER_DAY = new BigDecimal("5000");
 
     /**
-     * VIP Gold listing base price: 110,000 VND/day
+     * VIP Gold listing base price: 12,000 VND/day
      */
-    public static final BigDecimal GOLD_POST_PER_DAY = new BigDecimal("110000");
+    public static final BigDecimal GOLD_POST_PER_DAY = new BigDecimal("12000");
 
     /**
-     * VIP Diamond listing base price: 280,000 VND/day
+     * VIP Diamond listing base price: 32,000 VND/day
      */
-    public static final BigDecimal DIAMOND_POST_PER_DAY = new BigDecimal("280000");
+    public static final BigDecimal DIAMOND_POST_PER_DAY = new BigDecimal("32000");
 
     // =====================================================
     // DURATION DISCOUNT PERCENTAGES
@@ -50,14 +50,14 @@ public final class PricingConstants {
     public static final BigDecimal DISCOUNT_10_DAYS = BigDecimal.ZERO;
 
     /**
-     * Discount for 15 days: 11%
+     * Discount for 15 days: 10%
      */
-    public static final BigDecimal DISCOUNT_15_DAYS = new BigDecimal("0.11");
+    public static final BigDecimal DISCOUNT_15_DAYS = new BigDecimal("0.10");
 
     /**
-     * Discount for 30 days: 18.5%
+     * Discount for 30 days: ~16.67% (pay for 25 of the 30 days)
      */
-    public static final BigDecimal DISCOUNT_30_DAYS = new BigDecimal("0.185");
+    public static final BigDecimal DISCOUNT_30_DAYS = new BigDecimal("0.166667");
 
     // =====================================================
     // PUSH PRICES
@@ -78,32 +78,32 @@ public final class PricingConstants {
     public static final String DEFAULT_CURRENCY = "VND";
 
     // =====================================================
-    // STANDARD PRICES (30 days with 18.5% discount)
+    // STANDARD PRICES (30 days, pay for 25 of 30 days)
     // =====================================================
 
     /**
-     * Normal listing price for 30 days: 66,000 VND
-     * Calculation: 2,700 × 30 × (1 - 0.185) = 66,015 ≈ 66,000
+     * Normal listing price for 30 days: 12,500 VND
+     * Calculation: 500 × 25 = 12,500
      */
-    public static final BigDecimal NORMAL_POST_30_DAYS = new BigDecimal("66000");
+    public static final BigDecimal NORMAL_POST_30_DAYS = new BigDecimal("12500");
 
     /**
-     * VIP Silver listing price for 30 days: 1,222,500 VND
-     * Calculation: 50,000 × 30 × (1 - 0.185) = 1,222,500
+     * VIP Silver listing price for 30 days: 125,000 VND
+     * Calculation: 5,000 × 25 = 125,000
      */
-    public static final BigDecimal SILVER_POST_30_DAYS = new BigDecimal("1222500");
+    public static final BigDecimal SILVER_POST_30_DAYS = new BigDecimal("125000");
 
     /**
-     * VIP Gold listing price for 30 days: 2,689,500 VND
-     * Calculation: 110,000 × 30 × (1 - 0.185) = 2,689,500
+     * VIP Gold listing price for 30 days: 300,000 VND
+     * Calculation: 12,000 × 25 = 300,000
      */
-    public static final BigDecimal GOLD_POST_30_DAYS = new BigDecimal("2689500");
+    public static final BigDecimal GOLD_POST_30_DAYS = new BigDecimal("300000");
 
     /**
-     * VIP Diamond listing price for 30 days: 6,846,000 VND
-     * Calculation: 280,000 × 30 × (1 - 0.185) = 6,846,000
+     * VIP Diamond listing price for 30 days: 800,000 VND
+     * Calculation: 32,000 × 25 = 800,000
      */
-    public static final BigDecimal DIAMOND_POST_30_DAYS = new BigDecimal("6846000");
+    public static final BigDecimal DIAMOND_POST_30_DAYS = new BigDecimal("800000");
 
     // =====================================================
     // DURATION CONSTANTS
