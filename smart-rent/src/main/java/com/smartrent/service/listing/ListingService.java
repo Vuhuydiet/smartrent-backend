@@ -120,6 +120,24 @@ public interface ListingService {
     com.smartrent.dto.response.ListingFilterOptionsResponse getFilterOptions(ListingFilterRequest filter);
 
     /**
+     * Same computation as {@link #getFilterOptions}, but reads/writes the
+     * permanent, daily-refreshed cache reserved for the bounded
+     * "first load, no filters yet" (province × productType) baseline — see
+     * {@code ListingFilterBucketDefinitions#BASELINE_WARM_PROVINCE_IDS}.
+     * Callers must only pass requests that actually match that bounded shape
+     * (checked by the caller); anything else would permanently cache a key
+     * the daily scheduler never refreshes.
+     */
+    com.smartrent.dto.response.ListingFilterOptionsResponse getFilterOptionsBaseline(ListingFilterRequest filter);
+
+    /**
+     * Recomputes one baseline filter-options entry and OVERWRITES the
+     * permanent cache in place — mirrors {@link #refreshProvinceStats}. Called
+     * only by the daily scheduler, never from a request path.
+     */
+    com.smartrent.dto.response.ListingFilterOptionsResponse refreshFilterOptionsBaseline(ListingFilterRequest filter);
+
+    /**
      * Public endpoint data source: get top saved listings for a specific seller.
      * Sorted by number of saves descending.
      *

@@ -1649,6 +1649,28 @@ public class ListingServiceImpl implements ListingService {
             key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
             unless = "#result == null")
     public ListingFilterOptionsResponse getFilterOptions(ListingFilterRequest filter) {
+        return computeFilterOptions(filter);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_FILTER_OPTIONS_BASELINE,
+            key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
+            unless = "#result == null")
+    public ListingFilterOptionsResponse getFilterOptionsBaseline(ListingFilterRequest filter) {
+        return computeFilterOptions(filter);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @CachePut(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_FILTER_OPTIONS_BASELINE,
+            key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
+            unless = "#result == null")
+    public ListingFilterOptionsResponse refreshFilterOptionsBaseline(ListingFilterRequest filter) {
+        return computeFilterOptions(filter);
+    }
+
+    private ListingFilterOptionsResponse computeFilterOptions(ListingFilterRequest filter) {
         // Resolve legacy<->new address mappings ONCE on the shared filter — each
         // of the three toBuilder() copies below inherits the resolved fields, so
         // the (DB-backed) resolution never re-runs per bucket.
