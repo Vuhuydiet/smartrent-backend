@@ -158,6 +158,7 @@ spring:
       - "listing.detail"
       - "listing.suggestions"
       - "listing.map"
+      - "listing.filter-options"
       - "listing.stats.categories"
       - "listing.stats.provinces"
       - "listing.stats.admin"
@@ -176,6 +177,12 @@ spring:
         "[listing.detail]": 3m
         "[listing.suggestions]": 2m
         "[listing.map]": 1m
+        # Sidebar filter-bucket counts (price/area/bedrooms): each request runs up
+        # to ~14 COUNT(*) queries (one per bucket across 3 dimensions), so a short
+        # TTL matters more here than for a single-query endpoint — repeated calls
+        # for the same filter context (e.g. re-render, browser back/forward) reuse
+        # one computed result instead of re-running the whole batch.
+        "[listing.filter-options]": 3m
         # Homepage stats: permanent (0s = no TTL). Refreshed daily at 00:00
         # Asia/Ho_Chi_Minh by HomepageStatsCacheScheduler.
         "[listing.stats.categories]": 0s
