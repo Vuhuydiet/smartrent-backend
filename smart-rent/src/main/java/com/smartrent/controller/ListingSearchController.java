@@ -308,6 +308,33 @@ public class ListingSearchController {
         return ApiResponse.<ListingCardListResponse>builder().data(response).build();
     }
 
+    @PostMapping("/filter-options")
+    @Operation(
+        summary = "[PUBLIC API] Dynamic filter bucket options with live counts",
+        description = """
+            **PUBLIC API - Không cần authentication**
+
+            Trả về các khoảng lọc động (bucket, tối đa 5 mỗi nhóm) cho **giá**,
+            **diện tích** và **số phòng ngủ** hiển thị ở sidebar lọc trang tìm kiếm —
+            mỗi bucket kèm số lượng tin đăng còn khớp (`count`), để frontend có thể
+            ẩn/làm mờ bucket không còn dữ liệu thay vì để người dùng bấm vào ngõ cụt.
+
+            Body giống hệt `POST /search` (`ListingFilterRequest`). Field
+            `price`/`area`/`bedroomsRange`/`bedrooms` trong body bị BỎ QUA cho
+            chính nhóm bucket tương ứng (chúng mô tả nhóm đang tính, không phải một
+            ràng buộc lên nó) — mọi field còn lại (vị trí, `productType`,
+            `categoryId`, ...) được giữ nguyên làm ngữ cảnh lọc cho cả 3 nhóm.
+            """
+    )
+    public ApiResponse<ListingFilterOptionsResponse> getListingFilterOptions(
+            @RequestBody(required = false) ListingFilterRequest filter) {
+        if (filter == null) {
+            filter = ListingFilterRequest.builder().build();
+        }
+        ListingFilterOptionsResponse response = listingService.getFilterOptions(filter);
+        return ApiResponse.<ListingFilterOptionsResponse>builder().data(response).build();
+    }
+
     @GetMapping("/autocomplete")
     @Operation(
         summary = "Autocomplete listing titles",

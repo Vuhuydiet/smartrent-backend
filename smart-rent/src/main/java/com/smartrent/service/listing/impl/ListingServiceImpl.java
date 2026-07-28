@@ -16,9 +16,11 @@ import com.smartrent.dto.request.VipListingCreationRequest;
 import com.smartrent.dto.response.CategoryListingStatsResponse;
 import com.smartrent.dto.response.AddressConversionResponse;
 import com.smartrent.dto.response.DraftListingResponse;
+import com.smartrent.dto.response.FilterBucketOption;
 import com.smartrent.dto.response.ListingCreationResponse;
 import com.smartrent.dto.response.ListingCardListResponse;
 import com.smartrent.dto.response.ListingCardResponse;
+import com.smartrent.dto.response.ListingFilterOptionsResponse;
 import com.smartrent.dto.response.ListingListResponse;
 import com.smartrent.dto.response.ListingResponse;
 import com.smartrent.dto.response.ListingResponseWithAdmin;
@@ -54,7 +56,9 @@ import com.smartrent.infra.repository.UserRepository;
 import com.smartrent.infra.repository.VipTierDetailRepository;
 import com.smartrent.infra.repository.entity.*;
 import com.smartrent.infra.repository.entity.enums.VerificationStatus;
+import com.smartrent.infra.repository.specification.ListingSpecification;
 import com.smartrent.mapper.ListingMapper;
+import com.smartrent.service.listing.ListingFilterBucketDefinitions;
 import com.smartrent.service.listing.ListingService;
 import com.smartrent.service.listing.ListingQueryService;
 import com.smartrent.service.listing.PostingAccessGuard;
@@ -96,6 +100,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -1636,6 +1641,65 @@ public class ListingServiceImpl implements ListingService {
                 .hasNext(hasNext)
                 .size(safeSize)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @Cacheable(cacheNames = com.smartrent.config.Constants.CacheNames.LISTING_FILTER_OPTIONS,
+            key = "T(com.smartrent.util.CacheKeyBuilder).listingSearchKey(#filter)",
+            unless = "#result == null")
+    public ListingFilterOptionsResponse getFilterOptions(ListingFilterRequest filter) {
+        // Resolve legacy<->new address mappings ONCE on the shared filter — each
+        // of the three toBuilder() copies below inherits the resolved fields, so
+        // the (DB-backed) resolution never re-runs per bucket.
+        resolveAddressMappings(filter);
+
+        return ListingFilterOptionsResponse.builder()
+                .priceOptions(countFilterBuckets(
+                        filter.toBuilder().price(null).build(),
+                        ListingFilterBucketDefinitions.PRICE,
+                        ListingFilterRequest::setPrice))
+                .areaOptions(countFilterBuckets(
+                        filter.toBuilder().area(null).build(),
+                        ListingFilterBucketDefinitions.AREA,
+                        ListingFilterRequest::setArea))
+                .bedroomOptions(countFilterBuckets(
+                        filter.toBuilder().bedroomsRange(null).bedrooms(null).build(),
+                        ListingFilterBucketDefinitions.BEDROOM,
+                        ListingFilterRequest::setBedroomsRange))
+                .build();
+    }
+
+    /**
+     * Counts listings per bucket for one dimension (price/area/bedrooms). Every
+     * OTHER active filter on {@code contextFilter} (location, productType,
+     * category, ...) is kept, so a bucket with {@code count == 0} genuinely has
+     * no matching listings under the user's current selection — the frontend
+     * can grey it out instead of letting the user click into a dead end.
+     * {@code contextFilter} is mutated and reused across buckets (each
+     * {@code count(spec)} call fully evaluates before the next mutation), which
+     * avoids re-copying ~60 fields per bucket.
+     */
+    private List<FilterBucketOption> countFilterBuckets(
+            ListingFilterRequest contextFilter,
+            List<ListingFilterBucketDefinitions.Bucket> buckets,
+            BiConsumer<ListingFilterRequest, String> rangeSetter) {
+        List<FilterBucketOption> options = new ArrayList<>(buckets.size());
+        for (ListingFilterBucketDefinitions.Bucket bucket : buckets) {
+            rangeSetter.accept(contextFilter, bucketRangeString(bucket.min(), bucket.max()));
+            long count = listingRepository.count(ListingSpecification.fromFilterRequest(contextFilter));
+            options.add(FilterBucketOption.builder()
+                    .key(bucket.key())
+                    .min(bucket.min() != null ? bucket.min().doubleValue() : null)
+                    .max(bucket.max() != null ? bucket.max().doubleValue() : null)
+                    .count(count)
+                    .build());
+        }
+        return options;
+    }
+
+    private static String bucketRangeString(Long min, Long max) {
+        return (min != null ? min : "") + ".." + (max != null ? max : "");
     }
 
             @Override

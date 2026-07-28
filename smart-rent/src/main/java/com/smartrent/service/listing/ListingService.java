@@ -108,6 +108,18 @@ public interface ListingService {
             ListingFilterRequest filter, String cursor, int size);
 
     /**
+     * Dynamic bucket options (price / area / bedrooms) for the public listings
+     * sidebar filters. Each bucket is annotated with a live count of listings
+     * matching every OTHER active filter — so the frontend can grey out /
+     * hide buckets with zero results instead of letting users click into a
+     * dead-end filter. {@code filter.price}/{@code area}/{@code bedroomsRange}/
+     * {@code bedrooms} on the incoming request are ignored (they describe the
+     * dimension being computed, not a constraint on it); every other field
+     * (location, productType, categoryId, ...) is used as filter context.
+     */
+    com.smartrent.dto.response.ListingFilterOptionsResponse getFilterOptions(ListingFilterRequest filter);
+
+    /**
      * Public endpoint data source: get top saved listings for a specific seller.
      * Sorted by number of saves descending.
      *
