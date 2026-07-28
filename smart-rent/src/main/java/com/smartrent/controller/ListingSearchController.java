@@ -331,8 +331,46 @@ public class ListingSearchController {
         if (filter == null) {
             filter = ListingFilterRequest.builder().build();
         }
-        ListingFilterOptionsResponse response = listingService.getFilterOptions(filter);
+        ListingFilterOptionsResponse response = isBaselineFilterOptionsRequest(filter)
+                ? listingService.getFilterOptionsBaseline(filter)
+                : listingService.getFilterOptions(filter);
         return ApiResponse.<ListingFilterOptionsResponse>builder().data(response).build();
+    }
+
+    /**
+     * True only for the bounded "first load, no filters yet" shape the daily
+     * {@code FilterOptionsCacheScheduler} pre-warms: a legacy-structure
+     * {@code provinceId} from {@code BASELINE_WARM_PROVINCE_IDS}, an optional
+     * {@code productType}, and nothing else set. Membership in that exact
+     * province list (not just "shape") matters — routing an unwarmed province
+     * into the permanent cache would cache it cold and never refresh it again.
+     */
+    private static boolean isBaselineFilterOptionsRequest(ListingFilterRequest filter) {
+        if (!Boolean.TRUE.equals(filter.getIsLegacy())
+                || filter.getProvinceId() == null
+                || !com.smartrent.service.listing.ListingFilterBucketDefinitions
+                        .BASELINE_WARM_PROVINCE_IDS.contains(filter.getProvinceId())
+                || filter.getProvinceCode() != null
+                || (filter.getProvinceCodes() != null && !filter.getProvinceCodes().isEmpty())) {
+            return false;
+        }
+
+        ListingFilterRequest cleared = clearBaselineContextFields(filter);
+        ListingFilterRequest empty = clearBaselineContextFields(ListingFilterRequest.builder().build());
+        return com.smartrent.util.CacheKeyBuilder.listingSearchKey(cleared)
+                .equals(com.smartrent.util.CacheKeyBuilder.listingSearchKey(empty));
+    }
+
+    private static ListingFilterRequest clearBaselineContextFields(ListingFilterRequest filter) {
+        return filter.toBuilder()
+                .provinceId(null)
+                .isLegacy(null)
+                .productType(null)
+                .page(null)
+                .size(null)
+                .sortBy(null)
+                .sortDirection(null)
+                .build();
     }
 
     @GetMapping("/autocomplete")

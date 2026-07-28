@@ -47,4 +47,18 @@ public final class ListingFilterBucketDefinitions {
             new Bucket("4to5", 4L, 5L),
             new Bucket("6plus", 6L, null)
     );
+
+    /**
+     * Legacy-structure province IDs pre-warmed into the permanent
+     * {@code listing.filter-options.baseline} cache by
+     * {@code FilterOptionsCacheScheduler} — same top provinces as
+     * {@code HomepageStatsCacheScheduler}. Shared constant so the scheduler
+     * (what gets warmed) and the controller (what gets routed to that cache)
+     * can never drift apart: a request only ever reads from the permanent
+     * cache if its province is in THIS list, and the scheduler warms every
+     * (province, productType) pair from THIS list — so nothing routed there
+     * can go stale forever unrefreshed.
+     */
+    public static final List<String> BASELINE_WARM_PROVINCE_IDS =
+            List.of("1", "49", "32", "47", "48");
 }
