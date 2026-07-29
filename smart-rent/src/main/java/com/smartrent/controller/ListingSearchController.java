@@ -42,6 +42,7 @@ public class ListingSearchController {
 
     private final ListingService listingService;
     private final SearchSuggestionService searchSuggestionService;
+    private final com.smartrent.service.listing.ContactVisibility contactVisibility;
 
     @PostMapping("/search")
     @Operation(
@@ -171,7 +172,7 @@ public class ListingSearchController {
         }
 
         ListingCardListResponse response = listingService.searchListings(filter);
-        return ApiResponse.<ListingCardListResponse>builder().data(response).build();
+        return ApiResponse.<ListingCardListResponse>builder().data(contactVisibility.apply(response)).build();
     }
 
     @PostMapping("/search/cursor")
@@ -200,7 +201,7 @@ public class ListingSearchController {
                 : (filter.getSize() != null ? filter.getSize() : 20);
 
         ListingCursorResponse response = listingService.searchListingsByCursor(filter, cursor, effectiveSize);
-        return ApiResponse.<ListingCursorResponse>builder().data(response).build();
+        return ApiResponse.<ListingCursorResponse>builder().data(contactVisibility.apply(response)).build();
     }
 
     @GetMapping("/homepage-tier")
@@ -222,7 +223,7 @@ public class ListingSearchController {
             @RequestParam("vipType") String vipType,
             @RequestParam(value = "limit", defaultValue = "10") int limit) {
         List<ListingCardResponse> listings = listingService.getHomepageTierListings(vipType, limit);
-        return ApiResponse.<List<ListingCardResponse>>builder().data(listings).build();
+        return ApiResponse.<List<ListingCardResponse>>builder().data(contactVisibility.applyCards(listings)).build();
     }
 
     @GetMapping("/sellers/{userId}/diamond")
@@ -287,7 +288,7 @@ public class ListingSearchController {
             @RequestParam(defaultValue = "5") Integer limit) {
         int safeLimit = limit != null && limit > 0 ? Math.min(limit, 20) : 5;
         ListingCardListResponse response = listingService.getTopSavedListingsByUser(userId, safeLimit);
-        return ApiResponse.<ListingCardListResponse>builder().data(response).build();
+        return ApiResponse.<ListingCardListResponse>builder().data(contactVisibility.apply(response)).build();
     }
 
     private ApiResponse<ListingCardListResponse> searchSellerListingsByVipType(
@@ -305,7 +306,7 @@ public class ListingSearchController {
                 .build();
 
         ListingCardListResponse response = listingService.searchListings(filter);
-        return ApiResponse.<ListingCardListResponse>builder().data(response).build();
+        return ApiResponse.<ListingCardListResponse>builder().data(contactVisibility.apply(response)).build();
     }
 
     @GetMapping("/filter-options")

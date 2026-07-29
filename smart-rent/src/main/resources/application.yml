@@ -205,6 +205,13 @@ application:
     allowed-origins: "${CORS_ALLOWED_ORIGINS:http://localhost:3000}"
   admin:
     contact-phone-number: "${ADMIN_CONTACT_PHONE}"
+  contact:
+    # Withhold seller contact (phone/email/zalo) from listing responses served to
+    # anonymous callers. Shipped OFF: enabling it requires the web frontend to
+    # render its "log in to view contact" affordance from an availability flag
+    # (today it keys off the value) and the AI service to forward the user token
+    # so authenticated chat still gets contact. See ContactVisibility.
+    strip-anonymous-contact: ${STRIP_ANONYMOUS_CONTACT:false}
   authorize-ignored:
     methods:
       get:
